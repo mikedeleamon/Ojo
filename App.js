@@ -18,6 +18,7 @@ import HotWeatherPreferencesScreen from "./app/views/HotWeatherPreferencesScreen
 import ColdWeatherPreferencesScreen from "./app/views/ColdWeatherPreferencesScreen"
 import HumidityPreferencesScreen from "./app/views/HumidityPreferencesScreen"
 
+//import { connect } from 'react-redux';
 
 const MainNavigator = createStackNavigator({
   Login: {screen: Login},
@@ -32,3 +33,6 @@ const MainNavigator = createStackNavigator({
 const App = createAppContainer(MainNavigator);
 
 export default App;
+
+// use when APP is ready to store state w/ redux
+//export default connect(mapStateToProps, mapDispatchToProps)(App)
