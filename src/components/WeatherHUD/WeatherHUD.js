@@ -3,7 +3,7 @@ import { WeatherIconDisplay } from "../WeatherIconDisplay/WeatherIconDisplay";
 import { WeatherDetails } from "../WeatherDetails/WeatherDetails";
 import { MinimizedWeatherDisplay } from "../MinimizedWeatherDisplay/MinimizedWeatherDisplay";
 import './WeatherHUD.css'
- export const WeatherHUD = () => {
+export const WeatherHUD = () => {
     return(
     <div className='big-weather-width center'>
     <p className="title">New York</p>
@@ -19,4 +19,4 @@ import './WeatherHUD.css'
     <WeatherDetails />
     </div>
     )
- }
+}
