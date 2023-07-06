@@ -1,0 +1,14 @@
+.miniWeatherIcon{
+    height: 40px;
+    width: 40px;
+}
+.miniWeatherText{
+    margin-top: 0px;
+    font-size: 12px;
+}
+
+.flex{
+    display: inline-block;
+    margin-inline: 16px;
+}
+
