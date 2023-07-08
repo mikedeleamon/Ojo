@@ -4,8 +4,8 @@ import cloudy from '../../assets/images/weatherIcons/Cloudy.png'
 
 
 //component responsible for displaying weather
-export const WeatherIconDisplay = (props) => {
+export const WeatherIconDisplay = ({weatherConditon}) => {
     return(<div>
-        <img src={cloudy} alt="cloudy weather" className="currentWeatherLogo"></img>
+        <img src={cloudy} alt={weatherConditon} className="currentWeatherLogo"></img>
     </div>)
 }
