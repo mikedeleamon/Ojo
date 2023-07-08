@@ -8,3 +8,26 @@
     font-weight: 400;
     margin-top: 0px;
 }
+.x-scroll{
+    display: flex;
+    overflow-x: auto;
+    white-space: nowrap;
+}
+.x-scroll::-webkit-scrollbar {
+    width: 0.5rem; /* Adjust the width as needed */
+    background-color: transparent; /* Make the scrollbar transparent */
+}
+
+.forecast-margin{
+    margin-left: 15%;
+    margin-right:15%;
+}
+
+@media (max-width: 500px) {
+    .forecast-margin{
+        padding-left: 12px;
+        margin-left: 5%;
+        margin-right:5%;
+    }
+
+}
