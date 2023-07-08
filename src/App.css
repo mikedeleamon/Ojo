@@ -1,11 +1,15 @@
 .App {
   text-align: center;
-  background-color: #4b6154;
   color: azure;
 }
 body {
-  background-color: #4b6154;
+  /* background: linear-gradient(270deg, #73e276, #dccf15); */
+  background-color: darkolivegreen;
   color: azure;
+}
+
+.gradient-background {
+  background: linear-gradient(45deg, #86FF8A, #FFF119);
 }
 
 .currentWeatherLogo{
@@ -25,7 +29,7 @@ body {
 }
 
 .App-header {
-  background-color: #282c34;
+  /* background-color: #282c34; */
   min-height: 100vh;
   display: flex;
   flex-direction: column;
