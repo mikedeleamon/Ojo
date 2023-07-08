@@ -5,13 +5,13 @@ import React from 'react';
 import './CurrentWeatherHeader.css'
 
 
-const CurrentWeatherHeader = ({cityName,WeatherCondition}) =>{
+const CurrentWeatherHeader = ({cityName,weatherCondition}) =>{
 
 	return(
 
 		<div>
 			<p >{cityName}</p>
-			<p>{WeatherCondition}</p>
+			<p>{weatherCondition}</p>
 		</div>
 
 	)

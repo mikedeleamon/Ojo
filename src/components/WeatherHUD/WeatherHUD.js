@@ -5,11 +5,14 @@ import WeatherDetails from "../WeatherDetails/WeatherDetails";
 import { MinimizedWeatherDisplay } from "../MinimizedWeatherDisplay/MinimizedWeatherDisplay";
 import weatherConstants from "../../constants/weatherConstants";
 import mockData from "../../mockData/mockData";
+import Loading from "../Loading/Loading";
+import CurrentWeatherHeader from '../CurrentWeatherHeader/CurrentWeatherHeader'
 import './WeatherHUD.css';
 
 export const WeatherHUD = () => {
   const [currentWeather, setCurrentWeather] = useState([]);
   const [forecasts, setForecasts] = useState([]);
+  const [isLoading,setIsLoading] = useState(true)
 
   useEffect(() => {
     const getForecastInfo = async () => {
@@ -37,12 +40,13 @@ export const WeatherHUD = () => {
     // Use mock data for testing purposes
     setForecasts(mockData.forecast);
     setCurrentWeather(mockData.currentWeather);
+    setIsLoading(false)
   }, []);
 
   return (
+    isLoading?(<Loading/>):(
     <div className='big-weather-width center'>
-      <p className="title">New York</p>
-      <p className="subtitle"> cloudy </p>
+      <CurrentWeatherHeader cityName={'New York'} weatherCondition={currentWeather.data[0].WeatherText} />
       <WeatherIconDisplay />
       <div className="x-scroll forecast-margin">
         {forecasts.length > 0 ? (
@@ -64,5 +68,5 @@ export const WeatherHUD = () => {
         <p>We're experiencing an issue here, please refresh</p>
       )}
     </div>
-  );
+  ));
 };
