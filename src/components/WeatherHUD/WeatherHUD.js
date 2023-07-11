@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { WeatherIconDisplay } from "../WeatherIconDisplay/WeatherIconDisplay";
+import WeatherIconDisplay from "../WeatherIconDisplay/WeatherIconDisplay";
 import WeatherDetails from "../WeatherDetails/WeatherDetails";
-import { MinimizedWeatherDisplay } from "../MinimizedWeatherDisplay/MinimizedWeatherDisplay";
+import MinimizedWeatherDisplay from "../MinimizedWeatherDisplay/MinimizedWeatherDisplay";
 import weatherConstants from "../../constants/weatherConstants";
 import mockData from "../../mockData/mockData";
 import Loading from "../Loading/Loading";
@@ -47,7 +47,7 @@ export const WeatherHUD = () => {
     isLoading?(<Loading/>):(
     <div className='big-weather-width center'>
       <CurrentWeatherHeader cityName={'New York'} weatherCondition={currentWeather.data[0].WeatherText} />
-      <WeatherIconDisplay />
+      <WeatherIconDisplay weatherCondition = {currentWeather.data[0].WeatherText} size={'Big'} />
       <div className="x-scroll forecast-margin">
         {forecasts.length > 0 ? (
           forecasts.map((forecast, index) => (
