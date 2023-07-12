@@ -1,3 +1,8 @@
 .loadMargin{
-    margin-top: 160px;
+    /* margin-top: 160px; */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 80vh;
 }

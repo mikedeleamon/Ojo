@@ -26,34 +26,36 @@ const WeatherIconDisplay = ({ weatherCondition, isDay, size }) => {
         case "Dreary (Overcast)":
             weatherIcon = <Cloudy className={iconSize} />;
             break;
-        case "Intermittent clouds":
         case "Partly cloudy":
-        case "Partly Cloudy w/ Showers":
-        case "Intermittent Clouds":
+        case "Partly sunny":
+        case "Partly cloudy w/ showers":
+        case "Intermittent clouds":
+        case "Hazy sunshine":
             weatherIcon = isDay ? <PartlyCloudy className={iconSize} /> : <PartlyCloudyNight className={iconSize} />;
             break;
         case "Snow":
-        case "Mostly Cloudy w/ Snow":
-        case "Mostly Cloudy w/ Flurries":
+        case "Mostly cloudy w/ snow":
+        case "Mostly cloudy w/ flurries":
             weatherIcon = <Snow className={iconSize} />;
             break;
         case "Rain":
         case "Showers":
         case "Flurries":
-        case "Mostly Cloudy w/ Showers":
+        case "Mostly cloudy w/ showers":
             weatherIcon = <Rainy className={iconSize} />;
             break;
         case "Sunny":
-        case "Mostly Sunny":
+        case "Mostly sunny":
             weatherIcon = <Sunny className={iconSize} />;
             break;
         case "Clear":
-        case "Mostly Clear":
+        case "Mostly clear":
             weatherIcon = isDay ? <Sunny className={iconSize} /> : <ClearNight className={iconSize} />;
             break;
         case "Thunderstorms":
-        case "Partly Cloudy w/ T-Storms":
-        case "Mostly Cloudy w/ T-Storms":
+        case "Partly sunny w/ t-storms":
+        case "Partly cloudy w/ t-Storms":
+        case "Mostly cloudy w/ t-Storms":
             weatherIcon = <Stormy className={iconSize} />;
             break;
         default:
