@@ -9,11 +9,11 @@ const [uvIndex, setUvIndex] = useState('');
 const [feelsLike, setFeelsLike] = useState('');
 useEffect(() => {
 if (Object.keys(weatherDetails).length > 0) {
-    setTemperature(weatherDetails.data[0].Temperature.Imperial.Value);
-    setWindSpeed(weatherDetails.data[0].Wind.Speed.Imperial.Value);
-    setHumidity(weatherDetails.data[0].RelativeHumidity);
-    setUvIndex(weatherDetails.data[0].UVIndexText);
-    setFeelsLike(weatherDetails.data[0].RealFeelTemperature.Imperial.Value);
+    setTemperature(weatherDetails[0].Temperature.Imperial.Value);
+    setWindSpeed(weatherDetails[0].Wind.Speed.Imperial.Value);
+    setHumidity(weatherDetails[0].RelativeHumidity);
+    setUvIndex(weatherDetails[0].UVIndexText);
+    setFeelsLike(weatherDetails[0].RealFeelTemperature.Imperial.Value);
 }
 }, [weatherDetails]);
 
