@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import '../../App.css'
+import styles from './MainPage.module.css'
 import WeatherHUD from "../../components/WeatherHUD/WeatherHUD";
 import Loading from "../../components/Loading/Loading";
 
@@ -25,7 +26,7 @@ const MainPage = () => {
 
     return (
         isLoading ? <Loading/> :(
-        <div className="App">
+        <div className={`App`}>
             <WeatherHUD location={location}/>
         </div>)
     );
