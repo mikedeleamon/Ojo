@@ -56,14 +56,14 @@ const WeatherHUD = ({ location }) => {
     };
 
     // Uncomment the following lines to fetch live data instead of using mock data
-    if (cityData.Key) {
-      getForecastInfo();
-      getCurrentWeatherInfo();
-    }
+    // if (cityData.Key) {
+    //   getForecastInfo();
+    //   getCurrentWeatherInfo();
+    // }
 
     // Use mock data for testing purposes
-    // setForecasts(mockData.forecast);
-    // setCurrentWeather(mockData.currentWeather);
+    setForecasts(mockData.forecast);
+    setCurrentWeather(mockData.currentWeather);
     setIsLoading(false);
   }, [cityData]);
 
@@ -91,6 +91,7 @@ const WeatherHUD = ({ location }) => {
                     key={index}
                     weather={forecast.IconPhrase}
                     temperature={forecast.Temperature.Value}
+                    time={forecast.DateTime}
                     tempUnit={forecast.Temperature.Unit}
                     isDay={forecast.IsDaylight}
                   />
