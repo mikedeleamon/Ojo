@@ -7,7 +7,7 @@ const Loading = () => {
     return (
         <div className={styles.loadMargin}>
             <img src={Sunny} alt="Loading" className={`App-logo`} />
-            <h2>Loading</h2>
+            <h1 className="display-4">Loading</h1>
         </div>
     );
 };
