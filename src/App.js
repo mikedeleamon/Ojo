@@ -1,12 +1,23 @@
+import React, { useState, useEffect } from 'react';
 import './App.css';
-import LoginPage from './views/LoginPage/LoginPage';
+import { BrowserRouter as Router } from 'react-router-dom';
+import AppRoutes from './routes/AppRoutes';
 
 function App() {
+    const [loggedIn, setLoggedIn] = useState(false);
 
-  return (
-    <LoginPage/>
-    )
-  ;
+    useEffect(() => {
+        // Simulating login logic
+        setTimeout(() => {
+            setLoggedIn(false);
+        }, 2000);
+    }, []);
+
+    return (
+        <Router>
+            <AppRoutes loggedIn={loggedIn} setLoggedIn={setLoggedIn}/>
+        </Router>
+    );
 }
 
 export default App;

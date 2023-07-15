@@ -1,5 +1,4 @@
 import React from "react";
-import cloudy from '../../assets/images/weatherIcons/Cloudy.png'
 import './MinimizedWeatherDisplay.css'
 import  WeatherIconDisplay  from "../WeatherIconDisplay/WeatherIconDisplay";
 

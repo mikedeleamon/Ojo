@@ -71,7 +71,7 @@ const WeatherHUD = ({ location }) => {
     isLoading ? (
       <Loading />
     ) : (
-      <div className='big-weather-width center'>
+      <div className='big-weather-width center mt-5'>
         {cityData && currentWeather.length > 0 && (
           <CurrentWeatherHeader
             cityName={cityData.LocalizedName}
