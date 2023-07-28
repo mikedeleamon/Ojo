@@ -1,4 +1,4 @@
-const mockData = {
+const mockWeatherData = {
     forecast:[
         {
             "DateTime": "2023-07-08T00:00:00-04:00",
@@ -1665,4 +1665,4 @@ const mockData = {
     ]
 }
 
-export default mockData
+export default mockWeatherData
