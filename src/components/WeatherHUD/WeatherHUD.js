@@ -4,7 +4,7 @@ import WeatherIconDisplay from "../WeatherIconDisplay/WeatherIconDisplay";
 import WeatherDetails from "../WeatherDetails/WeatherDetails";
 import MinimizedWeatherDisplay from "../MinimizedWeatherDisplay/MinimizedWeatherDisplay";
 import weatherConstants from "../../constants/weatherConstants";
-import mockData from "../../mockData/mockData";
+import mockWeatherData from "../../mockData/mockWeatherData";
 import Loading from "../Loading/Loading";
 import CurrentWeatherHeader from '../CurrentWeatherHeader/CurrentWeatherHeader';
 import './WeatherHUD.css';
@@ -62,8 +62,8 @@ const WeatherHUD = ({ location }) => {
     // }
 
     // Use mock data for testing purposes
-    setForecasts(mockData.forecast);
-    setCurrentWeather(mockData.currentWeather);
+    setForecasts(mockWeatherData.forecast);
+    setCurrentWeather(mockWeatherData.currentWeather);
     setIsLoading(false);
   }, [cityData]);
 
