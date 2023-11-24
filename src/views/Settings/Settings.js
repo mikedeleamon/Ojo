@@ -20,7 +20,7 @@ const Settings = ({ onSaveSettings }) => {
 
     return (
         <div className='App'>
-            <h2>Settings</h2>
+            <h2 className='text-white p-4'>Settings</h2>
             <div>
                 <label>
                     Preferred Clothing Style:
@@ -66,7 +66,12 @@ const Settings = ({ onSaveSettings }) => {
                 </label>
             </div>
             {/* Add more input fields for other settings as needed */}
-            <button onClick={handleSave}>Save</button>
+            <button
+                type='button'
+                onClick={handleSave}
+            >
+                Save
+            </button>
         </div>
     );
 };

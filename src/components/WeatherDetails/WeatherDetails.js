@@ -22,6 +22,7 @@ const WeatherDetails = ({ weatherDetails }) => {
 
     return (
         <>
+            <OutfitSuggestion weather = {weatherDetails} />
             <div>
                 <p>{`temperature: ${temperature}\u00B0 ${tempUnit}`} </p>
                 <p>wind speed: {windSpeed} mi/h</p>
@@ -29,7 +30,6 @@ const WeatherDetails = ({ weatherDetails }) => {
                 <p>humidity: {humidity}</p>
                 <p>feels like: {feelsLike} F</p>
             </div>
-            <OutfitSuggestion />
         </>
     );
 };
