@@ -1,27 +1,28 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
-const OutfitSuggestion = () => {
-    const [temperatureFahrenheit, setTemperatureFahrenheit] = useState('');
+const OutfitSuggestion = ({weather}) => {
+    //const [temperatureFahrenheit, setTemperatureFahrenheit] = useState('');
     const [isRaining, setIsRaining] = useState(false);
     const [userPreferences, setUserPreferences] = useState('');
     const [recommendation, setRecommendation] = useState('');
 
     const handleRecommendation = () => {
         // Convert Fahrenheit to Celsius
+        setIsRaining(weather[0].HasPrecipitation)
         const temperatureCelsius =
-            (parseFloat(temperatureFahrenheit) - 32) * (5 / 9);
+            (parseFloat(weather[0].Temperature.Imperial.Value) - 32) * (5 / 9);
 
         // Temperature-based clothing suggestions
         let outfit = '';
         if (temperatureCelsius < 5) {
-            outfit =
+            outfit +=
                 'Very Cold: Heavy winter coat, gloves, hat, scarf, warm layers';
         } else if (temperatureCelsius < 15) {
-            outfit = 'Cold: Jacket, sweater, long pants';
+            outfit += 'Cold: Jacket, sweater, long pants';
         } else if (temperatureCelsius < 25) {
-            outfit = 'Mild: Light jacket, long sleeves, jeans or trousers';
+            outfit += 'Mild: Light jacket, long sleeves, jeans or trousers';
         } else {
-            outfit = 'Hot: T-shirt, shorts or skirt';
+            outfit += 'Hot: T-shirt, shorts or skirt';
         }
 
         // Add rain-specific clothing suggestions
@@ -35,44 +36,14 @@ const OutfitSuggestion = () => {
         setRecommendation(outfit);
     };
 
+    useEffect(()=>{
+        handleRecommendation()
+    },[])
+
     return (
         <div>
-            <h2>Outfit Suggestion</h2>
+            {/* <h2>Outfit Suggestion</h2> */}
             <div>
-                <label>
-                    Temperature (in Fahrenheit):
-                    <input
-                        type='number'
-                        value={temperatureFahrenheit}
-                        onChange={(e) =>
-                            setTemperatureFahrenheit(e.target.value)
-                        }
-                    />
-                </label>
-            </div>
-            <div>
-                <label>
-                    Is it raining?
-                    <input
-                        type='checkbox'
-                        checked={isRaining}
-                        onChange={(e) => setIsRaining(e.target.checked)}
-                    />
-                </label>
-            </div>
-            <div>
-                <label>
-                    Clothing Preferences:
-                    <input
-                        type='text'
-                        value={userPreferences}
-                        onChange={(e) => setUserPreferences(e.target.value)}
-                    />
-                </label>
-            </div>
-            <button onClick={handleRecommendation}>Get Recommendation</button>
-            <div>
-                <h3>Recommendation:</h3>
                 <p>{recommendation}</p>
             </div>
         </div>
