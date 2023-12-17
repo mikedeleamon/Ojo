@@ -83,6 +83,9 @@ const WeatherHUD = ({ location }) => {
                     <WeatherIconDisplay
                         weatherCondition={currentWeather[0].WeatherText}
                         size={'Big'}
+                        temperature={
+                            currentWeather[0].Temperature.Imperial.Value
+                        }
                     />
                     <div className='x-scroll forecast-margin'>
                         {forecasts.length > 0 ? (

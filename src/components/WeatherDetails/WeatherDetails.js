@@ -22,9 +22,9 @@ const WeatherDetails = ({ weatherDetails }) => {
 
     return (
         <>
-            <OutfitSuggestion weather = {weatherDetails} />
+            <OutfitSuggestion weather={weatherDetails} />
             <div>
-                <p>{`temperature: ${temperature}\u00B0 ${tempUnit}`} </p>
+                {/* <p>{`temperature: ${temperature}\u00B0 ${tempUnit}`} </p> */}
                 <p>wind speed: {windSpeed} mi/h</p>
                 <p>UV Index: {uvIndex}</p>
                 <p>humidity: {humidity}</p>

@@ -1,5 +1,5 @@
 import React from 'react';
-import SettingsIcon from '../Icons/SettingsIcon/SettingsIcon';
+import SettingsIcon from '../../Icons/SettingsIcon/SettingsIcon';
 import { useNavigate } from 'react-router-dom';
 
 const SettingsButton = () => {

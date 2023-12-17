@@ -3,7 +3,7 @@ import '../../App.css';
 import styles from './MainPage.module.css';
 import WeatherHUD from '../../components/WeatherHUD/WeatherHUD';
 import Loading from '../../components/Loading/Loading';
-import SettingsButton from '../../components/SettingsButton/SettingsButton';
+import SettingsButton from '../../components/buttons/SettingsButton/SettingsButton';
 
 const MainPage = () => {
     const [latitude, setLatitude] = useState(null);
@@ -28,13 +28,8 @@ const MainPage = () => {
     return isLoading ? (
         <Loading />
     ) : (
-        <div className={`App`}>
+        <div className='App'>
             <div className={styles.settingsButtonContainer}>
-                {/* <button
-                    className={`col-12 col-sm-12 col-lg-12 btn btn-block btn-secondary mt-4`}
-                >
-                    Settings
-                </button> */}
                 <SettingsButton />
             </div>
             <WeatherHUD location={location} />

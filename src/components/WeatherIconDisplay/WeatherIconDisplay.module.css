@@ -1,0 +1,12 @@
+/* WeatherIconDisplay.module.css */
+
+.weatherContainer {
+    display: flex;
+    align-items: center;
+}
+
+.temperature {
+    margin-top: 20px;
+    margin-left: 0px; /* Adjust margin as needed */
+    font-size: 84px;
+}

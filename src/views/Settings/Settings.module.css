@@ -1,0 +1,22 @@
+.closeButton {
+    position: absolute;
+    top: 10px;
+    right: 10px; /* Adjust the right property for the desired spacing from the right edge */
+    background-color: transparent;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.closeButtonContainer {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+}
+
+.sliderContainer {
+    max-width: 230px; /* Set the desired width for the sliders */
+    margin: 0 auto; /* Center the sliders within the container */
+}
+/* Rest of your styles */

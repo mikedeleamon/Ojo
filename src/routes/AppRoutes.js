@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route, Outlet, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import MainPage from '../views/MainPage/MainPage';
 import SignupPage from '../views/SignupPage/Signup';
 import LoginPage from '../views/LoginPage/LoginPage';
@@ -18,7 +18,7 @@ const AppRoutes = ({ loggedIn, setLoggedIn }) => {
             />
             <Route
                 path='/signup'
-                element={<SignupPage />}
+                element={<SignupPage setLoggedIn={setLoggedIn} />}
             />
             <Route
                 path='/settings'
