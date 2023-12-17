@@ -1,5 +1,4 @@
-.center{
-    /* margin-top: 160px; */
+.center {
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -7,16 +6,29 @@
     height: 70vh;
 }
 
-.left{
-    /* margin-top: 160px; */
+.left {
     display: flex;
     flex-direction: column;
-    justify-content: left;
-    align-items:baseline;
+    justify-content: center; /* Updated to center vertically */
+    align-items: flex-start; /* Align to the left */
     height: 70vh;
-    margin-left: 5vh;
+    margin-left: 5vh; /* Adjusted margin to the left */
 }
 
 .blkText{
     color: black !important;
+    }
+
+.blueText{
+    color: blue !important;
+    }
+.closeButton {
+    position: absolute;
+    top: 10px;
+    right: 10px; /* Adjust the right property for the desired spacing from the right edge */
+    background-color: transparent;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 16px;
     }
