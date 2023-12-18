@@ -9,6 +9,7 @@ const Settings = ({ onSaveSettings }) => {
     const [location, setLocation] = useState('New York');
     const [hiTemp, setHiTemp] = useState(50);
     const [lowTemp, setLowTemp] = useState(50);
+    const [humidityPreference, setHumidityPreference] = useState(50);
     // Add more state variables for other settings as needed
     const navigate = useNavigate();
 
@@ -39,18 +40,21 @@ const Settings = ({ onSaveSettings }) => {
                 <h2 className='text-white p-4'>Settings</h2>
             </div>
 
-            <div className=' mb-4'>
-                <label>
-                    Preferred Clothing Style:
-                    <input
-                        className='form-control'
-                        type='text'
-                        value={clothingStyle}
-                        onChange={(e) => setClothingStyle(e.target.value)}
-                    />
-                </label>
+            <div className={`${styles.sliderContainer} mb-4`}>
+                <label>Preferred Clothing Style:</label>
+                <select
+                    className='form-control'
+                    value={clothingStyle}
+                    onChange={(e) => setClothingStyle(e.target.value)}
+                >
+                    <option>Business Casual</option>
+                    <option>Formal</option>
+                    <option>Urban</option>
+                    <option>Cozy</option>
+                    <option>Preppy</option>
+                </select>
             </div>
-            <div className='mb-4'>
+            <div className={`${styles.sliderContainer} mb-4`}>
                 <label>
                     Location:
                     <input
@@ -63,9 +67,34 @@ const Settings = ({ onSaveSettings }) => {
             </div>
 
             <div className={`${styles.sliderContainer} mb-5`}>
-                <div className='mb-4'>
+                <div
+                    class='btn-group btn-group-toggle'
+                    data-toggle='buttons'
+                >
+                    <label class='btn btn-secondary active'>
+                        <input
+                            type='radio'
+                            name='options'
+                            id='Imperialoption1'
+                            autoComplete='off'
+                            checked
+                        />
+                        Imperial
+                    </label>
+                    <label class='btn btn-secondary'>
+                        <input
+                            type='radio'
+                            name='options'
+                            id='Metricoption2'
+                            autoComplete='off'
+                        />
+                        Metric
+                    </label>
+                </div>
+
+                <div className='mb-2'>
                     <label>
-                        High Temperature: {hiTemp}
+                        Hot Weather Preference: {`${hiTemp}\u00B0`}
                         <input
                             className='form-range'
                             type='range'
@@ -76,9 +105,9 @@ const Settings = ({ onSaveSettings }) => {
                         />
                     </label>
                 </div>
-                <div>
+                <div className='mb-2'>
                     <label>
-                        Low Temperature: {lowTemp}
+                        Cold Weather Preference: {`${lowTemp}\u00B0`}
                         <input
                             className='form-range'
                             type='range'
@@ -86,6 +115,21 @@ const Settings = ({ onSaveSettings }) => {
                             max='100'
                             value={lowTemp}
                             onChange={(e) => setLowTemp(e.target.value)}
+                        />
+                    </label>
+                </div>
+                <div className='mb-2'>
+                    <label>
+                        Humidity Preference: {humidityPreference}
+                        <input
+                            className='form-range'
+                            type='range'
+                            min='0'
+                            max='100'
+                            value={humidityPreference}
+                            onChange={(e) =>
+                                setHumidityPreference(e.target.value)
+                            }
                         />
                     </label>
                 </div>

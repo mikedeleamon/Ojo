@@ -86,6 +86,9 @@ const WeatherHUD = ({ location }) => {
                         temperature={
                             currentWeather[0].Temperature.Imperial.Value
                         }
+                        feelsLike={
+                            currentWeather[0].RealFeelTemperature.Imperial.Value
+                        }
                     />
                     <div className='x-scroll forecast-margin'>
                         {forecasts.length > 0 ? (
