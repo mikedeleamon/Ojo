@@ -11,7 +11,13 @@ import PartlyCloudyNight from '../weatherIcons/PartlyCloudy/PartlyCloudyNight';
 import styles from './WeatherIconDisplay.module.css';
 
 // Component responsible for displaying weather
-const WeatherIconDisplay = ({ weatherCondition, isDay, size, temperature }) => {
+const WeatherIconDisplay = ({
+    weatherCondition,
+    isDay,
+    size,
+    temperature,
+    feelsLike,
+}) => {
     const bigIcon = 'currentWeatherLogo';
     const smallIcon = 'miniWeatherIcon';
     const [iconSize, setIconSize] = useState('');
@@ -74,7 +80,14 @@ const WeatherIconDisplay = ({ weatherCondition, isDay, size, temperature }) => {
     return (
         <div className={styles.weatherContainer}>
             {weatherIcon}
-            <div className={styles.temperature}>{temperature}</div>
+            {size === 'Big' ? (
+                <div className={styles.temperature}>
+                    <div>{`${temperature}\u00B0`}</div>
+                    <div>{`${feelsLike}\u00B0`}</div>
+                </div>
+            ) : (
+                <div className={styles.temperature}>{temperature}</div>
+            )}
         </div>
     );
 };

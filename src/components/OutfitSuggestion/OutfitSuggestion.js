@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-const OutfitSuggestion = ({ weather }) => {
+const OutfitSuggestion = ({ currentWeather }) => {
     const [isRaining, setIsRaining] = useState(false);
     const [userPreferences, setUserPreferences] = useState('');
     const [recommendation, setRecommendation] = useState('');
@@ -8,13 +8,15 @@ const OutfitSuggestion = ({ weather }) => {
     useEffect(() => {
         const handleRecommendation = () => {
             // Extracting relevant data from the weather object
-            setIsRaining(weather[0].HasPrecipitation);
+            setIsRaining(currentWeather[0].HasPrecipitation);
             const temperature = parseFloat(
-                weather[0].Temperature.Imperial.Value
+                currentWeather[0].Temperature.Imperial.Value
             );
-
-            // Temperature-based clothing suggestions
+            const humidity = parseFloat(currentWeather[0].RelativeHumidity);
+            console.log(humidity);
+            // Temperature and humidity-based clothing suggestions
             let outfit = '';
+
             if (temperature > 77) {
                 outfit += "It's hot! Wear light and breathable clothes.";
             } else if (temperature >= 59 && temperature <= 77) {
@@ -26,6 +28,14 @@ const OutfitSuggestion = ({ weather }) => {
                 outfit += "It's cold. Wear warm layers.";
             } else {
                 outfit += 'Weather recommendation not available.';
+            }
+
+            // Add humidity-specific clothing suggestions
+            if (humidity > 70) {
+                outfit += ' Consider wearing breathable fabrics.';
+            } else if (humidity > 50) {
+                outfit +=
+                    ' It might be a bit humid. Choose comfortable clothing.';
             }
 
             // Add user's preferences to the recommendation
@@ -40,7 +50,7 @@ const OutfitSuggestion = ({ weather }) => {
         };
 
         handleRecommendation();
-    }, [weather, isRaining, userPreferences]);
+    }, [currentWeather, isRaining, userPreferences]);
 
     return (
         <div>
