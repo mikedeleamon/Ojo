@@ -1,19 +1,46 @@
 import React, { useEffect, useState } from 'react';
 
-const OutfitSuggestion = ({ currentWeather }) => {
-    const [isRaining, setIsRaining] = useState(false);
-    const [userPreferences, setUserPreferences] = useState('');
-    const [recommendation, setRecommendation] = useState('');
+interface WeatherDetail {
+    HasPrecipitation: boolean;
+    Temperature: {
+        Imperial: {
+            Value: string; // Temperature value as a string
+        };
+    };
+    Wind: {
+        Speed: {
+            Imperial: {
+                Value: string; // Wind speed value as a string
+            };
+        };
+    };
+    RelativeHumidity: string; // Humidity as a string
+    UVIndexText: string; // UV Index description as a string
+}
+
+interface OutfitSuggestionProps {
+    currentWeather: WeatherDetail[]; // Array of weather details
+}
+
+const OutfitSuggestion: React.FC<OutfitSuggestionProps> = ({
+    currentWeather,
+}) => {
+    const [isRaining, setIsRaining] = useState<boolean>(false);
+    const [userPreferences, setUserPreferences] = useState<string>('');
+    const [recommendation, setRecommendation] = useState<string>('');
 
     useEffect(() => {
         const handleRecommendation = () => {
+            if (currentWeather.length === 0) return;
+
             // Extracting relevant data from the weather object
             setIsRaining(currentWeather[0].HasPrecipitation);
+
             const temperature = parseFloat(
                 currentWeather[0].Temperature.Imperial.Value
             );
             const humidity = parseFloat(currentWeather[0].RelativeHumidity);
-            console.log(humidity);
+
             // Temperature and humidity-based clothing suggestions
             let outfit = '';
 
@@ -54,7 +81,6 @@ const OutfitSuggestion = ({ currentWeather }) => {
 
     return (
         <div>
-            {/* <h2>Outfit Suggestion</h2> */}
             <div>
                 <p>{recommendation}</p>
             </div>

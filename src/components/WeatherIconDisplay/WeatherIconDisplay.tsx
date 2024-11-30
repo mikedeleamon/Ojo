@@ -10,8 +10,15 @@ import PartlyCloudy from '../weatherIcons/PartlyCloudy/PartlyCloudy';
 import PartlyCloudyNight from '../weatherIcons/PartlyCloudy/PartlyCloudyNight';
 import styles from './WeatherIconDisplay.module.css';
 
-// Component responsible for displaying weather
-const WeatherIconDisplay = ({
+interface WeatherIconDisplayProps {
+    weatherCondition: string; // Description of the current weather
+    isDay: boolean; // Indicates if it's daytime
+    size: string; // Size of the weather icon
+    temperature: number | string; // Current temperature
+    feelsLike?: number | string; // Feels-like temperature (optional)
+}
+
+const WeatherIconDisplay: React.FC<WeatherIconDisplayProps> = ({
     weatherCondition,
     isDay,
     size,
@@ -20,11 +27,12 @@ const WeatherIconDisplay = ({
 }) => {
     const bigIcon = 'currentWeatherLogo';
     const smallIcon = 'miniWeatherIcon';
-    const [iconSize, setIconSize] = useState('');
-    let weatherIcon;
+    const [iconSize, setIconSize] = useState<string>('');
+
+    let weatherIcon: React.ReactNode;
 
     useEffect(() => {
-        size === 'Big' ? setIconSize(bigIcon) : setIconSize(smallIcon);
+        setIconSize(size === 'Big' ? bigIcon : smallIcon);
     }, [size]);
 
     switch (weatherCondition) {
@@ -83,7 +91,7 @@ const WeatherIconDisplay = ({
             {size === 'Big' ? (
                 <div className={styles.temperature}>
                     <div>{`${temperature}\u00B0`}</div>
-                    <div>{`${feelsLike}\u00B0`}</div>
+                    {feelsLike && <div>{`${feelsLike}\u00B0`}</div>}
                 </div>
             ) : (
                 <div className={styles.temperature}>{temperature}</div>
