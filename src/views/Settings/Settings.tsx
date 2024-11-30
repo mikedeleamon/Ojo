@@ -4,13 +4,21 @@ import styles from './Settings.module.css';
 import CloseButton from '../../components/buttons/CloseButton/CloseButton';
 import { useNavigate } from 'react-router-dom';
 
-const Settings = ({ onSaveSettings }) => {
-    const [clothingStyle, setClothingStyle] = useState('Casual');
-    const [location, setLocation] = useState('New York');
-    const [hiTemp, setHiTemp] = useState(50);
-    const [lowTemp, setLowTemp] = useState(50);
-    const [humidityPreference, setHumidityPreference] = useState(50);
-    // Add more state variables for other settings as needed
+interface SettingsProps {
+    onSaveSettings: (settings: {
+        clothingStyle: string;
+        location: string;
+        // Add more properties for additional settings as needed
+    }) => void;
+}
+
+const Settings: React.FC<SettingsProps> = ({ onSaveSettings }) => {
+    const [clothingStyle, setClothingStyle] = useState<string>('Casual');
+    const [location, setLocation] = useState<string>('New York');
+    const [hiTemp, setHiTemp] = useState<number>(50);
+    const [lowTemp, setLowTemp] = useState<number>(50);
+    const [humidityPreference, setHumidityPreference] = useState<number>(50);
+
     const navigate = useNavigate();
 
     const handleSave = () => {
@@ -20,7 +28,7 @@ const Settings = ({ onSaveSettings }) => {
             // Add other settings to the object as needed
         };
 
-        // Pass the settings object to the parent component (e.g., App.js)
+        // Pass the settings object to the parent component (e.g., App.tsx)
         onSaveSettings(settings);
     };
 
@@ -68,20 +76,20 @@ const Settings = ({ onSaveSettings }) => {
 
             <div className={`${styles.sliderContainer} mb-5`}>
                 <div
-                    class='btn-group btn-group-toggle'
+                    className='btn-group btn-group-toggle'
                     data-toggle='buttons'
                 >
-                    <label class='btn btn-secondary active'>
+                    <label className='btn btn-secondary active'>
                         <input
                             type='radio'
                             name='options'
                             id='Imperialoption1'
                             autoComplete='off'
-                            checked
+                            defaultChecked
                         />
                         Imperial
                     </label>
-                    <label class='btn btn-secondary'>
+                    <label className='btn btn-secondary'>
                         <input
                             type='radio'
                             name='options'
@@ -101,7 +109,7 @@ const Settings = ({ onSaveSettings }) => {
                             min='0'
                             max='100'
                             value={hiTemp}
-                            onChange={(e) => setHiTemp(e.target.value)}
+                            onChange={(e) => setHiTemp(Number(e.target.value))}
                         />
                     </label>
                 </div>
@@ -114,7 +122,7 @@ const Settings = ({ onSaveSettings }) => {
                             min='0'
                             max='100'
                             value={lowTemp}
-                            onChange={(e) => setLowTemp(e.target.value)}
+                            onChange={(e) => setLowTemp(Number(e.target.value))}
                         />
                     </label>
                 </div>
@@ -128,7 +136,7 @@ const Settings = ({ onSaveSettings }) => {
                             max='100'
                             value={humidityPreference}
                             onChange={(e) =>
-                                setHumidityPreference(e.target.value)
+                                setHumidityPreference(Number(e.target.value))
                             }
                         />
                     </label>
