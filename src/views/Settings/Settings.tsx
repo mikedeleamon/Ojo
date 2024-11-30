@@ -3,33 +3,48 @@ import '../../App.css';
 import styles from './Settings.module.css';
 import CloseButton from '../../components/buttons/CloseButton/CloseButton';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
 interface SettingsProps {
-    onSaveSettings: (settings: {
-        clothingStyle: string;
-        location: string;
-        // Add more properties for additional settings as needed
-    }) => void;
+    onSaveSettings: (settings: Settings) => void;
 }
 
-const Settings: React.FC<SettingsProps> = ({ onSaveSettings }) => {
+interface Settings {
+    clothingStyle: string;
+    location: string;
+    temperatureScale: string;
+    hiTemp: number;
+    lowTemp: number;
+    humidityPreference: number;
+}
+
+const Settings: React.FC<SettingsProps> = () => {
     const [clothingStyle, setClothingStyle] = useState<string>('Casual');
     const [location, setLocation] = useState<string>('New York');
+    const [temperatureScale, setTemperatureScale] =
+        useState<string>('Imperial');
     const [hiTemp, setHiTemp] = useState<number>(50);
     const [lowTemp, setLowTemp] = useState<number>(50);
     const [humidityPreference, setHumidityPreference] = useState<number>(50);
 
     const navigate = useNavigate();
 
-    const handleSave = () => {
-        const settings = {
+    const handleSave = async () => {
+        const newSettings: Settings = {
             clothingStyle,
             location,
-            // Add other settings to the object as needed
+            temperatureScale,
+            hiTemp,
+            lowTemp,
+            humidityPreference,
         };
-
-        // Pass the settings object to the parent component (e.g., App.tsx)
-        onSaveSettings(settings);
+        try {
+            await axios.post('/save-settings', newSettings);
+        } catch (e) {
+            console.log('error');
+        } finally {
+            navigate('/');
+        }
     };
 
     const onClose = () => {
@@ -62,6 +77,7 @@ const Settings: React.FC<SettingsProps> = ({ onSaveSettings }) => {
                     <option>Preppy</option>
                 </select>
             </div>
+
             <div className={`${styles.sliderContainer} mb-4`}>
                 <label>
                     Location:
@@ -79,22 +95,33 @@ const Settings: React.FC<SettingsProps> = ({ onSaveSettings }) => {
                     className='btn-group btn-group-toggle'
                     data-toggle='buttons'
                 >
-                    <label className='btn btn-secondary active'>
+                    <label
+                        className={`btn btn-secondary ${
+                            temperatureScale === 'Imperial' ? 'active' : ''
+                        }`}
+                    >
                         <input
                             type='radio'
                             name='options'
-                            id='Imperialoption1'
-                            autoComplete='off'
-                            defaultChecked
+                            value='Imperial'
+                            onClick={() => setTemperatureScale('Imperial')}
+                            checked={temperatureScale === 'Imperial'}
+                            readOnly
                         />
                         Imperial
                     </label>
-                    <label className='btn btn-secondary'>
+                    <label
+                        className={`btn btn-secondary ${
+                            temperatureScale === 'Metric' ? 'active' : ''
+                        }`}
+                    >
                         <input
                             type='radio'
                             name='options'
-                            id='Metricoption2'
-                            autoComplete='off'
+                            value='Metric'
+                            onClick={() => setTemperatureScale('Metric')}
+                            checked={temperatureScale === 'Metric'}
+                            readOnly
                         />
                         Metric
                     </label>
@@ -128,7 +155,7 @@ const Settings: React.FC<SettingsProps> = ({ onSaveSettings }) => {
                 </div>
                 <div className='mb-2'>
                     <label>
-                        Humidity Preference: {humidityPreference}
+                        Humidity Preference: {humidityPreference}%
                         <input
                             className='form-range'
                             type='range'
@@ -143,7 +170,6 @@ const Settings: React.FC<SettingsProps> = ({ onSaveSettings }) => {
                 </div>
             </div>
 
-            {/* Add more input fields for other settings as needed */}
             <button
                 type='button'
                 onClick={handleSave}
