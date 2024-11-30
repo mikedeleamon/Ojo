@@ -3,8 +3,8 @@ import './App.css';
 import { BrowserRouter as Router } from 'react-router-dom';
 import AppRoutes from './routes/AppRoutes';
 
-function App() {
-    const [loggedIn, setLoggedIn] = useState(false);
+const App: React.FC = () => {
+    const [loggedIn, setLoggedIn] = useState<boolean>(false);
 
     useEffect(() => {
         // Simulating login logic
@@ -15,9 +15,12 @@ function App() {
 
     return (
         <Router>
-            <AppRoutes loggedIn={loggedIn} setLoggedIn={setLoggedIn}/>
+            <AppRoutes
+                loggedIn={loggedIn}
+                setLoggedIn={setLoggedIn}
+            />
         </Router>
     );
-}
+};
 
 export default App;
