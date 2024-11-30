@@ -1,9 +1,9 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import MainPage from '../views/MainPage/MainPage.tsx';
-import SignupPage from '../views/SignupPage/Signup';
-import LoginPage from '../views/LoginPage/LoginPage';
-import Settings from '../views/Settings/Settings';
+import SignupPage from '../views/SignupPage/Signup.tsx';
+import LoginPage from '../views/LoginPage/LoginPage.tsx';
+import Settings from '../views/Settings/Settings.tsx';
 
 const AppRoutes = ({ loggedIn, setLoggedIn }) => {
     return (

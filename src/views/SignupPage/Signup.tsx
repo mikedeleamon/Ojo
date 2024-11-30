@@ -3,7 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import styles from './SignupPage.module.css';
 import CloseButton from '../../components/buttons/CloseButton/CloseButton';
 
-const SignupPage = ({ setLoggedIn }) => {
+interface SignupPageProps {
+    setLoggedIn: (value: boolean) => void;
+}
+
+const SignupPage: React.FC<SignupPageProps> = ({ setLoggedIn }) => {
     const navigate = useNavigate();
 
     const navigateToLoginPage = () => {
@@ -14,6 +18,7 @@ const SignupPage = ({ setLoggedIn }) => {
     const onClose = () => {
         navigate('/');
     };
+
     return (
         <div className={'App'}>
             <div className={styles.closeButtonContainer}>
@@ -25,85 +30,81 @@ const SignupPage = ({ setLoggedIn }) => {
             <div className='mt-5'>
                 <h1 className={'text-white p-4'}>Sign Up</h1>
             </div>
-            {/* <article> */}
-            <div class='form-group mb-4'>
-                <label for='firstName'>
+            <div className='form-group mb-4'>
+                <label htmlFor='firstName'>
                     First Name
                     <input
                         type='text'
-                        class='form-control '
+                        className='form-control'
                         id='formGroupExampleInput'
                         placeholder='John'
                     />
                 </label>
             </div>
-            <div class='form-group mb-4'>
-                <label for='lastName'>
+            <div className='form-group mb-4'>
+                <label htmlFor='lastName'>
                     Last Name
                     <input
                         type='text'
-                        class='form-control '
+                        className='form-control'
                         id='formGroupExampleInput'
                         placeholder='Weatherspoon'
                     />
                 </label>
             </div>
-            <div class='form-group mb-4'>
-                <label for='dob'>
+            <div className='form-group mb-4'>
+                <label htmlFor='dob'>
                     Date of Birth
                     <input
                         type='text'
-                        class='form-control '
+                        className='form-control'
                         id='formGroupExampleInput'
                         placeholder='MM/DD/YYYY'
                     />
                 </label>
             </div>
-            <div class='form-group mb-4'>
-                <label for='email'>
+            <div className='form-group mb-4'>
+                <label htmlFor='email'>
                     Email
                     <input
                         type='text'
-                        class='form-control'
+                        className='form-control'
                         id='formGroupExampleInput'
-                        placeholder='Weatherspoon'
+                        placeholder='youremail@example.com'
                     />
                 </label>
             </div>
-            <div class='form-group mb-4'>
-                <label for='username'>
+            <div className='form-group mb-4'>
+                <label htmlFor='username'>
                     Username
                     <input
                         type='text'
-                        class='form-control '
+                        className='form-control'
                         id='formGroupExampleInput'
                         placeholder='@Weatherspoon123'
                     />
                 </label>
             </div>
-            <div class='form-group mb-4'>
-                <label for='password'>
+            <div className='form-group mb-4'>
+                <label htmlFor='password'>
                     Password
                     <input
                         type='password'
-                        class='form-control '
+                        className='form-control'
                         id='formGroupExampleInput'
-                        placeholder=''
                     />
                 </label>
             </div>
-            <div class='form-group mb-4'>
-                <label for='passwordConfirm'>
+            <div className='form-group mb-4'>
+                <label htmlFor='passwordConfirm'>
                     Confirm Password
                     <input
                         type='password'
-                        class='form-control '
+                        className='form-control'
                         id='formGroupExampleInput'
-                        placeholder=''
                     />
                 </label>
             </div>
-            {/* </article> */}
             <button
                 type='submit'
                 className='col-8 col-sm-4 col-lg-2 btn btn-block btn-secondary mt-4'
@@ -124,4 +125,5 @@ const SignupPage = ({ setLoggedIn }) => {
         </div>
     );
 };
+
 export default SignupPage;
