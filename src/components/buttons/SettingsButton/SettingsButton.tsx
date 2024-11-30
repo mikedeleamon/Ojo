@@ -2,10 +2,10 @@ import React from 'react';
 import SettingsIcon from '../../Icons/SettingsIcon/SettingsIcon';
 import { useNavigate } from 'react-router-dom';
 
-const SettingsButton = () => {
+const SettingsButton: React.FC = () => {
     const navigate = useNavigate();
 
-    const navigateToSettings = () => {
+    const navigateToSettings = (): void => {
         navigate('/settings');
     };
 
