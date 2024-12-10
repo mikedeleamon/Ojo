@@ -3,7 +3,7 @@ import './App.css';
 import { BrowserRouter as Router } from 'react-router-dom';
 import AppRoutes from './routes/AppRoutes';
 
-const App: React.FC = () => {
+const App = () => {
     const [loggedIn, setLoggedIn] = useState<boolean>(false);
 
     useEffect(() => {

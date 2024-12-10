@@ -11,12 +11,12 @@ interface SettingsProps {
     onSaveSettings: (settings: Settings) => void;
 }
 
-const SettingsPage: React.FC<SettingsProps> = () => {
+const SettingsPage = ({ onSaveSettings }: SettingsProps) => {
     const [clothingStyle, setClothingStyle] = useState<string>('Casual');
     const [location, setLocation] = useState<string>('New York');
     const [temperatureScale, setTemperatureScale] =
         useState<string>('Imperial');
-    const [hiTempThreshold, setHiTempThreshold] = useState<number>(90);
+    const [hiTempThreshold, setHiTempThreshold] = useState<number>(50);
     const [lowTempThreshold, setLowTempThreshold] = useState<number>(50);
     const [humidityPreference, setHumidityPreference] = useState<number>(50);
 

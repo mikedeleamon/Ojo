@@ -8,7 +8,7 @@ import axios from 'axios';
 
 import { Settings } from '../../types';
 
-const MainPage: React.FC = () => {
+const MainPage = () => {
     const [latitude, setLatitude] = useState<number | null>(null);
     const [longitude, setLongitude] = useState<number | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(true);

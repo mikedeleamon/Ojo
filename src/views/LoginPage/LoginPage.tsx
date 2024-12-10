@@ -7,7 +7,7 @@ interface LoginPageProps {
     setLoggedIn: (value: boolean) => void;
 }
 
-const LoginPage: React.FC<LoginPageProps> = ({ setLoggedIn }) => {
+const LoginPage = ({ setLoggedIn }: LoginPageProps) => {
     const navigate = useNavigate();
 
     const navigateToPage = () => {

@@ -1,30 +1,12 @@
 import React, { useEffect, useState } from 'react';
 
-interface WeatherDetail {
-    HasPrecipitation: boolean;
-    Temperature: {
-        Imperial: {
-            Value: string; // Temperature value as a string
-        };
-    };
-    Wind: {
-        Speed: {
-            Imperial: {
-                Value: string; // Wind speed value as a string
-            };
-        };
-    };
-    RelativeHumidity: string; // Humidity as a string
-    UVIndexText: string; // UV Index description as a string
-}
+import { WeatherDetail } from '../../types';
 
 interface OutfitSuggestionProps {
     currentWeather: WeatherDetail[]; // Array of weather details
 }
 
-const OutfitSuggestion: React.FC<OutfitSuggestionProps> = ({
-    currentWeather,
-}) => {
+const OutfitSuggestion = ({ currentWeather }: OutfitSuggestionProps) => {
     const [isRaining, setIsRaining] = useState<boolean>(false);
     const [userPreferences, setUserPreferences] = useState<string>('');
     const [recommendation, setRecommendation] = useState<string>('');
