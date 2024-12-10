@@ -31,8 +31,7 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "frontend": "npm start",
-    "backend": "cd db && npm start",
-    "install":  "npm install && cd db && npm install",
+    "backend": "cd db && node server.js",
     "app": "concurrently \"npm run frontend\" \"npm run backend\""
 
 
