@@ -1,30 +1,23 @@
 import React, { useState } from 'react';
 import '../../App.css';
-import styles from './Settings.module.css';
+import styles from './SettingsPage.module.css';
 import CloseButton from '../../components/buttons/CloseButton/CloseButton';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+
+import { Settings } from '../../types';
 
 interface SettingsProps {
     onSaveSettings: (settings: Settings) => void;
 }
 
-interface Settings {
-    clothingStyle: string;
-    location: string;
-    temperatureScale: string;
-    hiTemp: number;
-    lowTemp: number;
-    humidityPreference: number;
-}
-
-const Settings: React.FC<SettingsProps> = () => {
+const SettingsPage: React.FC<SettingsProps> = () => {
     const [clothingStyle, setClothingStyle] = useState<string>('Casual');
     const [location, setLocation] = useState<string>('New York');
     const [temperatureScale, setTemperatureScale] =
         useState<string>('Imperial');
-    const [hiTemp, setHiTemp] = useState<number>(50);
-    const [lowTemp, setLowTemp] = useState<number>(50);
+    const [hiTempThreshold, setHiTempThreshold] = useState<number>(90);
+    const [lowTempThreshold, setLowTempThreshold] = useState<number>(50);
     const [humidityPreference, setHumidityPreference] = useState<number>(50);
 
     const navigate = useNavigate();
@@ -34,8 +27,8 @@ const Settings: React.FC<SettingsProps> = () => {
             clothingStyle,
             location,
             temperatureScale,
-            hiTemp,
-            lowTemp,
+            hiTempThreshold,
+            lowTempThreshold,
             humidityPreference,
         };
         try {
@@ -129,27 +122,31 @@ const Settings: React.FC<SettingsProps> = () => {
 
                 <div className='mb-2'>
                     <label>
-                        Hot Weather Preference: {`${hiTemp}\u00B0`}
+                        Hot Weather Preference: {`${hiTempThreshold}\u00B0`}
                         <input
                             className='form-range'
                             type='range'
                             min='0'
                             max='100'
-                            value={hiTemp}
-                            onChange={(e) => setHiTemp(Number(e.target.value))}
+                            value={hiTempThreshold}
+                            onChange={(e) =>
+                                setHiTempThreshold(Number(e.target.value))
+                            }
                         />
                     </label>
                 </div>
                 <div className='mb-2'>
                     <label>
-                        Cold Weather Preference: {`${lowTemp}\u00B0`}
+                        Cold Weather Preference: {`${lowTempThreshold}\u00B0`}
                         <input
                             className='form-range'
                             type='range'
                             min='0'
                             max='100'
-                            value={lowTemp}
-                            onChange={(e) => setLowTemp(Number(e.target.value))}
+                            value={lowTempThreshold}
+                            onChange={(e) =>
+                                setLowTempThreshold(Number(e.target.value))
+                            }
                         />
                     </label>
                 </div>
@@ -181,4 +178,4 @@ const Settings: React.FC<SettingsProps> = () => {
     );
 };
 
-export default Settings;
+export default SettingsPage;

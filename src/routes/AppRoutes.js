@@ -3,7 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import MainPage from '../views/MainPage/MainPage.tsx';
 import SignupPage from '../views/SignupPage/Signup.tsx';
 import LoginPage from '../views/LoginPage/LoginPage.tsx';
-import Settings from '../views/Settings/Settings.tsx';
+import SettingsPage from '../views/SettingsPage/SettingsPage.tsx';
 
 const AppRoutes = ({ loggedIn, setLoggedIn }) => {
     return (
@@ -22,7 +22,7 @@ const AppRoutes = ({ loggedIn, setLoggedIn }) => {
             />
             <Route
                 path='/settings'
-                element={<Settings setLoggedIn={setLoggedIn} />}
+                element={<SettingsPage setLoggedIn={setLoggedIn} />}
             />
             {loggedIn && (
                 <Route
