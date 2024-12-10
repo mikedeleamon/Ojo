@@ -1,9 +1,4 @@
-import React, {
-    useState,
-    useEffect,
-    SetStateAction,
-    PropsWithChildren,
-} from 'react';
+import React, { useState, useEffect, SetStateAction } from 'react';
 import axios from 'axios';
 import WeatherIconDisplay from '../WeatherIconDisplay/WeatherIconDisplay.tsx';
 import WeatherDetails from '../WeatherDetails/WeatherDetails.tsx';
@@ -26,7 +21,7 @@ const WeatherHUD = ({
     location,
     getBackgroundColor,
     settings,
-}: PropsWithChildren<WeatherHUDProps>) => {
+}: WeatherHUDProps) => {
     const [currentWeather, setCurrentWeather] = useState<CurrentWeather[]>([]);
     const [forecasts, setForecasts] = useState<Forecast[]>([]);
     const [isLoading, setIsLoading] = useState<boolean>(true);
