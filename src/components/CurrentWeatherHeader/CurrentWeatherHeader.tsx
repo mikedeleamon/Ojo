@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { PropsWithChildren } from 'react';
 import styles from './CurrentWeatherHeader.module.css';
 
 interface CurrentWeatherHeaderProps {
@@ -6,10 +6,10 @@ interface CurrentWeatherHeaderProps {
     weatherCondition: string; // Description of the current weather
 }
 
-const CurrentWeatherHeader: React.FC<CurrentWeatherHeaderProps> = ({
+const CurrentWeatherHeader = ({
     cityName,
     weatherCondition,
-}) => {
+}: PropsWithChildren<CurrentWeatherHeaderProps>) => {
     return (
         <div>
             <h2 className={styles.text}>{cityName}</h2>

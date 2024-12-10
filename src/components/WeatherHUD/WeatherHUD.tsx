@@ -1,4 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, {
+    useState,
+    useEffect,
+    SetStateAction,
+    PropsWithChildren,
+} from 'react';
 import axios from 'axios';
 import WeatherIconDisplay from '../WeatherIconDisplay/WeatherIconDisplay.tsx';
 import WeatherDetails from '../WeatherDetails/WeatherDetails.tsx';
@@ -9,56 +14,43 @@ import Loading from '../Loading/Loading.tsx';
 import CurrentWeatherHeader from '../CurrentWeatherHeader/CurrentWeatherHeader.tsx';
 import './WeatherHUD.css';
 
+import { CityData, CurrentWeather, Forecast, Settings } from '../../types';
+
 interface WeatherHUDProps {
     location: string;
+    getBackgroundColor: React.Dispatch<React.SetStateAction<string>>;
+    settings: Settings;
 }
 
-interface CityData {
-    Key: string;
-    LocalizedName: string;
-}
-
-interface CurrentWeather {
-    WeatherText: string;
-    HasPrecipitation: boolean;
-    Temperature: {
-        Imperial: {
-            Value: string; // Temperature value as a string
-            Unit: string;
-        };
-    };
-    Wind: {
-        Speed: {
-            Imperial: {
-                Value: string; // Wind speed value as a string
-            };
-        };
-    };
-    RelativeHumidity: string; // Humidity percentage as a string
-    UVIndexText: string; // UV Index description as a string
-    RealFeelTemperature: {
-        Imperial: {
-            Value: string; // Temperature value as a string
-            Unit: string;
-        };
-    };
-}
-
-interface Forecast {
-    IconPhrase: string;
-    Temperature: {
-        Value: number; // Temperature value as a string
-        Unit: string;
-    };
-    DateTime: string;
-    IsDaylight: boolean;
-}
-
-const WeatherHUD: React.FC<WeatherHUDProps> = ({ location }) => {
+const WeatherHUD = ({
+    location,
+    getBackgroundColor,
+    settings,
+}: PropsWithChildren<WeatherHUDProps>) => {
     const [currentWeather, setCurrentWeather] = useState<CurrentWeather[]>([]);
     const [forecasts, setForecasts] = useState<Forecast[]>([]);
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [cityData, setCityData] = useState<CityData | null>(null);
+
+    const setBackgroundColor = (temp: string): string => {
+        //TODO use 'Settings' preferences
+        const temperature = parseFloat(temp);
+        if (isNaN(temperature)) {
+            return 'lightgray';
+        }
+        if (temperature > 50 && temperature < 90) {
+            return 'lightblue'; // Mid-range temperature
+        }
+        if (temperature <= 50) {
+            return 'lightgreen'; // Low temperature
+        }
+        return 'lightcoral'; // High temperature
+    };
+    useEffect(() => {
+        let currentTemperature = currentWeather[0]?.Temperature.Imperial.Value;
+
+        getBackgroundColor(setBackgroundColor(currentTemperature));
+    }, [currentWeather[0]?.Temperature.Imperial.Value]);
 
     const getForecastInfo = async () => {
         if (!cityData) return;
