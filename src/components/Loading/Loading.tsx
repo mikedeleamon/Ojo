@@ -3,7 +3,7 @@ import Sunny from '../../assets/images/weatherIcons/Sunny.png';
 import '../../App.css';
 import styles from './Loading.module.css';
 
-const Loading: React.FC = () => {
+const Loading = () => {
     return (
         <div className={styles.loadMargin}>
             <img

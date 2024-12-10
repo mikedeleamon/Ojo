@@ -11,13 +11,13 @@ interface MinimizedWeatherDisplayProps {
     isDay: boolean; // Whether it is day or night (true for day, false for night)
 }
 
-const MinimizedWeatherDisplay: React.FC<MinimizedWeatherDisplayProps> = ({
+const MinimizedWeatherDisplay = ({
     weather,
     temperature,
     time,
     tempUnit,
     isDay,
-}) => {
+}: MinimizedWeatherDisplayProps) => {
     // Format the time to a readable format
     function formatTime(dateString: string): string {
         const date = new Date(dateString);

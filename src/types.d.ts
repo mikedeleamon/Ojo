@@ -34,6 +34,24 @@ export interface CurrentWeather {
     };
 }
 
+interface WeatherDetail {
+    HasPrecipitation: boolean;
+    Temperature: {
+        Imperial: {
+            Value: string; // Temperature value as a string
+        };
+    };
+    Wind: {
+        Speed: {
+            Imperial: {
+                Value: string; // Wind speed value as a string
+            };
+        };
+    };
+    RelativeHumidity: string; // Humidity as a string
+    UVIndexText: string; // UV Index description as a string
+}
+
 export interface CityData {
     Key: string;
     LocalizedName: string;

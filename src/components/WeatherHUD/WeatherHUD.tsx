@@ -13,7 +13,7 @@ import { CityData, CurrentWeather, Forecast, Settings } from '../../types';
 
 interface WeatherHUDProps {
     location: string;
-    getBackgroundColor: React.Dispatch<React.SetStateAction<string>>;
+    getBackgroundColor: (backgroundColor: string) => void;
     settings: Settings;
 }
 

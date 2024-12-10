@@ -18,13 +18,13 @@ interface WeatherIconDisplayProps {
     feelsLike?: number | string; // Feels-like temperature (optional)
 }
 
-const WeatherIconDisplay: React.FC<WeatherIconDisplayProps> = ({
+const WeatherIconDisplay = ({
     weatherCondition,
     isDay,
     size,
     temperature,
     feelsLike,
-}) => {
+}: WeatherIconDisplayProps) => {
     const bigIcon = 'currentWeatherLogo';
     const smallIcon = 'miniWeatherIcon';
     const [iconSize, setIconSize] = useState<string>('');
