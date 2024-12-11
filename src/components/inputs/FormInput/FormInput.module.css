@@ -1,0 +1,62 @@
+.inputUnderline {
+    border: none;
+    border-bottom: 2px solid #ccc;
+    background-color: transparent !important;
+    outline: none;
+    width: 100%;
+    padding: 5px 0;
+    color: #fff; /* Adjust based on your theme */
+    font-size: 16px;
+    transition: border-color 0.3s;
+}
+
+.inputUnderline:focus {
+    border-bottom: 2px solid #007bff; /* Highlight color on focus */
+}
+
+.form-group {
+    margin-bottom: 1.5rem; /* Keeps spacing between inputs consistent */
+}
+
+.form-group label {
+    font-size: 14px; /* Adjust label font size to match the design */
+    margin-bottom: 0.5rem;
+    display: block;
+    color: #fff; /* Ensure labels have sufficient contrast */
+}
+
+.form-group input {
+    margin-top: 0.25rem; /* Add some spacing between label and input */
+}
+
+/* General styling for inputs */
+.formInput {
+    width: 100%;
+    border: none;
+    border-bottom: 2px solid #ccc;
+    background: transparent;
+    color: inherit;
+    padding: 5px 0;
+    font-size: 16px;
+    outline: none;
+    transition: border-color 0.3s ease-in-out;
+}
+
+.formInput:focus {
+    border-bottom: 2px solid #000;
+}
+
+/* Autofill background fix */
+.formInput:-webkit-autofill {
+    -webkit-box-shadow: 0 0 0px 1000px transparent inset;
+    box-shadow: 0 0 0px 1000px transparent inset;
+    -webkit-text-fill-color: inherit; /* Ensure text matches design */
+    transition: background-color 5000s ease-in-out 0s; /* Prevent background flash */
+}
+
+/* Autofill when form input is in focus */
+.formInput:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0px 1000px transparent inset;
+    box-shadow: 0 0 0px 1000px transparent inset;
+    -webkit-text-fill-color: inherit;
+}

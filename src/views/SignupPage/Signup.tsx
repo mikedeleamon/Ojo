@@ -1,13 +1,24 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styles from './SignupPage.module.css';
 import CloseButton from '../../components/buttons/CloseButton/CloseButton';
+import axios from 'axios';
+import FormInput from '../../components/inputs/FormInput/FormInput.tsx';
 
 interface SignupPageProps {
     setLoggedIn: (value: boolean) => void;
 }
 
 const SignupPage = ({ setLoggedIn }: SignupPageProps) => {
+    const [firstName, setFirstName] = useState('');
+    const [lastName, setLastName] = useState('');
+    const [birthday, setBirthday] = useState('');
+    const [email, setEmail] = useState('');
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
+    const [passwordConfirmation, setPasswordConfirmation] = useState('');
+    const [error, setError] = useState<string | null>(null);
+
     const navigate = useNavigate();
 
     const navigateToLoginPage = () => {
@@ -17,6 +28,32 @@ const SignupPage = ({ setLoggedIn }: SignupPageProps) => {
 
     const onClose = () => {
         navigate('/');
+    };
+
+    const onSubmit = async () => {
+        if (password !== passwordConfirmation) {
+            setError('Passwords do not match');
+            return;
+        }
+
+        const userInfo = {
+            firstName,
+            lastName,
+            birthday,
+            email,
+            username,
+            password,
+        };
+        console.log(userInfo);
+
+        try {
+            await axios.put('/add-user', userInfo);
+            setLoggedIn(true);
+            navigate('/');
+        } catch (error) {
+            console.error(error);
+            setError('Failed to register. Please try again later.');
+        }
     };
 
     return (
@@ -30,84 +67,65 @@ const SignupPage = ({ setLoggedIn }: SignupPageProps) => {
             <div className='mt-5'>
                 <h1 className={'text-white p-4'}>Sign Up</h1>
             </div>
-            <div className='form-group mb-4'>
-                <label htmlFor='firstName'>
-                    First Name
-                    <input
-                        type='text'
-                        className='form-control'
-                        id='formGroupExampleInput'
-                        placeholder='John'
-                    />
-                </label>
-            </div>
-            <div className='form-group mb-4'>
-                <label htmlFor='lastName'>
-                    Last Name
-                    <input
-                        type='text'
-                        className='form-control'
-                        id='formGroupExampleInput'
-                        placeholder='Weatherspoon'
-                    />
-                </label>
-            </div>
-            <div className='form-group mb-4'>
-                <label htmlFor='dob'>
-                    Date of Birth
-                    <input
-                        type='text'
-                        className='form-control'
-                        id='formGroupExampleInput'
-                        placeholder='MM/DD/YYYY'
-                    />
-                </label>
-            </div>
-            <div className='form-group mb-4'>
-                <label htmlFor='email'>
-                    Email
-                    <input
-                        type='text'
-                        className='form-control'
-                        id='formGroupExampleInput'
-                        placeholder='youremail@example.com'
-                    />
-                </label>
-            </div>
-            <div className='form-group mb-4'>
-                <label htmlFor='username'>
-                    Username
-                    <input
-                        type='text'
-                        className='form-control'
-                        id='formGroupExampleInput'
-                        placeholder='@Weatherspoon123'
-                    />
-                </label>
-            </div>
-            <div className='form-group mb-4'>
-                <label htmlFor='password'>
-                    Password
-                    <input
-                        type='password'
-                        className='form-control'
-                        id='formGroupExampleInput'
-                    />
-                </label>
-            </div>
-            <div className='form-group mb-4'>
-                <label htmlFor='passwordConfirm'>
-                    Confirm Password
-                    <input
-                        type='password'
-                        className='form-control'
-                        id='formGroupExampleInput'
-                    />
-                </label>
-            </div>
+            {error && <p className='text-danger'>{error}</p>}
+            <FormInput
+                label='First Name'
+                type='text'
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder='John'
+                id='firstName'
+            />
+            <FormInput
+                label='Last Name'
+                type='text'
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder='Weatherspoon'
+                id='lastName'
+            />
+            <FormInput
+                label='Date of Birth'
+                type='text'
+                value={birthday}
+                onChange={(e) => setBirthday(e.target.value)}
+                placeholder='MM/DD/YYYY'
+                id='dob'
+            />
+            <FormInput
+                label='Email'
+                type='email'
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder='youremail@example.com'
+                id='email'
+            />
+            <FormInput
+                label='Username'
+                type='text'
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder='@Weatherspoon123'
+                id='username'
+            />
+            <FormInput
+                label='Password'
+                type='password'
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                id='password'
+            />
+            <FormInput
+                label='Confirm Password'
+                type='password'
+                value={passwordConfirmation}
+                onChange={(e) => setPasswordConfirmation(e.target.value)}
+                id='passwordConfirm'
+            />
             <button
                 type='submit'
                 className='col-8 col-sm-4 col-lg-2 btn btn-block btn-secondary mt-4'
+                onClick={onSubmit}
             >
                 Submit
             </button>
