@@ -39,6 +39,7 @@ interface WeatherDetail {
     Temperature: {
         Imperial: {
             Value: string; // Temperature value as a string
+            Unit?: string;
         };
     };
     Wind: {

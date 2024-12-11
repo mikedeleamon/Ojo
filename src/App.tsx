@@ -7,6 +7,8 @@ const App = () => {
     const [loggedIn, setLoggedIn] = useState<boolean>(false);
 
     useEffect(() => {
+        //TODO make fake users
+        //TODO add some login logic after creating a User account
         // Simulating login logic
         setTimeout(() => {
             setLoggedIn(false);
