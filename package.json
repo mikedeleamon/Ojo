@@ -29,6 +29,7 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
+    "local-nuke": "rm -rf node_modules package-lock.json && npm install",
     "eject": "react-scripts eject",
     "frontend": "npm start",
     "backend": "cd db && node server.js",
