@@ -1,10 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import './App.css';
-import { BrowserRouter as Router } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import HomePage from './pages/HomePage';
 import AppRoutes from './routes/AppRoutes';
+import SettingsPage from './pages/SettingsPage';
 
-const App = () => {
+const App: React.FC = () => {
     const [loggedIn, setLoggedIn] = useState<boolean>(false);
+
+    const [preferences, setPreferences] = useState({
+        coldThreshold: 15,
+        warmThreshold: 25,
+    });
 
     useEffect(() => {
         //TODO make fake users
@@ -17,10 +23,31 @@ const App = () => {
 
     return (
         <Router>
-            <AppRoutes
-                loggedIn={loggedIn}
-                setLoggedIn={setLoggedIn}
-            />
+            <div>
+                {/* <nav>
+                    <Link to='/'>Home</Link> |{' '}
+                    <Link to='/settings'>Settings</Link>
+                </nav> */}
+                <AppRoutes
+                    loggedIn={loggedIn}
+                    setLoggedIn={setLoggedIn}
+                />
+                <Routes>
+                    <Route
+                        path='/fakehome'
+                        element={<HomePage preferences={preferences} />}
+                    />
+                    <Route
+                        path='/fakesettings'
+                        element={
+                            <SettingsPage
+                                preferences={preferences}
+                                setPreferences={setPreferences}
+                            />
+                        }
+                    />
+                </Routes>
+            </div>
         </Router>
     );
 };

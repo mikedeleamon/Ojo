@@ -8,10 +8,11 @@ import axios from 'axios';
 import { Settings } from '../../types';
 
 interface SettingsProps {
-    onSaveSettings: (settings: Settings) => void;
+    setLoggedIn: (value: boolean) => void;
+    //onSaveSettings: (settings: Settings ) => void;
 }
 
-const SettingsPage = ({ onSaveSettings }: SettingsProps) => {
+const SettingsPage = ({ setLoggedIn }: SettingsProps) => {
     const [clothingStyle, setClothingStyle] = useState<string>('Casual');
     const [location, setLocation] = useState<string>('New York');
     const [temperatureScale, setTemperatureScale] =

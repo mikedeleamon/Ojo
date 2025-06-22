@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import styles from './SignupPage.module.css';
 import CloseButton from '../../components/buttons/CloseButton/CloseButton';
 import axios from 'axios';
-import FormInput from '../../components/inputs/FormInput/FormInput.tsx';
+import FormInput from '../../components/inputs/FormInput/FormInput';
+import { formatDate } from '../../helpers/formatTools.js';
 
 interface SignupPageProps {
     setLoggedIn: (value: boolean) => void;
@@ -47,11 +48,11 @@ const SignupPage = ({ setLoggedIn }: SignupPageProps) => {
         console.log(userInfo);
 
         try {
-            await axios.put('/add-user', userInfo);
+            await axios.post('/add-user', userInfo);
             setLoggedIn(true);
             navigate('/');
         } catch (error) {
-            console.error(error);
+            console.error('ERRRRRRROOOORRRRRRR:', error);
             setError('Failed to register. Please try again later.');
         }
     };
@@ -88,7 +89,7 @@ const SignupPage = ({ setLoggedIn }: SignupPageProps) => {
                 label='Date of Birth'
                 type='text'
                 value={birthday}
-                onChange={(e) => setBirthday(e.target.value)}
+                onChange={(e) => setBirthday(formatDate(e))}
                 placeholder='MM/DD/YYYY'
                 id='dob'
             />
