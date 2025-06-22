@@ -1,6 +1,6 @@
 import React from 'react';
 import './MinimizedWeatherDisplay.css';
-import WeatherIconDisplay from '../WeatherIconDisplay/WeatherIconDisplay.tsx';
+import WeatherIconDisplay from '../WeatherIconDisplay/WeatherIconDisplay';
 
 // Define types for props
 interface MinimizedWeatherDisplayProps {

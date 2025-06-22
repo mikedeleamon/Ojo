@@ -1,5 +1,5 @@
 import React from 'react';
-import CancelIcon from '../../Icons/CloseIcon/CancelIcon';
+import CancelIcon from '../../Icons/CloseIcon/CancelIcon.js';
 //import { useNavigate } from 'react-router-dom';
 
 const CloseButton = ({ onClose, className }) => {

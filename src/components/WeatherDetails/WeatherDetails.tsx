@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import '../../App.css';
-import OutfitSuggestion from '../OutfitSuggestion/OutfitSuggestion.tsx';
+import OutfitSuggestion from '../OutfitSuggestion/OutfitSuggestion';
 import { WeatherDetail } from '../../types';
 
 interface WeatherDetailsProps {

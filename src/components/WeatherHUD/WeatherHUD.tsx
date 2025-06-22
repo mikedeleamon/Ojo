@@ -1,12 +1,12 @@
 import React, { useState, useEffect, SetStateAction } from 'react';
 import axios from 'axios';
-import WeatherIconDisplay from '../WeatherIconDisplay/WeatherIconDisplay.tsx';
-import WeatherDetails from '../WeatherDetails/WeatherDetails.tsx';
-import MinimizedWeatherDisplay from '../MinimizedWeatherDisplay/MinimizedWeatherDisplay.tsx';
+import WeatherIconDisplay from '../WeatherIconDisplay/WeatherIconDisplay';
+import WeatherDetails from '../WeatherDetails/WeatherDetails';
+import MinimizedWeatherDisplay from '../MinimizedWeatherDisplay/MinimizedWeatherDisplay';
 import weatherConstants from '../../constants/weatherConstants';
 import mockWeatherData from '../../mockData/mockWeatherData';
-import Loading from '../Loading/Loading.tsx';
-import CurrentWeatherHeader from '../CurrentWeatherHeader/CurrentWeatherHeader.tsx';
+import Loading from '../Loading/Loading';
+import CurrentWeatherHeader from '../CurrentWeatherHeader/CurrentWeatherHeader';
 import './WeatherHUD.css';
 
 import { CityData, CurrentWeather, Forecast, Settings } from '../../types';

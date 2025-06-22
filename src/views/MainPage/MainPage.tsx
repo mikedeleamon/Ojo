@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import '../../App.css';
 import styles from './MainPage.module.css';
-import WeatherHUD from '../../components/WeatherHUD/WeatherHUD.tsx';
-import Loading from '../../components/Loading/Loading.tsx';
-import SettingsButton from '../../components/buttons/SettingsButton/SettingsButton.tsx';
+import WeatherHUD from '../../components/WeatherHUD/WeatherHUD';
+import Loading from '../../components/Loading/Loading';
+import SettingsButton from '../../components/buttons/SettingsButton/SettingsButton';
 import axios from 'axios';
 
 import { Settings } from '../../types';
