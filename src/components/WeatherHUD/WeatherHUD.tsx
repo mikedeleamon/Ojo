@@ -1,4 +1,4 @@
-import React, { useState, useEffect, SetStateAction } from 'react';
+import { useState, useEffect, SetStateAction } from 'react';
 import axios from 'axios';
 import WeatherIconDisplay from '../WeatherIconDisplay/WeatherIconDisplay';
 import WeatherDetails from '../WeatherDetails/WeatherDetails';

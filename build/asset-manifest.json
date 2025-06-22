@@ -1,0 +1,24 @@
+{
+  "files": {
+    "main.css": "/static/css/main.3d2e0de3.css",
+    "main.js": "/static/js/main.abe94f6f.js",
+    "static/js/453.9fc72654.chunk.js": "/static/js/453.9fc72654.chunk.js",
+    "static/media/Ojo word logo 2.png": "/static/media/Ojo word logo 2.105084e21520a5e7d429.png",
+    "static/media/PartlyCloudy.png": "/static/media/PartlyCloudy.85720144650f2483cceb.png",
+    "static/media/Sunny.png": "/static/media/Sunny.6b3e6d8cb8884be33ae7.png",
+    "static/media/Storm.png": "/static/media/Storm.de8f6fd5b48c1ab77526.png",
+    "static/media/Rainy.png": "/static/media/Rainy.293405cd5d0c8d8e2d80.png",
+    "static/media/Snow.png": "/static/media/Snow.01e67bf8cbe69b99d72e.png",
+    "static/media/PartlyCloudyNight.png": "/static/media/PartlyCloudyNight.09586ab624246cb313b8.png",
+    "static/media/Cloudy.png": "/static/media/Cloudy.290d2c513f19c7fcba1e.png",
+    "static/media/ClearNight.png": "/static/media/ClearNight.b35e128b513419ecd749.png",
+    "index.html": "/index.html",
+    "main.3d2e0de3.css.map": "/static/css/main.3d2e0de3.css.map",
+    "main.abe94f6f.js.map": "/static/js/main.abe94f6f.js.map",
+    "453.9fc72654.chunk.js.map": "/static/js/453.9fc72654.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.3d2e0de3.css",
+    "static/js/main.abe94f6f.js"
+  ]
+}
