@@ -24,10 +24,6 @@ const App: React.FC = () => {
     return (
         <Router>
             <div>
-                {/* <nav>
-                    <Link to='/'>Home</Link> |{' '}
-                    <Link to='/settings'>Settings</Link>
-                </nav> */}
                 <AppRoutes
                     loggedIn={loggedIn}
                     setLoggedIn={setLoggedIn}
