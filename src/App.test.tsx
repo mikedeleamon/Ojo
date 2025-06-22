@@ -1,17 +1,56 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import App from './App';
 
-test('renders the Ojo Weather App text when logged out', () => {
-    render(<App />);
+// Mock child components to isolate App test
+jest.mock('./routes/AppRoutes', () => (props: any) => {
+    return (
+        <div data-testid='app-routes'>
+            loggedIn: {props.loggedIn ? 'true' : 'false'}
+        </div>
+    );
+});
 
-    // Check for text that is rendered when the user is logged out
-    const headerText = screen.queryByText(/Ojo Weather App/i);
-    expect(headerText).toBeNull(); // Assert that it's not in the DOM initially (optional)
+jest.mock('./pages/HomePage', () => (props: any) => (
+    <div data-testid='home-page'>
+        Cold threshold: {props.preferences.coldThreshold}
+    </div>
+));
 
-    // Simulate the logged-out state or wait for it if delayed rendering occurs
-    setTimeout(() => {
-        const linkElement = screen.getByText(/Your Weather Solution/i);
-        expect(linkElement).toBeInTheDocument();
-    }, 1000);
+jest.mock('./pages/SettingsPage', () => (props: any) => (
+    <div data-testid='settings-page'>
+        Warm threshold: {props.preferences.warmThreshold}
+    </div>
+));
+
+describe('App component', () => {
+    beforeEach(() => {
+        jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+        jest.runOnlyPendingTimers();
+        jest.useRealTimers();
+    });
+
+    test('renders AppRoutes and initial preferences', () => {
+        render(<App />);
+
+        // AppRoutes should initially show loggedIn: false
+        const appRoutes = screen.getByTestId('app-routes');
+        expect(appRoutes).toHaveTextContent('loggedIn: false');
+    });
+
+    test('loggedIn state remains false after 2 seconds', async () => {
+        render(<App />);
+
+        // Fast-forward 2 seconds
+        jest.advanceTimersByTime(2000);
+
+        // Wait for possible re-renders
+        await waitFor(() => {
+            const appRoutes = screen.getByTestId('app-routes');
+            expect(appRoutes).toHaveTextContent('loggedIn: false');
+        });
+    });
 });
