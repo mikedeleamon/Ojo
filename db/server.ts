@@ -141,6 +141,59 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
   }
 });
 
+// ─── User profile routes (JWT protected) ─────────────────────────────────────
+
+// GET /api/user/me
+app.get('/api/user/me', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await User.findById(req.userId).select('firstName lastName username email');
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({ firstName: user.firstName, lastName: user.lastName, username: user.username ?? '', email: user.email });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to load profile', detail: err.message });
+  }
+});
+
+// PUT /api/user/profile — update username and/or email
+app.put('/api/user/profile', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const { username, email } = req.body;
+
+    if (email) {
+      const conflict = await User.findOne({ email, _id: { $ne: req.userId } });
+      if (conflict) return res.status(409).json({ error: 'That email is already in use.' });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.userId,
+      { $set: { ...(username !== undefined && { username }), ...(email && { email }) } },
+      { new: true, runValidators: true }
+    ).select('firstName lastName username email');
+
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({ firstName: user.firstName, lastName: user.lastName, username: user.username ?? '', email: user.email });
+  } catch (err: any) {
+    console.error('[Ojo] Profile update failed:', err.message);
+    res.status(500).json({ error: 'Profile update failed', detail: err.message });
+  }
+});
+
+// PUT /api/user/password — set a new password (no old password required)
+app.put('/api/user/password', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const { newPassword } = req.body;
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+    }
+    const hashed = await bcrypt.hash(newPassword, 12);
+    await User.findByIdAndUpdate(req.userId, { $set: { password: hashed } });
+    res.json({ message: 'Password updated.' });
+  } catch (err: any) {
+    console.error('[Ojo] Password update failed:', err.message);
+    res.status(500).json({ error: 'Password update failed', detail: err.message });
+  }
+});
+
 // ─── User settings routes (JWT protected) ────────────────────────────────────
 
 // GET /api/user/settings
