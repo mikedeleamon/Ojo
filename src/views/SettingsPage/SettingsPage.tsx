@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import { Settings } from '../../types';
 import styles from './SettingsPage.module.css';
 
@@ -27,14 +26,7 @@ const SettingsPage = ({ settings, saveSettings }: Props) => {
       clothingStyle, location, temperatureScale: tempScale,
       hiTempThreshold: hiTemp, lowTempThreshold: lowTemp, humidityPreference: humidity,
     };
-    // Persist to localStorage immediately — axios call is a placeholder for a real DB endpoint
-    saveSettings(next);
-    try {
-      await axios.post('/save-settings', next);
-    } catch (err) {
-      // DB call failed — localStorage is already saved, so the user's settings are safe
-      console.warn('[Ojo] /save-settings unavailable, persisted to localStorage only:', err);
-    }
+    saveSettings(next); // persists locally + to MongoDB via useSettings
     navigate('/');
   };
 

@@ -1,51 +1,31 @@
-import mongoose from "mongoose";
-import Settings, { settingsSchema } from "./Settings";
+import mongoose from 'mongoose';
+import { settingsSchema } from './Settings';
 
 const userSchema = new mongoose.Schema({
-    firstName: {
-        type: String,
-        required: true, // Makes this field mandatory
+  firstName: { type: String, required: true },
+  lastName:  { type: String, required: true },
+  username:  { type: String },
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    match: [/^\S+@\S+\.\S+$/, 'Invalid email address'],
+  },
+  password: { type: String, required: true, minlength: 8 },
+  birthday:  { type: Date, required: true },
+  isActive:  { type: Boolean, default: true },
+  settings: {
+    type: settingsSchema,
+    default: {
+      clothingStyle:      'Casual',
+      location:           '',
+      temperatureScale:   'Imperial',
+      hiTempThreshold:    85,
+      lowTempThreshold:   50,
+      humidityPreference: 70,
     },
-    lastName: {
-        type: String,
-        required: true,
-    },
-    email: {
-        type: String,
-        required: true,
-        unique: true,
-        match: [/^\S+@\S+\.\S+$/, 'Invalid email address'], // Regex for email validation
-    },
-    password: {
-        type: String,
-        required: true,
-        minlength: 8, // Minimum length validation
-    },
-    birthday: {
-        type: Date,
-        required: true,
-    },
-    isActive: {
-        type: Boolean,
-        default: true,
-    },
-    Settings: {
-        type: settingsSchema,
-        default: {
-            clothingStyle: 'Business Casual',
-            location: 'New York',
-            temperatureScale: 'F',
-            hiTempThreshold: 83,
-            lowTempThreshold: 54,
-            humidityPreference: 50,
-        },
-    },
-}, {
-    timestamps: true,
-});
+  },
+}, { timestamps: true });
 
-// Create the model
 const User = mongoose.model('User', userSchema);
-
-// Export the model
 export default User;

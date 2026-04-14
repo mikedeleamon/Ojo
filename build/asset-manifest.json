@@ -1,7 +1,7 @@
 {
   "files": {
-    "main.css": "/static/css/main.212b00e9.css",
-    "main.js": "/static/js/main.13fad7bc.js",
+    "main.css": "/static/css/main.64adb202.css",
+    "main.js": "/static/js/main.7241eb38.js",
     "static/js/453.8f8bf7d0.chunk.js": "/static/js/453.8f8bf7d0.chunk.js",
     "static/media/Ojo word logo 2.png": "/static/media/Ojo word logo 2.105084e21520a5e7d429.png",
     "static/media/PartlyCloudy.png": "/static/media/PartlyCloudy.85720144650f2483cceb.png",
@@ -13,12 +13,12 @@
     "static/media/Cloudy.png": "/static/media/Cloudy.290d2c513f19c7fcba1e.png",
     "static/media/ClearNight.png": "/static/media/ClearNight.b35e128b513419ecd749.png",
     "index.html": "/index.html",
-    "main.212b00e9.css.map": "/static/css/main.212b00e9.css.map",
-    "main.13fad7bc.js.map": "/static/js/main.13fad7bc.js.map",
+    "main.64adb202.css.map": "/static/css/main.64adb202.css.map",
+    "main.7241eb38.js.map": "/static/js/main.7241eb38.js.map",
     "453.8f8bf7d0.chunk.js.map": "/static/js/453.8f8bf7d0.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.212b00e9.css",
-    "static/js/main.13fad7bc.js"
+    "static/css/main.64adb202.css",
+    "static/js/main.7241eb38.js"
   ]
 }

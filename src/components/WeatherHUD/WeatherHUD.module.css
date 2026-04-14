@@ -1,3 +1,10 @@
+.accountBtn {
+  position: fixed;
+  top: var(--spacing-md);
+  left: var(--spacing-md);
+  z-index: 100;
+}
+
 .root {
   min-height: 100dvh;
   display: flex;

@@ -5,6 +5,8 @@ import OjoLogo from '../../assets/images/logos/Ojo word logo 2.png';
 import { formatDate } from '../../helpers/formatTools.js';
 import styles from './SignupPage.module.css';
 
+const AUTH_KEY = 'ojo_auth';
+
 interface Props { setLoggedIn: (v: boolean) => void; }
 
 const Field = ({ label, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) => (
@@ -19,23 +21,40 @@ const SignupPage = ({ setLoggedIn }: Props) => {
     firstName: '', lastName: '', birthday: '',
     email: '', username: '', password: '', passwordConfirmation: '',
   });
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError]   = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const set = (key: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(f => ({ ...f, [key]: e.target.value }));
 
   const onSubmit = async () => {
+    setError(null);
     if (form.password !== form.passwordConfirmation) {
-      setError('Passwords do not match');
+      setError('Passwords do not match.');
       return;
     }
+    if (form.password.length < 8) {
+      setError('Password must be at least 8 characters.');
+      return;
+    }
+    setLoading(true);
     try {
-      await axios.post('/add-user', form);
+      const { data } = await axios.post('/api/auth/signup', {
+        firstName: form.firstName,
+        lastName:  form.lastName,
+        username:  form.username,
+        email:     form.email,
+        password:  form.password,
+        birthday:  form.birthday,
+      });
+      localStorage.setItem(AUTH_KEY, JSON.stringify({ token: data.token, user: data.user }));
       setLoggedIn(true);
       navigate('/');
-    } catch {
-      setError('Failed to register. Please try again.');
+    } catch (err: any) {
+      setError(err.response?.data?.error ?? 'Sign up failed. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -56,17 +75,19 @@ const SignupPage = ({ setLoggedIn }: Props) => {
         <div className={styles.fields}>
           <div className={styles.row}>
             <Field label='First name' type='text' placeholder='Jane' value={form.firstName} onChange={set('firstName')} />
-            <Field label='Last name' type='text' placeholder='Doe' value={form.lastName} onChange={set('lastName')} />
+            <Field label='Last name'  type='text' placeholder='Doe'  value={form.lastName}  onChange={set('lastName')} />
           </div>
           <Field label='Date of birth' type='text' placeholder='MM/DD/YYYY' value={form.birthday}
             onChange={e => setForm(f => ({ ...f, birthday: formatDate(e) }))} />
-          <Field label='Email' type='email' placeholder='you@example.com' value={form.email} onChange={set('email')} />
-          <Field label='Username' type='text' placeholder='@janedoe' value={form.username} onChange={set('username')} />
-          <Field label='Password' type='password' placeholder='••••••••' value={form.password} onChange={set('password')} />
+          <Field label='Email'    type='email' placeholder='you@example.com' value={form.email}    onChange={set('email')} />
+          <Field label='Username' type='text'  placeholder='@janedoe'        value={form.username} onChange={set('username')} />
+          <Field label='Password'         type='password' placeholder='••••••••' value={form.password}             onChange={set('password')} />
           <Field label='Confirm password' type='password' placeholder='••••••••' value={form.passwordConfirmation} onChange={set('passwordConfirmation')} />
         </div>
 
-        <button className={styles.btn} onClick={onSubmit}>Create account</button>
+        <button className={styles.btn} onClick={onSubmit} disabled={loading}>
+          {loading ? 'Creating account…' : 'Create account'}
+        </button>
 
         <p className={styles.footer}>
           Already have an account?{' '}
