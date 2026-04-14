@@ -1,103 +1,55 @@
-import React, { useEffect, useState } from 'react';
-import '../../App.css';
-import Cloudy from '../weatherIcons/Cloudy/Cloudy';
-import Snow from '../weatherIcons/Snow/Snow';
-import Rainy from '../weatherIcons/Rainy/Rainy';
-import Sunny from '../weatherIcons/Sunny/Sunny';
-import ClearNight from '../weatherIcons/ClearNight/ClearNight';
-import Stormy from '../weatherIcons/Stormy/Stormy';
-import PartlyCloudy from '../weatherIcons/PartlyCloudy/PartlyCloudy';
-import PartlyCloudyNight from '../weatherIcons/PartlyCloudy/PartlyCloudyNight';
 import styles from './WeatherIconDisplay.module.css';
+import Cloudy from '../../assets/images/weatherIcons/Cloudy.png';
+import Snow from '../../assets/images/weatherIcons/Snow.png';
+import Rainy from '../../assets/images/weatherIcons/Rainy.png';
+import Sunny from '../../assets/images/weatherIcons/Sunny.png';
+import ClearNight from '../../assets/images/weatherIcons/ClearNight.png';
+import Storm from '../../assets/images/weatherIcons/Storm.png';
+import PartlyCloudy from '../../assets/images/weatherIcons/PartlyCloudy.png';
+import PartlyCloudyNight from '../../assets/images/weatherIcons/PartlyCloudyNight.png';
 
-interface WeatherIconDisplayProps {
-    weatherCondition: string; // Description of the current weather
-    isDay: boolean; // Indicates if it's daytime
-    size: string; // Size of the weather icon
-    temperature: number | string; // Current temperature
-    feelsLike?: number | string; // Feels-like temperature (optional)
+interface Props {
+  condition: string;
+  isDay: boolean;
+  size?: 'large' | 'small';
+  temperature?: number | string;
+  feelsLike?: number | string;
 }
 
-const WeatherIconDisplay = ({
-    weatherCondition,
-    isDay,
-    size,
-    temperature,
-    feelsLike,
-}: WeatherIconDisplayProps) => {
-    const bigIcon = 'currentWeatherLogo';
-    const smallIcon = 'miniWeatherIcon';
-    const [iconSize, setIconSize] = useState<string>('');
+const iconFor = (condition: string, isDay: boolean): string => {
+  const c = condition.toLowerCase();
+  if (c.includes('thunder') || c.includes('t-storm')) return Storm;
+  if (c.includes('snow') || c.includes('flurr')) return Snow;
+  if (c.includes('rain') || c.includes('shower') || c.includes('drizzle')) return Rainy;
+  if (c.includes('sunny') || c.includes('mostly sunny')) return Sunny;
+  if (c.includes('clear') || c.includes('mostly clear'))
+    return isDay ? Sunny : ClearNight;
+  if (c.includes('partly') || c.includes('intermittent') || c.includes('hazy'))
+    return isDay ? PartlyCloudy : PartlyCloudyNight;
+  if (c.includes('cloud') || c.includes('overcast') || c.includes('dreary')) return Cloudy;
+  return isDay ? Sunny : ClearNight;
+};
 
-    let weatherIcon: React.ReactNode;
+const WeatherIconDisplay = ({ condition, isDay, size = 'small', temperature, feelsLike }: Props) => {
+  const icon = iconFor(condition, isDay);
+  const isLarge = size === 'large';
 
-    useEffect(() => {
-        setIconSize(size === 'Big' ? bigIcon : smallIcon);
-    }, [size]);
-
-    switch (weatherCondition) {
-        case 'Cloudy':
-        case 'Mostly cloudy':
-        case 'Dreary (Overcast)':
-            weatherIcon = <Cloudy className={iconSize} />;
-            break;
-        case 'Partly cloudy':
-        case 'Partly sunny':
-        case 'Partly cloudy w/ showers':
-        case 'Intermittent clouds':
-        case 'Hazy sunshine':
-            weatherIcon = isDay ? (
-                <PartlyCloudy className={iconSize} />
-            ) : (
-                <PartlyCloudyNight className={iconSize} />
-            );
-            break;
-        case 'Snow':
-        case 'Mostly cloudy w/ snow':
-        case 'Mostly cloudy w/ flurries':
-            weatherIcon = <Snow className={iconSize} />;
-            break;
-        case 'Rain':
-        case 'Showers':
-        case 'Flurries':
-        case 'Mostly cloudy w/ showers':
-            weatherIcon = <Rainy className={iconSize} />;
-            break;
-        case 'Sunny':
-        case 'Mostly sunny':
-            weatherIcon = <Sunny className={iconSize} />;
-            break;
-        case 'Clear':
-        case 'Mostly clear':
-            weatherIcon = isDay ? (
-                <Sunny className={iconSize} />
-            ) : (
-                <ClearNight className={iconSize} />
-            );
-            break;
-        case 'Thunderstorms':
-        case 'Partly sunny w/ t-storms':
-        case 'Partly cloudy w/ t-Storms':
-        case 'Mostly cloudy w/ t-Storms':
-            weatherIcon = <Stormy className={iconSize} />;
-            break;
-        default:
-            weatherIcon = null;
-    }
-
-    return (
-        <div className={styles.weatherContainer}>
-            {weatherIcon}
-            {size === 'Big' ? (
-                <div className={styles.temperature}>
-                    <div>{`${temperature}\u00B0`}</div>
-                    {feelsLike && <div>{`${feelsLike}\u00B0`}</div>}
-                </div>
-            ) : (
-                <div className={styles.temperature}>{temperature}</div>
-            )}
+  return (
+    <div className={`${styles.root} ${isLarge ? styles.large : styles.small}`}>
+      <img src={icon} alt={condition} className={styles.icon} />
+      {isLarge && temperature !== undefined && (
+        <div className={styles.temps}>
+          <span className={styles.temp}>{temperature}°</span>
+          {feelsLike !== undefined && (
+            <span className={styles.feelsLike}>feels {feelsLike}°</span>
+          )}
         </div>
-    );
+      )}
+      {!isLarge && temperature !== undefined && (
+        <span className={styles.miniTemp}>{temperature}°</span>
+      )}
+    </div>
+  );
 };
 
 export default WeatherIconDisplay;

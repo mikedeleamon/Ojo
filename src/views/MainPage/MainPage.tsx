@@ -1,76 +1,38 @@
-import React, { useEffect, useState } from 'react';
-import '../../App.css';
-import styles from './MainPage.module.css';
+import { useState, useEffect } from 'react';
 import WeatherHUD from '../../components/WeatherHUD/WeatherHUD';
 import Loading from '../../components/Loading/Loading';
 import SettingsButton from '../../components/buttons/SettingsButton/SettingsButton';
-import axios from 'axios';
-
 import { Settings } from '../../types';
+import styles from './MainPage.module.css';
 
-const MainPage = () => {
-    const [latitude, setLatitude] = useState<number | null>(null);
-    const [longitude, setLongitude] = useState<number | null>(null);
-    const [isLoading, setIsLoading] = useState<boolean>(true);
-    const [settings, setSettings] = useState<Settings | null>(null);
-    const [backgroundColor, getBackgroundColor] = useState<string>('#fff');
+interface Props { settings: Settings; }
 
-    const location =
-        latitude !== null && longitude !== null
-            ? `${latitude},${longitude}`
-            : '';
+const MainPage = ({ settings }: Props) => {
+  const [location, setLocation] = useState('');
+  const [geoLoading, setGeoLoading] = useState(true);
 
-    const getSettings = async () => {
-        try {
-            const response = await axios.get('/get-settings');
-            setSettings(response.data);
-        } catch (error) {
-            console.error('Error retrieving settings:', error);
-        }
-    };
-    useEffect(() => {
-        // Fetch settings and geolocation data
-
-        const getLocation = () => {
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    setLatitude(position.coords.latitude);
-                    setLongitude(position.coords.longitude);
-                    setIsLoading(false);
-                },
-                (error) => {
-                    console.error('Error getting location:', error);
-                    setIsLoading(false); // Stop loading even if location fails
-                }
-            );
-        };
-
-        // Call both functions
-        getSettings();
-        getLocation();
-    }, []);
-
-    return isLoading ? (
-        <Loading />
-    ) : (
-        <div
-            className='App'
-            style={{
-                backgroundColor: backgroundColor as string,
-                height: '100vh',
-                padding: '20px',
-            }}
-        >
-            <div className={styles.settingsButtonContainer}>
-                <SettingsButton />
-            </div>
-            <WeatherHUD
-                location={location}
-                getBackgroundColor={getBackgroundColor}
-                settings={settings as Settings}
-            />
-        </div>
+  useEffect(() => {
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setLocation(`${coords.latitude},${coords.longitude}`);
+        setGeoLoading(false);
+      },
+      () => {
+        // Fall back to settings location if geo is denied
+        setLocation(settings.location);
+        setGeoLoading(false);
+      }
     );
+  }, []);
+
+  return (
+    <div className={styles.root}>
+      <div className={styles.settingsBtn}>
+        <SettingsButton />
+      </div>
+      {geoLoading ? <Loading /> : <WeatherHUD location={location} settings={settings} />}
+    </div>
+  );
 };
 
 export default MainPage;

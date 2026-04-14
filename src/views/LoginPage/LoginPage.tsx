@@ -1,64 +1,58 @@
-import React from 'react';
-import OjoLogoLight from '../../components/logos/OjoLogoLight/OjoLogoLight';
+import { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import OjoLogo from '../../assets/images/logos/Ojo word logo 2.png';
 import styles from './LoginPage.module.css';
-import { useNavigate } from 'react-router-dom';
 
-interface LoginPageProps {
-    setLoggedIn: (value: boolean) => void;
-}
+interface Props { setLoggedIn: (v: boolean) => void; }
 
-const LoginPage = ({ setLoggedIn }: LoginPageProps) => {
-    const navigate = useNavigate();
+const LoginPage = ({ setLoggedIn }: Props) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const navigate = useNavigate();
 
-    const navigateToPage = () => {
-        setLoggedIn(true);
-        navigate('/');
-    };
+  const handleSubmit = () => {
+    setLoggedIn(true);
+    navigate('/');
+  };
 
-    const navigateToSignupPage = () => {
-        navigate('/signup');
-    };
+  return (
+    <div className={styles.root}>
+      <div className={styles.card}>
+        <img src={OjoLogo} alt='Ojo' className={styles.logo} />
+        <p className={styles.tagline}>Dress for the weather.</p>
 
-    return (
-        <div className={`${styles.center} mt-5`}>
-            <OjoLogoLight className='currentWeatherLogo' />
-
-            <div className='col-8 col-sm-4 col-lg-2'>
-                <input
-                    type='email'
-                    className='form-control'
-                    aria-describedby='emailHelp'
-                    placeholder='Username'
-                />
-            </div>
-
-            <div className='col-8 col-sm-4 col-lg-2'>
-                <input
-                    type='password'
-                    className='form-control mt-3'
-                    placeholder='Password'
-                />
-            </div>
-
-            <button
-                onClick={navigateToPage}
-                type='submit'
-                className='col-8 col-sm-4 col-lg-2 btn btn-block btn-secondary mt-4'
-            >
-                Submit
-            </button>
-
-            <p className={`${styles.blkText} mt-2`}>
-                Don't have an account?{' '}
-                <a
-                    className={styles.blueText}
-                    onClick={navigateToSignupPage}
-                >
-                    Sign Up
-                </a>
-            </p>
+        <div className={styles.fields}>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>Email</span>
+            <input
+              type='email'
+              className={styles.input}
+              placeholder='you@example.com'
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+            />
+          </label>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>Password</span>
+            <input
+              type='password'
+              className={styles.input}
+              placeholder='••••••••'
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+            />
+          </label>
         </div>
-    );
+
+        <button className={styles.btn} onClick={handleSubmit}>Sign in</button>
+
+        <p className={styles.footer}>
+          Don't have an account?{' '}
+          <Link to='/signup' className={styles.link}>Sign up</Link>
+        </p>
+      </div>
+    </div>
+  );
 };
 
 export default LoginPage;

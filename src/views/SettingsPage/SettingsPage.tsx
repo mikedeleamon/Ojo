@@ -1,182 +1,135 @@
-import React, { useState } from 'react';
-import '../../App.css';
-import styles from './SettingsPage.module.css';
-import CloseButton from '../../components/buttons/CloseButton/CloseButton';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-
 import { Settings } from '../../types';
+import styles from './SettingsPage.module.css';
 
-interface SettingsProps {
-    setLoggedIn: (value: boolean) => void;
-    //onSaveSettings: (settings: Settings ) => void;
+interface Props {
+  settings: Settings;
+  saveSettings: (s: Settings) => void;
 }
 
-const SettingsPage = ({ setLoggedIn }: SettingsProps) => {
-    const [clothingStyle, setClothingStyle] = useState<string>('Casual');
-    const [location, setLocation] = useState<string>('New York');
-    const [temperatureScale, setTemperatureScale] =
-        useState<string>('Imperial');
-    const [hiTempThreshold, setHiTempThreshold] = useState<number>(50);
-    const [lowTempThreshold, setLowTempThreshold] = useState<number>(50);
-    const [humidityPreference, setHumidityPreference] = useState<number>(50);
+const STYLES = ['Casual', 'Business Casual', 'Formal', 'Urban', 'Cozy', 'Preppy'];
 
-    const navigate = useNavigate();
+const SettingsPage = ({ settings, saveSettings }: Props) => {
+  const navigate = useNavigate();
+  const [clothingStyle, setClothingStyle] = useState(settings.clothingStyle);
+  const [location, setLocation] = useState(settings.location);
+  const [tempScale, setTempScale] = useState<'Imperial' | 'Metric'>(
+    settings.temperatureScale as 'Imperial' | 'Metric'
+  );
+  const [hiTemp, setHiTemp] = useState(settings.hiTempThreshold);
+  const [lowTemp, setLowTemp] = useState(settings.lowTempThreshold);
+  const [humidity, setHumidity] = useState(settings.humidityPreference);
 
-    const handleSave = async () => {
-        const newSettings: Settings = {
-            clothingStyle,
-            location,
-            temperatureScale,
-            hiTempThreshold,
-            lowTempThreshold,
-            humidityPreference,
-        };
-        try {
-            await axios.post('/save-settings', newSettings);
-        } catch (e) {
-            console.log('error');
-        } finally {
-            navigate('/');
-        }
+  const save = async () => {
+    const next: Settings = {
+      clothingStyle, location, temperatureScale: tempScale,
+      hiTempThreshold: hiTemp, lowTempThreshold: lowTemp, humidityPreference: humidity,
     };
+    // Persist to localStorage immediately — axios call is a placeholder for a real DB endpoint
+    saveSettings(next);
+    try {
+      await axios.post('/save-settings', next);
+    } catch (err) {
+      // DB call failed — localStorage is already saved, so the user's settings are safe
+      console.warn('[Ojo] /save-settings unavailable, persisted to localStorage only:', err);
+    }
+    navigate('/');
+  };
 
-    const onClose = () => {
-        navigate('/');
-    };
-
-    return (
-        <div className='App'>
-            <div className={styles.closeButtonContainer}>
-                <CloseButton
-                    onClose={onClose}
-                    className={styles.closeButton}
-                />
-            </div>
-            <div className='mt-5'>
-                <h2 className='text-white p-4'>Settings</h2>
-            </div>
-
-            <div className={`${styles.sliderContainer} mb-4`}>
-                <label>Preferred Clothing Style:</label>
-                <select
-                    className='form-control'
-                    value={clothingStyle}
-                    onChange={(e) => setClothingStyle(e.target.value)}
-                >
-                    <option>Business Casual</option>
-                    <option>Formal</option>
-                    <option>Urban</option>
-                    <option>Cozy</option>
-                    <option>Preppy</option>
-                </select>
-            </div>
-
-            <div className={`${styles.sliderContainer} mb-4`}>
-                <label>
-                    Location:
-                    <input
-                        className='form-control'
-                        type='text'
-                        value={location}
-                        onChange={(e) => setLocation(e.target.value)}
-                    />
-                </label>
-            </div>
-
-            <div className={`${styles.sliderContainer} mb-5`}>
-                <div
-                    className='btn-group btn-group-toggle'
-                    data-toggle='buttons'
-                >
-                    <label
-                        className={`btn btn-secondary ${
-                            temperatureScale === 'Imperial' ? 'active' : ''
-                        }`}
-                    >
-                        <input
-                            type='radio'
-                            name='options'
-                            value='Imperial'
-                            onClick={() => setTemperatureScale('Imperial')}
-                            checked={temperatureScale === 'Imperial'}
-                            readOnly
-                        />
-                        Imperial
-                    </label>
-                    <label
-                        className={`btn btn-secondary ${
-                            temperatureScale === 'Metric' ? 'active' : ''
-                        }`}
-                    >
-                        <input
-                            type='radio'
-                            name='options'
-                            value='Metric'
-                            onClick={() => setTemperatureScale('Metric')}
-                            checked={temperatureScale === 'Metric'}
-                            readOnly
-                        />
-                        Metric
-                    </label>
-                </div>
-
-                <div className='mb-2'>
-                    <label>
-                        Hot Weather Preference: {`${hiTempThreshold}\u00B0`}
-                        <input
-                            className='form-range'
-                            type='range'
-                            min='0'
-                            max='100'
-                            value={hiTempThreshold}
-                            onChange={(e) =>
-                                setHiTempThreshold(Number(e.target.value))
-                            }
-                        />
-                    </label>
-                </div>
-                <div className='mb-2'>
-                    <label>
-                        Cold Weather Preference: {`${lowTempThreshold}\u00B0`}
-                        <input
-                            className='form-range'
-                            type='range'
-                            min='0'
-                            max='100'
-                            value={lowTempThreshold}
-                            onChange={(e) =>
-                                setLowTempThreshold(Number(e.target.value))
-                            }
-                        />
-                    </label>
-                </div>
-                <div className='mb-2'>
-                    <label>
-                        Humidity Preference: {humidityPreference}%
-                        <input
-                            className='form-range'
-                            type='range'
-                            min='0'
-                            max='100'
-                            value={humidityPreference}
-                            onChange={(e) =>
-                                setHumidityPreference(Number(e.target.value))
-                            }
-                        />
-                    </label>
-                </div>
-            </div>
-
-            <button
-                type='button'
-                onClick={handleSave}
-                className='col-8 col-sm-4 col-lg-2 btn btn-block btn-secondary mt-4'
-            >
-                Save
-            </button>
+  return (
+    <div className={styles.root}>
+      <div className={styles.card}>
+        {/* Header */}
+        <div className={styles.header}>
+          <button className={styles.backBtn} onClick={() => navigate('/')} aria-label='Close'>
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <path d="M11 14l-5-5 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+          <h1 className={styles.title}>Settings</h1>
         </div>
-    );
+
+        <div className={styles.sections}>
+          {/* Clothing style */}
+          <section className={styles.section}>
+            <h2 className={styles.sectionTitle}>Style preference</h2>
+            <div className={styles.chips}>
+              {STYLES.map(s => (
+                <button
+                  key={s}
+                  className={`${styles.chip} ${clothingStyle === s ? styles.chipActive : ''}`}
+                  onClick={() => setClothingStyle(s)}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          {/* Location */}
+          <section className={styles.section}>
+            <h2 className={styles.sectionTitle}>Default location</h2>
+            <input
+              className={styles.input}
+              type='text'
+              value={location}
+              onChange={e => setLocation(e.target.value)}
+              placeholder='City name'
+            />
+          </section>
+
+          {/* Temp scale */}
+          <section className={styles.section}>
+            <h2 className={styles.sectionTitle}>Temperature unit</h2>
+            <div className={styles.segmented}>
+              <button
+                className={`${styles.seg} ${tempScale === 'Imperial' ? styles.segActive : ''}`}
+                onClick={() => setTempScale('Imperial')}
+              >°F</button>
+              <button
+                className={`${styles.seg} ${tempScale === 'Metric' ? styles.segActive : ''}`}
+                onClick={() => setTempScale('Metric')}
+              >°C</button>
+            </div>
+          </section>
+
+          {/* Temp thresholds */}
+          <section className={styles.section}>
+            <h2 className={styles.sectionTitle}>Temperature feel</h2>
+            <SliderField label='Hot above' value={hiTemp} unit='°' min={50} max={120} onChange={setHiTemp} />
+            <SliderField label='Cold below' value={lowTemp} unit='°' min={0} max={70} onChange={setLowTemp} />
+          </section>
+
+          {/* Humidity */}
+          <section className={styles.section}>
+            <h2 className={styles.sectionTitle}>Humidity sensitivity</h2>
+            <SliderField label='Threshold' value={humidity} unit='%' min={0} max={100} onChange={setHumidity} />
+          </section>
+        </div>
+
+        <button className={styles.saveBtn} onClick={save}>Save changes</button>
+      </div>
+    </div>
+  );
 };
+
+const SliderField = ({ label, value, unit, min, max, onChange }: {
+  label: string; value: number; unit: string; min: number; max: number;
+  onChange: (v: number) => void;
+}) => (
+  <div className={styles.sliderRow}>
+    <div className={styles.sliderMeta}>
+      <span className={styles.sliderLabel}>{label}</span>
+      <span className={styles.sliderValue}>{value}{unit}</span>
+    </div>
+    <input
+      type='range' min={min} max={max} value={value}
+      onChange={e => onChange(Number(e.target.value))}
+      className={styles.slider}
+    />
+  </div>
+);
 
 export default SettingsPage;

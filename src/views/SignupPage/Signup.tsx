@@ -1,148 +1,80 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import styles from './SignupPage.module.css';
-import CloseButton from '../../components/buttons/CloseButton/CloseButton';
+import { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
-import FormInput from '../../components/inputs/FormInput/FormInput';
+import OjoLogo from '../../assets/images/logos/Ojo word logo 2.png';
 import { formatDate } from '../../helpers/formatTools.js';
+import styles from './SignupPage.module.css';
 
-interface SignupPageProps {
-    setLoggedIn: (value: boolean) => void;
-}
+interface Props { setLoggedIn: (v: boolean) => void; }
 
-const SignupPage = ({ setLoggedIn }: SignupPageProps) => {
-    const [firstName, setFirstName] = useState('');
-    const [lastName, setLastName] = useState('');
-    const [birthday, setBirthday] = useState('');
-    const [email, setEmail] = useState('');
-    const [username, setUsername] = useState('');
-    const [password, setPassword] = useState('');
-    const [passwordConfirmation, setPasswordConfirmation] = useState('');
-    const [error, setError] = useState<string | null>(null);
+const Field = ({ label, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) => (
+  <label className={styles.field}>
+    <span className={styles.fieldLabel}>{label}</span>
+    <input className={styles.input} {...props} />
+  </label>
+);
 
-    const navigate = useNavigate();
+const SignupPage = ({ setLoggedIn }: Props) => {
+  const [form, setForm] = useState({
+    firstName: '', lastName: '', birthday: '',
+    email: '', username: '', password: '', passwordConfirmation: '',
+  });
+  const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
 
-    const navigateToLoginPage = () => {
-        setLoggedIn(false);
-        navigate('/');
-    };
+  const set = (key: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm(f => ({ ...f, [key]: e.target.value }));
 
-    const onClose = () => {
-        navigate('/');
-    };
+  const onSubmit = async () => {
+    if (form.password !== form.passwordConfirmation) {
+      setError('Passwords do not match');
+      return;
+    }
+    try {
+      await axios.post('/add-user', form);
+      setLoggedIn(true);
+      navigate('/');
+    } catch {
+      setError('Failed to register. Please try again.');
+    }
+  };
 
-    const onSubmit = async () => {
-        if (password !== passwordConfirmation) {
-            setError('Passwords do not match');
-            return;
-        }
+  return (
+    <div className={styles.root}>
+      <div className={styles.card}>
+        <Link to='/login' className={styles.backBtn} aria-label='Back'>
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <path d="M11 14l-5-5 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </Link>
 
-        const userInfo = {
-            firstName,
-            lastName,
-            birthday,
-            email,
-            username,
-            password,
-        };
-        console.log(userInfo);
+        <img src={OjoLogo} alt='Ojo' className={styles.logo} />
+        <h1 className={styles.heading}>Create account</h1>
 
-        try {
-            await axios.post('/add-user', userInfo);
-            setLoggedIn(true);
-            navigate('/');
-        } catch (error) {
-            console.error('ERRRRRRROOOORRRRRRR:', error);
-            setError('Failed to register. Please try again later.');
-        }
-    };
+        {error && <p className={styles.error}>{error}</p>}
 
-    return (
-        <div className={'App'}>
-            <div className={styles.closeButtonContainer}>
-                <CloseButton
-                    onClose={onClose}
-                    className={styles.closeButton}
-                />
-            </div>
-            <div className='mt-5'>
-                <h1 className={'text-white p-4'}>Sign Up</h1>
-            </div>
-            {error && <p className='text-danger'>{error}</p>}
-            <FormInput
-                label='First Name'
-                type='text'
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                placeholder='John'
-                id='firstName'
-            />
-            <FormInput
-                label='Last Name'
-                type='text'
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                placeholder='Weatherspoon'
-                id='lastName'
-            />
-            <FormInput
-                label='Date of Birth'
-                type='text'
-                value={birthday}
-                onChange={(e) => setBirthday(formatDate(e))}
-                placeholder='MM/DD/YYYY'
-                id='dob'
-            />
-            <FormInput
-                label='Email'
-                type='email'
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder='youremail@example.com'
-                id='email'
-            />
-            <FormInput
-                label='Username'
-                type='text'
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder='@Weatherspoon123'
-                id='username'
-            />
-            <FormInput
-                label='Password'
-                type='password'
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                id='password'
-            />
-            <FormInput
-                label='Confirm Password'
-                type='password'
-                value={passwordConfirmation}
-                onChange={(e) => setPasswordConfirmation(e.target.value)}
-                id='passwordConfirm'
-            />
-            <button
-                type='submit'
-                className='col-8 col-sm-4 col-lg-2 btn btn-block btn-secondary mt-4'
-                onClick={onSubmit}
-            >
-                Submit
-            </button>
-            <div>
-                <p className={`${styles.blkText} mt-2`}>
-                    Have an account?{' '}
-                    <a
-                        className={styles.blueText}
-                        onClick={navigateToLoginPage}
-                    >
-                        Sign in
-                    </a>
-                </p>
-            </div>
+        <div className={styles.fields}>
+          <div className={styles.row}>
+            <Field label='First name' type='text' placeholder='Jane' value={form.firstName} onChange={set('firstName')} />
+            <Field label='Last name' type='text' placeholder='Doe' value={form.lastName} onChange={set('lastName')} />
+          </div>
+          <Field label='Date of birth' type='text' placeholder='MM/DD/YYYY' value={form.birthday}
+            onChange={e => setForm(f => ({ ...f, birthday: formatDate(e) }))} />
+          <Field label='Email' type='email' placeholder='you@example.com' value={form.email} onChange={set('email')} />
+          <Field label='Username' type='text' placeholder='@janedoe' value={form.username} onChange={set('username')} />
+          <Field label='Password' type='password' placeholder='••••••••' value={form.password} onChange={set('password')} />
+          <Field label='Confirm password' type='password' placeholder='••••••••' value={form.passwordConfirmation} onChange={set('passwordConfirmation')} />
         </div>
-    );
+
+        <button className={styles.btn} onClick={onSubmit}>Create account</button>
+
+        <p className={styles.footer}>
+          Already have an account?{' '}
+          <Link to='/login' className={styles.link}>Sign in</Link>
+        </p>
+      </div>
+    </div>
+  );
 };
 
 export default SignupPage;

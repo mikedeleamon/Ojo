@@ -1,73 +1,70 @@
-import React, { useEffect, useState } from 'react';
+import { useMemo } from 'react';
+import { CurrentWeather, Settings } from '../../types';
+import styles from './OutfitSuggestion.module.css';
 
-import { WeatherDetail } from '../../types';
+interface Props { weather: CurrentWeather; settings: Settings; }
 
-interface OutfitSuggestionProps {
-    currentWeather: WeatherDetail[]; // Array of weather details
-}
+const getOutfitAdvice = (weather: CurrentWeather, settings: Settings) => {
+  const tempF = weather.Temperature.Imperial.Value;
+  const humid = weather.RelativeHumidity;
+  const raining = weather.HasPrecipitation;
+  const { hiTempThreshold, lowTempThreshold, clothingStyle } = settings;
+  const items: string[] = [];
 
-const OutfitSuggestion = ({ currentWeather }: OutfitSuggestionProps) => {
-    const [isRaining, setIsRaining] = useState<boolean>(false);
-    const [userPreferences, setUserPreferences] = useState<string>('');
-    const [recommendation, setRecommendation] = useState<string>('');
+  // Temperature tiers use the user's own thresholds
+  if (tempF >= hiTempThreshold) {
+    items.push('Light t-shirt or tank top', 'Shorts or linen pants', 'Sunglasses & sunscreen');
+  } else if (tempF >= lowTempThreshold) {
+    items.push('Breathable shirt', 'Light pants or jeans');
+  } else if (tempF >= lowTempThreshold - 15) {
+    items.push('Long-sleeve shirt', 'Light jacket or hoodie', 'Jeans or chinos');
+  } else if (tempF >= 32) {
+    items.push('Warm sweater or fleece', 'Insulated jacket', 'Thick jeans or trousers');
+  } else {
+    items.push('Heavy coat', 'Thermal underlayer', 'Warm hat & gloves', 'Insulated boots');
+  }
 
-    useEffect(() => {
-        const handleRecommendation = () => {
-            if (currentWeather.length === 0) return;
+  // Style-specific extras
+  const styleExtras: Record<string, string> = {
+    'Business Casual': 'Dress shoes or clean sneakers',
+    'Formal':          'Dress shoes, consider a blazer',
+    'Urban':           'Streetwear sneakers, statement outerwear',
+    'Cozy':            'Soft knits, comfortable loafers',
+    'Preppy':          'Collared shirt, chinos',
+  };
+  if (styleExtras[clothingStyle]) items.push(styleExtras[clothingStyle]);
 
-            // Extracting relevant data from the weather object
-            setIsRaining(currentWeather[0].HasPrecipitation);
+  // Condition modifiers
+  if (humid > settings.humidityPreference) items.push('Moisture-wicking, breathable fabrics');
+  if (raining) items.push('Waterproof jacket', 'Umbrella');
 
-            const temperature = parseFloat(
-                currentWeather[0].Temperature.Imperial.Value
-            );
-            const humidity = parseFloat(currentWeather[0].RelativeHumidity);
+  const headline =
+    tempF >= hiTempThreshold  ? "It's hot out there." :
+    tempF >= lowTempThreshold  ? "Nice weather today." :
+    tempF >= lowTempThreshold - 15 ? "A bit cool — layer up." :
+    tempF >= 32                ? "Bundle up." :
+    "Dress warm — it's freezing.";
 
-            // Temperature and humidity-based clothing suggestions
-            let outfit = '';
+  return { headline, items };
+};
 
-            if (temperature > 77) {
-                outfit += "It's hot! Wear light and breathable clothes.";
-            } else if (temperature >= 59 && temperature <= 77) {
-                outfit += 'The weather is moderate. Dress comfortably.';
-            } else if (temperature < 59 && isRaining) {
-                outfit +=
-                    "It's cold and rainy. Wear a jacket and bring an umbrella.";
-            } else if (temperature < 59) {
-                outfit += "It's cold. Wear warm layers.";
-            } else {
-                outfit += 'Weather recommendation not available.';
-            }
+const OutfitSuggestion = ({ weather, settings }: Props) => {
+  const { headline, items } = useMemo(() => getOutfitAdvice(weather, settings), [weather, settings]);
 
-            // Add humidity-specific clothing suggestions
-            if (humidity > 70) {
-                outfit += ' Consider wearing breathable fabrics.';
-            } else if (humidity > 50) {
-                outfit +=
-                    ' It might be a bit humid. Choose comfortable clothing.';
-            }
-
-            // Add user's preferences to the recommendation
-            outfit += `, ${userPreferences} style`;
-
-            // Add rain-specific clothing suggestions
-            if (isRaining) {
-                outfit += ', umbrella, raincoat, waterproof shoes';
-            }
-
-            setRecommendation(outfit);
-        };
-
-        handleRecommendation();
-    }, [currentWeather, isRaining, userPreferences]);
-
-    return (
-        <div>
-            <div>
-                <p>{recommendation}</p>
-            </div>
-        </div>
-    );
+  return (
+    <div className={styles.root}>
+      <div className={styles.styleTag}>{settings.clothingStyle}</div>
+      <p className={styles.headline}>{headline}</p>
+      <ul className={styles.list}>
+        {items.map(item => (
+          <li key={item} className={styles.item}>
+            <span className={styles.dot} />
+            {item}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 };
 
 export default OutfitSuggestion;

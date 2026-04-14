@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import Settings from "./Settings";
+import Settings, { settingsSchema } from "./Settings";
 
 const userSchema = new mongoose.Schema({
     firstName: {
@@ -30,13 +30,15 @@ const userSchema = new mongoose.Schema({
         default: true,
     },
     Settings: {
-        type: Settings,
-        default: {clothingStyle: 'Business Casual',
+        type: settingsSchema,
+        default: {
+            clothingStyle: 'Business Casual',
             location: 'New York',
             temperatureScale: 'F',
             hiTempThreshold: 83,
             lowTempThreshold: 54,
-            humidityPreference: 50}
+            humidityPreference: 50,
+        },
     },
 }, {
     timestamps: true,
