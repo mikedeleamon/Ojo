@@ -5,6 +5,7 @@ import LoginPage from '../views/LoginPage/LoginPage';
 import SignupPage from '../views/SignupPage/Signup';
 import SettingsPage from '../views/SettingsPage/SettingsPage';
 import AccountPage from '../views/AccountPage/AccountPage';
+import ClosetPage from '../views/ClosetPage/ClosetPage';
 
 interface Props {
   loggedIn: boolean;
@@ -20,6 +21,7 @@ const AppRoutes = ({ loggedIn, setLoggedIn, onLogout, settings, settingsReady, s
     <Route path='/'         element={loggedIn ? <MainPage settings={settings} settingsReady={settingsReady} /> : <Navigate to='/login' replace />} />
     <Route path='/settings' element={loggedIn ? <SettingsPage settings={settings} saveSettings={saveSettings} /> : <Navigate to='/login' replace />} />
     <Route path='/account'  element={loggedIn ? <AccountPage settings={settings} saveSettings={saveSettings} onLogout={onLogout} /> : <Navigate to='/login' replace />} />
+    <Route path='/closet'   element={loggedIn ? <ClosetPage /> : <Navigate to='/login' replace />} />
     <Route path='/login'    element={<LoginPage setLoggedIn={setLoggedIn} />} />
     <Route path='/signup'   element={<SignupPage setLoggedIn={setLoggedIn} />} />
   </Routes>

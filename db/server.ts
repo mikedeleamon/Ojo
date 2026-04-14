@@ -8,6 +8,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
 import User from '../models/User';
+import Closet from '../models/Closet';
 
 dotenv.config();
 
@@ -358,6 +359,178 @@ app.get('/health', async (_req: Request, res: Response) => {
   };
 
   res.json(status);
+});
+
+// ─── Closet routes (JWT protected) ───────────────────────────────────────────
+
+// POST /api/closets — create a new closet
+app.post('/api/closets', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const { name } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: 'Closet name is required.' });
+    const closet = await Closet.create({ name: name.trim(), userId: req.userId, articles: [] });
+    res.status(201).json(closet);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to create closet', detail: err.message });
+  }
+});
+
+// GET /api/closets — get all closets for the authenticated user
+app.get('/api/closets', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const closets = await Closet.find({ userId: req.userId }).sort({ createdAt: -1 });
+    res.json(closets);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to fetch closets', detail: err.message });
+  }
+});
+
+// PUT /api/closets/:id — rename a closet
+app.put('/api/closets/:id', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const { name } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: 'Closet name is required.' });
+    const closet = await Closet.findOneAndUpdate(
+      { _id: req.params.id, userId: req.userId },
+      { $set: { name: name.trim() } },
+      { new: true }
+    );
+    if (!closet) return res.status(404).json({ error: 'Closet not found.' });
+    res.json(closet);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to update closet', detail: err.message });
+  }
+});
+
+// DELETE /api/closets/:id — delete a closet
+app.delete('/api/closets/:id', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const closet = await Closet.findOneAndDelete({ _id: req.params.id, userId: req.userId });
+    if (!closet) return res.status(404).json({ error: 'Closet not found.' });
+    res.json({ message: 'Closet deleted.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to delete closet', detail: err.message });
+  }
+});
+
+// ─── Article routes (JWT protected) ──────────────────────────────────────────
+
+// POST /api/closets/:id/articles — add an article to a closet
+app.post('/api/closets/:id/articles', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const closet = await Closet.findOne({ _id: req.params.id, userId: req.userId });
+    if (!closet) return res.status(404).json({ error: 'Closet not found.' });
+
+    const { clothingType, ...rest } = req.body;
+    if (!clothingType) return res.status(400).json({ error: 'clothingType is required.' });
+
+    closet.articles.push({ clothingType, ...rest } as any);
+    await closet.save();
+    res.status(201).json(closet);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to add article', detail: err.message });
+  }
+});
+
+// DELETE /api/closets/:closetId/articles/:articleId — remove an article
+app.delete('/api/closets/:closetId/articles/:articleId', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const closet = await Closet.findOne({ _id: req.params.closetId, userId: req.userId });
+    if (!closet) return res.status(404).json({ error: 'Closet not found.' });
+
+    const before = closet.articles.length;
+    closet.articles = closet.articles.filter(
+      (a) => a._id?.toString() !== req.params.articleId
+    ) as any;
+    if (closet.articles.length === before) return res.status(404).json({ error: 'Article not found.' });
+
+    await closet.save();
+    res.json(closet);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to remove article', detail: err.message });
+  }
+});
+
+// ─── Closet routes (JWT protected) ───────────────────────────────────────────
+
+// POST /api/closets — create a closet for the logged-in user
+app.post('/api/closets', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const { name } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: 'Closet name is required.' });
+    const closet = await Closet.create({ name: name.trim(), userId: req.userId, articles: [] });
+    res.status(201).json(closet);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to create closet.', detail: err.message });
+  }
+});
+
+// GET /api/closets — get all closets for the logged-in user
+app.get('/api/closets', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const closets = await Closet.find({ userId: req.userId }).sort({ createdAt: -1 });
+    res.json(closets);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to load closets.', detail: err.message });
+  }
+});
+
+// PUT /api/closets/:id — rename a closet
+app.put('/api/closets/:id', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const { name } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: 'Closet name is required.' });
+    const closet = await Closet.findOneAndUpdate(
+      { _id: req.params.id, userId: req.userId },
+      { $set: { name: name.trim() } },
+      { new: true }
+    );
+    if (!closet) return res.status(404).json({ error: 'Closet not found.' });
+    res.json(closet);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to rename closet.', detail: err.message });
+  }
+});
+
+// DELETE /api/closets/:id — delete a closet
+app.delete('/api/closets/:id', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const closet = await Closet.findOneAndDelete({ _id: req.params.id, userId: req.userId });
+    if (!closet) return res.status(404).json({ error: 'Closet not found.' });
+    res.json({ message: 'Closet deleted.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to delete closet.', detail: err.message });
+  }
+});
+
+// POST /api/closets/:id/articles — add an article to a closet
+app.post('/api/closets/:id/articles', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const closet = await Closet.findOneAndUpdate(
+      { _id: req.params.id, userId: req.userId },
+      { $push: { articles: req.body } },
+      { new: true, runValidators: true }
+    );
+    if (!closet) return res.status(404).json({ error: 'Closet not found.' });
+    res.status(201).json(closet);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to add article.', detail: err.message });
+  }
+});
+
+// DELETE /api/closets/:closetId/articles/:articleId — remove an article
+app.delete('/api/closets/:closetId/articles/:articleId', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const closet = await Closet.findOneAndUpdate(
+      { _id: req.params.closetId, userId: req.userId },
+      { $pull: { articles: { _id: req.params.articleId } } },
+      { new: true }
+    );
+    if (!closet) return res.status(404).json({ error: 'Closet not found.' });
+    res.json(closet);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to remove article.', detail: err.message });
+  }
 });
 
 // ─── Serve React production build ────────────────────────────────────────────
