@@ -11,7 +11,7 @@ type Tab = 'user' | 'preferences' | 'password';
 
 interface Props {
   settings: Settings;
-  saveSettings: (s: Settings) => void;
+  saveSettings: (s: Settings) => Promise<void>;
   onLogout: () => void;
 }
 
@@ -116,23 +116,28 @@ const UserTab = () => {
 
 // ─── Tab: Preferences ────────────────────────────────────────────────────────
 
-const PreferencesTab = ({ settings, saveSettings }: { settings: Settings; saveSettings: (s: Settings) => void }) => {
+const PreferencesTab = ({ settings, saveSettings }: { settings: Settings; saveSettings: (s: Settings) => Promise<void> }) => {
   const [clothingStyle, setClothingStyle] = useState(settings.clothingStyle);
   const [location,      setLocation]      = useState(settings.location);
   const [tempScale,     setTempScale]     = useState<'Imperial' | 'Metric'>(settings.temperatureScale as 'Imperial' | 'Metric');
   const [hiTemp,        setHiTemp]        = useState(settings.hiTempThreshold);
   const [lowTemp,       setLowTemp]       = useState(settings.lowTempThreshold);
   const [humidity,      setHumidity]      = useState(settings.humidityPreference);
-  const [saved,         setSaved]         = useState(false);
+  const [status,        setStatus]        = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
   const save = async () => {
     const next: Settings = {
       clothingStyle, location, temperatureScale: tempScale,
       hiTempThreshold: hiTemp, lowTempThreshold: lowTemp, humidityPreference: humidity,
     };
-    await saveSettings(next);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    setStatus(null);
+    try {
+      await saveSettings(next);
+      setStatus({ type: 'success', msg: 'Preferences saved.' });
+      setTimeout(() => setStatus(null), 2500);
+    } catch {
+      setStatus({ type: 'error', msg: 'Could not save — changes rolled back. Please try again.' });
+    }
   };
 
   return (
@@ -182,9 +187,8 @@ const PreferencesTab = ({ settings, saveSettings }: { settings: Settings; saveSe
         <SliderField label='Threshold' value={humidity} unit='%' min={0} max={100} onChange={setHumidity} />
       </section>
 
-      <button className={styles.saveBtn} onClick={save}>
-        {saved ? '✓ Saved' : 'Save changes'}
-      </button>
+      {status && <p className={`${styles.statusMsg} ${styles[status.type]}`}>{status.msg}</p>}
+      <button className={styles.saveBtn} onClick={save}>Save changes</button>
     </div>
   );
 };

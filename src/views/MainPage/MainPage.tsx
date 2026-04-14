@@ -5,9 +5,12 @@ import SettingsButton from '../../components/buttons/SettingsButton/SettingsButt
 import { Settings } from '../../types';
 import styles from './MainPage.module.css';
 
-interface Props { settings: Settings; }
+interface Props {
+  settings: Settings;
+  settingsReady: boolean;
+}
 
-const MainPage = ({ settings }: Props) => {
+const MainPage = ({ settings, settingsReady }: Props) => {
   const [location, setLocation] = useState('');
   const [geoLoading, setGeoLoading] = useState(true);
 
@@ -18,19 +21,22 @@ const MainPage = ({ settings }: Props) => {
         setGeoLoading(false);
       },
       () => {
-        // Fall back to settings location if geo is denied
         setLocation(settings.location);
         setGeoLoading(false);
       }
     );
   }, []);
 
+  // Wait for settings to load from MongoDB before rendering the HUD so that
+  // temperature scale, thresholds etc. are correct on first render.
+  if (!settingsReady || geoLoading) return <Loading />;
+
   return (
     <div className={styles.root}>
       <div className={styles.settingsBtn}>
         <SettingsButton />
       </div>
-      {geoLoading ? <Loading /> : <WeatherHUD location={location} settings={settings} />}
+      <WeatherHUD location={location} settings={settings} />
     </div>
   );
 };
