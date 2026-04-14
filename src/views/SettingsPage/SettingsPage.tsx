@@ -5,7 +5,7 @@ import styles from './SettingsPage.module.css';
 
 interface Props {
   settings: Settings;
-  saveSettings: (s: Settings) => void;
+  saveSettings: (s: Settings) => Promise<void>;
 }
 
 const STYLES = ['Casual', 'Business Casual', 'Formal', 'Urban', 'Cozy', 'Preppy'];
