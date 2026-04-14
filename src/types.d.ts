@@ -47,3 +47,27 @@ export interface Settings {
   lowTempThreshold: number;
   humidityPreference: number;
 }
+
+export interface ClothingArticle {
+  _id:              string;
+  clothingType:     string;
+  name?:            string;
+  topOrBottom?:     string;
+  clothingCategory?:string;
+  fabricType?:      string;
+  color?:           string;
+  isAccessory?:     boolean;
+  isWristWear?:     boolean;
+  isAnkleWear?:     boolean;
+  merchant?:        string;
+  imageUrl?:        string;
+  createdAt?:       string;
+}
+
+export interface Closet {
+  _id:      string;
+  name:     string;
+  userId:   string;
+  articles: ClothingArticle[];
+  createdAt?:string;
+}
