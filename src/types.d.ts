@@ -1,3 +1,15 @@
+export interface AuthUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+}
+
+export interface AuthState {
+  user: AuthUser;
+  token: string;
+}
+
 export interface CityData {
   Key: string;
   LocalizedName: string;

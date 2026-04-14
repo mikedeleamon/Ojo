@@ -8,6 +8,7 @@ import Loading from '../Loading/Loading';
 import mockWeatherData from '../../mockData/mockWeatherData';
 import { detectOversizedCookies } from '../../helpers/cookieUtils';
 import { CityData, CurrentWeather, Forecast, Settings } from '../../types';
+import AccountButton from '../buttons/AccountButton/AccountButton';
 import styles from './WeatherHUD.module.css';
 
 // ─── Toggle mock data — only reads the explicit env var, not NODE_ENV ───────
@@ -151,6 +152,11 @@ const WeatherHUD = ({ location, settings }: Props) => {
             className={styles.root}
             style={{ background: bg }}
         >
+            {/* Account button — top left */}
+            <div className={styles.accountBtn}>
+                <AccountButton />
+            </div>
+
             {/* Header */}
             <div className={styles.header}>
                 <h1 className={styles.city}>{city?.LocalizedName}</h1>
