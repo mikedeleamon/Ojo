@@ -2,6 +2,7 @@
   "name": "ojo",
   "version": "0.1.0",
   "private": true,
+  "proxy": "http://localhost:4000",
   "dependencies": {
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
@@ -12,6 +13,7 @@
     "@types/react-dom": "^18.3.1",
     "axios": "^1.10.0",
     "cors": "^2.8.5",
+    "dotenv": "^17.4.1",
     "mongoose": "^8.16.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -24,7 +26,11 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+  "server": "npm run build-server && npm run start-server",
+  "build-server": "tsc -p tsconfig.server.json",
+  "start-server": "node ./dist-server/db/server.js",
+  "dev": "concurrently \"npm run server\" \"npm start\""
   },
   "eslintConfig": {
     "extends": [
@@ -49,8 +55,11 @@
     "@babel/preset-env": "^7.27.2",
     "@babel/preset-react": "^7.27.1",
     "@babel/preset-typescript": "^7.27.1",
+    "@types/cors": "^2.8.19",
     "babel-jest": "^30.0.2",
+    "concurrently": "^9.0.0",
     "identity-obj-proxy": "^3.0.0",
-    "ts-jest": "^29.4.0"
+    "ts-jest": "^29.4.0",
+    "ts-node": "^10.9.2"
   }
 }

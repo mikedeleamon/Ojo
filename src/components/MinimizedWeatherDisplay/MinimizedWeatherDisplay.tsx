@@ -1,49 +1,23 @@
-import React from 'react';
-import './MinimizedWeatherDisplay.css';
 import WeatherIconDisplay from '../WeatherIconDisplay/WeatherIconDisplay';
+import styles from './MinimizedWeatherDisplay.module.css';
 
-// Define types for props
-interface MinimizedWeatherDisplayProps {
-    weather: string; // The weather condition (e.g., "Sunny", "Rainy")
-    temperature: number; // Temperature value (e.g., 75)
-    time: string; // Time string (e.g., "2024-11-29T14:00:00Z")
-    tempUnit: string; // Temperature unit (e.g., "F" for Fahrenheit, "C" for Celsius)
-    isDay: boolean; // Whether it is day or night (true for day, false for night)
+interface Props {
+  weather: string;
+  temperature: number;
+  time: string;
+  tempUnit: string;
+  isDay: boolean;
 }
 
-const MinimizedWeatherDisplay = ({
-    weather,
-    temperature,
-    time,
-    tempUnit,
-    isDay,
-}: MinimizedWeatherDisplayProps) => {
-    // Format the time to a readable format
-    function formatTime(dateString: string): string {
-        const date = new Date(dateString);
-        const formattedTime = date.toLocaleString('en-US', {
-            hour: 'numeric',
-            hour12: true,
-        });
-        return formattedTime;
-    }
+const formatTime = (iso: string) =>
+  new Date(iso).toLocaleString('en-US', { hour: 'numeric', hour12: true });
 
-    return (
-        <div className='flex'>
-            <div>
-                <p className='miniWeatherTimeText'>{formatTime(time)}</p>
-            </div>
-            <WeatherIconDisplay
-                weatherCondition={weather}
-                isDay={isDay}
-                size={'small'}
-                temperature={''}
-            />
-            <div>
-                <p className='miniWeatherTempText'>{`${temperature}\u00B0 ${tempUnit}`}</p>
-            </div>
-        </div>
-    );
-};
+const MinimizedWeatherDisplay = ({ weather, temperature, time, tempUnit, isDay }: Props) => (
+  <div className={styles.card}>
+    <span className={styles.time}>{formatTime(time)}</span>
+    <WeatherIconDisplay condition={weather} isDay={isDay} size='small' />
+    <span className={styles.temp}>{temperature}° {tempUnit}</span>
+  </div>
+);
 
 export default MinimizedWeatherDisplay;

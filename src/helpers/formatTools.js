@@ -1,10 +1,6 @@
-export const formatDate = (event) => {
-    const input = event.target.value;
-    const formattedDate = input
-        .replace(/[^\d]/g, '') // Remove non-numeric characters
-        .replace(
-            /(\d{2})(\d{2})(\d{4})/,
-            (match, month, day, year) => `${month}/${day}/${year}`
-        );
-    return formattedDate;
+export const formatDate = (e) => {
+  let value = e.target.value.replace(/\D/g, '');
+  if (value.length >= 3) value = value.slice(0, 2) + '/' + value.slice(2);
+  if (value.length >= 6) value = value.slice(0, 5) + '/' + value.slice(5, 9);
+  return value;
 };

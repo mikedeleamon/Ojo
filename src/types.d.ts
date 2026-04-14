@@ -1,104 +1,37 @@
-export interface WeatherHUDProps {
-    location: string;
-    getBackgroundColor: React.Dispatch<React.SetStateAction<string>>;
-}
-
 export interface CityData {
-    Key: string;
-    LocalizedName: string;
+  Key: string;
+  LocalizedName: string;
 }
 
 export interface CurrentWeather {
-    WeatherText: string;
-    HasPrecipitation: boolean;
-    Temperature: {
-        Imperial: {
-            Value: string; // Temperature value as a string
-            Unit: string;
-        };
-    };
-    Wind: {
-        Speed: {
-            Imperial: {
-                Value: string; // Wind speed value as a string
-            };
-        };
-    };
-    RelativeHumidity: string; // Humidity percentage as a string
-    UVIndexText: string; // UV Index description as a string
-    RealFeelTemperature: {
-        Imperial: {
-            Value: string; // Temperature value as a string
-            Unit: string;
-        };
-    };
-}
-
-interface WeatherDetail {
-    HasPrecipitation: boolean;
-    Temperature: {
-        Imperial: {
-            Value: string; // Temperature value as a string
-            Unit?: string;
-        };
-    };
-    Wind: {
-        Speed: {
-            Imperial: {
-                Value: string; // Wind speed value as a string
-            };
-        };
-    };
-    RelativeHumidity: string; // Humidity as a string
-    UVIndexText: string; // UV Index description as a string
-}
-
-export interface CityData {
-    Key: string;
-    LocalizedName: string;
-}
-
-export interface CurrentWeather {
-    WeatherText: string;
-    HasPrecipitation: boolean;
-    Temperature: {
-        Imperial: {
-            Value: string; // Temperature value as a string
-            Unit: string;
-        };
-    };
-    Wind: {
-        Speed: {
-            Imperial: {
-                Value: string; // Wind speed value as a string
-            };
-        };
-    };
-    RelativeHumidity: string; // Humidity percentage as a string
-    UVIndexText: string; // UV Index description as a string
-    RealFeelTemperature: {
-        Imperial: {
-            Value: string; // Temperature value as a string
-            Unit: string;
-        };
-    };
+  WeatherText: string;
+  HasPrecipitation: boolean;
+  IsDayTime: boolean;
+  Temperature: {
+    Imperial: { Value: number; Unit: string };
+    Metric: { Value: number; Unit: string };
+  };
+  RealFeelTemperature: {
+    Imperial: { Value: number; Unit: string };
+    Metric: { Value: number; Unit: string };
+  };
+  Wind: { Speed: { Imperial: { Value: number }; Metric: { Value: number } } };
+  RelativeHumidity: number;
+  UVIndexText: string;
 }
 
 export interface Forecast {
-    IconPhrase: string;
-    Temperature: {
-        Value: number; // Temperature value as a string
-        Unit: string;
-    };
-    DateTime: string;
-    IsDaylight: boolean;
+  IconPhrase: string;
+  Temperature: { Value: number; Unit: string };
+  DateTime: string;
+  IsDaylight: boolean;
 }
 
 export interface Settings {
-    clothingStyle: string;
-    location: string;
-    temperatureScale: string;
-    hiTempThreshold: number;
-    lowTempThreshold: number;
-    humidityPreference: number;
+  clothingStyle: string;
+  location: string;
+  temperatureScale: string;
+  hiTempThreshold: number;
+  lowTempThreshold: number;
+  humidityPreference: number;
 }

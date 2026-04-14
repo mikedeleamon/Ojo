@@ -1,56 +1,45 @@
-import React, { useState, useEffect } from 'react';
-import '../../App.css';
+import { useState } from 'react';
+import { CurrentWeather, Settings } from '../../types';
 import OutfitSuggestion from '../OutfitSuggestion/OutfitSuggestion';
-import { WeatherDetail } from '../../types';
+import styles from './WeatherDetails.module.css';
 
-interface WeatherDetailsProps {
-    weatherDetails: WeatherDetail[]; // Expecting an array of weather details
-}
+interface Props { weather: CurrentWeather; settings: Settings; }
 
-const WeatherDetails = ({ weatherDetails }: WeatherDetailsProps) => {
-    const [windSpeed, setWindSpeed] = useState<string>('');
-    const [humidity, setHumidity] = useState<string>('');
-    const [uvIndex, setUvIndex] = useState<string>('');
-    const [showDetails, setShowDetails] = useState<boolean>(false);
+const WeatherDetails = ({ weather, settings }: Props) => {
+  const [expanded, setExpanded] = useState(false);
+  const isMetric = settings.temperatureScale === 'Metric';
 
-    useEffect(() => {
-        if (weatherDetails.length > 0) {
-            setWindSpeed(weatherDetails[0].Wind.Speed.Imperial.Value);
-            setHumidity(weatherDetails[0].RelativeHumidity);
-            setUvIndex(weatherDetails[0].UVIndexText);
-        }
-    }, [weatherDetails]);
+  return (
+    <div className={styles.root}>
+      <OutfitSuggestion weather={weather} settings={settings} />
 
-    const handleShowDetails = () => {
-        setShowDetails(!showDetails);
-    };
+      <button className={styles.toggle} onClick={() => setExpanded(v => !v)}>
+        <span>{expanded ? 'Less' : 'More details'}</span>
+        <svg className={`${styles.chevron} ${expanded ? styles.open : ''}`}
+          width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
 
-    return (
-        <>
-            <OutfitSuggestion currentWeather={weatherDetails} />
-
-            {showDetails ? (
-                <div>
-                    <a
-                        onClick={handleShowDetails}
-                        style={{ cursor: 'pointer' }}
-                    >
-                        Show Less
-                    </a>
-                    <p>wind speed: {windSpeed} mi/h</p>
-                    <p>UV Index: {uvIndex}</p>
-                    <p>humidity: {humidity}</p>
-                </div>
-            ) : (
-                <a
-                    onClick={handleShowDetails}
-                    style={{ cursor: 'pointer' }}
-                >
-                    More
-                </a>
-            )}
-        </>
-    );
+      {expanded && (
+        <div className={styles.grid}>
+          <Stat label="Wind"     value={`${weather.Wind.Speed.Imperial.Value} mph`} />
+          <Stat label="Humidity" value={`${weather.RelativeHumidity}%`} />
+          <Stat label="UV Index" value={weather.UVIndexText} />
+          <Stat label="Feels like" value={`${isMetric
+            ? weather.RealFeelTemperature.Metric.Value
+            : weather.RealFeelTemperature.Imperial.Value}°`} />
+        </div>
+      )}
+    </div>
+  );
 };
+
+const Stat = ({ label, value }: { label: string; value: string }) => (
+  <div className={styles.stat}>
+    <span className={styles.statLabel}>{label}</span>
+    <span className={styles.statValue}>{value}</span>
+  </div>
+);
 
 export default WeatherDetails;

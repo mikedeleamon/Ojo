@@ -1,9 +1,10 @@
 const weatherConstants = {
-    FAHRENHEIT : "Imperial",
-    CELCIUS : "Metric",
-    API_KEY : "cGUHq7oSsi9m3l8s0tUrwHipm9H1PAoq",
-    GET_CURRENT_WEATHER : `https://dataservice.accuweather.com/currentconditions/v1/`,
-    GET_CURRENT_FORECAST : `http://dataservice.accuweather.com/forecasts/v1/hourly/12hour/`,
-    GET_CITY: `https://dataservice.accuweather.com/locations/v1/cities/search`}
+    FAHRENHEIT: 'Imperial',
+    CELSIUS: 'Metric',
+    // All requests go to the local Express proxy — AccuWeather is never called from the browser
+    GET_CITY: '/api/weather/city',
+    GET_CURRENT_WEATHER: '/api/weather/current',
+    GET_CURRENT_FORECAST: '/api/weather/forecast',
+};
 
-    export default weatherConstants
+export default weatherConstants;
