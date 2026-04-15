@@ -4,12 +4,13 @@ import ArticleModal, { ArticleFormData } from '../ArticleModal/ArticleModal';
 import styles from './ClosetView.module.css';
 
 interface Props {
-  closets:       Closet[];
-  onCreateCloset:(name: string) => Promise<void>;
-  onRenameCloset:(id: string, name: string) => Promise<void>;
-  onDeleteCloset:(id: string) => Promise<void>;
-  onAddArticle:  (closetId: string, data: ArticleFormData) => Promise<void>;
+  closets:        Closet[];
+  onCreateCloset: (name: string) => Promise<void>;
+  onRenameCloset: (id: string, name: string) => Promise<void>;
+  onDeleteCloset: (id: string) => Promise<void>;
+  onAddArticle:   (closetId: string, data: ArticleFormData) => Promise<void>;
   onRemoveArticle:(closetId: string, articleId: string) => Promise<void>;
+  onSetPreferred: (id: string) => Promise<void>;
 }
 
 const ArticleCard = ({ article, onRemove }: { article: ClothingArticle; onRemove: () => void }) => (
@@ -40,7 +41,7 @@ const ArticleCard = ({ article, onRemove }: { article: ClothingArticle; onRemove
   </div>
 );
 
-const ClosetView = ({ closets, onCreateCloset, onRenameCloset, onDeleteCloset, onAddArticle, onRemoveArticle }: Props) => {
+const ClosetView = ({ closets, onCreateCloset, onRenameCloset, onDeleteCloset, onAddArticle, onRemoveArticle, onSetPreferred }: Props) => {
   const [selectedId,   setSelectedId]   = useState<string>(closets[0]?._id ?? '');
   const [showModal,    setShowModal]     = useState(false);
   const [creating,     setCreating]      = useState(false);
@@ -147,9 +148,22 @@ const ClosetView = ({ closets, onCreateCloset, onRenameCloset, onDeleteCloset, o
                         stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
                     <span className={styles.closetName}>{c.name}</span>
+                    {c.isPreferred && <span className={styles.preferredBadge}>★</span>}
                     <span className={styles.closetCount}>{c.articles.length}</span>
                   </div>
                   <div className={styles.closetActions} onClick={e => e.stopPropagation()}>
+                    <button
+                      className={`${styles.microBtn} ${c.isPreferred ? styles.microPreferredActive : styles.microPreferred}`}
+                      onClick={() => onSetPreferred(c._id)}
+                      aria-label={c.isPreferred ? 'Preferred closet' : 'Set as preferred'}
+                      title={c.isPreferred ? 'Preferred closet' : 'Set as preferred'}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                        <path d="M8 1l2.09 4.26L15 6.27l-3.5 3.41.83 4.82L8 12.17l-4.33 2.28.83-4.82L1 6.27l4.91-.01L8 1z"
+                          stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"
+                          fill={c.isPreferred ? 'currentColor' : 'none'}/>
+                      </svg>
+                    </button>
                     <button className={styles.microBtn} onClick={() => { setEditingId(c._id); setEditName(c.name); }} aria-label="Rename">
                       <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
                         <path d="M11.5 2.5l2 2-9 9H2.5v-2l9-9z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>

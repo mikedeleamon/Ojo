@@ -65,9 +65,10 @@ export interface ClothingArticle {
 }
 
 export interface Closet {
-  _id:      string;
-  name:     string;
-  userId:   string;
-  articles: ClothingArticle[];
-  createdAt?:string;
+  _id:         string;
+  name:        string;
+  userId:      string;
+  articles:    ClothingArticle[];
+  isPreferred: boolean;
+  createdAt?:  string;
 }

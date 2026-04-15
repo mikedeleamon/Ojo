@@ -58,6 +58,11 @@ const ClosetPage = () => {
     setClosets(prev => prev.map(c => c._id === closetId ? data : c));
   }, []);
 
+  const setPreferred = useCallback(async (id: string) => {
+    const { data } = await axios.put<Closet>(`/api/closets/${id}/preferred`, {}, auth());
+    setClosets(prev => prev.map(c => ({ ...c, isPreferred: c._id === data._id })));
+  }, []);
+
   // ── Empty-state create ─────────────────────────────────────────────────────
   const handleFirstCreate = async () => {
     if (!newName.trim()) return;
@@ -129,6 +134,7 @@ const ClosetPage = () => {
           onDeleteCloset={deleteCloset}
           onAddArticle={addArticle}
           onRemoveArticle={removeArticle}
+          onSetPreferred={setPreferred}
         />
       )}
     </div>
