@@ -1,0 +1,350 @@
+/* ─── Root ───────────────────────────────────────────────────────────────── */
+.root {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-default);
+  padding: var(--spacing-md);
+  overflow: hidden;
+}
+
+/* ─── Card ───────────────────────────────────────────────────────────────── */
+.card {
+  width: 100%;
+  max-width: 460px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-xl) var(--spacing-lg) var(--spacing-lg);
+  box-shadow: var(--glass-shadow);
+}
+
+/* ─── Step shell ─────────────────────────────────────────────────────────── */
+.stepShell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-md);
+  text-align: center;
+  animation: stepIn 0.3s cubic-bezier(0.34, 1.26, 0.64, 1) both;
+}
+
+/* ─── Slide animations ───────────────────────────────────────────────────── */
+.slideInRight  { animation: slideInRight  0.28s cubic-bezier(0.4, 0, 0.2, 1) both; }
+.slideInLeft   { animation: slideInLeft   0.28s cubic-bezier(0.4, 0, 0.2, 1) both; }
+.slideOutLeft  { animation: slideOutLeft  0.24s cubic-bezier(0.4, 0, 0.2, 1) both; }
+.slideOutRight { animation: slideOutRight 0.24s cubic-bezier(0.4, 0, 0.2, 1) both; }
+
+@keyframes slideInRight  { from { opacity: 0; transform: translateX(36px);  } to { opacity: 1; transform: translateX(0); } }
+@keyframes slideInLeft   { from { opacity: 0; transform: translateX(-36px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes slideOutLeft  { from { opacity: 1; transform: translateX(0); }    to { opacity: 0; transform: translateX(-36px); } }
+@keyframes slideOutRight { from { opacity: 1; transform: translateX(0); }    to { opacity: 0; transform: translateX(36px); } }
+
+@keyframes stepIn {
+  from { opacity: 0; transform: translateY(14px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ─── Dots ───────────────────────────────────────────────────────────────── */
+.dots {
+  display: flex;
+  gap: 6px;
+  margin-bottom: var(--spacing-xs);
+}
+
+.dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--glass-border);
+  transition: all 0.3s ease;
+}
+
+.dotActive {
+  width: 18px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.dotDone {
+  background: rgba(52, 211, 153, 0.65);
+}
+
+/* ─── Logo ───────────────────────────────────────────────────────────────── */
+.logo {
+  height: 36px;
+  object-fit: contain;
+  filter: brightness(1.1);
+  animation: logoPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes logoPop {
+  from { opacity: 0; transform: scale(0.8); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* ─── Typography ─────────────────────────────────────────────────────────── */
+.heading {
+  font-family: var(--font-display);
+  font-size: 2.2rem;
+  font-weight: 400;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.sub {
+  font-size: 0.98rem;
+  color: var(--text-secondary);
+  line-height: 1.65;
+  max-width: 340px;
+}
+
+.stepIcon {
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  animation: iconBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s both;
+}
+
+@keyframes iconBounce {
+  from { transform: scale(0.6); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+.stepHeading {
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+  font-weight: 400;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.stepDesc {
+  font-size: 0.92rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  max-width: 320px;
+}
+
+/* ─── Emoji row (step 1) ─────────────────────────────────────────────────── */
+.illustrationRow {
+  display: flex;
+  gap: var(--spacing-md);
+  margin: var(--spacing-sm) 0;
+}
+
+.emoji {
+  font-size: 2.4rem;
+  animation: emojiFloat 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes emojiFloat {
+  from { opacity: 0; transform: translateY(16px) scale(0.7); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+
+/* ─── Buttons ────────────────────────────────────────────────────────────── */
+.primaryBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 28px;
+  background: rgba(255, 255, 255, 0.92);
+  border: none;
+  border-radius: var(--radius-pill);
+  color: #0D1B2A;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity var(--transition), transform var(--transition);
+  white-space: nowrap;
+}
+.primaryBtn:hover:not(:disabled) { opacity: 0.88; }
+.primaryBtn:active:not(:disabled) { transform: scale(0.97); }
+.primaryBtn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.ghostBtn {
+  padding: 12px 20px;
+  background: none;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.ghostBtn:hover { background: var(--glass-bg-strong); color: var(--text-primary); }
+
+.navRow {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: var(--spacing-xs);
+}
+
+/* ─── Skip ───────────────────────────────────────────────────────────────── */
+.skipLink {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color var(--transition);
+}
+.skipLink:hover { color: var(--text-secondary); }
+
+/* ─── Input ──────────────────────────────────────────────────────────────── */
+.inputRow { width: 100%; max-width: 320px; }
+
+.textInput {
+  width: 100%;
+  padding: 14px var(--spacing-md);
+  background: var(--glass-bg);
+  border: 1px solid rgba(255,255,255,0.28);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  outline: none;
+  text-align: center;
+  transition: border-color var(--transition);
+}
+.textInput:focus { border-color: rgba(255,255,255,0.5); }
+.textInput::placeholder { color: var(--text-muted); }
+
+/* ─── Success badge ──────────────────────────────────────────────────────── */
+.successBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  background: rgba(52, 211, 153, 0.1);
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  border-radius: var(--radius-pill);
+  color: rgba(52, 211, 153, 0.9);
+  font-size: 0.9rem;
+  animation: popIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes popIn {
+  from { transform: scale(0.8); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+.errText {
+  font-size: 0.82rem;
+  color: rgba(252, 165, 165, 0.9);
+  text-align: center;
+}
+
+/* ─── Preferences ────────────────────────────────────────────────────────── */
+.prefSection {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  text-align: left;
+}
+
+.prefLabel {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.chipGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  padding: 7px 16px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.chip:hover { background: var(--glass-bg-strong); color: var(--text-primary); }
+.chipActive {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: transparent;
+  color: #0D1B2A;
+  font-weight: 600;
+}
+
+.segmented {
+  display: flex;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.seg {
+  flex: 1;
+  padding: 10px;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.seg:not(:last-child) { border-right: 1px solid var(--glass-border); }
+.seg:hover { background: var(--glass-bg); }
+.segActive {
+  background: rgba(255, 255, 255, 0.9);
+  color: #0D1B2A;
+  font-weight: 600;
+}
+
+/* ─── Done state ─────────────────────────────────────────────────────────── */
+.doneIcon {
+  animation: doneScale 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes doneScale {
+  0%   { transform: scale(0); opacity: 0; }
+  70%  { transform: scale(1.15); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.loadingDots {
+  display: flex;
+  gap: 6px;
+  margin-top: var(--spacing-sm);
+}
+
+.loadingDots span {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--glass-border);
+  animation: dotPulse 1.2s ease-in-out infinite;
+}
+.loadingDots span:nth-child(2) { animation-delay: 0.2s; }
+.loadingDots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes dotPulse {
+  0%, 80%, 100% { transform: scale(0.8); opacity: 0.4; }
+  40%           { transform: scale(1.1); opacity: 1; }
+}
