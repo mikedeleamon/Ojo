@@ -7,7 +7,10 @@ import styles from './SignupPage.module.css';
 
 const AUTH_KEY = 'ojo_auth';
 
-interface Props { setLoggedIn: (v: boolean) => void; }
+interface Props {
+  setLoggedIn: (v: boolean) => void;
+  setNeedsOnboarding: (v: boolean) => void;
+}
 
 const Field = ({ label, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) => (
   <label className={styles.field}>
@@ -16,12 +19,12 @@ const Field = ({ label, ...props }: React.InputHTMLAttributes<HTMLInputElement> 
   </label>
 );
 
-const SignupPage = ({ setLoggedIn }: Props) => {
+const SignupPage = ({ setLoggedIn, setNeedsOnboarding }: Props) => {
   const [form, setForm] = useState({
     firstName: '', lastName: '', birthday: '',
     email: '', username: '', password: '', passwordConfirmation: '',
   });
-  const [error, setError]   = useState<string | null>(null);
+  const [error,   setError]   = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -30,14 +33,8 @@ const SignupPage = ({ setLoggedIn }: Props) => {
 
   const onSubmit = async () => {
     setError(null);
-    if (form.password !== form.passwordConfirmation) {
-      setError('Passwords do not match.');
-      return;
-    }
-    if (form.password.length < 8) {
-      setError('Password must be at least 8 characters.');
-      return;
-    }
+    if (form.password !== form.passwordConfirmation) { setError('Passwords do not match.'); return; }
+    if (form.password.length < 8) { setError('Password must be at least 8 characters.'); return; }
     setLoading(true);
     try {
       const { data } = await axios.post('/api/auth/signup', {
@@ -49,8 +46,9 @@ const SignupPage = ({ setLoggedIn }: Props) => {
         birthday:  form.birthday,
       });
       localStorage.setItem(AUTH_KEY, JSON.stringify({ token: data.token, user: data.user }));
+      setNeedsOnboarding(true);
       setLoggedIn(true);
-      navigate('/');
+      navigate('/onboarding');
     } catch (err: any) {
       setError(err.response?.data?.error ?? 'Sign up failed. Please try again.');
     } finally {

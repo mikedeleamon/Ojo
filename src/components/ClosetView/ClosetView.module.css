@@ -374,3 +374,206 @@
 .microPreferredActive {
   color: rgba(251, 191, 36, 0.9) !important;
 }
+
+/* ─── Search bar ─────────────────────────────────────────────────────────── */
+.searchBar {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border-bottom: 1px solid var(--glass-border);
+  flex-shrink: 0;
+}
+
+.searchInputWrap {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 12px;
+  color: var(--text-muted);
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 9px 36px 9px 36px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  outline: none;
+  transition: border-color var(--transition);
+}
+.searchInput:focus { border-color: rgba(255,255,255,0.35); }
+.searchInput::placeholder { color: var(--text-muted); }
+
+.clearSearch {
+  position: absolute;
+  right: 10px;
+  width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 50%;
+  transition: all var(--transition);
+}
+.clearSearch:hover { background: var(--glass-bg-strong); color: var(--text-primary); }
+
+.filterToggleBtn {
+  position: relative;
+  width: 38px; height: 38px;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.filterToggleBtn:hover { background: var(--glass-bg-strong); color: var(--text-primary); }
+.filterToggleBtnActive {
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.35);
+  color: var(--text-primary);
+}
+
+.filterBadge {
+  position: absolute;
+  top: -5px; right: -5px;
+  width: 16px; height: 16px;
+  background: rgba(255,255,255,0.9);
+  color: #0D1B2A;
+  border-radius: 50%;
+  font-size: 0.65rem;
+  font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  animation: popIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes popIn {
+  from { transform: scale(0); }
+  to   { transform: scale(1); }
+}
+
+/* ─── Filter panel ───────────────────────────────────────────────────────── */
+.filterPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid var(--glass-border);
+  background: rgba(255,255,255,0.02);
+  animation: filterSlideDown 0.22s cubic-bezier(0.4,0,0.2,1) both;
+  flex-shrink: 0;
+}
+
+@keyframes filterSlideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.filterGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.filterGroupLabel {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.filterChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+.filterChip:hover { background: var(--glass-bg-strong); color: var(--text-primary); }
+.filterChipActive {
+  background: rgba(255,255,255,0.88);
+  border-color: transparent;
+  color: #0D1B2A;
+  font-weight: 600;
+}
+
+.chipColor {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+
+.clearFiltersBtn {
+  align-self: flex-start;
+  padding: 6px 14px;
+  background: none;
+  border: 1px solid rgba(252,165,165,0.3);
+  border-radius: var(--radius-pill);
+  color: rgba(252,165,165,0.8);
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.clearFiltersBtn:hover { background: rgba(239,68,68,0.1); color: rgba(252,165,165,1); }
+
+/* ─── Results count ──────────────────────────────────────────────────────── */
+.resultsCount {
+  padding: 8px var(--spacing-lg) 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* ─── Color dot on article card ──────────────────────────────────────────── */
+.colorDot {
+  position: absolute;
+  bottom: 52px; right: 10px;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.2);
+  flex-shrink: 0;
+}
+
+/* ─── Category tag ───────────────────────────────────────────────────────── */
+.categoryTag {
+  display: inline-block;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  padding: 1px 7px;
+  margin-top: 1px;
+  white-space: nowrap;
+}

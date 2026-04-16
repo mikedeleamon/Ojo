@@ -4,7 +4,8 @@ import AppRoutes from './routes/AppRoutes';
 import { useSettings, clearSettingsSession } from './hooks/useSettings';
 
 const AUTH_KEY      = 'ojo_auth';
-const OLD_LOCAL_KEY = 'ojo_settings'; // legacy key from previous localStorage approach
+const OLD_LOCAL_KEY = 'ojo_settings';
+const ONBOARD_KEY   = 'ojo_onboarding_done';
 
 const isLoggedIn = (): boolean => {
   try {
@@ -16,17 +17,18 @@ const isLoggedIn = (): boolean => {
 };
 
 // One-time migration: remove any stale settings from localStorage
-// so the old approach never silently takes precedence over MongoDB.
 localStorage.removeItem(OLD_LOCAL_KEY);
 
 const App = () => {
-  const [loggedIn, setLoggedIn] = useState<boolean>(isLoggedIn);
+  const [loggedIn,          setLoggedIn]          = useState<boolean>(isLoggedIn);
+  const [needsOnboarding,   setNeedsOnboarding]   = useState<boolean>(false);
   const { settings, settingsReady, saveSettings } = useSettings();
 
   const handleLogout = () => {
     localStorage.removeItem(AUTH_KEY);
     clearSettingsSession();
     setLoggedIn(false);
+    setNeedsOnboarding(false);
   };
 
   return (
@@ -38,6 +40,8 @@ const App = () => {
         settings={settings}
         settingsReady={settingsReady}
         saveSettings={saveSettings}
+        needsOnboarding={needsOnboarding}
+        setNeedsOnboarding={setNeedsOnboarding}
       />
     </Router>
   );
