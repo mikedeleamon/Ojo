@@ -64,6 +64,15 @@ export interface ClothingArticle {
   createdAt?:       string;
 }
 
+export interface OutfitHistoryEntry {
+  id:        string;
+  wornAt:    string;
+  closetId:  string;
+  closetName:string;
+  articleIds:string[];
+  articleSummary: string;
+}
+
 export interface Closet {
   _id:         string;
   name:        string;

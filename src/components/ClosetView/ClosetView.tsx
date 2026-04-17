@@ -4,13 +4,14 @@ import ArticleModal, { ArticleFormData } from '../ArticleModal/ArticleModal';
 import styles from './ClosetView.module.css';
 
 interface Props {
-  closets:        Closet[];
-  onCreateCloset: (name: string) => Promise<void>;
-  onRenameCloset: (id: string, name: string) => Promise<void>;
-  onDeleteCloset: (id: string) => Promise<void>;
-  onAddArticle:   (closetId: string, data: ArticleFormData) => Promise<void>;
-  onRemoveArticle:(closetId: string, articleId: string) => Promise<void>;
-  onSetPreferred: (id: string) => Promise<void>;
+  closets:           Closet[];
+  initialSelectedId?:string;
+  onCreateCloset:    (name: string) => Promise<void>;
+  onRenameCloset:    (id: string, name: string) => Promise<void>;
+  onDeleteCloset:    (id: string) => Promise<void>;
+  onAddArticle:      (closetId: string, data: ArticleFormData) => Promise<void>;
+  onRemoveArticle:   (closetId: string, articleId: string) => Promise<void>;
+  onSetPreferred:    (id: string) => Promise<void>;
 }
 
 const CATEGORIES = ['Casual', 'Formal', 'Business Casual', 'Athletic', 'Lounge', 'Outdoor'];
@@ -75,10 +76,14 @@ const Chip = ({ label, active, color, onClick }: {
 );
 
 const ClosetView = ({
-  closets, onCreateCloset, onRenameCloset, onDeleteCloset,
+  closets, initialSelectedId, onCreateCloset, onRenameCloset, onDeleteCloset,
   onAddArticle, onRemoveArticle, onSetPreferred,
 }: Props) => {
-  const [selectedId, setSelectedId] = useState<string>(closets[0]?._id ?? '');
+  const [selectedId, setSelectedId] = useState<string>(
+    initialSelectedId && closets.find(c => c._id === initialSelectedId)
+      ? initialSelectedId
+      : (closets[0]?._id ?? '')
+  );
   const [showModal,  setShowModal]  = useState(false);
   const [creating,   setCreating]   = useState(false);
   const [newName,    setNewName]    = useState('');

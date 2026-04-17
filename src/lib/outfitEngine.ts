@@ -104,6 +104,7 @@ export const generateOutfit = (
   articles: ClothingArticle[],
   weather:  CurrentWeather,
   settings: Settings,
+  recentlyWorn: Set<string> = new Set(),
 ): OutfitResult => {
   if (articles.length === 0) {
     return { status: 'empty_closet', headline: '', slots: [], notes: [] };
@@ -123,6 +124,14 @@ export const generateOutfit = (
   const raining = weather.HasPrecipitation;
   const b       = bucket(tempF, settings.hiTempThreshold, settings.lowTempThreshold);
 
+  // Penalise recently-worn items so suggestions rotate
+  const score = (a: ClothingArticle) => {
+    const base = weatherScore(a, weather, settings);
+    return recentlyWorn.has(a._id) ? base - 3 : base;
+  };
+  const bestOf = (candidates: ClothingArticle[]) =>
+    candidates.reduce((a, b) => score(b) > score(a) ? b : a);
+
   // ── Core: full-body OR top + bottom ────────────────────────────────────────
   const fullBodyOptions = byRole.get('fullBody') ?? [];
   const topOptions      = byRole.get('top')      ?? [];
@@ -134,17 +143,16 @@ export const generateOutfit = (
       (b === 'hot' && Math.random() > 0.5));
 
   if (useFullBody) {
-    slots.push({ role: 'fullBody', article: best(fullBodyOptions, weather, settings) });
+    slots.push({ role: 'fullBody', article: bestOf(fullBodyOptions) });
   } else {
     if (topOptions.length > 0) {
-      slots.push({ role: 'top', article: best(topOptions, weather, settings) });
+      slots.push({ role: 'top', article: bestOf(topOptions) });
     }
     if (bottomOptions.length > 0) {
-      slots.push({ role: 'bottom', article: best(bottomOptions, weather, settings) });
+      slots.push({ role: 'bottom', article: bestOf(bottomOptions) });
     }
   }
 
-  // Check we have enough for a real outfit
   const hasCore = slots.some(s => s.role === 'fullBody' || s.role === 'top') &&
     (slots.some(s => s.role === 'fullBody' || s.role === 'bottom'));
 
@@ -156,20 +164,20 @@ export const generateOutfit = (
   const outerwearOptions = byRole.get('outerwear') ?? [];
   if (b === 'cool' || b === 'cold' || b === 'freezing') {
     if (outerwearOptions.length > 0) {
-      slots.push({ role: 'outerwear', article: best(outerwearOptions, weather, settings) });
+      slots.push({ role: 'outerwear', article: bestOf(outerwearOptions) });
     } else {
       notes.push(b === 'freezing' || b === 'cold'
         ? 'No coat in your closet — add one for cold days.'
         : 'A light jacket would work well today.');
     }
   } else if (raining && outerwearOptions.length > 0) {
-    slots.push({ role: 'outerwear', article: best(outerwearOptions, weather, settings) });
+    slots.push({ role: 'outerwear', article: bestOf(outerwearOptions) });
   }
 
   // ── Footwear ───────────────────────────────────────────────────────────────
   const footwearOptions = byRole.get('footwear') ?? [];
   if (footwearOptions.length > 0) {
-    slots.push({ role: 'footwear', article: best(footwearOptions, weather, settings) });
+    slots.push({ role: 'footwear', article: bestOf(footwearOptions) });
   } else {
     notes.push('No footwear in your closet yet.');
   }
@@ -183,8 +191,8 @@ export const generateOutfit = (
       ((b === 'cold' || b === 'freezing') && (a.clothingType === 'Scarf' || a.clothingType === 'Gloves'))
     );
     const pick = weatherAccessories.length > 0
-      ? best(weatherAccessories, weather, settings)
-      : best(accessoryOptions, weather, settings);
+      ? bestOf(weatherAccessories)
+      : bestOf(accessoryOptions);
     slots.push({ role: 'accessory', article: pick });
   }
 

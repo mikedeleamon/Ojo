@@ -391,3 +391,193 @@
     padding: var(--spacing-lg) var(--spacing-md);
   }
 }
+
+/* ─── Outfit History ─────────────────────────────────────────────────────── */
+.historyHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.clearAllBtn {
+  padding: 6px 14px;
+  background: none;
+  border: 1px solid rgba(252, 165, 165, 0.3);
+  border-radius: var(--radius-pill);
+  color: rgba(252, 165, 165, 0.75);
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all var(--transition);
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-top: 6px;
+}
+.clearAllBtn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: rgba(252, 165, 165, 1);
+}
+
+.confirmRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.confirmText {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.confirmYes {
+  padding: 5px 12px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: var(--radius-pill);
+  color: rgba(252, 165, 165, 1);
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.confirmYes:hover { background: rgba(239, 68, 68, 0.25); }
+
+.confirmNo {
+  padding: 5px 12px;
+  background: none;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.confirmNo:hover { background: var(--glass-bg-strong); color: var(--text-primary); }
+
+.historyEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xl) var(--spacing-lg);
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.historyEmptyTitle {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.historyEmptyDesc {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.65;
+  max-width: 300px;
+}
+.historyEmptyDesc strong {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.historyList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.historyCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--spacing-md);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  animation: fadeUp 0.3s ease both;
+  transition: background var(--transition);
+}
+.historyCard:hover { background: var(--glass-bg-strong); }
+
+.historyMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.historyDate {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.01em;
+}
+
+.historyCloset {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  padding: 2px 8px;
+}
+
+.historySummary {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  font-weight: 300;
+  padding-right: 24px;
+}
+
+.historyArticleCount {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  letter-spacing: 0.05em;
+}
+
+.historyDeleteBtn {
+  position: absolute;
+  top: var(--spacing-md);
+  right: var(--spacing-md);
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 50%;
+  transition: all var(--transition);
+  opacity: 0;
+}
+.historyCard:hover .historyDeleteBtn { opacity: 1; }
+.historyDeleteBtn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: rgba(252, 165, 165, 0.9);
+}
+
+.historyNote {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  font-style: italic;
+}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { Closet } from '../../types';
 import ClosetView from '../../components/ClosetView/ClosetView';
@@ -23,6 +23,8 @@ const ClosetPage = () => {
   const [creating, setCreating] = useState(false);
   const [newName,  setNewName]  = useState('');
   const navigate = useNavigate();
+  const { search } = useLocation();
+  const openId = new URLSearchParams(search).get('open') ?? undefined;
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -129,6 +131,7 @@ const ClosetPage = () => {
         /* ── Closet view ──────────────────────────────────────────────────── */
         <ClosetView
           closets={closets}
+          initialSelectedId={openId}
           onCreateCloset={createCloset}
           onRenameCloset={renameCloset}
           onDeleteCloset={deleteCloset}

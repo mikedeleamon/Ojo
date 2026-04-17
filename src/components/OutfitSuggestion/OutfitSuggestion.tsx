@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Closet, CurrentWeather, Settings } from '../../types';
 import { generateOutfit, OutfitRole } from '../../lib/outfitEngine';
+import { addHistoryEntry, recentlyWornIds } from '../../lib/outfitHistory';
 import styles from './OutfitSuggestion.module.css';
 
 const AUTH_KEY = 'ojo_auth';
@@ -22,7 +23,6 @@ const ROLE_META: Record<OutfitRole, { label: string; icon: React.ReactNode }> = 
   accessory: { label: 'Extra',     icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.5"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg> },
 };
 
-// ─── Article thumbnail ────────────────────────────────────────────────────────
 const ArticleThumb = ({ article, role }: { article: any; role: OutfitRole }) => {
   const meta = ROLE_META[role];
   return (
@@ -46,7 +46,6 @@ const ArticleThumb = ({ article, role }: { article: any; role: OutfitRole }) => 
   );
 };
 
-// Rough CSS color map for color dots
 const CSS_COLORS: Record<string, string> = {
   Black: '#1a1a1a', White: '#f5f5f5', Grey: '#9ca3af', Navy: '#1e3a5f',
   Blue: '#3b82f6', Green: '#22c55e', Red: '#ef4444', Brown: '#92400e',
@@ -54,7 +53,6 @@ const CSS_COLORS: Record<string, string> = {
   Orange: '#f97316', Multi: 'linear-gradient(135deg, #f97316, #3b82f6, #22c55e)',
 };
 
-// ─── Empty / prompt states ────────────────────────────────────────────────────
 const PromptState = ({ icon, title, body, action }: {
   icon: React.ReactNode; title: string; body: string; action?: React.ReactNode;
 }) => (
@@ -66,16 +64,15 @@ const PromptState = ({ icon, title, body, action }: {
   </div>
 );
 
-// ─── Main component ───────────────────────────────────────────────────────────
 interface Props { weather: CurrentWeather; settings: Settings; }
 
 const OutfitSuggestion = ({ weather, settings }: Props) => {
-  const [closets, setClosets]   = useState<Closet[]>([]);
-  const [loading, setLoading]   = useState(true);
+  const [closets,     setClosets]     = useState<Closet[]>([]);
+  const [loading,     setLoading]     = useState(true);
   const [settingPref, setSettingPref] = useState(false);
+  const [wornLogged,  setWornLogged]  = useState(false);
   const navigate = useNavigate();
 
-  // Fetch all closets once on mount
   useEffect(() => {
     const token = getToken();
     if (!token) { setLoading(false); return; }
@@ -87,7 +84,6 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
 
   const preferred = useMemo(() => closets.find(c => c.isPreferred) ?? null, [closets]);
 
-  // Set a closet as preferred
   const setPreferred = async (id: string) => {
     const token = getToken();
     if (!token) return;
@@ -99,20 +95,44 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
     setSettingPref(false);
   };
 
-  // Generate outfit from preferred closet
+  // Pass recently-worn IDs so engine avoids repetition
+  const worn = useMemo(() => recentlyWornIds(3), []);
+
   const outfit = useMemo(() => {
     if (!preferred) return null;
-    return generateOutfit(preferred.articles, weather, settings);
-  }, [preferred, weather, settings]);
+    return generateOutfit(preferred.articles, weather, settings, worn);
+  }, [preferred, weather, settings, worn]);
 
-  // ── Loading ──────────────────────────────────────────────────────────────────
+  // ── Log outfit as worn ────────────────────────────────────────────────────
+  const handleWoreThis = () => {
+    if (!preferred || !outfit || outfit.status !== 'ok') return;
+    const articleIds = outfit.slots.map(s => s.article._id);
+    const articleSummary = outfit.slots
+      .map(s => s.article.name || s.article.clothingType)
+      .join(', ');
+    addHistoryEntry({
+      closetId:    preferred._id,
+      closetName:  preferred.name,
+      articleIds,
+      articleSummary,
+    });
+    setWornLogged(true);
+    setTimeout(() => setWornLogged(false), 3000);
+  };
+
+  // ── Navigate to preferred closet (or /closet if none) ────────────────────
+  const goToCloset = () => {
+    if (preferred) {
+      navigate(`/closet?open=${preferred._id}`);
+    } else {
+      navigate('/closet');
+    }
+  };
+
   if (loading) return (
-    <div className={styles.root}>
-      <div className={styles.skeleton} />
-    </div>
+    <div className={styles.root}><div className={styles.skeleton} /></div>
   );
 
-  // ── No closets ───────────────────────────────────────────────────────────────
   if (closets.length === 0) return (
     <div className={styles.root}>
       <PromptState
@@ -124,7 +144,6 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
     </div>
   );
 
-  // ── No preferred closet — show picker ────────────────────────────────────────
   if (!preferred) return (
     <div className={styles.root}>
       <p className={styles.sectionLabel}>Outfit</p>
@@ -135,12 +154,8 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
       />
       <div className={styles.closetPicker}>
         {closets.map(c => (
-          <button
-            key={c._id}
-            className={styles.closetPickBtn}
-            onClick={() => setPreferred(c._id)}
-            disabled={settingPref}
-          >
+          <button key={c._id} className={styles.closetPickBtn}
+            onClick={() => setPreferred(c._id)} disabled={settingPref}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
               <path d="M12 4a2 2 0 0 1 2 2c0 .74-.4 1.38-1 1.73V9l8 5.5A1 1 0 0 1 20 16H4a1 1 0 0 1-.99-1.5L11 9V7.73A2 2 0 0 1 12 4Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
@@ -152,7 +167,6 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
     </div>
   );
 
-  // ── Empty preferred closet ───────────────────────────────────────────────────
   if (outfit?.status === 'empty_closet') return (
     <div className={styles.root}>
       <div className={styles.preferredBadge}>
@@ -163,12 +177,11 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
         icon={<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 4a2 2 0 0 1 2 2c0 .74-.4 1.38-1 1.73V9l8 5.5A1 1 0 0 1 20 16H4a1 1 0 0 1-.99-1.5L11 9V7.73A2 2 0 0 1 12 4Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
         title="This closet is empty"
         body="Add clothing articles to get outfit suggestions."
-        action={<button className={styles.ctaBtn} onClick={() => navigate('/closet')}>Add clothes</button>}
+        action={<button className={styles.ctaBtn} onClick={goToCloset}>Add clothes</button>}
       />
     </div>
   );
 
-  // ── Insufficient articles ────────────────────────────────────────────────────
   if (outfit?.status === 'insufficient') return (
     <div className={styles.root}>
       <div className={styles.preferredBadge}>
@@ -179,15 +192,13 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
         icon={<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>}
         title="Not enough to build an outfit"
         body="Add a top and a bottom (or a full-body piece) to get a suggestion."
-        action={<button className={styles.ctaBtn} onClick={() => navigate('/closet')}>Add more clothes</button>}
+        action={<button className={styles.ctaBtn} onClick={goToCloset}>Add more clothes</button>}
       />
     </div>
   );
 
-  // ── Full outfit ──────────────────────────────────────────────────────────────
   return (
     <div className={styles.root}>
-      {/* Header row */}
       <div className={styles.header}>
         <div className={styles.preferredBadge}>
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
@@ -200,14 +211,12 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
 
       <p className={styles.headline}>{outfit!.headline}</p>
 
-      {/* Article cards */}
       <div className={styles.articleGrid}>
         {outfit!.slots.map((slot, i) => (
           <ArticleThumb key={i} article={slot.article} role={slot.role} />
         ))}
       </div>
 
-      {/* Notes */}
       {outfit!.notes.length > 0 && (
         <ul className={styles.notesList}>
           {outfit!.notes.map((n, i) => (
@@ -221,6 +230,30 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
           ))}
         </ul>
       )}
+
+      {/* ── Wore this today button ───────────────────────────────────────── */}
+      <button
+        className={`${styles.woreThisBtn} ${wornLogged ? styles.woreThisLogged : ''}`}
+        onClick={handleWoreThis}
+        disabled={wornLogged}
+      >
+        {wornLogged ? (
+          <>
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.2"/>
+              <path d="M5 8l2.5 2.5L11 5.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Logged!
+          </>
+        ) : (
+          <>
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+              <path d="M8 2a6 6 0 1 0 0 12A6 6 0 0 0 8 2zm0 3v3l2 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Wore this today
+          </>
+        )}
+      </button>
     </div>
   );
 };
