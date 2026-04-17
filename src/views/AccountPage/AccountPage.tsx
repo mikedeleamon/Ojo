@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Settings } from '../../types';
+import { Settings, OutfitHistoryEntry } from '../../types';
+import { loadHistory, deleteHistoryEntry, clearHistory } from '../../lib/outfitHistory';
 import styles from './AccountPage.module.css';
 
 const AUTH_KEY = 'ojo_auth';
 const STYLES   = ['Casual', 'Business Casual', 'Formal', 'Urban', 'Cozy', 'Preppy'];
 
-type Tab = 'user' | 'preferences' | 'password';
+type Tab = 'user' | 'preferences' | 'password' | 'history';
 
 interface Props {
   settings: Settings;
@@ -261,6 +262,119 @@ const PasswordTab = () => {
   );
 };
 
+// ─── Tab: Outfit History ──────────────────────────────────────────────────────
+
+const HistoryTab = () => {
+  const [entries, setEntries] = useState<OutfitHistoryEntry[]>([]);
+  const [confirmClear, setConfirmClear] = useState(false);
+
+  useEffect(() => {
+    setEntries(loadHistory());
+  }, []);
+
+  const handleDelete = (id: string) => {
+    deleteHistoryEntry(id);
+    setEntries(prev => prev.filter(e => e.id !== id));
+  };
+
+  const handleClearAll = () => {
+    clearHistory();
+    setEntries([]);
+    setConfirmClear(false);
+  };
+
+  const formatDate = (iso: string) => {
+    const d = new Date(iso);
+    const today    = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+
+    const sameDay = (a: Date, b: Date) =>
+      a.getDate() === b.getDate() &&
+      a.getMonth() === b.getMonth() &&
+      a.getFullYear() === b.getFullYear();
+
+    const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    if (sameDay(d, today))     return `Today, ${timeStr}`;
+    if (sameDay(d, yesterday)) return `Yesterday, ${timeStr}`;
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) + `, ${timeStr}`;
+  };
+
+  return (
+    <div className={styles.tabContent}>
+      <div className={styles.historyHeader}>
+        <h2 className={styles.tabTitle}>Outfit History</h2>
+        {entries.length > 0 && (
+          confirmClear ? (
+            <div className={styles.confirmRow}>
+              <span className={styles.confirmText}>Clear all {entries.length} entries?</span>
+              <button className={styles.confirmYes} onClick={handleClearAll}>Yes, clear</button>
+              <button className={styles.confirmNo} onClick={() => setConfirmClear(false)}>Cancel</button>
+            </div>
+          ) : (
+            <button className={styles.clearAllBtn} onClick={() => setConfirmClear(true)}>
+              Clear all
+            </button>
+          )
+        )}
+      </div>
+
+      {entries.length === 0 ? (
+        <div className={styles.historyEmpty}>
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="none">
+            <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+              stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          <p className={styles.historyEmptyTitle}>No outfits logged yet</p>
+          <p className={styles.historyEmptyDesc}>
+            Tap <strong>Wore this today</strong> on the main screen after getting a suggestion
+            to start building your history.
+          </p>
+        </div>
+      ) : (
+        <div className={styles.historyList}>
+          {entries.map((entry, i) => (
+            <div
+              key={entry.id}
+              className={styles.historyCard}
+              style={{ animationDelay: `${i * 0.04}s` }}
+            >
+              <div className={styles.historyMeta}>
+                <span className={styles.historyDate}>{formatDate(entry.wornAt)}</span>
+                <span className={styles.historyCloset}>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 4a2 2 0 0 1 2 2c0 .74-.4 1.38-1 1.73V9l8 5.5A1 1 0 0 1 20 16H4a1 1 0 0 1-.99-1.5L11 9V7.73A2 2 0 0 1 12 4Z"
+                      stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  {entry.closetName}
+                </span>
+              </div>
+              <p className={styles.historySummary}>{entry.articleSummary}</p>
+              <div className={styles.historyArticleCount}>
+                {entry.articleIds.length} piece{entry.articleIds.length !== 1 ? 's' : ''}
+              </div>
+              <button
+                className={styles.historyDeleteBtn}
+                onClick={() => handleDelete(entry.id)}
+                aria-label="Remove entry"
+              >
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                  <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <p className={styles.historyNote}>
+        Outfits logged in the last 3 days are deprioritised in new suggestions to keep things fresh.
+      </p>
+    </div>
+  );
+};
+
 // ─── AccountPage ──────────────────────────────────────────────────────────────
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
@@ -280,6 +394,15 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     icon: (
       <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
         <path d="M3 6h14M3 10h14M3 14h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'history',
+    label: 'History',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
+        <path d="M10 2a8 8 0 1 0 0 16A8 8 0 0 0 10 2zm0 4v4l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
       </svg>
     ),
   },
@@ -364,6 +487,7 @@ const AccountPage = ({ settings, saveSettings, onLogout }: Props) => {
 
         {activeTab === 'user'        && <UserTab />}
         {activeTab === 'preferences' && <PreferencesTab settings={settings} saveSettings={saveSettings} />}
+        {activeTab === 'history'     && <HistoryTab />}
         {activeTab === 'password'    && <PasswordTab />}
       </main>
     </div>
