@@ -2,7 +2,8 @@ import { useState, useCallback, useEffect } from 'react';
 import axios from 'axios';
 import { Settings } from '../types';
 
-const SESSION_KEY = 'ojo_settings_session';
+const CACHE_KEY   = 'ojo_settings_cache';   // localStorage — survives refresh
+const SESSION_KEY = 'ojo_settings_session'; // kept for legacy clearance only
 const AUTH_KEY    = 'ojo_auth';
 
 export const defaults: Settings = {
@@ -28,65 +29,56 @@ const authHeaders = (token: string) => ({
   headers: { Authorization: `Bearer ${token}` },
 });
 
-const readSession = (): Settings | null => {
+const readCache = (): Settings | null => {
   try {
-    const raw = sessionStorage.getItem(SESSION_KEY);
+    const raw = localStorage.getItem(CACHE_KEY);
     return raw ? { ...defaults, ...JSON.parse(raw) } : null;
   } catch {
     return null;
   }
 };
 
-const writeSession = (s: Settings) => {
-  try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(s)); } catch {}
+const writeCache = (s: Settings) => {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify(s)); } catch {}
 };
 
 export const clearSettingsSession = () => {
-  try { sessionStorage.removeItem(SESSION_KEY); } catch {}
+  try {
+    localStorage.removeItem(CACHE_KEY);
+    sessionStorage.removeItem(SESSION_KEY); // clear legacy key too
+  } catch {}
 };
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export const useSettings = () => {
-  // Start with null — we don't render settings-dependent UI until we know the
-  // real values. Consumers can check `settingsReady` to show a loading state.
-  const [settings, setSettings] = useState<Settings | null>(null);
-  const [settingsReady, setSettingsReady] = useState(false);
+  // Seed from localStorage immediately so the UI never blocks on a network call
+  const [settings, setSettings] = useState<Settings>(() => readCache() ?? defaults);
+  const [settingsReady, setSettingsReady] = useState<boolean>(() => readCache() !== null);
 
   useEffect(() => {
     const token = getToken();
 
-    // Not logged in — use defaults immediately, no server call needed.
+    // Not logged in — defaults are already set, nothing to fetch
     if (!token) {
-      setSettings(defaults);
       setSettingsReady(true);
       return;
     }
 
-    // Session cache hit — render immediately without a network round-trip,
-    // but still revalidate in the background so settings stay fresh.
-    const cached = readSession();
-    if (cached) {
-      setSettings(cached);
-      setSettingsReady(true);
-    }
-
-    // Fetch from MongoDB (always, so the session cache never permanently diverges)
+    // Revalidate from MongoDB in the background so settings stay fresh.
+    // The UI is already unblocked via the localStorage seed above.
     axios
       .get('/api/user/settings', authHeaders(token))
       .then(({ data }) => {
         const fresh = { ...defaults, ...data };
         setSettings(fresh);
-        writeSession(fresh);
+        writeCache(fresh);
         setSettingsReady(true);
       })
       .catch((err) => {
-        console.warn('[Ojo] Could not load settings from server:', err.message);
-        // If we have a cached copy, keep using it. Otherwise fall back to defaults.
-        if (!cached) {
-          setSettings(defaults);
-          setSettingsReady(true);
-        }
+        console.warn('[Ojo] Could not revalidate settings:', err.message);
+        // Cache already applied — just mark ready so the UI can proceed
+        setSettingsReady(true);
       });
   }, []);
 
@@ -94,7 +86,7 @@ export const useSettings = () => {
   const saveSettings = useCallback(async (next: Settings) => {
     const previous = settings;
     setSettings(next);
-    writeSession(next);
+    writeCache(next);
 
     const token = getToken();
     if (!token) return;
@@ -103,18 +95,11 @@ export const useSettings = () => {
       await axios.put('/api/user/settings', next, authHeaders(token));
     } catch (err: any) {
       console.error('[Ojo] Settings save failed — rolling back:', err.message);
-      // Roll back UI and session cache to the last known good state.
-      if (previous) {
-        setSettings(previous);
-        writeSession(previous);
-      }
-      throw err; // re-throw so callers (e.g. AccountPage) can show an error
+      setSettings(previous);
+      writeCache(previous);
+      throw err;
     }
   }, [settings]);
 
-  return {
-    settings: settings ?? defaults,
-    settingsReady,
-    saveSettings,
-  };
+  return { settings, settingsReady, saveSettings };
 };
