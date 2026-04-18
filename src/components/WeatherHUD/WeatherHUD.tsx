@@ -58,9 +58,14 @@ const WeatherHUD = ({ location, settings }: Props) => {
             setIsLoading(false);
             return;
         }
-        // Debug logging removed
-        // ── No location yet — keep loading until geolocation resolves ──────────
-        if (!location) return;
+        // ── No location yet — wait for geolocation to resolve ─────────────────
+        // If location is genuinely empty (geo denied + no default set), surface
+        // an actionable error instead of spinning forever.
+        if (!location) {
+            setError('Location unavailable. Set a default city in Settings → Preferences.');
+            setIsLoading(false);
+            return;
+        }
 
         // Detect oversized cookies which commonly cause 431 responses when
         // forwarded through the dev proxy. If we detect problematic cookies,

@@ -19,7 +19,7 @@ const AW_BASE  = process.env.ACCUWEATHER_BASE_URL || 'https://dataservice.accuwe
 const JWT_SECRET = process.env.JWT_SECRET || 'ojo-dev-secret-change-in-production';
 const MONGO_URI  = process.env.MONGO_URI || '';
 
-const originsEnv = process.env.CORS_ORIGINS || 'http://localhost:3000,http://localhost:3001';
+const originsEnv = process.env.CORS_ORIGINS || 'http://localhost:3000,http://localhost:3001,http://localhost:4000';
 const origins = originsEnv.split(',').map((s) => s.trim()).filter(Boolean);
 
 app.use(cors({ origin: origins }));
@@ -469,7 +469,21 @@ app.delete('/api/closets/:closetId/articles/:articleId', requireAuth, async (req
 const BUILD_DIR = path.join(__dirname, '../../build');
 app.use(express.static(BUILD_DIR));
 app.get('*', (_req: Request, res: Response) => {
-  res.sendFile(path.join(BUILD_DIR, 'index.html'));
+  const indexPath = path.join(BUILD_DIR, 'index.html');
+  res.sendFile(indexPath, (err) => {
+    if (err) {
+      res.status(200).send(`<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Ojo</title>
+<style>body{background:#0F172A;color:rgba(255,255,255,0.8);font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;text-align:center}div{max-width:400px;padding:32px}code{background:rgba(255,255,255,0.1);padding:2px 6px;border-radius:4px;font-size:0.85em}</style>
+</head>
+<body><div>
+  <p style="font-size:1.1rem;font-weight:500">Build not found</p>
+  <p style="opacity:0.6;margin-top:8px">Run <code>npm run build</code> to compile the React app, then restart the server.</p>
+</div></body>
+</html>`);
+    }
+  });
 });
 
 // ─── Start ────────────────────────────────────────────────────────────────────
