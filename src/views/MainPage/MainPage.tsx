@@ -17,16 +17,26 @@ const MainPage = ({ settings, settingsReady }: Props) => {
   const [geoLoading, setGeoLoading] = useState(true);
 
   useEffect(() => {
+    // Timeout so geoLoading never hangs forever if the browser stalls
+    const timeout = setTimeout(() => {
+      setLocation(settings.location);
+      setGeoLoading(false);
+    }, 8000);
+
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
+        clearTimeout(timeout);
         setLocation(`${coords.latitude},${coords.longitude}`);
         setGeoLoading(false);
       },
       () => {
+        clearTimeout(timeout);
         setLocation(settings.location);
         setGeoLoading(false);
       }
     );
+
+    return () => clearTimeout(timeout);
   }, []);
 
   if (!settingsReady || geoLoading) return <Loading />;
