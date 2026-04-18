@@ -2,8 +2,9 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Closet, CurrentWeather, Settings } from '../../types';
-import { generateOutfit, OutfitRole } from '../../lib/outfitEngine';
+import { generateOutfits, OutfitRole, OutfitResult, ScoreBreakdown } from '../../lib/outfitEngine';
 import { addHistoryEntry, recentlyWornIds } from '../../lib/outfitHistory';
+import { updatePreferences } from '../../lib/userPreferences';
 import styles from './OutfitSuggestion.module.css';
 
 const AUTH_KEY = 'ojo_auth';
@@ -13,7 +14,15 @@ const getToken = (): string | null => {
 };
 const authHeaders = (token: string) => ({ headers: { Authorization: `Bearer ${token}` } });
 
-// ─── Role labels & icons ──────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const CSS_COLORS: Record<string, string> = {
+  Black: '#1a1a1a', White: '#f5f5f5', Grey: '#9ca3af', Navy: '#1e3a5f',
+  Blue: '#3b82f6', Green: '#22c55e', Red: '#ef4444', Brown: '#92400e',
+  Beige: '#d4b896', Pink: '#f9a8d4', Yellow: '#fbbf24', Purple: '#a855f7',
+  Orange: '#f97316', Multi: 'linear-gradient(135deg, #f97316, #3b82f6, #22c55e)',
+};
+
 const ROLE_META: Record<OutfitRole, { label: string; icon: React.ReactNode }> = {
   top:       { label: 'Top',       icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M3 6l4-3h10l4 3-4 4v11H7V10L3 6z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg> },
   bottom:    { label: 'Bottom',    icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 4h16v4l-4 12H8L4 8V4z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg> },
@@ -22,6 +31,8 @@ const ROLE_META: Record<OutfitRole, { label: string; icon: React.ReactNode }> = 
   footwear:  { label: 'Footwear',  icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M3 16l4-8h4l1 4h9v4H3z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg> },
   accessory: { label: 'Extra',     icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.5"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg> },
 };
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
 const ArticleThumb = ({ article, role }: { article: any; role: OutfitRole }) => {
   const meta = ROLE_META[role];
@@ -46,11 +57,44 @@ const ArticleThumb = ({ article, role }: { article: any; role: OutfitRole }) => 
   );
 };
 
-const CSS_COLORS: Record<string, string> = {
-  Black: '#1a1a1a', White: '#f5f5f5', Grey: '#9ca3af', Navy: '#1e3a5f',
-  Blue: '#3b82f6', Green: '#22c55e', Red: '#ef4444', Brown: '#92400e',
-  Beige: '#d4b896', Pink: '#f9a8d4', Yellow: '#fbbf24', Purple: '#a855f7',
-  Orange: '#f97316', Multi: 'linear-gradient(135deg, #f97316, #3b82f6, #22c55e)',
+const ScoreBadge = ({ score }: { score: number }) => {
+  const color =
+    score >= 80 ? 'rgba(52,211,153,0.9)'  :
+    score >= 60 ? 'rgba(251,191,36,0.9)'  :
+                  'rgba(148,163,184,0.9)';
+  return (
+    <span className={styles.scoreBadge} style={{ color, borderColor: color }}>
+      {score}
+    </span>
+  );
+};
+
+const BREAKDOWN_LABELS: { key: keyof ScoreBreakdown; label: string }[] = [
+  { key: 'fabric',     label: 'Weather' },
+  { key: 'color',      label: 'Color'   },
+  { key: 'style',      label: 'Style'   },
+  { key: 'simplicity', label: 'Simple'  },
+  { key: 'preference', label: 'You'     },
+];
+
+const ScoreBreakdownRow = ({ breakdown, expanded }: { breakdown: ScoreBreakdown; expanded: boolean }) => {
+  if (!expanded) return null;
+  return (
+    <div className={styles.breakdownRow}>
+      {BREAKDOWN_LABELS.map(({ key, label }) => (
+        <div key={key} className={styles.breakdownItem}>
+          <span className={styles.breakdownLabel}>{label}</span>
+          <div className={styles.breakdownBar}>
+            <div
+              className={styles.breakdownFill}
+              style={{ width: `${breakdown[key]}%` }}
+            />
+          </div>
+          <span className={styles.breakdownValue}>{breakdown[key]}</span>
+        </div>
+      ))}
+    </div>
+  );
 };
 
 const PromptState = ({ icon, title, body, action }: {
@@ -64,13 +108,24 @@ const PromptState = ({ icon, title, body, action }: {
   </div>
 );
 
+const HangerIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+    <path d="M12 4a2 2 0 0 1 2 2c0 .74-.4 1.38-1 1.73V9l8 5.5A1 1 0 0 1 20 16H4a1 1 0 0 1-.99-1.5L11 9V7.73A2 2 0 0 1 12 4Z"
+      stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
 interface Props { weather: CurrentWeather; settings: Settings; }
 
 const OutfitSuggestion = ({ weather, settings }: Props) => {
-  const [closets,     setClosets]     = useState<Closet[]>([]);
-  const [loading,     setLoading]     = useState(true);
-  const [settingPref, setSettingPref] = useState(false);
-  const [wornLogged,  setWornLogged]  = useState(false);
+  const [closets,      setClosets]      = useState<Closet[]>([]);
+  const [loading,      setLoading]      = useState(true);
+  const [settingPref,  setSettingPref]  = useState(false);
+  const [activeIdx,    setActiveIdx]    = useState(0);       // which of top-3 is shown
+  const [showBreakdown,setShowBreakdown] = useState(false);
+  const [wornLogged,   setWornLogged]   = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -84,7 +139,7 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
 
   const preferred = useMemo(() => closets.find(c => c.isPreferred) ?? null, [closets]);
 
-  const setPreferred = async (id: string) => {
+  const setPreferredCloset = async (id: string) => {
     const token = getToken();
     if (!token) return;
     setSettingPref(true);
@@ -95,70 +150,61 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
     setSettingPref(false);
   };
 
-  // Pass recently-worn IDs so engine avoids repetition
+  // Recently-worn IDs from history (last 3 days) — used for recency penalty
   const worn = useMemo(() => recentlyWornIds(3), []);
 
-  const outfit = useMemo(() => {
-    if (!preferred) return null;
-    return generateOutfit(preferred.articles, weather, settings, worn);
+  // Generate top-3 outfits from the preferred closet
+  const { outfits, status } = useMemo(() => {
+    if (!preferred) return { outfits: [], status: 'no_preferred' as const };
+    const { results, status } = generateOutfits(preferred.articles, weather, settings, worn, 3);
+    return { outfits: results, status };
   }, [preferred, weather, settings, worn]);
 
-  // ── Log outfit as worn ────────────────────────────────────────────────────
+  // Keep activeIdx in bounds when outfits list changes
+  const safeIdx   = Math.min(activeIdx, Math.max(0, outfits.length - 1));
+  const activeOutfit: OutfitResult | null = outfits[safeIdx] ?? null;
+
+  // ── Log worn outfit ────────────────────────────────────────────────────────
   const handleWoreThis = () => {
-    if (!preferred || !outfit || outfit.status !== 'ok') return;
-    const articleIds = outfit.slots.map(s => s.article._id);
-    const articleSummary = outfit.slots
-      .map(s => s.article.name || s.article.clothingType)
-      .join(', ');
-    addHistoryEntry({
-      closetId:    preferred._id,
-      closetName:  preferred.name,
-      articleIds,
-      articleSummary,
-    });
+    if (!preferred || !activeOutfit || activeOutfit.status !== 'ok') return;
+    const articles    = activeOutfit.slots.map(s => s.article);
+    const articleIds  = articles.map(a => a._id);
+    const summary     = articles.map(a => a.name || a.clothingType).join(', ');
+
+    // Update outfit history log
+    addHistoryEntry({ closetId: preferred._id, closetName: preferred.name, articleIds, articleSummary: summary });
+    // Update preference model
+    updatePreferences(articles);
+
     setWornLogged(true);
     setTimeout(() => setWornLogged(false), 3000);
   };
 
-  // ── Navigate to preferred closet (or /closet if none) ────────────────────
-  const goToCloset = () => {
-    if (preferred) {
-      navigate(`/closet?open=${preferred._id}`);
-    } else {
-      navigate('/closet');
-    }
-  };
+  // ── Navigate to preferred closet ──────────────────────────────────────────
+  const goToCloset = () =>
+    navigate(preferred ? `/closet?open=${preferred._id}` : '/closet');
 
-  if (loading) return (
-    <div className={styles.root}><div className={styles.skeleton} /></div>
-  );
+  // ── Render guards ──────────────────────────────────────────────────────────
+  if (loading) return <div className={styles.root}><div className={styles.skeleton} /></div>;
 
   if (closets.length === 0) return (
     <div className={styles.root}>
-      <PromptState
-        icon={<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 4a2 2 0 0 1 2 2c0 .74-.4 1.38-1 1.73V9l8 5.5A1 1 0 0 1 20 16H4a1 1 0 0 1-.99-1.5L11 9V7.73A2 2 0 0 1 12 4Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-        title="No closet yet"
+      <PromptState icon={<HangerIcon />} title="No closet yet"
         body="Create a closet and add your clothes to get outfit suggestions."
-        action={<button className={styles.ctaBtn} onClick={() => navigate('/closet')}>Create closet</button>}
-      />
+        action={<button className={styles.ctaBtn} onClick={() => navigate('/closet')}>Create closet</button>} />
     </div>
   );
 
   if (!preferred) return (
     <div className={styles.root}>
       <p className={styles.sectionLabel}>Outfit</p>
-      <PromptState
-        icon={<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 4a2 2 0 0 1 2 2c0 .74-.4 1.38-1 1.73V9l8 5.5A1 1 0 0 1 20 16H4a1 1 0 0 1-.99-1.5L11 9V7.73A2 2 0 0 1 12 4Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-        title="Pick a preferred closet"
-        body="Select a closet to use for daily outfit suggestions."
-      />
+      <PromptState icon={<HangerIcon />} title="Pick a preferred closet"
+        body="Select a closet to use for daily outfit suggestions." />
       <div className={styles.closetPicker}>
         {closets.map(c => (
           <button key={c._id} className={styles.closetPickBtn}
-            onClick={() => setPreferred(c._id)} disabled={settingPref}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-              <path d="M12 4a2 2 0 0 1 2 2c0 .74-.4 1.38-1 1.73V9l8 5.5A1 1 0 0 1 20 16H4a1 1 0 0 1-.99-1.5L11 9V7.73A2 2 0 0 1 12 4Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            onClick={() => setPreferredCloset(c._id)} disabled={settingPref}>
+            <HangerIcon />
             {c.name}
             <span className={styles.closetCount}>{c.articles.length}</span>
           </button>
@@ -167,59 +213,82 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
     </div>
   );
 
-  if (outfit?.status === 'empty_closet') return (
+  if (status === 'empty_closet') return (
     <div className={styles.root}>
-      <div className={styles.preferredBadge}>
-        <span>{preferred.name}</span>
-        <button className={styles.changePrefBtn} onClick={() => setClosets(prev => prev.map(c => ({ ...c, isPreferred: false })))}>change</button>
-      </div>
-      <PromptState
-        icon={<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 4a2 2 0 0 1 2 2c0 .74-.4 1.38-1 1.73V9l8 5.5A1 1 0 0 1 20 16H4a1 1 0 0 1-.99-1.5L11 9V7.73A2 2 0 0 1 12 4Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-        title="This closet is empty"
+      <PreferredBadge name={preferred.name} onClear={() => setClosets(p => p.map(c => ({ ...c, isPreferred: false })))} />
+      <PromptState icon={<HangerIcon />} title="This closet is empty"
         body="Add clothing articles to get outfit suggestions."
-        action={<button className={styles.ctaBtn} onClick={goToCloset}>Add clothes</button>}
-      />
+        action={<button className={styles.ctaBtn} onClick={goToCloset}>Add clothes</button>} />
     </div>
   );
 
-  if (outfit?.status === 'insufficient') return (
+  if (status === 'insufficient') return (
     <div className={styles.root}>
-      <div className={styles.preferredBadge}>
-        <span>{preferred.name}</span>
-        <button className={styles.changePrefBtn} onClick={() => setClosets(prev => prev.map(c => ({ ...c, isPreferred: false })))}>change</button>
-      </div>
+      <PreferredBadge name={preferred.name} onClear={() => setClosets(p => p.map(c => ({ ...c, isPreferred: false })))} />
       <PromptState
         icon={<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>}
         title="Not enough to build an outfit"
         body="Add a top and a bottom (or a full-body piece) to get a suggestion."
-        action={<button className={styles.ctaBtn} onClick={goToCloset}>Add more clothes</button>}
-      />
+        action={<button className={styles.ctaBtn} onClick={goToCloset}>Add more clothes</button>} />
     </div>
   );
 
+  if (!activeOutfit) return null;
+
   return (
     <div className={styles.root}>
+      {/* ── Header: preferred badge + score ─────────────────────────────── */}
       <div className={styles.header}>
-        <div className={styles.preferredBadge}>
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
-            <path d="M12 4a2 2 0 0 1 2 2c0 .74-.4 1.38-1 1.73V9l8 5.5A1 1 0 0 1 20 16H4a1 1 0 0 1-.99-1.5L11 9V7.73A2 2 0 0 1 12 4Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          <span>{preferred.name}</span>
-          <button className={styles.changePrefBtn} onClick={() => setClosets(prev => prev.map(c => ({ ...c, isPreferred: false })))}>change</button>
-        </div>
+        <PreferredBadge name={preferred.name} onClear={() => setClosets(p => p.map(c => ({ ...c, isPreferred: false })))} />
+        <ScoreBadge score={activeOutfit.score} />
       </div>
 
-      <p className={styles.headline}>{outfit!.headline}</p>
+      {/* ── Top-3 outfit selector tabs ───────────────────────────────────── */}
+      {outfits.length > 1 && (
+        <div className={styles.outfitTabs}>
+          {outfits.map((o, i) => (
+            <button
+              key={i}
+              className={`${styles.outfitTab} ${i === safeIdx ? styles.outfitTabActive : ''}`}
+              onClick={() => { setActiveIdx(i); setWornLogged(false); setShowBreakdown(false); }}
+            >
+              {i === 0 ? 'Best match' : `Option ${i + 1}`}
+              <span className={styles.tabScore}>{o.score}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
+      {/* ── Headline ─────────────────────────────────────────────────────── */}
+      <p className={styles.headline}>{activeOutfit.headline}</p>
+
+      {/* ── Article grid ─────────────────────────────────────────────────── */}
       <div className={styles.articleGrid}>
-        {outfit!.slots.map((slot, i) => (
-          <ArticleThumb key={i} article={slot.article} role={slot.role} />
+        {activeOutfit.slots.map((slot, i) => (
+          <ArticleThumb key={`${safeIdx}-${i}`} article={slot.article} role={slot.role} />
         ))}
       </div>
 
-      {outfit!.notes.length > 0 && (
+      {/* ── Score breakdown (expandable) ─────────────────────────────────── */}
+      <button
+        className={styles.breakdownToggle}
+        onClick={() => setShowBreakdown(v => !v)}
+      >
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+          <path d="M2 4h12M4 8h8M6 12h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+        </svg>
+        {showBreakdown ? 'Hide breakdown' : 'Score breakdown'}
+        <svg className={`${styles.chevron} ${showBreakdown ? styles.chevronOpen : ''}`}
+          width="12" height="12" viewBox="0 0 16 16" fill="none">
+          <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+      <ScoreBreakdownRow breakdown={activeOutfit.scoreBreakdown} expanded={showBreakdown} />
+
+      {/* ── Notes ────────────────────────────────────────────────────────── */}
+      {activeOutfit.notes.length > 0 && (
         <ul className={styles.notesList}>
-          {outfit!.notes.map((n, i) => (
+          {activeOutfit.notes.map((n, i) => (
             <li key={i} className={styles.note}>
               <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
                 <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.2"/>
@@ -231,7 +300,7 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
         </ul>
       )}
 
-      {/* ── Wore this today button ───────────────────────────────────────── */}
+      {/* ── Wore this today ───────────────────────────────────────────────── */}
       <button
         className={`${styles.woreThisBtn} ${wornLogged ? styles.woreThisLogged : ''}`}
         onClick={handleWoreThis}
@@ -257,5 +326,18 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
     </div>
   );
 };
+
+// ─── Shared sub-component ─────────────────────────────────────────────────────
+
+const PreferredBadge = ({ name, onClear }: { name: string; onClear: () => void }) => (
+  <div className={styles.preferredBadge}>
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+      <path d="M12 4a2 2 0 0 1 2 2c0 .74-.4 1.38-1 1.73V9l8 5.5A1 1 0 0 1 20 16H4a1 1 0 0 1-.99-1.5L11 9V7.73A2 2 0 0 1 12 4Z"
+        stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+    <span>{name}</span>
+    <button className={styles.changePrefBtn} onClick={onClear}>change</button>
+  </div>
+);
 
 export default OutfitSuggestion;
