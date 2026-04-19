@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { ClothingArticle } from '../../types';
 import styles from './ArticleModal.module.css';
 
 const CLOTHING_TYPES = ['Shirt', 'T-Shirt', 'Blouse', 'Sweater', 'Hoodie', 'Jacket', 'Coat',
@@ -24,9 +25,25 @@ export interface ArticleFormData {
 }
 
 interface Props {
-  onClose:  () => void;
-  onSubmit: (data: ArticleFormData) => Promise<void>;
+  onClose:      () => void;
+  onSubmit:     (data: ArticleFormData) => Promise<void>;
+  /** When provided the modal opens in edit mode pre-populated with this article */
+  initialData?: ClothingArticle;
 }
+
+const articleToForm = (a: ClothingArticle): ArticleFormData => ({
+  name:             a.name             ?? '',
+  clothingType:     a.clothingType     ?? '',
+  topOrBottom:      a.topOrBottom      ?? '',
+  clothingCategory: a.clothingCategory ?? '',
+  fabricType:       a.fabricType       ?? '',
+  color:            a.color            ?? '',
+  isAccessory:      a.isAccessory      ?? false,
+  isWristWear:      a.isWristWear      ?? false,
+  isAnkleWear:      a.isAnkleWear      ?? false,
+  merchant:         a.merchant         ?? '',
+  imageUrl:         a.imageUrl         ?? '',
+});
 
 const empty: ArticleFormData = {
   name: '', clothingType: '', topOrBottom: '', clothingCategory: '',
@@ -34,12 +51,14 @@ const empty: ArticleFormData = {
   isAnkleWear: false, merchant: '', imageUrl: '',
 };
 
-const ArticleModal = ({ onClose, onSubmit }: Props) => {
-  const [form, setForm]         = useState<ArticleFormData>(empty);
-  const [imgMode, setImgMode]   = useState<'url' | 'file'>('url');
-  const [preview, setPreview]   = useState<string>('');
-  const [error, setError]       = useState<string | null>(null);
-  const [saving, setSaving]     = useState(false);
+const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
+  const isEditing = !!initialData;
+
+  const [form,    setForm]    = useState<ArticleFormData>(initialData ? articleToForm(initialData) : empty);
+  const [imgMode, setImgMode] = useState<'url' | 'file'>('url');
+  const [preview, setPreview] = useState<string>(initialData?.imageUrl ?? '');
+  const [error,   setError]   = useState<string | null>(null);
+  const [saving,  setSaving]  = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const set = (key: keyof ArticleFormData) => (
@@ -78,7 +97,7 @@ const ArticleModal = ({ onClose, onSubmit }: Props) => {
       <div className={styles.modal}>
         {/* Header */}
         <div className={styles.header}>
-          <h2 className={styles.title}>Add Article</h2>
+          <h2 className={styles.title}>{isEditing ? 'Edit Article' : 'Add Article'}</h2>
           <button className={styles.closeBtn} onClick={onClose} aria-label="Close">
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
               <path d="M4 4l10 10M14 4L4 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
@@ -208,7 +227,10 @@ const ArticleModal = ({ onClose, onSubmit }: Props) => {
         <div className={styles.footer}>
           <button className={styles.cancelBtn} onClick={onClose}>Cancel</button>
           <button className={styles.submitBtn} onClick={handleSubmit} disabled={saving}>
-            {saving ? 'Saving…' : 'Add to closet'}
+            {saving
+              ? (isEditing ? 'Saving…' : 'Adding…')
+              : (isEditing ? 'Save changes' : 'Add to closet')
+            }
           </button>
         </div>
       </div>

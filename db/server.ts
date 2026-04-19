@@ -483,6 +483,39 @@ app.delete('/api/closets/:closetId/articles/:articleId', requireAuth, async (req
   }
 });
 
+// PUT /api/closets/:closetId/articles/:articleId — update an existing article
+app.put('/api/closets/:closetId/articles/:articleId', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const closet = await Closet.findOne({ _id: req.params.closetId, userId: req.userId });
+    if (!closet) return res.status(404).json({ error: 'Closet not found.' });
+
+    const article = closet.articles.find(
+      (a) => a._id?.toString() === req.params.articleId
+    );
+    if (!article) return res.status(404).json({ error: 'Article not found.' });
+
+    const { clothingType, name, topOrBottom, clothingCategory, fabricType, color,
+            isAccessory, isWristWear, isAnkleWear, merchant, imageUrl } = req.body;
+
+    if (clothingType !== undefined) (article as any).clothingType     = clothingType;
+    if (name        !== undefined) (article as any).name              = name;
+    if (topOrBottom !== undefined) (article as any).topOrBottom       = topOrBottom;
+    if (clothingCategory !== undefined) (article as any).clothingCategory = clothingCategory;
+    if (fabricType  !== undefined) (article as any).fabricType        = fabricType;
+    if (color       !== undefined) (article as any).color             = color;
+    if (isAccessory !== undefined) (article as any).isAccessory       = isAccessory;
+    if (isWristWear !== undefined) (article as any).isWristWear       = isWristWear;
+    if (isAnkleWear !== undefined) (article as any).isAnkleWear       = isAnkleWear;
+    if (merchant    !== undefined) (article as any).merchant          = merchant;
+    if (imageUrl    !== undefined) (article as any).imageUrl          = imageUrl;
+
+    await closet.save();
+    res.json(closet);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to update article', detail: err.message });
+  }
+});
+
 // ─── Serve React production build ────────────────────────────────────────────
 const BUILD_DIR = path.join(__dirname, '../../build');
 app.use(express.static(BUILD_DIR));

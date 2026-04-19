@@ -303,6 +303,22 @@
   opacity: 0.7;
 }
 
+.editBtn {
+  position: absolute;
+  top: 7px; left: 7px;
+  width: 26px; height: 26px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.55);
+  border: 1px solid var(--glass-border);
+  border-radius: 50%;
+  color: var(--text-secondary);
+  cursor: pointer;
+  opacity: 0;
+  transition: all var(--transition);
+}
+.articleCard:hover .editBtn { opacity: 1; }
+.editBtn:hover { background: rgba(255,255,255,0.15); color: var(--text-primary); border-color: rgba(255,255,255,0.3); }
+
 .removeBtn {
   position: absolute;
   top: 7px; right: 7px;
