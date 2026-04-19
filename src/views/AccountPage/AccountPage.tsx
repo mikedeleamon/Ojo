@@ -419,7 +419,10 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
 ];
 
 const AccountPage = ({ settings, saveSettings, onLogout }: Props) => {
-  const [activeTab, setActiveTab] = useState<Tab>('user');
+  const [activeTab,      setActiveTab]      = useState<Tab>('user');
+  const [showDeleteModal,setShowDeleteModal] = useState(false);
+  const [deleteLoading,  setDeleteLoading]  = useState(false);
+  const [deleteError,    setDeleteError]    = useState<string | null>(null);
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -427,8 +430,62 @@ const AccountPage = ({ settings, saveSettings, onLogout }: Props) => {
     navigate('/login');
   };
 
+  const handleDeleteAccount = async () => {
+    setDeleteLoading(true);
+    setDeleteError(null);
+    try {
+      const token = getToken();
+      if (!token) throw new Error('Not authenticated.');
+      await axios.delete('/api/user/me', { headers: { Authorization: `Bearer ${token}` } });
+      // Clear all local data then logout
+      localStorage.clear();
+      onLogout();
+      navigate('/login');
+    } catch (err: any) {
+      setDeleteError(err.response?.data?.error ?? 'Could not delete account. Please try again.');
+      setDeleteLoading(false);
+    }
+  };
+
   return (
     <div className={styles.root}>
+
+      {/* ── Delete account confirmation modal ─────────────────────────────── */}
+      {showDeleteModal && (
+        <div className={styles.modalOverlay} onClick={e => { if (e.target === e.currentTarget) { setShowDeleteModal(false); setDeleteError(null); } }}>
+          <div className={styles.deleteModal}>
+            <div className={styles.deleteModalIcon}>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+                <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+                  stroke="rgba(252,165,165,0.85)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+            <h3 className={styles.deleteModalTitle}>Delete account?</h3>
+            <p className={styles.deleteModalBody}>
+              This permanently removes your account, all closets, and all clothing articles.
+              This action <strong>cannot be undone</strong>.
+            </p>
+            {deleteError && <p className={styles.deleteModalError}>{deleteError}</p>}
+            <div className={styles.deleteModalActions}>
+              <button
+                className={styles.deleteModalCancel}
+                onClick={() => { setShowDeleteModal(false); setDeleteError(null); }}
+                disabled={deleteLoading}
+              >
+                Cancel
+              </button>
+              <button
+                className={styles.deleteModalConfirm}
+                onClick={handleDeleteAccount}
+                disabled={deleteLoading}
+              >
+                {deleteLoading ? 'Deleting…' : 'Delete my account'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Sidebar */}
       <aside className={styles.sidebar}>
         <button className={styles.backBtn} onClick={() => navigate('/')} aria-label='Back'>
@@ -466,6 +523,13 @@ const AccountPage = ({ settings, saveSettings, onLogout }: Props) => {
             <path d="M9 5H6a2 2 0 00-2 2v6a2 2 0 002 2h3M13 7l3 3-3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           Log out
+        </button>
+
+        <button className={styles.deleteAccountBtn} onClick={() => setShowDeleteModal(true)}>
+          <svg width="15" height="15" viewBox="0 0 20 20" fill="none">
+            <path d="M3 6h14M8 6V4h4v2M5 6l1 11h8l1-11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Delete account
         </button>
       </aside>
 

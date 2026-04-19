@@ -581,3 +581,177 @@
   border-radius: var(--radius-sm);
   font-style: italic;
 }
+
+/* ─── Delete account button ──────────────────────────────────────────────── */
+.deleteAccountBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: 10px var(--spacing-sm);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: rgba(252, 165, 165, 0.45);
+  font-family: var(--font-body);
+  font-size: 0.83rem;
+  font-weight: 400;
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--transition);
+  width: 100%;
+  margin-top: 2px;
+}
+.deleteAccountBtn:hover {
+  background: rgba(239, 68, 68, 0.08);
+  color: rgba(252, 165, 165, 0.85);
+}
+
+/* ─── Delete confirmation modal ──────────────────────────────────────────── */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: var(--spacing-md);
+  animation: overlayIn 0.2s ease both;
+}
+
+@keyframes overlayIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.deleteModal {
+  width: 100%;
+  max-width: 400px;
+  background: #0f1923;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-xl) var(--spacing-lg) var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-md);
+  text-align: center;
+  animation: modalIn 0.25s cubic-bezier(0.34, 1.26, 0.64, 1) both;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+}
+
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.93) translateY(12px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.deleteModalIcon {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.deleteModalTitle {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  font-weight: 400;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.deleteModalBody {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  line-height: 1.65;
+  max-width: 300px;
+}
+.deleteModalBody strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.deleteModalPrompt {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+.deleteModalPrompt strong {
+  color: rgba(252, 165, 165, 0.8);
+  font-family: monospace;
+  letter-spacing: 0.05em;
+}
+
+.deleteModalInput {
+  width: 100%;
+  padding: 12px var(--spacing-md);
+  background: rgba(239, 68, 68, 0.06);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  text-align: center;
+  letter-spacing: 0.05em;
+  outline: none;
+  transition: border-color var(--transition);
+}
+.deleteModalInput:focus { border-color: rgba(239, 68, 68, 0.5); }
+.deleteModalInput::placeholder { color: var(--text-muted); letter-spacing: 0; }
+
+.deleteModalError {
+  font-size: 0.82rem;
+  color: rgba(252, 165, 165, 0.9);
+  text-align: center;
+}
+
+.deleteModalActions {
+  display: flex;
+  gap: var(--spacing-sm);
+  width: 100%;
+  margin-top: var(--spacing-xs);
+}
+
+.deleteModalCancel {
+  flex: 1;
+  padding: 13px;
+  background: none;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.deleteModalCancel:hover:not(:disabled) {
+  background: var(--glass-bg-strong);
+  color: var(--text-primary);
+}
+.deleteModalCancel:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.deleteModalConfirm {
+  flex: 1;
+  padding: 13px;
+  background: rgba(239, 68, 68, 0.85);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: #fff;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.deleteModalConfirm:hover:not(:disabled) { background: rgba(239, 68, 68, 1); }
+.deleteModalConfirm:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
