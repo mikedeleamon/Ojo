@@ -26,7 +26,13 @@
   color: var(--text-muted);
 }
 
-/* ─── Preferred badge ────────────────────────────────────────────────────── */
+/* ─── Preferred badge (clickable → opens closet) ─────────────────────────── */
+.badgeRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .preferredBadge {
   display: inline-flex;
   align-items: center;
@@ -38,6 +44,15 @@
   color: var(--text-secondary);
   font-size: 0.72rem;
   font-weight: 500;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: all var(--transition);
+  text-decoration: none;
+}
+.preferredBadge:hover {
+  background: var(--glass-bg-strong);
+  color: var(--text-primary);
+  border-color: rgba(255,255,255,0.3);
 }
 
 .changePrefBtn {

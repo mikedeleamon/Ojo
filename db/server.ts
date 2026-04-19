@@ -106,22 +106,27 @@ app.post('/api/auth/signup', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/auth/login
+// POST /api/auth/login — accepts email address OR @username
 app.post('/api/auth/login', async (req: Request, res: Response) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required' });
+    const { identifier, password } = req.body;
+    if (!identifier || !password) {
+      return res.status(400).json({ error: 'Email/username and password are required.' });
     }
 
-    const user = await User.findOne({ email });
+    // Route lookup: email format → search by email, otherwise search by username
+    const isEmail = /\S+@\S+\.\S+/.test(identifier.trim());
+    const user = isEmail
+      ? await User.findOne({ email: identifier.toLowerCase().trim() })
+      : await User.findOne({ username: identifier.trim() });
+
     if (!user) {
-      return res.status(401).json({ error: 'Invalid email or password' });
+      return res.status(401).json({ error: 'Invalid credentials.' });
     }
 
     const match = await bcrypt.compare(password, user.password);
     if (!match) {
-      return res.status(401).json({ error: 'Invalid email or password' });
+      return res.status(401).json({ error: 'Invalid credentials.' });
     }
 
     const token = jwt.sign({ userId: user._id.toString() }, JWT_SECRET, { expiresIn: '7d' });

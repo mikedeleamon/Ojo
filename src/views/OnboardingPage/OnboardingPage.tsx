@@ -141,9 +141,34 @@ const OnboardingPage = ({ settings, saveSettings, setNeedsOnboarding }: Props) =
               perfect outfits every day.
             </p>
             <div className={styles.illustrationRow}>
-              {['👗','👔','👟','🧥'].map((e, i) => (
-                <span key={i} className={styles.emoji} style={{ animationDelay: `${i * 0.12}s` }}>{e}</span>
-              ))}
+              {/* Dress */}
+              <span className={styles.iconPill} style={{ animationDelay: '0s' }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2a3 3 0 0 1 3 3v1l4 2v14H5V8l4-2V5a3 3 0 0 1 3-3z"
+                    stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+                </svg>
+              </span>
+              {/* Shirt */}
+              <span className={styles.iconPill} style={{ animationDelay: '0.1s' }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+                  <path d="M3 6l4-3h10l4 3-4 4v11H7V10L3 6z"
+                    stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+                </svg>
+              </span>
+              {/* Sneaker */}
+              <span className={styles.iconPill} style={{ animationDelay: '0.2s' }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+                  <path d="M3 16l4-8h4l1 4h9v4H3z"
+                    stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+                </svg>
+              </span>
+              {/* Coat */}
+              <span className={styles.iconPill} style={{ animationDelay: '0.3s' }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+                  <path d="M4 6l3-3 5 3 5-3 3 3v14H4V6z"
+                    stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+                </svg>
+              </span>
             </div>
             <button className={styles.primaryBtn} onClick={() => advance(2)}>
               Let's go
