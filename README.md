@@ -2,105 +2,96 @@
 
 > Dress for the weather.
 
-A weather app that tells you what to wear based on current conditions and your personal style preferences.
+Ojo is a full-stack wardrobe intelligence app. It reads the current weather at your location, scores every possible outfit combination from your closet using a five-factor engine, and surfaces the top three ranked suggestions — getting smarter the more you use it.
+
+---
 
 ## Stack
 
-- React 18 + TypeScript
-- Express + Node.js (API proxy server)
-- React Router v6
-- Axios
-- AccuWeather API
-- MongoDB (optional — for user accounts and saved settings)
+| Layer | Tech |
+|---|---|
+| Frontend | React 18 + TypeScript, React Router v6, Axios |
+| Backend | Node.js, Express, TypeScript |
+| Database | MongoDB (via Mongoose) |
+| Weather | AccuWeather API (proxied server-side) |
+| Styling | CSS Modules, glassmorphism design system |
 
 ---
 
 ## Prerequisites
 
-- Node.js ≥ 16
+- Node.js ≥ 18 (tested on Node 22)
 - npm ≥ 8
-- An [AccuWeather API key](https://developer.accuweather.com/) (free tier works)
+- MongoDB URI (MongoDB Atlas free tier works)
+- [AccuWeather API key](https://developer.accuweather.com/) (free tier works)
 
 ---
 
 ## Environment setup
 
-Copy the example env file and fill in your values:
-
-```bash
-cp .env.example .env
-```
-
-Open `.env` and set at minimum:
+The `.env` file in the project root is already configured. At minimum you need:
 
 ```
 ACCUWEATHER_API_KEY=your_key_here
+MONGO_URI=your_mongodb_connection_string
+JWT_SECRET=a_long_random_secret
 ```
 
-All other variables are optional — see `.env.example` for the full list and descriptions. The app will run without MongoDB; user settings just won't persist between sessions.
+All available variables:
+
+| Variable | Required | Description |
+|---|---|---|
+| `ACCUWEATHER_API_KEY` | Yes | AccuWeather API key |
+| `MONGO_URI` | Yes | MongoDB connection URI |
+| `JWT_SECRET` | Yes | Secret for signing JWTs |
+| `ACCUWEATHER_BASE_URL` | No | Defaults to AccuWeather's production URL |
+| `REACT_APP_USE_MOCK` | No | Set to `true` to skip AccuWeather entirely and use bundled mock data |
+| `CORS_ORIGINS` | No | Comma-separated allowed origins (default: `localhost:3000,3001,4000`) |
+| `PORT` | No | Server port (default: `4000`) |
 
 ---
 
 ## Running in development
 
-Development mode runs two processes concurrently: the Express server on port 4000 and the React dev server on port 3000.
+Two processes run concurrently: Express on port 4000 and the React dev server on port 3000.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Then open **http://localhost:3000** in your browser.
+Open **http://localhost:3000**.
 
-> **Important:** always use port 3000 in development. The React dev server handles all asset requests (JS bundles, images, fonts) and proxies API calls to Express on port 4000 automatically. Visiting port 4000 directly in dev will break icon and asset loading.
+> Always use port 3000 in development. CRA's dev server proxies all `/api/*` requests to Express on port 4000, and handles asset serving. Visiting port 4000 directly in dev will break icon and image loading.
 
-If you see a `431 Request Header Fields Too Large` error, your browser cookies for localhost have grown too large. Fix it by clearing cookies for `localhost` in DevTools → Application → Cookies, or set `REACT_APP_SERVER_BASE=http://localhost:4000` in `.env` to bypass the proxy.
+**Skipping the AccuWeather API key (mock mode)**
 
-### Skipping the API key (mock mode)
-
-To develop without an AccuWeather API key, add this to your `.env`:
-
-```
+```env
 REACT_APP_USE_MOCK=true
 ```
 
-The app will use bundled mock data and all icons and UI will render normally.
+The app uses bundled mock weather data. All UI, outfit engine, and closet features work normally in mock mode.
 
 ---
 
 ## Running in production
 
-The production setup builds the React app into static files, then serves everything — the React app and the API — from Express on a single port.
-
-**Step 1 — Build the React app:**
+Everything — React app + API — is served from Express on a single port.
 
 ```bash
+# 1. Build the React frontend
 npm run build
-```
 
-This produces a `build/` directory containing `index.html` and all compiled assets (JS bundles, hashed image files, etc.).
-
-**Step 2 — Build the Express server:**
-
-```bash
+# 2. Compile the TypeScript server
 npm run build-server
-```
 
-This compiles the TypeScript server from `db/server.ts` into `dist-server/`.
-
-**Step 3 — Start the server:**
-
-```bash
+# 3. Start
 npm run start-server
 ```
 
-Then open **http://localhost:4000** in your browser.
+Open **http://localhost:4000**.
 
-The Express server serves the React build's static files (including `/static/media/` where webpack places the compiled weather icons) and falls back to `index.html` for all non-API routes so React Router works correctly.
-
-> **Why icons 404 if you skip step 1:** The weather icons live in `src/assets/images/weatherIcons/` during development, but webpack copies and renames them into `build/static/media/` with a content hash during the build. The compiled app references those hashed paths. If `build/` is missing or stale, Express has no files to serve and the browser gets a 404.
-
-Or run steps 1–3 together:
+Or run all three steps together:
 
 ```bash
 npm run build && npm run server
@@ -108,23 +99,155 @@ npm run build && npm run server
 
 ---
 
-## How the API proxy works
-
-API calls never go directly from the browser to AccuWeather. The flow is:
+## Project structure
 
 ```
-Browser → Express (/api/weather/*) → AccuWeather (with API key appended server-side)
+src/
+├── api/              # Axios client setup
+├── assets/           # Weather icons, logos
+├── components/
+│   ├── ArticleModal/ # Add / edit clothing article form
+│   ├── ClosetView/   # Closet list + article grid with search & filters
+│   ├── OutfitSuggestion/  # Top-3 ranked outfit display
+│   ├── WeatherHUD/   # Main weather view (background, forecast strip)
+│   ├── WeatherDetails/    # Expandable weather stats
+│   └── buttons/      # Nav buttons (Closet, Account, Settings)
+├── lib/
+│   ├── outfitEngine.ts    # Five-factor scoring engine
+│   ├── outfitHistory.ts   # Worn-outfit log (localStorage)
+│   └── userPreferences.ts # Preference learning profile (localStorage)
+├── views/
+│   ├── AccountPage/  # Profile, Preferences, Outfit History, Password tabs
+│   ├── ClosetPage/   # Closet management
+│   ├── LoginPage/    # Email or username login
+│   ├── MainPage/     # App shell
+│   ├── OnboardingPage/ # New-user setup wizard
+│   ├── SettingsPage/ # Quick settings
+│   └── SignupPage/   # Account creation
+├── hooks/
+│   └── useSettings.ts     # Settings fetch + localStorage cache
+└── types.d.ts        # Shared TypeScript interfaces
+db/
+└── server.ts         # Express API (auth, closets, articles, weather proxy)
+models/               # Mongoose schemas (User, Closet, ClothingArticle, Settings)
 ```
-
-This keeps the API key out of the browser entirely. In development, CRA's built-in proxy (configured via `"proxy": "http://localhost:4000"` in `package.json`) forwards `/api/*` requests from port 3000 to Express on port 4000.
 
 ---
 
 ## Features
 
-- Live weather from your current location (geolocation API)
+### Weather
+- Live weather from device geolocation, with configurable fallback location
+- Dynamic full-screen backgrounds that change with weather conditions (sunny, cloudy, rainy, stormy, snow, night)
 - 12-hour hourly forecast strip
-- Outfit recommendations based on temperature, humidity, and precipitation
-- Style preferences (Casual, Business Casual, Urban, Cozy, Preppy, Formal)
-- Dynamic backgrounds that change with weather conditions
-- Dark-first glassmorphism UI
+- Expandable weather detail panel (wind, humidity, UV, feels-like)
+
+### Outfit engine
+The engine runs entirely on the server-compiled client bundle — no inference latency.
+
+1. **Hard weather filter** — eliminates climatically impossible items before scoring (e.g. sandals in freezing weather, heavy coats in heat)
+2. **Role bucketing** — groups articles into `top`, `bottom`, `fullBody`, `outerwear`, `footwear`, `accessory`; pre-ranks each pool by fabric suitability and caps at 8 candidates per role to bound combination count
+3. **Full combination enumeration** — generates every valid cross-role combination (no greedy selection)
+4. **Five-factor scorer** — each combination is scored 0–100:
+
+   | Factor | Weight | Signal |
+   |---|---|---|
+   | Fabric × weather | 30% | 10-cell lookup table per fabric per weather bucket; rain and humidity adjustments |
+   | Color harmony | 25% | 12-position RYB color wheel; pairwise scoring (complementary = 1.0, analogous = 0.80, clashing = 0.35) |
+   | Style alignment | 25% | Per-style affinity tables for clothing types, categories, fabrics |
+   | Simplicity | 10% | Neutral base + one accent = 1.0; penalises busy multi-accent outfits |
+   | User preference | 10% | Laplace-smoothed frequency scores from wear history |
+
+5. **Recency penalty** — articles worn in the last 3 days are deprioritised (−0.12 per slot)
+6. **Top-3 results** — deduplicated by article fingerprint, sorted by score
+
+### Closet
+- Multiple named closets; one can be starred as the preferred closet for outfit suggestions
+- Add, edit, and remove clothing articles with type, category, fabric, color, merchant, and image (URL or local file upload)
+- Search articles by any field; filter by category, color, and fabric simultaneously
+- "Add clothes" button on the outfit card deep-links directly to the preferred closet
+
+### Outfit history & preference learning
+- Log worn outfits with one tap ("Wore this today")
+- History displayed in Account → History with per-entry timestamps, closet name, and article summary
+- Wear frequency feeds a Laplace-smoothed preference model (color 50%, fabric 30%, category 20%) that increases scores for items matching the user's learned style
+- Items worn in the last 3 days are automatically deprioritised in new suggestions
+
+### Accounts
+- Sign up with first name, last name, email, username, birthday, and password
+- Sign in with **email or username**
+- JWT authentication (7-day tokens)
+- Account management: update profile, change password, adjust preferences
+- Delete account — permanently removes the user and all associated closets
+
+### Onboarding
+- Four-step animated wizard fires automatically after signup
+- Step 1: Welcome, Step 2: Create first closet, Step 3: Style and temperature preferences, Step 4: Done
+- Skippable at any point
+
+---
+
+## API routes
+
+### Auth
+| Method | Route | Description |
+|---|---|---|
+| POST | `/api/auth/signup` | Create account |
+| POST | `/api/auth/login` | Login with email or username |
+
+### User
+| Method | Route | Description |
+|---|---|---|
+| GET | `/api/user/me` | Current user info |
+| PUT | `/api/user/profile` | Update username / email |
+| PUT | `/api/user/password` | Change password |
+| GET | `/api/user/settings` | Load preferences |
+| PUT | `/api/user/settings` | Save preferences |
+| DELETE | `/api/user/me` | Delete account and all closets |
+
+### Closets
+| Method | Route | Description |
+|---|---|---|
+| GET | `/api/closets` | All closets for the user |
+| POST | `/api/closets` | Create closet |
+| PUT | `/api/closets/:id` | Rename closet |
+| DELETE | `/api/closets/:id` | Delete closet |
+| PUT | `/api/closets/:id/preferred` | Set as preferred |
+| POST | `/api/closets/:id/articles` | Add article |
+| PUT | `/api/closets/:id/articles/:articleId` | Edit article |
+| DELETE | `/api/closets/:id/articles/:articleId` | Remove article |
+
+### Weather (proxied)
+| Method | Route | Description |
+|---|---|---|
+| GET | `/api/weather/city` | City lookup by coordinates |
+| GET | `/api/weather/current/:cityKey` | Current conditions |
+| GET | `/api/weather/forecast/:cityKey` | 12-hour forecast |
+
+---
+
+## How the API proxy works
+
+AccuWeather requests flow server-side so the API key never touches the browser:
+
+```
+Browser → Express (/api/weather/*) → AccuWeather (API key appended)
+```
+
+In development, CRA's built-in proxy (set via `"proxy": "http://localhost:4000"` in `package.json`) forwards `/api/*` requests from port 3000 to port 4000 automatically.
+
+---
+
+## Troubleshooting
+
+**White screen on refresh at `localhost:4000`**
+Run `npm run build` — the server needs a compiled `build/` folder to serve `index.html` for all non-API routes.
+
+**`431 Request Header Fields Too Large`**
+Your browser cookies for localhost have grown too large. Clear cookies for `localhost` in DevTools → Application → Cookies.
+
+**Weather shows an error instead of loading**
+Check that the Express server is running on port 4000 and that `ACCUWEATHER_API_KEY` is set in `.env`. Use `REACT_APP_USE_MOCK=true` to bypass AccuWeather entirely during development.
+
+**Geolocation blocked / no weather loads**
+Set a default city in Account → Preferences → Default location. Ojo falls back to that value when the browser geolocation API is unavailable or denied.
