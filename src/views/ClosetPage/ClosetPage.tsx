@@ -55,6 +55,11 @@ const ClosetPage = () => {
     setClosets(prev => prev.map(c => c._id === closetId ? data : c));
   }, []);
 
+  const editArticle = useCallback(async (closetId: string, articleId: string, formData: ArticleFormData) => {
+    const { data } = await axios.put<Closet>(`/api/closets/${closetId}/articles/${articleId}`, formData, auth());
+    setClosets(prev => prev.map(c => c._id === closetId ? data : c));
+  }, []);
+
   const removeArticle = useCallback(async (closetId: string, articleId: string) => {
     const { data } = await axios.delete<Closet>(`/api/closets/${closetId}/articles/${articleId}`, auth());
     setClosets(prev => prev.map(c => c._id === closetId ? data : c));
@@ -136,6 +141,7 @@ const ClosetPage = () => {
           onRenameCloset={renameCloset}
           onDeleteCloset={deleteCloset}
           onAddArticle={addArticle}
+          onEditArticle={editArticle}
           onRemoveArticle={removeArticle}
           onSetPreferred={setPreferred}
         />

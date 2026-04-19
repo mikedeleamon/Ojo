@@ -10,6 +10,7 @@ interface Props {
   onRenameCloset:    (id: string, name: string) => Promise<void>;
   onDeleteCloset:    (id: string) => Promise<void>;
   onAddArticle:      (closetId: string, data: ArticleFormData) => Promise<void>;
+  onEditArticle:     (closetId: string, articleId: string, data: ArticleFormData) => Promise<void>;
   onRemoveArticle:   (closetId: string, articleId: string) => Promise<void>;
   onSetPreferred:    (id: string) => Promise<void>;
 }
@@ -25,7 +26,11 @@ const CSS_COLORS: Record<string, string> = {
   Orange: '#f97316', Multi: 'linear-gradient(135deg,#f97316,#3b82f6,#22c55e)',
 };
 
-const ArticleCard = ({ article, onRemove }: { article: ClothingArticle; onRemove: () => void }) => (
+const ArticleCard = ({ article, onRemove, onEdit }: {
+  article: ClothingArticle;
+  onRemove: () => void;
+  onEdit: () => void;
+}) => (
   <div className={styles.articleCard}>
     <div className={styles.articleImg}>
       {article.imageUrl
@@ -55,6 +60,11 @@ const ArticleCard = ({ article, onRemove }: { article: ClothingArticle; onRemove
         title={article.color}
       />
     )}
+    <button className={styles.editBtn} onClick={onEdit} aria-label="Edit article">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+        <path d="M11.5 2.5l2 2-9 9H2.5v-2l9-9z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    </button>
     <button className={styles.removeBtn} onClick={onRemove} aria-label="Remove article">
       <svg width="14" height="14" viewBox="0 0 18 18" fill="none">
         <path d="M4 4l10 10M14 4L4 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
@@ -77,14 +87,15 @@ const Chip = ({ label, active, color, onClick }: {
 
 const ClosetView = ({
   closets, initialSelectedId, onCreateCloset, onRenameCloset, onDeleteCloset,
-  onAddArticle, onRemoveArticle, onSetPreferred,
+  onAddArticle, onEditArticle, onRemoveArticle, onSetPreferred,
 }: Props) => {
   const [selectedId, setSelectedId] = useState<string>(
     initialSelectedId && closets.find(c => c._id === initialSelectedId)
       ? initialSelectedId
       : (closets[0]?._id ?? '')
   );
-  const [showModal,  setShowModal]  = useState(false);
+  const [showModal,      setShowModal]      = useState(false);
+  const [editingArticle, setEditingArticle] = useState<ClothingArticle | null>(null);
   const [creating,   setCreating]   = useState(false);
   const [newName,    setNewName]    = useState('');
   const [editingId,  setEditingId]  = useState<string | null>(null);
@@ -157,6 +168,12 @@ const ClosetView = ({
   const handleAddArticle = async (data: ArticleFormData) => {
     await onAddArticle(selected._id, data);
     setShowModal(false);
+  };
+
+  const handleEditArticle = async (data: ArticleFormData) => {
+    if (!editingArticle) return;
+    await onEditArticle(selected._id, editingArticle._id, data);
+    setEditingArticle(null);
   };
 
   return (
@@ -353,13 +370,22 @@ const ClosetView = ({
         ) : (
           <div className={styles.articleGrid}>
             {filteredArticles.map(a => (
-              <ArticleCard key={a._id} article={a} onRemove={() => onRemoveArticle(selected._id, a._id)} />
+              <ArticleCard key={a._id} article={a} onEdit={() => setEditingArticle(a)} onRemove={() => onRemoveArticle(selected._id, a._id)} />
             ))}
           </div>
         )}
       </main>
 
-      {showModal && <ArticleModal onClose={() => setShowModal(false)} onSubmit={handleAddArticle} />}
+      {showModal && (
+        <ArticleModal onClose={() => setShowModal(false)} onSubmit={handleAddArticle} />
+      )}
+      {editingArticle && (
+        <ArticleModal
+          onClose={() => setEditingArticle(null)}
+          onSubmit={handleEditArticle}
+          initialData={editingArticle}
+        />
+      )}
     </div>
   );
 };
