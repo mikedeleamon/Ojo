@@ -291,6 +291,19 @@ app.get('/api/user/me', requireAuth, async (req: AuthRequest, res: Response) => 
   }
 });
 
+// DELETE /api/user/me — permanently delete the authenticated user and all their closets
+app.delete('/api/user/me', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    await Closet.deleteMany({ userId: req.userId });
+    const deleted = await User.findByIdAndDelete(req.userId);
+    if (!deleted) return res.status(404).json({ error: 'User not found.' });
+    res.json({ message: 'Account deleted.' });
+  } catch (err: any) {
+    console.error('[Ojo] Account deletion failed:', err.message);
+    res.status(500).json({ error: 'Could not delete account.', detail: err.message });
+  }
+});
+
 // ─── AccuWeather proxy routes ─────────────────────────────────────────────────
 type CacheEntry = { data: any; expires: number };
 const CITY_CACHE = new Map<string, CacheEntry>();
