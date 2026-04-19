@@ -215,7 +215,10 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
 
   if (status === 'empty_closet') return (
     <div className={styles.root}>
-      <PreferredBadge name={preferred.name} onClear={() => setClosets(p => p.map(c => ({ ...c, isPreferred: false })))} />
+      <div className={styles.badgeRow}>
+        <PreferredBadge name={preferred.name} closetId={preferred._id} />
+        <button className={styles.changePrefBtn} onClick={() => setClosets(p => p.map(c => ({ ...c, isPreferred: false })))}>change</button>
+      </div>
       <PromptState icon={<HangerIcon />} title="This closet is empty"
         body="Add clothing articles to get outfit suggestions."
         action={<button className={styles.ctaBtn} onClick={goToCloset}>Add clothes</button>} />
@@ -224,7 +227,10 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
 
   if (status === 'insufficient') return (
     <div className={styles.root}>
-      <PreferredBadge name={preferred.name} onClear={() => setClosets(p => p.map(c => ({ ...c, isPreferred: false })))} />
+      <div className={styles.badgeRow}>
+        <PreferredBadge name={preferred.name} closetId={preferred._id} />
+        <button className={styles.changePrefBtn} onClick={() => setClosets(p => p.map(c => ({ ...c, isPreferred: false })))}>change</button>
+      </div>
       <PromptState
         icon={<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>}
         title="Not enough to build an outfit"
@@ -239,7 +245,10 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
     <div className={styles.root}>
       {/* ── Header: preferred badge + score ─────────────────────────────── */}
       <div className={styles.header}>
-        <PreferredBadge name={preferred.name} onClear={() => setClosets(p => p.map(c => ({ ...c, isPreferred: false })))} />
+        <div className={styles.badgeRow}>
+          <PreferredBadge name={preferred.name} closetId={preferred._id} />
+          <button className={styles.changePrefBtn} onClick={() => setClosets(p => p.map(c => ({ ...c, isPreferred: false })))}>change</button>
+        </div>
         <ScoreBadge score={activeOutfit.score} />
       </div>
 
@@ -329,15 +338,21 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
 
 // ─── Shared sub-component ─────────────────────────────────────────────────────
 
-const PreferredBadge = ({ name, onClear }: { name: string; onClear: () => void }) => (
-  <div className={styles.preferredBadge}>
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
-      <path d="M12 4a2 2 0 0 1 2 2c0 .74-.4 1.38-1 1.73V9l8 5.5A1 1 0 0 1 20 16H4a1 1 0 0 1-.99-1.5L11 9V7.73A2 2 0 0 1 12 4Z"
-        stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-    <span>{name}</span>
-    <button className={styles.changePrefBtn} onClick={onClear}>change</button>
-  </div>
-);
+const PreferredBadge = ({ name, closetId }: { name: string; closetId: string }) => {
+  const navigate = useNavigate();
+  return (
+    <button
+      className={styles.preferredBadge}
+      onClick={() => navigate(`/closet?open=${closetId}`)}
+      title="Open this closet"
+    >
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+        <path d="M12 4a2 2 0 0 1 2 2c0 .74-.4 1.38-1 1.73V9l8 5.5A1 1 0 0 1 20 16H4a1 1 0 0 1-.99-1.5L11 9V7.73A2 2 0 0 1 12 4Z"
+          stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+      <span>{name}</span>
+    </button>
+  );
+};
 
 export default OutfitSuggestion;

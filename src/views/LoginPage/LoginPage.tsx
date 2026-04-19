@@ -10,21 +10,24 @@ const AUTH_KEY = 'ojo_auth';
 interface Props { setLoggedIn: (v: boolean) => void; }
 
 const LoginPage = ({ setLoggedIn }: Props) => {
-  const [email, setEmail]       = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError]       = useState<string | null>(null);
-  const [loading, setLoading]   = useState(false);
+  const [identifier, setIdentifier] = useState('');
+  const [password,   setPassword]   = useState('');
+  const [error,      setError]      = useState<string | null>(null);
+  const [loading,    setLoading]    = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async () => {
     setError(null);
-    if (!email || !password) {
-      setError('Please enter your email and password.');
+    if (!identifier || !password) {
+      setError('Please enter your email or username, and your password.');
       return;
     }
     setLoading(true);
     try {
-      const { data } = await axios.post<AuthState & { settings: any }>('/api/auth/login', { email, password });
+      const { data } = await axios.post<AuthState & { settings: any }>(
+        '/api/auth/login',
+        { identifier, password },
+      );
       localStorage.setItem(AUTH_KEY, JSON.stringify({ token: data.token, user: data.user }));
       setLoggedIn(true);
       navigate('/');
@@ -45,13 +48,15 @@ const LoginPage = ({ setLoggedIn }: Props) => {
 
         <div className={styles.fields}>
           <label className={styles.field}>
-            <span className={styles.fieldLabel}>Email</span>
+            <span className={styles.fieldLabel}>Email or username</span>
             <input
-              type='email'
+              type='text'
               className={styles.input}
-              placeholder='you@example.com'
-              value={email}
-              onChange={e => setEmail(e.target.value)}
+              placeholder='you@example.com or @janedoe'
+              value={identifier}
+              onChange={e => setIdentifier(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+              autoComplete='username'
             />
           </label>
           <label className={styles.field}>
@@ -62,6 +67,8 @@ const LoginPage = ({ setLoggedIn }: Props) => {
               placeholder='••••••••'
               value={password}
               onChange={e => setPassword(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+              autoComplete='current-password'
             />
           </label>
         </div>

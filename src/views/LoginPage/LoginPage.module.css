@@ -117,3 +117,14 @@
   from { opacity: 0; transform: translateY(24px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+.error {
+  width: 100%;
+  padding: 10px var(--spacing-md);
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-sm);
+  color: rgba(252, 165, 165, 1);
+  font-size: 0.85rem;
+  text-align: center;
+}
