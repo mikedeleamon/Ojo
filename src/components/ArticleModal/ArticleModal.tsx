@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { ClothingArticle } from '../../types';
+import { getErrorMessage } from '../../lib/auth';
 import styles from './ArticleModal.module.css';
 
 const CLOTHING_TYPES = ['Shirt', 'T-Shirt', 'Blouse', 'Sweater', 'Hoodie', 'Jacket', 'Coat',
@@ -85,8 +86,8 @@ const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
     setSaving(true);
     try {
       await onSubmit(form);
-    } catch (err: any) {
-      setError(err.message ?? 'Failed to save article.');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Failed to save article.'));
     } finally {
       setSaving(false);
     }

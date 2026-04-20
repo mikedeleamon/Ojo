@@ -2,10 +2,9 @@ import { useState } from 'react';
 import { BrowserRouter as Router } from 'react-router-dom';
 import AppRoutes from './routes/AppRoutes';
 import { useSettings, clearSettingsSession } from './hooks/useSettings';
+import { AUTH_KEY } from './lib/auth';
 
-const AUTH_KEY      = 'ojo_auth';
-const OLD_LOCAL_KEY = 'ojo_settings';
-const ONBOARD_KEY   = 'ojo_onboarding_done';
+const ONBOARD_KEY = 'ojo_onboarding_done';
 
 const isLoggedIn = (): boolean => {
   try {
@@ -16,8 +15,6 @@ const isLoggedIn = (): boolean => {
   }
 };
 
-// One-time migration: remove any stale settings from localStorage
-localStorage.removeItem(OLD_LOCAL_KEY);
 
 const App = () => {
   const [loggedIn,          setLoggedIn]          = useState<boolean>(isLoggedIn);

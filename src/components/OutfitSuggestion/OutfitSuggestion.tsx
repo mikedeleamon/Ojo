@@ -1,18 +1,12 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { Closet, CurrentWeather, Settings } from '../../types';
+import { ClothingArticle, CurrentWeather, Settings } from '../../types';
+import { useClosets } from '../../hooks/useClosets';
 import { generateOutfits, OutfitRole, OutfitResult, ScoreBreakdown } from '../../lib/outfitEngine';
 import { addHistoryEntry, recentlyWornIds } from '../../lib/outfitHistory';
 import { updatePreferences } from '../../lib/userPreferences';
+import { EmptyState } from '../shared';
 import styles from './OutfitSuggestion.module.css';
-
-const AUTH_KEY = 'ojo_auth';
-const getToken = (): string | null => {
-  try { return JSON.parse(localStorage.getItem(AUTH_KEY) || '{}').token ?? null; }
-  catch { return null; }
-};
-const authHeaders = (token: string) => ({ headers: { Authorization: `Bearer ${token}` } });
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -34,7 +28,7 @@ const ROLE_META: Record<OutfitRole, { label: string; icon: React.ReactNode }> = 
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-const ArticleThumb = ({ article, role }: { article: any; role: OutfitRole }) => {
+const ArticleThumb = ({ article, role }: { article: ClothingArticle; role: OutfitRole }) => {
   const meta = ROLE_META[role];
   return (
     <div className={styles.articleCard}>
@@ -97,17 +91,6 @@ const ScoreBreakdownRow = ({ breakdown, expanded }: { breakdown: ScoreBreakdown;
   );
 };
 
-const PromptState = ({ icon, title, body, action }: {
-  icon: React.ReactNode; title: string; body: string; action?: React.ReactNode;
-}) => (
-  <div className={styles.promptState}>
-    <span className={styles.promptIcon}>{icon}</span>
-    <p className={styles.promptTitle}>{title}</p>
-    <p className={styles.promptBody}>{body}</p>
-    {action}
-  </div>
-);
-
 const HangerIcon = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
     <path d="M12 4a2 2 0 0 1 2 2c0 .74-.4 1.38-1 1.73V9l8 5.5A1 1 0 0 1 20 16H4a1 1 0 0 1-.99-1.5L11 9V7.73A2 2 0 0 1 12 4Z"
@@ -115,81 +98,56 @@ const HangerIcon = () => (
   </svg>
 );
 
+// Alias EmptyState with the local styles object pre-bound
+const Prompt = (props: Omit<Parameters<typeof EmptyState>[0], 'styles'>) =>
+  <EmptyState {...props} styles={styles} />;
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 interface Props { weather: CurrentWeather; settings: Settings; }
 
 const OutfitSuggestion = ({ weather, settings }: Props) => {
-  const [closets,      setClosets]      = useState<Closet[]>([]);
-  const [loading,      setLoading]      = useState(true);
-  const [settingPref,  setSettingPref]  = useState(false);
-  const [activeIdx,    setActiveIdx]    = useState(0);       // which of top-3 is shown
-  const [showBreakdown,setShowBreakdown] = useState(false);
-  const [wornLogged,   setWornLogged]   = useState(false);
+  const { closets, loading, preferred, setPreferred, setClosets } = useClosets();
+  const [settingPref,   setSettingPref]   = useState(false);
+  const [activeIdx,     setActiveIdx]     = useState(0);
+  const [showBreakdown, setShowBreakdown] = useState(false);
+  const [wornLogged,    setWornLogged]    = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const token = getToken();
-    if (!token) { setLoading(false); return; }
-    axios.get<Closet[]>('/api/closets', authHeaders(token))
-      .then(({ data }) => setClosets(data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
-
-  const preferred = useMemo(() => closets.find(c => c.isPreferred) ?? null, [closets]);
-
   const setPreferredCloset = async (id: string) => {
-    const token = getToken();
-    if (!token) return;
     setSettingPref(true);
-    try {
-      const { data } = await axios.put<Closet>(`/api/closets/${id}/preferred`, {}, authHeaders(token));
-      setClosets(prev => prev.map(c => ({ ...c, isPreferred: c._id === data._id })));
-    } catch {}
+    try { await setPreferred(id); } catch {}
     setSettingPref(false);
   };
 
-  // Recently-worn IDs from history (last 3 days) — used for recency penalty
   const worn = useMemo(() => recentlyWornIds(3), []);
 
-  // Generate top-3 outfits from the preferred closet
   const { outfits, status } = useMemo(() => {
     if (!preferred) return { outfits: [], status: 'no_preferred' as const };
     const { results, status } = generateOutfits(preferred.articles, weather, settings, worn, 3);
     return { outfits: results, status };
   }, [preferred, weather, settings, worn]);
 
-  // Keep activeIdx in bounds when outfits list changes
-  const safeIdx   = Math.min(activeIdx, Math.max(0, outfits.length - 1));
+  const safeIdx    = Math.min(activeIdx, Math.max(0, outfits.length - 1));
   const activeOutfit: OutfitResult | null = outfits[safeIdx] ?? null;
 
-  // ── Log worn outfit ────────────────────────────────────────────────────────
   const handleWoreThis = () => {
     if (!preferred || !activeOutfit || activeOutfit.status !== 'ok') return;
-    const articles    = activeOutfit.slots.map(s => s.article);
-    const articleIds  = articles.map(a => a._id);
-    const summary     = articles.map(a => a.name || a.clothingType).join(', ');
-
-    // Update outfit history log
-    addHistoryEntry({ closetId: preferred._id, closetName: preferred.name, articleIds, articleSummary: summary });
-    // Update preference model
+    const articles   = activeOutfit.slots.map(s => s.article);
+    addHistoryEntry({ closetId: preferred._id, closetName: preferred.name,
+      articleIds: articles.map(a => a._id), articleSummary: articles.map(a => a.name || a.clothingType).join(', ') });
     updatePreferences(articles);
-
     setWornLogged(true);
     setTimeout(() => setWornLogged(false), 3000);
   };
 
-  // ── Navigate to preferred closet ──────────────────────────────────────────
-  const goToCloset = () =>
-    navigate(preferred ? `/closet?open=${preferred._id}` : '/closet');
+  const goToCloset = () => navigate(preferred ? `/closet?open=${preferred._id}` : '/closet');
 
-  // ── Render guards ──────────────────────────────────────────────────────────
   if (loading) return <div className={styles.root}><div className={styles.skeleton} /></div>;
 
   if (closets.length === 0) return (
     <div className={styles.root}>
-      <PromptState icon={<HangerIcon />} title="No closet yet"
+      <Prompt icon={<HangerIcon />} title="No closet yet"
         body="Create a closet and add your clothes to get outfit suggestions."
         action={<button className={styles.ctaBtn} onClick={() => navigate('/closet')}>Create closet</button>} />
     </div>
@@ -198,7 +156,7 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
   if (!preferred) return (
     <div className={styles.root}>
       <p className={styles.sectionLabel}>Outfit</p>
-      <PromptState icon={<HangerIcon />} title="Pick a preferred closet"
+      <Prompt icon={<HangerIcon />} title="Pick a preferred closet"
         body="Select a closet to use for daily outfit suggestions." />
       <div className={styles.closetPicker}>
         {closets.map(c => (
@@ -217,9 +175,9 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
     <div className={styles.root}>
       <div className={styles.badgeRow}>
         <PreferredBadge name={preferred.name} closetId={preferred._id} />
-        <button className={styles.changePrefBtn} onClick={() => setClosets(p => p.map(c => ({ ...c, isPreferred: false })))}>change</button>
+        <button className={styles.changePrefBtn} onClick={() => setClosets(prev => prev.map(c => ({ ...c, isPreferred: false })))}>change</button>
       </div>
-      <PromptState icon={<HangerIcon />} title="This closet is empty"
+      <Prompt icon={<HangerIcon />} title="This closet is empty"
         body="Add clothing articles to get outfit suggestions."
         action={<button className={styles.ctaBtn} onClick={goToCloset}>Add clothes</button>} />
     </div>
@@ -229,9 +187,9 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
     <div className={styles.root}>
       <div className={styles.badgeRow}>
         <PreferredBadge name={preferred.name} closetId={preferred._id} />
-        <button className={styles.changePrefBtn} onClick={() => setClosets(p => p.map(c => ({ ...c, isPreferred: false })))}>change</button>
+        <button className={styles.changePrefBtn} onClick={() => setClosets(prev => prev.map(c => ({ ...c, isPreferred: false })))}>change</button>
       </div>
-      <PromptState
+      <Prompt
         icon={<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>}
         title="Not enough to build an outfit"
         body="Add a top and a bottom (or a full-body piece) to get a suggestion."
@@ -247,7 +205,7 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
       <div className={styles.header}>
         <div className={styles.badgeRow}>
           <PreferredBadge name={preferred.name} closetId={preferred._id} />
-          <button className={styles.changePrefBtn} onClick={() => setClosets(p => p.map(c => ({ ...c, isPreferred: false })))}>change</button>
+          <button className={styles.changePrefBtn} onClick={() => setClosets(prev => prev.map(c => ({ ...c, isPreferred: false })))}>change</button>
         </div>
         <ScoreBadge score={activeOutfit.score} />
       </div>

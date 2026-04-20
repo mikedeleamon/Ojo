@@ -3,16 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import OjoLogo from '../../assets/images/logos/Ojo word logo 2.png';
 import { Settings } from '../../types';
+import { auth } from '../../lib/auth';
 import styles from './OnboardingPage.module.css';
 
-const AUTH_KEY       = 'ojo_auth';
-const ONBOARD_KEY    = 'ojo_onboarding_done';
-
-const getToken = (): string | null => {
-  try { return JSON.parse(localStorage.getItem(AUTH_KEY) || '{}').token ?? null; }
-  catch { return null; }
-};
-const auth = () => ({ headers: { Authorization: `Bearer ${getToken()}` } });
+const ONBOARD_KEY = 'ojo_onboarding_done';
 
 const STYLES     = ['Casual', 'Business Casual', 'Formal', 'Athletic', 'Streetwear', 'Minimalist'];
 const TEMP_UNITS = ['Imperial', 'Metric'] as const;
