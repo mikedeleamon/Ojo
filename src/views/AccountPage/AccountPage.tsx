@@ -6,6 +6,8 @@ import { auth, AUTH_KEY, getToken } from '../../lib/auth';
 import { useFormSubmit } from '../../hooks/useFormSubmit';
 import { StatusMessage } from '../../components/shared';
 import { loadHistory, deleteHistoryEntry, clearHistory } from '../../lib/outfitHistory';
+import LegalModal from '../../components/LegalModal/LegalModal';
+import { PRIVACY_POLICY, TERMS_OF_SERVICE, LegalDocument } from '../../config/legal';
 import styles from './AccountPage.module.css';
 
 const STYLES: string[] = ['Casual', 'Business Casual', 'Formal', 'Urban', 'Cozy', 'Preppy'];
@@ -323,6 +325,7 @@ const AccountPage = ({ settings, saveSettings, onLogout }: Props) => {
   const navigate = useNavigate();
 
   const [showLogoutModal,  setShowLogoutModal]  = useState(false);
+  const [legalDoc,         setLegalDoc]         = useState<LegalDocument | null>(null);
   const handleLogout = () => { onLogout(); navigate('/login'); };
 
   const handleDeleteAccount = async () => {
@@ -401,6 +404,11 @@ const AccountPage = ({ settings, saveSettings, onLogout }: Props) => {
         </div>
       )}
 
+      {/* Legal document modal */}
+      {legalDoc && (
+        <LegalModal doc={legalDoc} onClose={() => setLegalDoc(null)} />
+      )}
+
       {/* Sidebar */}
       <aside className={styles.sidebar}>
         <button className={styles.backBtn} onClick={() => navigate('/')} aria-label="Back">
@@ -429,6 +437,39 @@ const AccountPage = ({ settings, saveSettings, onLogout }: Props) => {
             </button>
           ))}
         </nav>
+
+        {/* Legal section */}
+        <div className={styles.legalSection}>
+          <span className={styles.legalSectionLabel}>Legal</span>
+          <button className={styles.legalItem} onClick={() => setLegalDoc(PRIVACY_POLICY)}>
+            <span className={styles.navIcon}>
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                <path d="M6 2h8a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4a2 2 0 012-2z"
+                  stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                <path d="M7 7h6M7 10h6M7 13h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+              </svg>
+            </span>
+            <span className={styles.navLabel}>Privacy Policy</span>
+            <svg className={styles.legalChevron} width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+          <button className={styles.legalItem} onClick={() => setLegalDoc(TERMS_OF_SERVICE)}>
+            <span className={styles.navIcon}>
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                <path d="M6 2h8a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4a2 2 0 012-2z"
+                  stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                <path d="M7 7h6M7 10h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                <circle cx="14" cy="14" r="3" fill="none" stroke="currentColor" strokeWidth="1.4"/>
+                <path d="M14 13v1.5l1 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              </svg>
+            </span>
+            <span className={styles.navLabel}>Terms of Service</span>
+            <svg className={styles.legalChevron} width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        </div>
 
         <button className={styles.logoutBtn} onClick={() => setShowLogoutModal(true)}>
           <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
