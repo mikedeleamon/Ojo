@@ -755,3 +755,19 @@
   opacity: 0.35;
   cursor: not-allowed;
 }
+
+/* ─── Logout confirm button ──────────────────────────────────────────────── */
+.logoutConfirmBtn {
+  flex: 1;
+  padding: 13px;
+  background: rgba(255, 255, 255, 0.88);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: #0D1B2A;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity var(--transition);
+}
+.logoutConfirmBtn:hover { opacity: 0.85; }

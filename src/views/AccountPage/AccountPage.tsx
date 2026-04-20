@@ -322,6 +322,7 @@ const AccountPage = ({ settings, saveSettings, onLogout }: Props) => {
   const [deleteError,     setDeleteError]     = useState<string | null>(null);
   const navigate = useNavigate();
 
+  const [showLogoutModal,  setShowLogoutModal]  = useState(false);
   const handleLogout = () => { onLogout(); navigate('/login'); };
 
   const handleDeleteAccount = async () => {
@@ -342,6 +343,33 @@ const AccountPage = ({ settings, saveSettings, onLogout }: Props) => {
 
   return (
     <div className={styles.root}>
+
+      {/* Logout confirmation modal */}
+      {showLogoutModal && (
+        <div className={styles.modalOverlay}
+          onClick={e => { if (e.target === e.currentTarget) setShowLogoutModal(false); }}>
+          <div className={styles.deleteModal}>
+            <div className={styles.deleteModalIcon} style={{ background: 'rgba(148,163,184,0.08)', borderColor: 'rgba(148,163,184,0.2)' }}>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+                <path d="M16 17l5-5-5-5M21 12H9M13 5H5a2 2 0 00-2 2v10a2 2 0 002 2h8"
+                  stroke="rgba(148,163,184,0.85)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+            <h3 className={styles.deleteModalTitle}>Log out?</h3>
+            <p className={styles.deleteModalBody}>
+              You'll need to sign in again to access your wardrobe.
+            </p>
+            <div className={styles.deleteModalActions}>
+              <button className={styles.deleteModalCancel} onClick={() => setShowLogoutModal(false)}>
+                Cancel
+              </button>
+              <button className={styles.logoutConfirmBtn} onClick={handleLogout}>
+                Log out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete confirmation modal */}
       {showDeleteModal && (
@@ -402,7 +430,7 @@ const AccountPage = ({ settings, saveSettings, onLogout }: Props) => {
           ))}
         </nav>
 
-        <button className={styles.logoutBtn} onClick={handleLogout}>
+        <button className={styles.logoutBtn} onClick={() => setShowLogoutModal(true)}>
           <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
             <path d="M13 10H3m0 0l3-3m-3 3l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             <path d="M9 5H6a2 2 0 00-2 2v6a2 2 0 002 2h3M13 7l3 3-3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
