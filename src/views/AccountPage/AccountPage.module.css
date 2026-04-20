@@ -771,3 +771,57 @@
   transition: opacity var(--transition);
 }
 .logoutConfirmBtn:hover { opacity: 0.85; }
+
+/* ─── Legal section ──────────────────────────────────────────────────────── */
+.legalSection {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 12px;
+  margin-top: 8px;
+  border-top: 1px solid var(--glass-border, rgba(255,255,255,0.07));
+}
+
+.legalSectionLabel {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary, rgba(148,163,184,0.45));
+  padding: 0 var(--spacing-sm, 10px) 4px;
+}
+
+.legalItem {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm, 10px);
+  padding: 9px var(--spacing-sm, 10px);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm, 8px);
+  color: var(--text-secondary, rgba(148,163,184,0.7));
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  font-weight: 400;
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--transition, 0.15s ease);
+  width: 100%;
+}
+.legalItem:hover {
+  background: var(--glass-bg-strong, rgba(255,255,255,0.05));
+  color: var(--text-primary, #f1f5f9);
+}
+
+.legalChevron {
+  margin-left: auto;
+  opacity: 0.4;
+  flex-shrink: 0;
+  transition: opacity var(--transition, 0.15s ease);
+}
+.legalItem:hover .legalChevron { opacity: 0.7; }
+
+/* Hide legal labels on mobile (icon + chevron convey enough) */
+@media (max-width: 640px) {
+  .legalSection  { display: none; }
+}
