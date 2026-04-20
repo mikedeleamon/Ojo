@@ -2,10 +2,9 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import OjoLogo from '../../assets/images/logos/Ojo word logo 2.png';
-import { AuthState } from '../../types';
+import { AuthState, Settings } from '../../types';
+import { AUTH_KEY, getErrorMessage } from '../../lib/auth';
 import styles from './LoginPage.module.css';
-
-const AUTH_KEY = 'ojo_auth';
 
 interface Props { setLoggedIn: (v: boolean) => void; }
 
@@ -24,15 +23,15 @@ const LoginPage = ({ setLoggedIn }: Props) => {
     }
     setLoading(true);
     try {
-      const { data } = await axios.post<AuthState & { settings: any }>(
+      const { data } = await axios.post<AuthState & { settings: Settings }>(
         '/api/auth/login',
         { identifier, password },
       );
       localStorage.setItem(AUTH_KEY, JSON.stringify({ token: data.token, user: data.user }));
       setLoggedIn(true);
       navigate('/');
-    } catch (err: any) {
-      setError(err.response?.data?.error ?? 'Login failed. Please try again.');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Login failed. Please try again.'));
     } finally {
       setLoading(false);
     }

@@ -3,9 +3,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import OjoLogo from '../../assets/images/logos/Ojo word logo 2.png';
 import { formatDate } from '../../helpers/formatTools.js';
+import { AUTH_KEY, getErrorMessage } from '../../lib/auth';
 import styles from './SignupPage.module.css';
-
-const AUTH_KEY = 'ojo_auth';
 
 interface Props {
   setLoggedIn: (v: boolean) => void;
@@ -49,8 +48,8 @@ const SignupPage = ({ setLoggedIn, setNeedsOnboarding }: Props) => {
       setNeedsOnboarding(true);
       setLoggedIn(true);
       navigate('/onboarding');
-    } catch (err: any) {
-      setError(err.response?.data?.error ?? 'Sign up failed. Please try again.');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Sign up failed. Please try again.'));
     } finally {
       setLoading(false);
     }
