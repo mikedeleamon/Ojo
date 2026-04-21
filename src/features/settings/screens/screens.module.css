@@ -1,0 +1,607 @@
+/* ─── Forms ──────────────────────────────────────────────────────────────── */
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  font-size: 0.73rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.input {
+  width: 100%;
+  padding: 12px var(--spacing-md, 16px);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  font-weight: 300;
+  outline: none;
+  transition: border-color var(--transition), background var(--transition);
+  box-sizing: border-box;
+}
+.input::placeholder { color: var(--text-muted); }
+.input:focus {
+  border-color: rgba(255, 255, 255, 0.4);
+  background: var(--glass-bg-strong);
+}
+
+.saveBtn {
+  width: 100%;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.92);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: #0D1B2A;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity var(--transition), transform var(--transition);
+}
+.saveBtn:hover:not(:disabled) { opacity: 0.88; }
+.saveBtn:active:not(:disabled) { transform: scale(0.98); }
+.saveBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ─── Status messages ────────────────────────────────────────────────────── */
+.statusMsg {
+  padding: 10px var(--spacing-md, 16px);
+  border-radius: var(--radius-sm);
+  font-size: 0.88rem;
+}
+.success {
+  background: rgba(52, 211, 153, 0.12);
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  color: rgba(110, 231, 183, 1);
+}
+.error {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: rgba(252, 165, 165, 1);
+}
+
+/* ─── Sections ───────────────────────────────────────────────────────────── */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm, 10px);
+}
+
+.sectionLabel {
+  font-size: 0.73rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding-bottom: 2px;
+  border-bottom: 1px solid var(--glass-border);
+  margin: 0;
+}
+
+.hint {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ─── Chip picker ────────────────────────────────────────────────────────── */
+.chipGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs, 6px);
+}
+
+.chip {
+  padding: 7px 16px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.chip:hover { background: var(--glass-bg-strong); color: var(--text-primary); }
+.chipActive {
+  background: rgba(255, 255, 255, 0.92);
+  color: #0D1B2A;
+  border-color: transparent;
+  font-weight: 600;
+}
+
+/* ─── Segmented control ──────────────────────────────────────────────────── */
+.segmented {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+  width: 100%;
+}
+
+.seg {
+  padding: 12px 20px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  font-weight: 400;
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--transition);
+}
+.seg:hover { color: var(--text-primary); background: var(--glass-bg-strong); }
+.segActive {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* ─── Info cards (Notifications, Permissions, DataUsage) ─────────────────── */
+.infoCard {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.infoTitle {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.infoBody {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.65;
+  margin: 0;
+}
+
+/* ─── History ────────────────────────────────────────────────────────────── */
+.clearAllBtn {
+  align-self: flex-end;
+  padding: 6px 14px;
+  background: none;
+  border: 1px solid rgba(252, 165, 165, 0.3);
+  border-radius: var(--radius-pill);
+  color: rgba(252, 165, 165, 0.75);
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.clearAllBtn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: rgba(252, 165, 165, 1);
+}
+
+.confirmRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.confirmText {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  flex: 1;
+}
+
+.confirmYes {
+  padding: 5px 12px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: var(--radius-pill);
+  color: rgba(252, 165, 165, 1);
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.confirmYes:hover { background: rgba(239, 68, 68, 0.25); }
+
+.confirmNo {
+  padding: 5px 12px;
+  background: none;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.confirmNo:hover { background: var(--glass-bg-strong); color: var(--text-primary); }
+
+.historyList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm, 10px);
+}
+
+.historyCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--spacing-md, 16px);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md, 12px);
+  transition: background var(--transition);
+  animation: fadeUp 0.25s ease both;
+}
+.historyCard:hover { background: var(--glass-bg-strong); }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.historyMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm, 10px);
+  flex-wrap: wrap;
+}
+
+.historyDate {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.01em;
+}
+
+.historyCloset {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  padding: 2px 8px;
+}
+
+.historySummary {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  font-weight: 300;
+  padding-right: 28px;
+  margin: 0;
+}
+
+.historyDeleteBtn {
+  position: absolute;
+  top: var(--spacing-md, 16px);
+  right: var(--spacing-md, 16px);
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 50%;
+  opacity: 0;
+  transition: all var(--transition);
+}
+.historyCard:hover .historyDeleteBtn { opacity: 1; }
+.historyDeleteBtn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: rgba(252, 165, 165, 0.9);
+}
+
+/* ─── Danger zone (Delete Account) ──────────────────────────────────────── */
+.dangerCard {
+  background: rgba(239, 68, 68, 0.05);
+  border: 1px solid rgba(239, 68, 68, 0.18);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dangerTitle {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: rgba(252, 165, 165, 0.9);
+  margin: 0;
+}
+
+.dangerBody {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.dangerBtn {
+  align-self: flex-start;
+  padding: 8px 16px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-sm);
+  color: rgba(252, 165, 165, 0.9);
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.dangerBtn:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.2);
+  color: rgba(252, 165, 165, 1);
+}
+.dangerBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ─── Sliders (Preferences screen) ──────────────────────────────────────── */
+.sliderRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sliderMeta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.sliderLabel { font-size: 0.85rem; color: var(--text-secondary); }
+.sliderValue { font-size: 0.9rem; font-weight: 500; color: var(--text-primary); }
+
+.slider {
+  width: 100%;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--glass-border);
+  border-radius: 4px;
+  cursor: pointer;
+  outline: none;
+}
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.9);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  transition: transform var(--transition);
+}
+.slider::-webkit-slider-thumb:hover { transform: scale(1.15); }
+.slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.9);
+  border: none;
+  cursor: pointer;
+}
+
+/* Segmented control (horizontal for Preferences) */
+.segmented {
+  display: flex;
+  gap: 4px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+  width: fit-content;
+}
+.seg {
+  padding: 8px 24px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.seg:hover { color: var(--text-primary); }
+.segActive { background: rgba(255,255,255,0.14); color: var(--text-primary); }
+
+/* ─── Danger zone (Delete account in ProfileScreen) ──────────────────────  */
+.dangerCard {
+  background: rgba(239, 68, 68, 0.05);
+  border: 1px solid rgba(239, 68, 68, 0.15);
+  border-radius: var(--radius-sm);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dangerTitle {
+  font-size: 0.73rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(252, 165, 165, 0.75);
+  margin: 0;
+}
+.dangerBody {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0;
+}
+.dangerBtn {
+  align-self: flex-start;
+  padding: 8px 16px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.28);
+  border-radius: var(--radius-sm);
+  color: rgba(252, 165, 165, 0.85);
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.dangerBtn:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.18);
+  color: rgba(252, 165, 165, 1);
+}
+.dangerBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.dangerConfirmRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.dangerConfirmLabel {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  flex: 1;
+  min-width: 100px;
+}
+.dangerBtnConfirm {
+  padding: 7px 14px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: var(--radius-sm);
+  color: rgba(252, 165, 165, 1);
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.dangerBtnConfirm:hover:not(:disabled) { background: rgba(239, 68, 68, 0.25); }
+.dangerBtnConfirm:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.dangerBtnCancel {
+  padding: 7px 14px;
+  background: none;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.dangerBtnCancel:hover:not(:disabled) { background: var(--glass-bg-strong); color: var(--text-primary); }
+.dangerBtnCancel:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ─── Delete account confirmation modal ──────────────────────────────────── */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: overlayIn 0.15s ease;
+}
+@keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
+
+.modalCard {
+  width: 100%;
+  max-width: 360px;
+  background: var(--glass-bg-strong, rgba(15, 23, 42, 0.96));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg, 16px);
+  padding: 28px 24px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: modalIn 0.18s cubic-bezier(0.32, 0.72, 0, 1);
+}
+@keyframes modalIn {
+  from { transform: scale(0.96) translateY(8px); opacity: 0; }
+  to   { transform: scale(1)    translateY(0);   opacity: 1; }
+}
+
+.modalIcon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.modalTitle {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.modalBody {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0;
+}
+.modalBody strong { color: var(--text-primary); font-weight: 500; }
+
+.modalActions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.modalCancel {
+  flex: 1;
+  padding: 12px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity var(--transition);
+}
+.modalCancel:hover:not(:disabled) { opacity: 0.75; }
+.modalCancel:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.modalConfirm {
+  flex: 1;
+  padding: 12px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: var(--radius-sm);
+  color: rgba(252, 165, 165, 1);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.modalConfirm:hover:not(:disabled) { background: rgba(239, 68, 68, 0.25); }
+.modalConfirm:disabled { opacity: 0.5; cursor: not-allowed; }

@@ -504,6 +504,39 @@ const AccountPage = ({ settings, saveSettings, onLogout }: Props) => {
         {activeTab === 'preferences' && <PreferencesTab settings={settings} saveSettings={saveSettings} />}
         {activeTab === 'history'     && <HistoryTab />}
         {activeTab === 'password'    && <PasswordTab />}
+
+        {/* Legal — shown only on mobile (sidebar version is hidden at <600px) */}
+        <div className={styles.mobileLegalSection}>
+          <span className={styles.mobileLegalLabel}>Legal</span>
+          <button className={styles.mobileLegalItem} onClick={() => setLegalDoc(PRIVACY_POLICY)}>
+            <span className={styles.mobileLegalIcon}>
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                <path d="M6 2h8a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4a2 2 0 012-2z"
+                  stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                <path d="M7 7h6M7 10h6M7 13h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+              </svg>
+            </span>
+            <span className={styles.mobileLegalText}>Privacy Policy</span>
+            <svg className={styles.mobileLegalChevron} width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+          <button className={styles.mobileLegalItem} onClick={() => setLegalDoc(TERMS_OF_SERVICE)}>
+            <span className={styles.mobileLegalIcon}>
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+                <path d="M6 2h8a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4a2 2 0 012-2z"
+                  stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                <path d="M7 7h6M7 10h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                <circle cx="14" cy="14" r="3" fill="none" stroke="currentColor" strokeWidth="1.4"/>
+                <path d="M14 13v1.5l1 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              </svg>
+            </span>
+            <span className={styles.mobileLegalText}>Terms of Service</span>
+            <svg className={styles.mobileLegalChevron} width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        </div>
       </main>
     </div>
   );
