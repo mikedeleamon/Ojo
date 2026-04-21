@@ -825,3 +825,73 @@
 @media (max-width: 640px) {
   .legalSection  { display: none; }
 }
+
+/* ─── Mobile legal section ───────────────────────────────────────────────── */
+/* Hidden on desktop — the sidebar legal section handles it there.            */
+.mobileLegalSection {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .mobileLegalSection {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 0 var(--spacing-md, 16px) var(--spacing-xl, 32px);
+    padding-top: 16px;
+    border-top: 1px solid var(--glass-border, rgba(255,255,255,0.07));
+  }
+
+  .mobileLegalLabel {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--text-secondary, rgba(148,163,184,0.45));
+    padding: 0 4px 6px;
+  }
+
+  .mobileLegalItem {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 13px 14px;
+    background: var(--glass-bg, rgba(255,255,255,0.03));
+    border: 1px solid var(--glass-border, rgba(255,255,255,0.07));
+    border-radius: var(--radius-sm, 10px);
+    color: var(--text-secondary, rgba(148,163,184,0.8));
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    font-weight: 400;
+    cursor: pointer;
+    text-align: left;
+    transition: all var(--transition, 0.15s ease);
+    margin-bottom: 4px;
+  }
+  .mobileLegalItem:hover,
+  .mobileLegalItem:active {
+    background: var(--glass-bg-strong, rgba(255,255,255,0.07));
+    color: var(--text-primary, #f1f5f9);
+  }
+
+  .mobileLegalIcon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    opacity: 0.7;
+  }
+
+  .mobileLegalText {
+    flex: 1;
+    line-height: 1;
+  }
+
+  .mobileLegalChevron {
+    opacity: 0.35;
+    flex-shrink: 0;
+    transition: opacity var(--transition, 0.15s ease);
+  }
+  .mobileLegalItem:hover .mobileLegalChevron { opacity: 0.65; }
+}
