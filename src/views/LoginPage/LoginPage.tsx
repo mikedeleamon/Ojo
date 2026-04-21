@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import OjoLogo from '../../assets/images/logos/Ojo word logo 2.png';
 import { AuthState, Settings } from '../../types';
-import { AUTH_KEY, getErrorMessage } from '../../lib/auth';
+import { AUTH_KEY, getErrorMessage, saveAuth } from '../../lib/auth';
 import styles from './LoginPage.module.css';
 
 interface Props { setLoggedIn: (v: boolean) => void; }
@@ -27,7 +27,7 @@ const LoginPage = ({ setLoggedIn }: Props) => {
         '/api/auth/login',
         { identifier, password },
       );
-      localStorage.setItem(AUTH_KEY, JSON.stringify({ token: data.token, user: data.user }));
+      await saveAuth(data.token, data.user);
       setLoggedIn(true);
       navigate('/');
     } catch (err: unknown) {

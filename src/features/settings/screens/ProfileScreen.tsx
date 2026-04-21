@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import ScreenShell from '../components/ScreenShell';
-import { auth, AUTH_KEY, getToken, getErrorMessage } from '../../../lib/auth';
+import { auth, getToken, getErrorMessage, updateAuthUser, clearAuth } from '../../../lib/auth';
+import { storage } from '../../../lib/storage';
 import { useFormSubmit } from '../../../hooks/useFormSubmit';
 import { StatusMessage } from '../../../components/shared';
 import styles from './screens.module.css';
@@ -33,8 +34,7 @@ const ProfileScreen = ({ embedded, onLogout }: Props) => {
 
   const save = () => submit(async () => {
     await axios.put('/api/user/profile', { username, email }, auth());
-    const raw = JSON.parse(localStorage.getItem(AUTH_KEY) || '{}');
-    localStorage.setItem(AUTH_KEY, JSON.stringify({ ...raw, user: { ...raw.user, email, username } }));
+    await updateAuthUser({ email, username });
   });
 
   const handleDelete = async () => {
@@ -42,7 +42,8 @@ const ProfileScreen = ({ embedded, onLogout }: Props) => {
     setDeleteError(null);
     try {
       await axios.delete('/api/user/me', auth());
-      localStorage.clear();
+      await clearAuth();
+      await storage.clear();
       onLogout?.();
       navigate('/login');
     } catch (err: unknown) {

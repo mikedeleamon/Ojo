@@ -3,13 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Closet, CurrentWeather, Settings } from '../../types';
 import { generateOutfit, OutfitRole } from '../../lib/outfitEngine';
+import { getToken } from '../../lib/auth';
 import styles from './WearTodayStrip.module.css';
-
-const AUTH_KEY = 'ojo_auth';
-const getToken = (): string | null => {
-  try { return JSON.parse(localStorage.getItem(AUTH_KEY) || '{}').token ?? null; }
-  catch { return null; }
-};
 
 const CSS_COLORS: Record<string, string> = {
   Black: '#1a1a1a', White: '#f5f5f5', Grey: '#9ca3af', Navy: '#1e3a5f',
