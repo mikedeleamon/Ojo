@@ -80,15 +80,17 @@ export const HistoryScreen = ({ embedded }: EmbedProps) => {
   const [entries,      setEntries]      = useState<OutfitHistoryEntry[]>([]);
   const [confirmClear, setConfirmClear] = useState(false);
 
-  useEffect(() => { setEntries(loadHistory()); }, []);
+  useEffect(() => {
+    loadHistory().then(setEntries);
+  }, []);
 
-  const handleDelete = (id: string) => {
-    deleteHistoryEntry(id);
+  const handleDelete = async (id: string) => {
+    await deleteHistoryEntry(id);
     setEntries(prev => prev.filter(e => e.id !== id));
   };
 
-  const handleClearAll = () => {
-    clearHistory();
+  const handleClearAll = async () => {
+    await clearHistory();
     setEntries([]);
     setConfirmClear(false);
   };

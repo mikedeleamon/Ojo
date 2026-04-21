@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ClothingArticle, CurrentWeather, Settings } from '../../types';
 import { useClosets } from '../../hooks/useClosets';
@@ -120,7 +120,11 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
     setSettingPref(false);
   };
 
-  const worn = useMemo(() => recentlyWornIds(3), []);
+  // Load recently worn IDs once on mount (async)
+  const [worn, setWorn] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    recentlyWornIds(3).then(setWorn);
+  }, []);
 
   const { outfits, status } = useMemo(() => {
     if (!preferred) return { outfits: [], status: 'no_preferred' as const };
@@ -131,12 +135,12 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
   const safeIdx    = Math.min(activeIdx, Math.max(0, outfits.length - 1));
   const activeOutfit: OutfitResult | null = outfits[safeIdx] ?? null;
 
-  const handleWoreThis = () => {
+  const handleWoreThis = async () => {
     if (!preferred || !activeOutfit || activeOutfit.status !== 'ok') return;
-    const articles   = activeOutfit.slots.map(s => s.article);
-    addHistoryEntry({ closetId: preferred._id, closetName: preferred.name,
+    const articles = activeOutfit.slots.map(s => s.article);
+    await addHistoryEntry({ closetId: preferred._id, closetName: preferred.name,
       articleIds: articles.map(a => a._id), articleSummary: articles.map(a => a.name || a.clothingType).join(', ') });
-    updatePreferences(articles);
+    await updatePreferences(articles);
     setWornLogged(true);
     setTimeout(() => setWornLogged(false), 3000);
   };

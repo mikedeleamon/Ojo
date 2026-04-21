@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { BrowserRouter as Router } from 'react-router-dom';
 import AppRoutes from './routes/AppRoutes';
-import { useSettings, clearSettingsSession } from './hooks/useSettings';
-import { AUTH_KEY } from './lib/auth';
+import { useSettings, clearSettingsCache } from './hooks/useSettings';
+import { AUTH_KEY, clearAuth } from './lib/auth';
+import { storage } from './lib/storage';
 
 const ONBOARD_KEY = 'ojo_onboarding_done';
 
+// Synchronous boot check — reads localStorage directly once on startup.
+// RN migration: replace with SplashScreen + async SecureStore.getItemAsync().
 const isLoggedIn = (): boolean => {
   try {
     const raw = localStorage.getItem(AUTH_KEY);
@@ -15,15 +18,15 @@ const isLoggedIn = (): boolean => {
   }
 };
 
-
 const App = () => {
-  const [loggedIn,          setLoggedIn]          = useState<boolean>(isLoggedIn);
-  const [needsOnboarding,   setNeedsOnboarding]   = useState<boolean>(false);
+  const [loggedIn,        setLoggedIn]        = useState<boolean>(isLoggedIn);
+  const [needsOnboarding, setNeedsOnboarding] = useState<boolean>(false);
   const { settings, settingsReady, saveSettings } = useSettings();
 
-  const handleLogout = () => {
-    localStorage.removeItem(AUTH_KEY);
-    clearSettingsSession();
+  const handleLogout = async () => {
+    await clearAuth();
+    await clearSettingsCache();
+    await storage.removeItem(ONBOARD_KEY);
     setLoggedIn(false);
     setNeedsOnboarding(false);
   };

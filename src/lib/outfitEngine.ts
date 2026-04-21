@@ -15,7 +15,7 @@
  */
 
 import { ClothingArticle, CurrentWeather, Settings } from '../types';
-import { loadPreferences, articlePreferenceScore } from './userPreferences';
+import { articlePreferenceScore, UserPreferenceProfile } from './userPreferences';
 
 // ─── Core types ───────────────────────────────────────────────────────────────
 
@@ -261,9 +261,8 @@ const simplicityScore = (slots: OutfitSlot[]): number => {
 
 // ─── 3e. User preference scoring ─────────────────────────────────────────────
 
-const outfitPreferenceScore = (slots: OutfitSlot[]): number => {
+const outfitPreferenceScore = (slots: OutfitSlot[], profile: UserPreferenceProfile): number => {
   if (slots.length === 0) return 0.50;
-  const profile = loadPreferences();
   const scores = slots.map(s => articlePreferenceScore(s.article, profile));
   return scores.reduce((a, b) => a + b, 0) / scores.length;
 };
@@ -295,12 +294,13 @@ const scoreCombo = (
   humidity:       number,
   settings:       Settings,
   recentlyWorn:   Set<string>,
+  profile:        UserPreferenceProfile,
 ): ScoredCombo => {
   const fabric     = outfitFabricScore(slots, bucket, raining, humidity, settings.humidityPreference);
   const color      = outfitColorScore(slots);
   const style      = outfitStyleScore(slots, settings.clothingStyle);
   const simplicity = simplicityScore(slots);
-  const preference = outfitPreferenceScore(slots);
+  const preference = outfitPreferenceScore(slots, profile);
 
   const recencyPenalty = slots.filter(s => recentlyWorn.has(s.article._id)).length
     * RECENCY_PENALTY_PER_SLOT;
@@ -364,8 +364,9 @@ export const generateOutfits = (
   articles:     ClothingArticle[],
   weather:      CurrentWeather,
   settings:     Settings,
-  recentlyWorn: Set<string> = new Set(),
-  topK:         number      = 3,
+  recentlyWorn: Set<string>          = new Set(),
+  topK:         number               = 3,
+  profile:      UserPreferenceProfile = { colors: {}, fabrics: {}, categories: {}, totalOutfits: 0 },
 ): { results: OutfitResult[]; status: OutfitStatus } => {
 
   // ── Early exits ──────────────────────────────────────────────────────────
@@ -458,7 +459,7 @@ export const generateOutfits = (
           if (shoe)  slots.push({ role: 'footwear',  article: shoe  });
           if (acc)   slots.push({ role: 'accessory', article: acc   });
 
-          scored.push(scoreCombo(slots, bucket, raining, humidity, settings, recentlyWorn));
+          scored.push(scoreCombo(slots, bucket, raining, humidity, settings, recentlyWorn, profile));
         }
       }
     }

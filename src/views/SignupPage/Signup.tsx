@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import OjoLogo from '../../assets/images/logos/Ojo word logo 2.png';
 import { formatDate } from '../../helpers/formatTools.js';
-import { AUTH_KEY, getErrorMessage } from '../../lib/auth';
+import { AUTH_KEY, getErrorMessage, saveAuth } from '../../lib/auth';
 import styles from './SignupPage.module.css';
 
 interface Props {
@@ -44,7 +44,7 @@ const SignupPage = ({ setLoggedIn, setNeedsOnboarding }: Props) => {
         password:  form.password,
         birthday:  form.birthday,
       });
-      localStorage.setItem(AUTH_KEY, JSON.stringify({ token: data.token, user: data.user }));
+      await saveAuth(data.token, data.user);
       setNeedsOnboarding(true);
       setLoggedIn(true);
       navigate('/onboarding');

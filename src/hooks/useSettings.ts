@@ -2,9 +2,9 @@ import { useState, useCallback, useEffect } from 'react';
 import axios from 'axios';
 import { Settings } from '../types';
 import { getToken, authHeaders, getErrorMessage } from '../lib/auth';
+import { storage, storageGetJSON } from '../lib/storage';
 
-const CACHE_KEY   = 'ojo_settings_cache';
-const SESSION_KEY = 'ojo_settings_session'; // legacy key — cleared on logout
+const CACHE_KEY = 'ojo_settings_cache';
 
 export const defaults: Settings = {
   clothingStyle:      'Casual',
@@ -15,50 +15,59 @@ export const defaults: Settings = {
   humidityPreference: 70,
 };
 
-const readCache = (): Settings | null => {
-  try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    return raw ? { ...defaults, ...JSON.parse(raw) } : null;
-  } catch { return null; }
+const readCache = async (): Promise<Settings | null> => {
+  const data = await storageGetJSON<Partial<Settings>>(storage, CACHE_KEY, {});
+  return Object.keys(data).length > 0 ? { ...defaults, ...data } : null;
 };
 
-const writeCache = (s: Settings) => {
-  try { localStorage.setItem(CACHE_KEY, JSON.stringify(s)); } catch {}
+const writeCache = async (s: Settings): Promise<void> => {
+  await storage.setItem(CACHE_KEY, JSON.stringify(s));
 };
 
-export const clearSettingsSession = () => {
-  try {
-    localStorage.removeItem(CACHE_KEY);
-    sessionStorage.removeItem(SESSION_KEY);
-  } catch {}
+export const clearSettingsCache = async (): Promise<void> => {
+  await storage.removeItem(CACHE_KEY);
 };
 
 export const useSettings = () => {
-  const [settings, setSettings] = useState<Settings>(() => readCache() ?? defaults);
-  const [settingsReady, setSettingsReady] = useState<boolean>(() => readCache() !== null);
+  const [settings,      setSettings]      = useState<Settings>(defaults);
+  const [settingsReady, setSettingsReady] = useState(false);
 
+  // Hydrate from cache first, then revalidate from server
   useEffect(() => {
-    const token = getToken();
-    if (!token) { setSettingsReady(true); return; }
+    let cancelled = false;
 
-    axios
-      .get('/api/user/settings', authHeaders())
-      .then(({ data }) => {
+    const init = async () => {
+      const cached = await readCache();
+      if (cached && !cancelled) {
+        setSettings(cached);
+        setSettingsReady(true);
+      }
+
+      const token = getToken();
+      if (!token) { if (!cancelled) setSettingsReady(true); return; }
+
+      try {
+        const { data } = await axios.get('/api/user/settings', authHeaders());
         const fresh = { ...defaults, ...data };
-        setSettings(fresh);
-        writeCache(fresh);
-        setSettingsReady(true);
-      })
-      .catch((err: unknown) => {
+        if (!cancelled) {
+          setSettings(fresh);
+          setSettingsReady(true);
+        }
+        await writeCache(fresh);
+      } catch (err: unknown) {
         console.warn('[Ojo] Could not revalidate settings:', getErrorMessage(err));
-        setSettingsReady(true);
-      });
+        if (!cancelled) setSettingsReady(true);
+      }
+    };
+
+    init();
+    return () => { cancelled = true; };
   }, []);
 
   const saveSettings = useCallback(async (next: Settings) => {
     const previous = settings;
     setSettings(next);
-    writeCache(next);
+    await writeCache(next);
 
     if (!getToken()) return;
 
@@ -67,7 +76,7 @@ export const useSettings = () => {
     } catch (err: unknown) {
       console.error('[Ojo] Settings save failed — rolling back:', getErrorMessage(err));
       setSettings(previous);
-      writeCache(previous);
+      await writeCache(previous);
       throw err;
     }
   }, [settings]);
