@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import ScreenShell from '../components/ScreenShell';
+import { View, Text, Pressable } from '../../../components/primitives';
 import { loadHistory, deleteHistoryEntry, clearHistory } from '../../../lib/outfitHistory';
 import { OutfitHistoryEntry } from '../../../types';
 import styles from './screens.module.css';
@@ -10,12 +11,12 @@ interface EmbedProps { embedded?: boolean; }
 
 export const NotificationsScreen = ({ embedded }: EmbedProps) => (
   <ScreenShell title="Push Notifications" embedded={embedded}>
-    <div className={styles.infoCard}>
-      <p className={styles.infoTitle}>Coming soon</p>
-      <p className={styles.infoBody}>
+    <View style={styles.infoCard}>
+      <Text style={styles.infoTitle}>Coming soon</Text>
+      <Text style={styles.infoBody}>
         Push notifications aren't available yet. Check back in a future update.
-      </p>
-    </div>
+      </Text>
+    </View>
   </ScreenShell>
 );
 
@@ -23,27 +24,27 @@ export const NotificationsScreen = ({ embedded }: EmbedProps) => (
 
 export const PermissionsScreen = ({ embedded }: EmbedProps) => (
   <ScreenShell title="Permissions" embedded={embedded}>
-    <div className={styles.infoCard}>
-      <p className={styles.infoTitle}>Location</p>
-      <p className={styles.infoBody}>
+    <View style={styles.infoCard}>
+      <Text style={styles.infoTitle}>Location</Text>
+      <Text style={styles.infoBody}>
         Only the city name you enter is used for weather lookups — no GPS or
         precise location data is ever collected.
-      </p>
-    </div>
-    <div className={styles.infoCard}>
-      <p className={styles.infoTitle}>Photos</p>
-      <p className={styles.infoBody}>
+      </Text>
+    </View>
+    <View style={styles.infoCard}>
+      <Text style={styles.infoTitle}>Photos</Text>
+      <Text style={styles.infoBody}>
         Photo access is only requested when you add a clothing image. Images are
         stored securely and used solely to display your items.
-      </p>
-    </div>
-    <div className={styles.infoCard}>
-      <p className={styles.infoTitle}>Other</p>
-      <p className={styles.infoBody}>
+      </Text>
+    </View>
+    <View style={styles.infoCard}>
+      <Text style={styles.infoTitle}>Other</Text>
+      <Text style={styles.infoBody}>
         No microphone, contacts, background services, or other device permissions
         are requested.
-      </p>
-    </div>
+      </Text>
+    </View>
   </ScreenShell>
 );
 
@@ -51,26 +52,26 @@ export const PermissionsScreen = ({ embedded }: EmbedProps) => (
 
 export const DataUsageScreen = ({ embedded }: EmbedProps) => (
   <ScreenShell title="Data Usage" embedded={embedded}>
-    <div className={styles.infoCard}>
-      <p className={styles.infoTitle}>What we store</p>
-      <p className={styles.infoBody}>
+    <View style={styles.infoCard}>
+      <Text style={styles.infoTitle}>What we store</Text>
+      <Text style={styles.infoBody}>
         Your account, closets, clothing articles, outfit history, and style
         preferences are stored in our secure cloud database (MongoDB Atlas).
-      </p>
-    </div>
-    <div className={styles.infoCard}>
-      <p className={styles.infoTitle}>What we don't do</p>
-      <p className={styles.infoBody}>
+      </Text>
+    </View>
+    <View style={styles.infoCard}>
+      <Text style={styles.infoTitle}>What we don't do</Text>
+      <Text style={styles.infoBody}>
         We don't sell your data, use it for advertising, or share it with third
         parties beyond what's needed to run the app.
-      </p>
-    </div>
-    <div className={styles.infoCard}>
-      <p className={styles.infoTitle}>Delete your data</p>
-      <p className={styles.infoBody}>
+      </Text>
+    </View>
+    <View style={styles.infoCard}>
+      <Text style={styles.infoTitle}>Delete your data</Text>
+      <Text style={styles.infoBody}>
         You can permanently remove your account and all data from Account → Profile → Delete Account.
-      </p>
-    </div>
+      </Text>
+    </View>
   </ScreenShell>
 );
 
@@ -97,7 +98,7 @@ export const HistoryScreen = ({ embedded }: EmbedProps) => {
 
   const formatDate = (iso: string): string => {
     const d = new Date(iso);
-    const today = new Date();
+    const today     = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(today.getDate() - 1);
     const same = (a: Date, b: Date) =>
@@ -111,45 +112,54 @@ export const HistoryScreen = ({ embedded }: EmbedProps) => {
   return (
     <ScreenShell title="Outfit History" embedded={embedded}>
       {entries.length === 0 ? (
-        <div className={styles.infoCard}>
-          <p className={styles.infoTitle}>No outfits logged yet</p>
-          <p className={styles.infoBody}>
-            Tap <strong>Wore this today</strong> on the home screen after getting a suggestion.
-          </p>
-        </div>
+        <View style={styles.infoCard}>
+          <Text style={styles.infoTitle}>No outfits logged yet</Text>
+          <Text style={styles.infoBody}>
+            Tap "Wore this today" on the home screen after getting a suggestion.
+          </Text>
+        </View>
       ) : (
         <>
           {confirmClear ? (
-            <div className={styles.confirmRow}>
-              <span className={styles.confirmText}>Clear all {entries.length} entries?</span>
-              <button className={styles.confirmYes} onClick={handleClearAll}>Yes, clear</button>
-              <button className={styles.confirmNo}  onClick={() => setConfirmClear(false)}>Cancel</button>
-            </div>
+            <View style={styles.confirmRow}>
+              <Text style={styles.confirmText}>Clear all {entries.length} entries?</Text>
+              <Pressable style={styles.confirmYes} onPress={handleClearAll}>
+                <Text>Yes, clear</Text>
+              </Pressable>
+              <Pressable style={styles.confirmNo} onPress={() => setConfirmClear(false)}>
+                <Text>Cancel</Text>
+              </Pressable>
+            </View>
           ) : (
-            <button className={styles.clearAllBtn} onClick={() => setConfirmClear(true)}>Clear all</button>
+            <Pressable style={styles.clearAllBtn} onPress={() => setConfirmClear(true)}>
+              <Text>Clear all</Text>
+            </Pressable>
           )}
 
-          <div className={styles.historyList}>
+          <View style={styles.historyList}>
             {entries.map(entry => (
-              <div key={entry.id} className={styles.historyCard}>
-                <div className={styles.historyMeta}>
-                  <span className={styles.historyDate}>{formatDate(entry.wornAt)}</span>
-                  <span className={styles.historyCloset}>{entry.closetName}</span>
-                </div>
-                <p className={styles.historySummary}>{entry.articleSummary}</p>
-                <button className={styles.historyDeleteBtn}
-                  onClick={() => handleDelete(entry.id)} aria-label="Remove entry">
+              <View key={entry.id} style={styles.historyCard}>
+                <View style={styles.historyMeta}>
+                  <Text style={styles.historyDate}>{formatDate(entry.wornAt)}</Text>
+                  <Text style={styles.historyCloset}>{entry.closetName}</Text>
+                </View>
+                <Text style={styles.historySummary}>{entry.articleSummary}</Text>
+                <Pressable
+                  style={styles.historyDeleteBtn}
+                  onPress={() => handleDelete(entry.id)}
+                  accessibilityLabel="Remove entry"
+                >
                   <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
                     <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                   </svg>
-                </button>
-              </div>
+                </Pressable>
+              </View>
             ))}
-          </div>
+          </View>
 
-          <p className={styles.hint}>
+          <Text style={styles.hint}>
             Outfits from the last 3 days are deprioritised in new suggestions.
-          </p>
+          </Text>
         </>
       )}
     </ScreenShell>

@@ -1,15 +1,17 @@
 import { useState } from 'react';
 import axios from 'axios';
 import ScreenShell from '../components/ScreenShell';
+import { View, Text, TextInput, Pressable } from '../../../components/primitives';
 import { auth } from '../../../lib/auth';
 import { useFormSubmit } from '../../../hooks/useFormSubmit';
 import { StatusMessage } from '../../../components/shared';
 import styles from './screens.module.css';
 
 interface PasswordProps { embedded?: boolean; }
+
 const PasswordScreen = ({ embedded }: PasswordProps) => {
-  const [newPassword,  setNewPassword]  = useState('');
-  const [confirm,      setConfirm]      = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirm,     setConfirm]     = useState('');
   const { status, loading, submit, clearStatus } = useFormSubmit('Password updated successfully.');
 
   const validationMsg =
@@ -30,25 +32,35 @@ const PasswordScreen = ({ embedded }: PasswordProps) => {
   return (
     <ScreenShell title="Change Password" embedded={embedded}>
       {validationMsg
-        ? <p className={`${styles.statusMsg} ${styles.error}`}>{validationMsg}</p>
+        ? <Text style={`${styles.statusMsg} ${styles.error}`}>{validationMsg}</Text>
         : <StatusMessage status={status} styles={styles} />
       }
 
-      <div className={styles.formGroup}>
-        <label className={styles.label}>New password</label>
-        <input className={styles.input} type="password" placeholder="At least 8 characters"
-          value={newPassword} onChange={e => setNewPassword(e.target.value)} />
-      </div>
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>New password</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="At least 8 characters"
+          secureTextEntry
+          value={newPassword}
+          onChangeText={setNewPassword}
+        />
+      </View>
 
-      <div className={styles.formGroup}>
-        <label className={styles.label}>Confirm new password</label>
-        <input className={styles.input} type="password" placeholder="••••••••"
-          value={confirm} onChange={e => setConfirm(e.target.value)} />
-      </div>
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Confirm new password</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="••••••••"
+          secureTextEntry
+          value={confirm}
+          onChangeText={setConfirm}
+        />
+      </View>
 
-      <button className={styles.saveBtn} onClick={save} disabled={loading}>
-        {loading ? 'Updating…' : 'Update password'}
-      </button>
+      <Pressable style={styles.saveBtn} onPress={save} disabled={loading}>
+        <Text>{loading ? 'Updating…' : 'Update password'}</Text>
+      </Pressable>
     </ScreenShell>
   );
 };

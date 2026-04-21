@@ -1,16 +1,19 @@
+import { View, Text } from '../../../components/primitives';
 import { SettingsSectionConfig, SettingsAction } from '../config';
 import { Settings } from '../../../types';
 import SettingsItem from './SettingsItem';
 import styles from './SettingsSection.module.css';
 
 interface Props {
-  section:   SettingsSectionConfig;
-  settings:  Settings;
-  onAction:  (action: SettingsAction) => void;
+  section:  SettingsSectionConfig;
+  settings: Settings;
+  onAction: (action: SettingsAction) => void;
 }
 
-/** Derives the display value for a sublabel key from the live settings object. */
-const getSublabel = (key: SettingsSectionConfig['items'][0]['sublabelKey'], settings: Settings): string => {
+const getSublabel = (
+  key: SettingsSectionConfig['items'][0]['sublabelKey'],
+  settings: Settings
+): string => {
   if (!key) return '';
   if (key === 'temperatureScale') return settings.temperatureScale === 'Imperial' ? '°F' : '°C';
   const value = settings[key];
@@ -18,17 +21,16 @@ const getSublabel = (key: SettingsSectionConfig['items'][0]['sublabelKey'], sett
 };
 
 /**
- * One settings group: a muted section title above a frosted card of rows.
- *
- * React Native migration note:
- *   <div className={styles.group}>  → <View style={styles.group}>
- *   <span className={styles.title}> → <Text style={styles.title}>
+ * React Native migration:
+ *   View → View (react-native)
+ *   Text → Text (react-native)
+ *   className → style={styles.x} via StyleSheet
  */
 const SettingsSection = ({ section, settings, onAction }: Props) => (
-  <div className={styles.section}>
-    <span className={styles.title}>{section.title}</span>
+  <View style={styles.section}>
+    <Text style={styles.title}>{section.title}</Text>
 
-    <div className={styles.group}>
+    <View style={styles.group}>
       {section.items.map(item => (
         <SettingsItem
           key={item.key}
@@ -37,8 +39,8 @@ const SettingsSection = ({ section, settings, onAction }: Props) => (
           onPress={() => onAction(item.action)}
         />
       ))}
-    </div>
-  </div>
+    </View>
+  </View>
 );
 
 export default SettingsSection;

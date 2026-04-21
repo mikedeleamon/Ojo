@@ -3,7 +3,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import OjoLogo from '../../assets/images/logos/Ojo word logo 2.png';
 import { AuthState, Settings } from '../../types';
-import { AUTH_KEY, getErrorMessage, saveAuth } from '../../lib/auth';
+import { getErrorMessage, saveAuth } from '../../lib/auth';
+import { View, Text, TextInput, Pressable, Image } from '../../components/primitives';
 import styles from './LoginPage.module.css';
 
 interface Props { setLoggedIn: (v: boolean) => void; }
@@ -38,50 +39,50 @@ const LoginPage = ({ setLoggedIn }: Props) => {
   };
 
   return (
-    <div className={styles.root}>
-      <div className={styles.card}>
-        <img src={OjoLogo} alt='Ojo' className={styles.logo} />
-        <p className={styles.tagline}>Dress for the weather.</p>
+    <View style={styles.root}>
+      <View style={styles.card}>
+        <Image source={{ uri: OjoLogo }} style={styles.logo} accessibilityLabel="Ojo" resizeMode="contain" />
+        <Text style={styles.tagline}>Dress for the weather.</Text>
 
-        {error && <p className={styles.error}>{error}</p>}
+        {error && <Text style={styles.error}>{error}</Text>}
 
-        <div className={styles.fields}>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Email or username</span>
-            <input
-              type='text'
-              className={styles.input}
-              placeholder='you@example.com or @janedoe'
+        <View style={styles.fields}>
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Email or username</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="you@example.com or @janedoe"
               value={identifier}
-              onChange={e => setIdentifier(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-              autoComplete='username'
+              onChangeText={setIdentifier}
+              onSubmitEditing={handleSubmit}
+              keyboardType="email-address"
+              autoCapitalize="none"
             />
-          </label>
-          <label className={styles.field}>
-            <span className={styles.fieldLabel}>Password</span>
-            <input
-              type='password'
-              className={styles.input}
-              placeholder='••••••••'
+          </View>
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Password</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="••••••••"
+              secureTextEntry
               value={password}
-              onChange={e => setPassword(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-              autoComplete='current-password'
+              onChangeText={setPassword}
+              onSubmitEditing={handleSubmit}
             />
-          </label>
-        </div>
+          </View>
+        </View>
 
-        <button className={styles.btn} onClick={handleSubmit} disabled={loading}>
-          {loading ? 'Signing in…' : 'Sign in'}
-        </button>
+        <Pressable style={styles.btn} onPress={handleSubmit} disabled={loading}>
+          <Text>{loading ? 'Signing in…' : 'Sign in'}</Text>
+        </Pressable>
 
-        <p className={styles.footer}>
+        {/* Link uses React Router — RN migration: replace with navigation.navigate('Signup') */}
+        <Text style={styles.footer}>
           Don't have an account?{' '}
-          <Link to='/signup' className={styles.link}>Sign up</Link>
-        </p>
-      </div>
-    </div>
+          <Link to="/signup" className={styles.link}>Sign up</Link>
+        </Text>
+      </View>
+    </View>
   );
 };
 
