@@ -1,39 +1,48 @@
 import { useNavigate } from 'react-router-dom';
+import { View, Text, Pressable } from '../../../components/primitives';
 import styles from './ScreenShell.module.css';
 
 interface Props {
   title:     string;
   children:  React.ReactNode;
-  /**
-   * When true the shell header is hidden — used when this screen is rendered
-   * inline inside the desktop sidebar layout (the sidebar itself provides nav).
-   *
-   * React Native migration: delete this component entirely and configure the
-   * header via Stack.Screen options in React Navigation.
-   */
   embedded?: boolean;
 }
 
+/**
+ * React Native migration:
+ *   Delete this component entirely.
+ *   React Navigation provides the header via Stack.Screen options:
+ *
+ *   <Stack.Screen
+ *     name="Profile"
+ *     component={ProfileScreen}
+ *     options={{ title: 'Profile', headerBackTitle: '' }}
+ *   />
+ */
 const ScreenShell = ({ title, children, embedded = false }: Props) => {
   const navigate = useNavigate();
 
   return (
-    <div className={`${styles.root} ${embedded ? styles.embedded : ''}`}>
+    <View style={`${styles.root} ${embedded ? styles.embedded : ''}`}>
       {!embedded && (
-        <header className={styles.header}>
-          <button className={styles.backBtn} onClick={() => navigate(-1)} aria-label="Back">
+        <View style={styles.header}>
+          <Pressable
+            onPress={() => navigate(-1 as never)}
+            style={styles.backBtn}
+            accessibilityLabel="Back"
+          >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
               <path d="M11 14l-5-5 5-5" stroke="currentColor" strokeWidth="1.5"
                 strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-          </button>
-          <h1 className={styles.title}>{title}</h1>
-        </header>
+          </Pressable>
+          <Text style={styles.title}>{title}</Text>
+        </View>
       )}
-      <div className={`${styles.content} ${embedded ? styles.embeddedContent : ''}`}>
+      <View style={`${styles.content} ${embedded ? styles.embeddedContent : ''}`}>
         {children}
-      </div>
-    </div>
+      </View>
+    </View>
   );
 };
 
