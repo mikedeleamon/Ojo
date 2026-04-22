@@ -1,6 +1,34 @@
+import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import SunnyPng from '../../assets/images/weatherIcons/Sunny.png';
 import styles from './BottomNav.module.css';
+
+/**
+ * Footer colour per page.
+ *
+ * Home (/) is intentionally absent — WeatherHUD owns --footer-bg for that
+ * route and updates it with the live weather condition colour.
+ *
+ * All other pages use var(--bg-default) whose darkest gradient stop is #0F172A.
+ * We match that stop directly so the footer sits flush with the page background.
+ */
+const ROUTE_FOOTER_COLORS: Record<string, string> = {
+  '/closet':               'rgba(10, 15, 30, 0.97)',   // bg-default start #0F172A
+  '/account':              'rgba(10, 15, 30, 0.97)',
+  '/account/preferences':  'rgba(10, 15, 30, 0.97)',
+};
+
+/** Returns the footer colour for any route, falling back to the default dark. */
+const footerColorForPath = (pathname: string): string | null => {
+  // Exact matches first
+  if (ROUTE_FOOTER_COLORS[pathname]) return ROUTE_FOOTER_COLORS[pathname];
+  // All /account/* sub-routes (detail screens)
+  if (pathname.startsWith('/account/')) return 'rgba(10, 15, 30, 0.97)';
+  // Home — let WeatherHUD own --footer-bg, don't override
+  if (pathname === '/') return null;
+  // Any other route (onboarding, login, etc.) — default dark
+  return 'rgba(10, 15, 30, 0.97)';
+};
 
 const TABS = [
   {
@@ -8,7 +36,7 @@ const TABS = [
     label: 'Home',
     route: '/',
     icon:  ({ active }: { active: boolean }) => (
-      <img src={SunnyPng} alt="Home"
+      <img src={SunnyPng} alt=""
         className={`${styles.imgIcon} ${active ? styles.imgIconActive : ''}`}
       />
     ),
@@ -18,7 +46,6 @@ const TABS = [
     label: 'Closet',
     route: '/closet',
     icon:  ({ active }: { active: boolean }) => (
-      /* Hanger icon */
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
         strokeWidth={active ? 2 : 1.5} strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 5a2 2 0 1 1 0-4 2 2 0 0 1 0 4z" fill={active ? 'currentColor' : 'none'}/>
@@ -33,7 +60,6 @@ const TABS = [
     label: 'Style',
     route: '/account/preferences',
     icon:  ({ active }: { active: boolean }) => (
-      /* Sparkles / magic wand — fits "style suggestions" */
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
         strokeWidth={active ? 2 : 1.5} strokeLinecap="round" strokeLinejoin="round">
         <path d="M15 4l1.5 3L20 8.5 16.5 10 15 13l-1.5-3L10 8.5 13.5 7z"
@@ -50,7 +76,6 @@ const TABS = [
     label: 'Account',
     route: '/account',
     icon:  ({ active }: { active: boolean }) => (
-      /* Gear icon */
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
         strokeWidth={active ? 2 : 1.5} strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="3" fill={active ? 'currentColor' : 'none'}/>
@@ -62,12 +87,23 @@ const TABS = [
 
 const isActive = (route: string, pathname: string): boolean => {
   if (route === '/') return pathname === '/';
+  // Preferences must be exact — otherwise /account would also match
+  if (route === '/account') return pathname === '/account';
   return pathname === route || pathname.startsWith(route + '/');
 };
 
 const BottomNav = () => {
-  const navigate  = useNavigate();
-  const { pathname } = useLocation();
+  const navigate       = useNavigate();
+  const { pathname }   = useLocation();
+
+  // Update --footer-bg on every route change
+  useEffect(() => {
+    const color = footerColorForPath(pathname);
+    if (color !== null) {
+      document.documentElement.style.setProperty('--footer-bg', color);
+    }
+    // null → leave WeatherHUD's value in place (home page)
+  }, [pathname]);
 
   return (
     <nav className={styles.nav} role="navigation" aria-label="Main navigation">
