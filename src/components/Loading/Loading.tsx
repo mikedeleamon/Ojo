@@ -1,11 +1,17 @@
 import Sunny from '../../assets/images/weatherIcons/Sunny.png';
+import { View, Text, Image } from '../../components/primitives';
 import styles from './Loading.module.css';
 
 const Loading = () => (
-  <div className={styles.root}>
-    <img src={Sunny} alt='Loading' className={styles.spin} />
-    <p className={styles.label}>Loading</p>
-  </div>
+  <View style={styles.root}>
+    <Image
+      source={{ uri: Sunny }}
+      style={styles.spin}
+      resizeMode="contain"
+      accessibilityLabel="Loading"
+    />
+    <Text style={styles.label}>Loading</Text>
+  </View>
 );
 
 export default Loading;

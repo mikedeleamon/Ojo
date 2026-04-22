@@ -74,3 +74,8 @@
   max-width: 520px;
   animation: fadeUp 0.2s ease both;
 }
+
+/* Space for fixed bottom nav on mobile */
+@media (max-width: 600px) {
+  .content { padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
+}

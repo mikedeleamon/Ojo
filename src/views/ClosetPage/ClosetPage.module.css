@@ -165,3 +165,8 @@
   from { opacity: 0; transform: translateY(24px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+/* Space for fixed bottom nav on mobile */
+@media (max-width: 600px) {
+  .root { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
+}

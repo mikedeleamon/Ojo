@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { BrowserRouter as Router } from 'react-router-dom';
 import AppRoutes from './routes/AppRoutes';
+import BottomNav from './components/BottomNav/BottomNav';
 import { useSettings, clearSettingsCache } from './hooks/useSettings';
 import { AUTH_KEY, clearAuth } from './lib/auth';
 import { storage } from './lib/storage';
@@ -43,6 +44,7 @@ const App = () => {
         needsOnboarding={needsOnboarding}
         setNeedsOnboarding={setNeedsOnboarding}
       />
+      {loggedIn && <BottomNav />}
     </Router>
   );
 };
