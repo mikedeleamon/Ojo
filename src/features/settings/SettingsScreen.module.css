@@ -294,3 +294,8 @@
   color: #0D1B2A;
 }
 .dialogConfirm:hover { opacity: 0.85; }
+
+/* Space for fixed bottom nav on mobile */
+@media (max-width: 600px) {
+  .list { padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
+}

@@ -27,6 +27,37 @@ const BG_MAP: Record<string, string> = {
     flurr: 'var(--bg-snow)',
 };
 
+/**
+ * Solid colours for the footer — derived from each gradient's darkest end stop,
+ * shifted darker for day conditions (light backgrounds need more contrast) and
+ * slightly lighter for night/dark conditions (so the footer reads against the bg).
+ */
+const FOOTER_BG_MAP: Record<string, string> = {
+    sunny:         'rgba(180, 83,  9,  0.97)',  // amber-800 — darker than gradient start
+    'clear-day':   'rgba(2,   78, 142, 0.97)',  // sky-900
+    'clear-night': 'rgba(12,  20,  40, 0.97)',  // slightly lighter than #020617
+    'partly':      'rgba(22,  34,  54, 0.97)',  // slate-900
+    cloudy:        'rgba(16,  24,  39, 0.97)',  // gray-900
+    rainy:         'rgba(6,   18,  36, 0.97)',  // dark navy
+    stormy:        'rgba(10,   8,  28, 0.97)',  // deep indigo-black
+    snow:          'rgba(50,  90, 130, 0.97)',  // muted steel blue
+    default:       'rgba(10,  16,  32, 0.97)',  // dark fallback
+};
+
+const footerBgForCondition = (condition: string, isDay: boolean): string => {
+    const c = condition.toLowerCase();
+    if (!isDay && (c.includes('clear') || c.includes('mostly clear')))
+        return FOOTER_BG_MAP['clear-night'];
+    if (c.includes('sunny') || c.includes('mostly sunny')) return FOOTER_BG_MAP['sunny'];
+    if (c.includes('clear'))   return isDay ? FOOTER_BG_MAP['clear-day'] : FOOTER_BG_MAP['clear-night'];
+    if (c.includes('partly') || c.includes('intermittent')) return FOOTER_BG_MAP['partly'];
+    if (c.includes('cloud') || c.includes('overcast'))      return FOOTER_BG_MAP['cloudy'];
+    if (c.includes('rain') || c.includes('shower'))         return FOOTER_BG_MAP['rainy'];
+    if (c.includes('thunder') || c.includes('storm'))       return FOOTER_BG_MAP['stormy'];
+    if (c.includes('snow') || c.includes('flurr'))          return FOOTER_BG_MAP['snow'];
+    return isDay ? FOOTER_BG_MAP['clear-day'] : FOOTER_BG_MAP['default'];
+};
+
 const bgForCondition = (condition: string, isDay: boolean): string => {
     const c = condition.toLowerCase();
     if (!isDay && (c.includes('clear') || c.includes('mostly clear')))
@@ -150,6 +181,8 @@ const WeatherHUD = ({ location, settings }: Props) => {
         );
 
     const bg = bgForCondition(weather.WeatherText, weather.IsDayTime);
+    const footerBg = footerBgForCondition(weather.WeatherText, weather.IsDayTime);
+    document.documentElement.style.setProperty('--footer-bg', footerBg);
 
     return (
         <div
