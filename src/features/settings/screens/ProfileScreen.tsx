@@ -99,7 +99,7 @@ const ProfileScreen = ({ embedded, onLogout }: Props) => {
       {deleteStep === 'confirm' && createPortal(
         <View style={styles.modalOverlay}>
           <Pressable
-            style={styles.modalOverlay}
+            style={styles.modalBackdrop}
             onPress={() => { if (!deleteLoading) setDeleteStep('idle'); }}
           />
           <View style={styles.modalCard}>

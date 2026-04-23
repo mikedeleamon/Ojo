@@ -470,11 +470,36 @@ const danger = {
 };
 
 // ─── Delete confirmation modal ────────────────────────────────────────────────
-// RN migration: replace <div className={modalOverlay}> with React Native <Modal>
-// component. The overlay/backdrop is built into <Modal>.
+// RN migration:
+//   modalOverlay  → wrap with <Modal transparent animationType="fade">
+//   modalBackdrop → <Pressable style={[styles.modalBackdrop, StyleSheet.absoluteFillObject]}>
+//   modalCard     → unchanged — position relative + zIndex works identically in RN
 
 const modal = {
+  // Outer container: position fixed, flex-centers the card
+  modalOverlay: {
+    position:       'fixed'   as const,
+    inset:          0,
+    zIndex:         200,
+    alignItems:     'center'  as const,
+    justifyContent: 'center'  as const,
+    padding:        24,
+  },
+
+  // Backdrop: fills the overlay behind the card
+  // RN: use StyleSheet.absoluteFillObject + backgroundColor
+  modalBackdrop: {
+    position:        'absolute' as const,
+    inset:           0,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    // Web-only: backdrop-filter set in CSS module
+  },
+
+  // Card: sits above the backdrop via position relative + zIndex
+  // RN: position relative + zIndex works identically
   modalCard: {
+    position:        'relative' as const,
+    zIndex:          1,
     width:           '100%'   as const,
     maxWidth:        360,
     backgroundColor: colors.glassBgStrong,
