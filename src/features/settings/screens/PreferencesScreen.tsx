@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 import { useAppNavigation } from '../../../hooks/useAppNavigation';
 import { useSettings } from '../../../hooks/useSettings';
@@ -21,7 +21,7 @@ interface Props {
 
 const PreferencesScreen = ({ embedded }: Props) => {
     const nav = useAppNavigation();
-    const { settings, saveSettings } = useSettings();
+    const { settings, saveSettings, settingsReady } = useSettings();
 
     const [clothingStyle, setClothingStyle] = useState(settings.clothingStyle);
     const [location, setLocation] = useState(settings.location);
@@ -31,6 +31,19 @@ const PreferencesScreen = ({ embedded }: Props) => {
     const [hiTemp, setHiTemp] = useState(settings.hiTempThreshold);
     const [lowTemp, setLowTemp] = useState(settings.lowTempThreshold);
     const [humidity, setHumidity] = useState(settings.humidityPreference);
+
+    // Sync local state once settings have loaded from cache / server.
+    // useState only captures the initial value on first render — without this,
+    // fields stay on defaults if settings aren't ready when the screen mounts.
+    useEffect(() => {
+        if (!settingsReady) return;
+        setClothingStyle(settings.clothingStyle);
+        setLocation(settings.location);
+        setTempScale(settings.temperatureScale as 'Imperial' | 'Metric');
+        setHiTemp(settings.hiTempThreshold);
+        setLowTemp(settings.lowTempThreshold);
+        setHumidity(settings.humidityPreference);
+    }, [settingsReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const { status, loading, submit } = useFormSubmit(
         'Preferences saved.',
