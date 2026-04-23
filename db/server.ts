@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import rateLimit from 'express-rate-limit';
 
 import User from '../models/User';
 import Closet from '../models/Closet';
@@ -16,8 +17,15 @@ const app = express();
 
 const API_KEY  = process.env.ACCUWEATHER_API_KEY || '';
 const AW_BASE  = process.env.ACCUWEATHER_BASE_URL || 'https://dataservice.accuweather.com';
-const JWT_SECRET = process.env.JWT_SECRET || 'ojo-dev-secret-change-in-production';
 const MONGO_URI  = process.env.MONGO_URI || '';
+
+// ─── JWT secret — hard-fail at startup if not set in production ───────────────
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET && process.env.NODE_ENV === 'production') {
+  console.error('[Ojo] FATAL: JWT_SECRET env var is required in production.');
+  process.exit(1);
+}
+const JWT_SECRET_RESOLVED = JWT_SECRET || 'ojo-dev-secret-change-in-production';
 
 const originsEnv = process.env.CORS_ORIGINS || 'http://localhost:3000,http://localhost:3001,http://localhost:4000';
 const origins = originsEnv.split(',').map((s) => s.trim()).filter(Boolean);
@@ -44,8 +52,29 @@ const requireAccuKey = (_req: Request, res: Response, next: NextFunction) => {
   if (!API_KEY) return res.status(500).json({ error: 'Server misconfigured: ACCUWEATHER_API_KEY not set' });
   next();
 };
-
 app.use('/api/weather', requireAccuKey);
+
+// ─── Rate limiting ────────────────────────────────────────────────────────────
+// Tight limit on auth endpoints to prevent brute-force attacks
+const authLimiter = rateLimit({
+  windowMs:         15 * 60 * 1000, // 15 minutes
+  max:              20,              // 20 attempts per window per IP
+  standardHeaders:  true,
+  legacyHeaders:    false,
+  message:          { error: 'Too many attempts. Please try again in 15 minutes.' },
+});
+
+// General API limit — prevents scraping and abuse
+const apiLimiter = rateLimit({
+  windowMs:         15 * 60 * 1000,
+  max:              300,
+  standardHeaders:  true,
+  legacyHeaders:    false,
+  message:          { error: 'Too many requests. Please slow down.' },
+});
+
+app.use('/api/auth', authLimiter);
+app.use('/api',      apiLimiter);
 
 // ─── JWT auth middleware ──────────────────────────────────────────────────────
 interface AuthRequest extends Request {
@@ -58,12 +87,21 @@ const requireAuth = (req: AuthRequest, res: Response, next: NextFunction) => {
     return res.status(401).json({ error: 'Missing or invalid Authorization header' });
   }
   try {
-    const payload = jwt.verify(header.slice(7), JWT_SECRET) as { userId: string };
+    const payload = jwt.verify(header.slice(7), JWT_SECRET_RESOLVED) as { userId: string };
     req.userId = payload.userId;
     next();
   } catch {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
+};
+
+// ─── Auth helpers ─────────────────────────────────────────────────────────────
+
+/** Returns age in fractional years from a birthday string or Date. */
+const getAge = (birthday: string | Date): number => {
+  const dob = new Date(birthday);
+  if (isNaN(dob.getTime())) return -1;
+  return (Date.now() - dob.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
 };
 
 // ─── Auth routes ──────────────────────────────────────────────────────────────
@@ -77,6 +115,15 @@ app.post('/api/auth/signup', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'All fields are required' });
     }
 
+    // COPPA — users must be 13 or older
+    const age = getAge(birthday);
+    if (age < 0) {
+      return res.status(400).json({ error: 'Please enter a valid date of birth.' });
+    }
+    if (age < 13) {
+      return res.status(400).json({ error: 'You must be 13 or older to use Ojo.' });
+    }
+
     const existing = await User.findOne({ email });
     if (existing) {
       return res.status(409).json({ error: 'An account with this email already exists' });
@@ -88,7 +135,7 @@ app.post('/api/auth/signup', async (req: Request, res: Response) => {
       password: hashed,
     });
 
-    const token = jwt.sign({ userId: user._id.toString() }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ userId: user._id.toString() }, JWT_SECRET_RESOLVED, { expiresIn: '7d' });
 
     res.status(201).json({
       token,
@@ -114,22 +161,17 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Email/username and password are required.' });
     }
 
-    // Route lookup: email format → search by email, otherwise search by username
     const isEmail = /\S+@\S+\.\S+/.test(identifier.trim());
     const user = isEmail
       ? await User.findOne({ email: identifier.toLowerCase().trim() })
       : await User.findOne({ username: identifier.trim() });
 
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid credentials.' });
-    }
+    if (!user) return res.status(401).json({ error: 'Invalid credentials.' });
 
     const match = await bcrypt.compare(password, user.password);
-    if (!match) {
-      return res.status(401).json({ error: 'Invalid credentials.' });
-    }
+    if (!match) return res.status(401).json({ error: 'Invalid credentials.' });
 
-    const token = jwt.sign({ userId: user._id.toString() }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ userId: user._id.toString() }, JWT_SECRET_RESOLVED, { expiresIn: '7d' });
 
     res.json({
       token,
@@ -164,6 +206,9 @@ app.get('/api/user/me', requireAuth, async (req: AuthRequest, res: Response) => 
 app.put('/api/user/profile', requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { username, email } = req.body;
+    if (!username && !email) {
+      return res.status(400).json({ error: 'Provide at least one field to update' });
+    }
 
     if (email) {
       const conflict = await User.findOne({ email, _id: { $ne: req.userId } });
@@ -184,15 +229,27 @@ app.put('/api/user/profile', requireAuth, async (req: AuthRequest, res: Response
   }
 });
 
-// PUT /api/user/password — set a new password (no old password required)
+// PUT /api/user/password — requires current password verification
 app.put('/api/user/password', requireAuth, async (req: AuthRequest, res: Response) => {
   try {
-    const { newPassword } = req.body;
-    if (!newPassword || newPassword.length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword) {
+      return res.status(400).json({ error: 'Current password is required.' });
     }
-    const hashed = await bcrypt.hash(newPassword, 12);
-    await User.findByIdAndUpdate(req.userId, { $set: { password: hashed } });
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({ error: 'New password must be at least 8 characters.' });
+    }
+
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+
+    const match = await bcrypt.compare(currentPassword, user.password);
+    if (!match) return res.status(401).json({ error: 'Current password is incorrect.' });
+
+    user.password = await bcrypt.hash(newPassword, 12);
+    await user.save();
+
     res.json({ message: 'Password updated.' });
   } catch (err: any) {
     console.error('[Ojo] Password update failed:', err.message);
@@ -230,68 +287,7 @@ app.put('/api/user/settings', requireAuth, async (req: AuthRequest, res: Respons
   }
 });
 
-// ─── User profile routes (JWT protected) ─────────────────────────────────────
-
-// PUT /api/user/profile — update username and/or email
-app.put('/api/user/profile', requireAuth, async (req: AuthRequest, res: Response) => {
-  try {
-    const { username, email } = req.body;
-    if (!username && !email) {
-      return res.status(400).json({ error: 'Provide at least one field to update' });
-    }
-
-    // Check email uniqueness if being changed
-    if (email) {
-      const conflict = await User.findOne({ email, _id: { $ne: req.userId } });
-      if (conflict) return res.status(409).json({ error: 'Email is already in use' });
-    }
-
-    const update: Record<string, string> = {};
-    if (username) update.username = username;
-    if (email)    update.email    = email;
-
-    const user = await User.findByIdAndUpdate(
-      req.userId,
-      { $set: update },
-      { new: true, runValidators: true }
-    ).select('firstName lastName email username');
-
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json({ id: user._id, firstName: user.firstName, lastName: user.lastName, email: user.email, username: user.username });
-  } catch (err: any) {
-    console.error('[Ojo] Profile update failed:', err.message);
-    res.status(500).json({ error: 'Profile update failed', detail: err.message });
-  }
-});
-
-// PUT /api/user/password — set a new password (old password not required)
-app.put('/api/user/password', requireAuth, async (req: AuthRequest, res: Response) => {
-  try {
-    const { newPassword } = req.body;
-    if (!newPassword || newPassword.length < 8) {
-      return res.status(400).json({ error: 'New password must be at least 8 characters' });
-    }
-    const hashed = await bcrypt.hash(newPassword, 12);
-    await User.findByIdAndUpdate(req.userId, { $set: { password: hashed } });
-    res.json({ message: 'Password updated successfully' });
-  } catch (err: any) {
-    console.error('[Ojo] Password update failed:', err.message);
-    res.status(500).json({ error: 'Password update failed', detail: err.message });
-  }
-});
-
-// GET /api/user/me — current user info
-app.get('/api/user/me', requireAuth, async (req: AuthRequest, res: Response) => {
-  try {
-    const user = await User.findById(req.userId).select('firstName lastName email username');
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json({ id: user._id, firstName: user.firstName, lastName: user.lastName, email: user.email, username: user.username });
-  } catch (err: any) {
-    res.status(500).json({ error: 'Failed to load user', detail: err.message });
-  }
-});
-
-// DELETE /api/user/me — permanently delete the authenticated user and all their closets
+// DELETE /api/user/me — permanently delete account and all closets
 app.delete('/api/user/me', requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     await Closet.deleteMany({ userId: req.userId });
@@ -301,6 +297,44 @@ app.delete('/api/user/me', requireAuth, async (req: AuthRequest, res: Response) 
   } catch (err: any) {
     console.error('[Ojo] Account deletion failed:', err.message);
     res.status(500).json({ error: 'Could not delete account.', detail: err.message });
+  }
+});
+
+// GET /api/user/export — GDPR data export
+app.get('/api/user/export', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const user    = await User.findById(req.userId).select('-password');
+    const closets = await Closet.find({ userId: req.userId });
+
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+
+    const exportData = {
+      exportedAt: new Date().toISOString(),
+      account: {
+        id:        user._id,
+        firstName: user.firstName,
+        lastName:  user.lastName,
+        email:     user.email,
+        username:  user.username,
+        birthday:  user.birthday,
+        createdAt: (user as any).createdAt,
+      },
+      settings: user.settings,
+      closets:  closets.map(c => ({
+        id:          c._id,
+        name:        c.name,
+        isPreferred: c.isPreferred,
+        articles:    c.articles,
+        createdAt:   (c as any).createdAt,
+      })),
+    };
+
+    res.setHeader('Content-Disposition', 'attachment; filename="ojo-data-export.json"');
+    res.setHeader('Content-Type', 'application/json');
+    res.json(exportData);
+  } catch (err: any) {
+    console.error('[Ojo] Data export failed:', err.message);
+    res.status(500).json({ error: 'Data export failed.', detail: err.message });
   }
 });
 
@@ -363,17 +397,17 @@ app.get('/health', async (_req: Request, res: Response) => {
         params: { apikey: API_KEY, q: '40.7128,-74.0060' },
         timeout: 4000,
       });
-      status.accuweather.ok = true;
+      status.accuweather.ok     = true;
       status.accuweather.sample = { key: r.data?.Key ?? null };
     } catch (e: any) {
-      status.accuweather.ok = false;
+      status.accuweather.ok    = false;
       status.accuweather.error = e.message;
     }
   }
 
   status.mongodb = {
     configured: !!MONGO_URI,
-    state: mongoose.connection.readyState, // 0 disconnected, 1 connected
+    state: mongoose.connection.readyState,
   };
 
   res.json(status);
@@ -381,7 +415,6 @@ app.get('/health', async (_req: Request, res: Response) => {
 
 // ─── Closet routes (JWT protected) ───────────────────────────────────────────
 
-// POST /api/closets — create a new closet
 app.post('/api/closets', requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { name } = req.body;
@@ -393,7 +426,6 @@ app.post('/api/closets', requireAuth, async (req: AuthRequest, res: Response) =>
   }
 });
 
-// GET /api/closets — get all closets for the authenticated user
 app.get('/api/closets', requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const closets = await Closet.find({ userId: req.userId }).sort({ createdAt: -1 });
@@ -403,7 +435,6 @@ app.get('/api/closets', requireAuth, async (req: AuthRequest, res: Response) => 
   }
 });
 
-// PUT /api/closets/:id — rename a closet
 app.put('/api/closets/:id', requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { name } = req.body;
@@ -420,7 +451,6 @@ app.put('/api/closets/:id', requireAuth, async (req: AuthRequest, res: Response)
   }
 });
 
-// PUT /api/closets/:id/preferred — set as preferred, unset all others for this user
 app.put('/api/closets/:id/preferred', requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     await Closet.updateMany({ userId: req.userId }, { $set: { isPreferred: false } });
@@ -436,7 +466,6 @@ app.put('/api/closets/:id/preferred', requireAuth, async (req: AuthRequest, res:
   }
 });
 
-// DELETE /api/closets/:id — delete a closet
 app.delete('/api/closets/:id', requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const closet = await Closet.findOneAndDelete({ _id: req.params.id, userId: req.userId });
@@ -447,7 +476,6 @@ app.delete('/api/closets/:id', requireAuth, async (req: AuthRequest, res: Respon
   }
 });
 
-// POST /api/closets/:id/articles — add an article to a closet
 app.post('/api/closets/:id/articles', requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const closet = await Closet.findOne({ _id: req.params.id, userId: req.userId });
@@ -464,7 +492,6 @@ app.post('/api/closets/:id/articles', requireAuth, async (req: AuthRequest, res:
   }
 });
 
-// DELETE /api/closets/:closetId/articles/:articleId — remove an article
 app.delete('/api/closets/:closetId/articles/:articleId', requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const closet = await Closet.findOne({ _id: req.params.closetId, userId: req.userId });
@@ -483,31 +510,28 @@ app.delete('/api/closets/:closetId/articles/:articleId', requireAuth, async (req
   }
 });
 
-// PUT /api/closets/:closetId/articles/:articleId — update an existing article
 app.put('/api/closets/:closetId/articles/:articleId', requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const closet = await Closet.findOne({ _id: req.params.closetId, userId: req.userId });
     if (!closet) return res.status(404).json({ error: 'Closet not found.' });
 
-    const article = closet.articles.find(
-      (a) => a._id?.toString() === req.params.articleId
-    );
+    const article = closet.articles.find((a) => a._id?.toString() === req.params.articleId);
     if (!article) return res.status(404).json({ error: 'Article not found.' });
 
     const { clothingType, name, topOrBottom, clothingCategory, fabricType, color,
             isAccessory, isWristWear, isAnkleWear, merchant, imageUrl } = req.body;
 
-    if (clothingType !== undefined) (article as any).clothingType     = clothingType;
-    if (name        !== undefined) (article as any).name              = name;
-    if (topOrBottom !== undefined) (article as any).topOrBottom       = topOrBottom;
+    if (clothingType  !== undefined) (article as any).clothingType      = clothingType;
+    if (name          !== undefined) (article as any).name               = name;
+    if (topOrBottom   !== undefined) (article as any).topOrBottom        = topOrBottom;
     if (clothingCategory !== undefined) (article as any).clothingCategory = clothingCategory;
-    if (fabricType  !== undefined) (article as any).fabricType        = fabricType;
-    if (color       !== undefined) (article as any).color             = color;
-    if (isAccessory !== undefined) (article as any).isAccessory       = isAccessory;
-    if (isWristWear !== undefined) (article as any).isWristWear       = isWristWear;
-    if (isAnkleWear !== undefined) (article as any).isAnkleWear       = isAnkleWear;
-    if (merchant    !== undefined) (article as any).merchant          = merchant;
-    if (imageUrl    !== undefined) (article as any).imageUrl          = imageUrl;
+    if (fabricType    !== undefined) (article as any).fabricType         = fabricType;
+    if (color         !== undefined) (article as any).color              = color;
+    if (isAccessory   !== undefined) (article as any).isAccessory        = isAccessory;
+    if (isWristWear   !== undefined) (article as any).isWristWear        = isWristWear;
+    if (isAnkleWear   !== undefined) (article as any).isAnkleWear        = isAnkleWear;
+    if (merchant      !== undefined) (article as any).merchant           = merchant;
+    if (imageUrl      !== undefined) (article as any).imageUrl           = imageUrl;
 
     await closet.save();
     res.json(closet);

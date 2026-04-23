@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+
+import { useAppNavigation } from '../../../hooks/useAppNavigation';
+import axios from '../../../api/client';
 import ScreenShell from '../components/ScreenShell';
 import { View, Text, TextInput, Pressable } from '../../../components/primitives';
 import { auth, getToken, getErrorMessage, updateAuthUser, clearAuth } from '../../../lib/auth';
@@ -16,7 +17,7 @@ interface Props {
 }
 
 const ProfileScreen = ({ embedded, onLogout }: Props) => {
-  const navigate = useNavigate();
+  const nav = useAppNavigation();
   const [username, setUsername] = useState('');
   const [email,    setEmail]    = useState('');
   const { status, loading, submit } = useFormSubmit('Profile updated.');
@@ -45,7 +46,7 @@ const ProfileScreen = ({ embedded, onLogout }: Props) => {
       await clearAuth();
       await storage.clear();
       onLogout?.();
-      navigate('/login');
+      nav.push('/login');
     } catch (err: unknown) {
       setDeleteError(getErrorMessage(err, 'Could not delete account. Please try again.'));
       setDeleteLoading(false);

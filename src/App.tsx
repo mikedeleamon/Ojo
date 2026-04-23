@@ -5,6 +5,15 @@ import BottomNav from './components/BottomNav/BottomNav';
 import { useSettings, clearSettingsCache } from './hooks/useSettings';
 import { AUTH_KEY, clearAuth } from './lib/auth';
 import { storage } from './lib/storage';
+import { clearCookiesIfOversized } from './helpers/cookieUtils';
+
+// Clear oversized cookies before any API requests fire — dev only.
+// Accumulated localhost cookies during development are the most common
+// cause of 431 Request Header Fields Too Large errors. In production,
+// withCredentials: false already prevents cookies from being sent cross-origin.
+if (process.env.NODE_ENV === 'development') {
+  clearCookiesIfOversized();
+}
 
 const ONBOARD_KEY = 'ojo_onboarding_done';
 

@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
+import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { useClosets } from '../../hooks/useClosets';
 import ClosetView from '../../components/ClosetView/ClosetView';
 import Loading from '../../components/Loading/Loading';
 import styles from './ClosetPage.module.css';
 
 const ClosetPage = () => {
-  const navigate = useNavigate();
+  const nav = useAppNavigation();
   const { search } = useLocation();
   const openId = new URLSearchParams(search).get('open') ?? undefined;
 
@@ -31,7 +32,7 @@ const ClosetPage = () => {
   return (
     <div className={styles.root}>
       <header className={styles.topBar}>
-        <button className={styles.backBtn} onClick={() => navigate('/')} aria-label="Back">
+        <button className={styles.backBtn} onClick={() => nav.push('/')} aria-label="Back">
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
             <path d="M11 14l-5-5 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>

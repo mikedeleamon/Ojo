@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+
+import { useAppNavigation } from '../../../hooks/useAppNavigation';
 import { useSettings } from '../../../hooks/useSettings';
 import { useFormSubmit } from '../../../hooks/useFormSubmit';
 import { StatusMessage } from '../../../components/shared';
@@ -19,7 +20,7 @@ interface Props {
 }
 
 const PreferencesScreen = ({ embedded }: Props) => {
-    const navigate = useNavigate();
+    const nav = useAppNavigation();
     const { settings, saveSettings } = useSettings();
 
     const [clothingStyle, setClothingStyle] = useState(settings.clothingStyle);

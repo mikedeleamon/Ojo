@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+
+import { useAppNavigation } from '../../hooks/useAppNavigation';
+import axios from '../../api/client';
 import { Settings, OutfitHistoryEntry } from '../../types';
 import { auth, getToken, updateAuthUser, clearAuth } from '../../lib/auth';
 import { storage } from '../../lib/storage';
@@ -322,11 +323,11 @@ const AccountPage = ({ settings, saveSettings, onLogout }: Props) => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteLoading,   setDeleteLoading]   = useState(false);
   const [deleteError,     setDeleteError]     = useState<string | null>(null);
-  const navigate = useNavigate();
+  const nav = useAppNavigation();
 
   const [showLogoutModal,  setShowLogoutModal]  = useState(false);
   const [legalDoc,         setLegalDoc]         = useState<LegalDocument | null>(null);
-  const handleLogout = () => { onLogout(); navigate('/login'); };
+  const handleLogout = () => { onLogout(); nav.push('/login'); };
 
   const handleDeleteAccount = async () => {
     setDeleteLoading(true);
@@ -336,7 +337,7 @@ const AccountPage = ({ settings, saveSettings, onLogout }: Props) => {
       await clearAuth();
       await storage.clear();
       onLogout();
-      navigate('/login');
+      nav.push('/login');
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
         ?? 'Could not delete account. Please try again.';
@@ -412,7 +413,7 @@ const AccountPage = ({ settings, saveSettings, onLogout }: Props) => {
 
       {/* Sidebar */}
       <aside className={styles.sidebar}>
-        <button className={styles.backBtn} onClick={() => navigate('/')} aria-label="Back">
+        <button className={styles.backBtn} onClick={() => nav.push('/')} aria-label="Back">
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
             <path d="M11 14l-5-5 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>

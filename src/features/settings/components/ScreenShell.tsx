@@ -1,4 +1,5 @@
-import { useNavigate } from 'react-router-dom';
+
+import { useAppNavigation } from '../../../hooks/useAppNavigation';
 import { View, Text, Pressable } from '../../../components/primitives';
 import styles from './ScreenShell.module.css';
 
@@ -20,14 +21,14 @@ interface Props {
  *   />
  */
 const ScreenShell = ({ title, children, embedded = false }: Props) => {
-  const navigate = useNavigate();
+  const nav = useAppNavigation();
 
   return (
     <View style={`${styles.root} ${embedded ? styles.embedded : ''}`}>
       {!embedded && (
         <View style={styles.header}>
           <Pressable
-            onPress={() => navigate(-1 as never)}
+            onPress={() => nav.goBack()}
             style={styles.backBtn}
             accessibilityLabel="Back"
           >

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import axios from 'axios';
+import axios from '../api/client';
 import { Settings } from '../types';
 import { getToken, authHeaders, getErrorMessage } from '../lib/auth';
 import { storage, storageGetJSON } from '../lib/storage';
