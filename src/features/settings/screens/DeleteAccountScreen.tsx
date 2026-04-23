@@ -3,7 +3,8 @@ import { useState } from 'react';
 import { useAppNavigation } from '../../../hooks/useAppNavigation';
 import axios from '../../../api/client';
 import ScreenShell from '../components/ScreenShell';
-import { auth, getErrorMessage } from '../../../lib/auth';
+import { auth, getErrorMessage, clearAuth } from '../../../lib/auth';
+import { storage } from '../../../lib/storage';
 import styles from './screens.module.css';
 
 interface Props { onLogout: () => void; }
@@ -19,7 +20,8 @@ const DeleteAccountScreen = ({ onLogout }: Props) => {
     setError(null);
     try {
       await axios.delete('/api/user/me', auth());
-      localStorage.clear();
+      await clearAuth();
+      await storage.clear();
       onLogout();
       nav.push('/login');
     } catch (err: unknown) {
