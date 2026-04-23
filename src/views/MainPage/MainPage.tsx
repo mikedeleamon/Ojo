@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import WeatherHUD from '../../components/WeatherHUD/WeatherHUD';
 import Loading from '../../components/Loading/Loading';
+import ClosetButton from '../../components/buttons/ClosetButton/ClosetButton';
+import AccountButton from '../../components/buttons/AccountButton/AccountButton';
+import SettingsButton from '../../components/buttons/SettingsButton/SettingsButton';
 import { Settings } from '../../types';
 import { getCurrentLocation, formatCoords } from '../../lib/location';
 import styles from './MainPage.module.css';
@@ -28,6 +31,15 @@ const MainPage = ({ settings, settingsReady }: Props) => {
 
   return (
     <div className={styles.root}>
+      {/* Corner nav — desktop/tablet only (>600px). Mobile uses BottomNav. */}
+      <div className={styles.leftNav}>
+        <ClosetButton />
+        <AccountButton />
+      </div>
+      <div className={styles.rightNav}>
+        <SettingsButton />
+      </div>
+
       <WeatherHUD location={location} settings={settings} />
     </div>
   );

@@ -3,7 +3,34 @@
   min-height: 100dvh;
 }
 
-/* Space for the fixed bottom nav on mobile */
+/* ─── Corner nav — tablet and desktop only ───────────────────────────────── */
+/* Hidden on mobile: BottomNav handles navigation there.                      */
+.leftNav,
+.rightNav {
+  display: none;
+}
+
+@media (min-width: 601px) {
+  .leftNav {
+    display: flex;
+    position: fixed;
+    top: var(--spacing-md);
+    left: var(--spacing-md);
+    z-index: 100;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+  }
+
+  .rightNav {
+    display: flex;
+    position: fixed;
+    top: var(--spacing-md);
+    right: var(--spacing-md);
+    z-index: 100;
+  }
+}
+
+/* ─── Mobile bottom padding — clears the fixed BottomNav ─────────────────── */
 @media (max-width: 600px) {
   .root {
     padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));

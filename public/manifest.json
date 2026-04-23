@@ -1,6 +1,7 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "Ojo",
+  "name": "Ojo — Dress for the weather",
+  "description": "A Wardrobe assistant that suggests outfits based on your closet and local weather.",
   "icons": [
     {
       "src": "favicon.ico",
@@ -20,6 +21,6 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "theme_color": "#0F172A",
+  "background_color": "#0F172A"
 }
