@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import axios from 'axios';
+import axios from '../../../api/client';
 import ScreenShell from '../components/ScreenShell';
 import { View, Text, TextInput, Pressable } from '../../../components/primitives';
 import { auth } from '../../../lib/auth';
@@ -10,20 +10,23 @@ import styles from './screens.module.css';
 interface PasswordProps { embedded?: boolean; }
 
 const PasswordScreen = ({ embedded }: PasswordProps) => {
-  const [newPassword, setNewPassword] = useState('');
-  const [confirm,     setConfirm]     = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword,     setNewPassword]     = useState('');
+  const [confirm,         setConfirm]         = useState('');
   const { status, loading, submit, clearStatus } = useFormSubmit('Password updated successfully.');
 
   const validationMsg =
-    newPassword && newPassword.length < 8 ? 'Password must be at least 8 characters.' :
+    newPassword && newPassword.length < 8 ? 'New password must be at least 8 characters.' :
     confirm && newPassword !== confirm     ? 'Passwords do not match.' :
     null;
 
   const save = () => {
     clearStatus();
+    if (!currentPassword) return;
     if (newPassword.length < 8 || newPassword !== confirm) return;
     submit(async () => {
-      await axios.put('/api/user/password', { newPassword }, auth());
+      await axios.put('/api/user/password', { currentPassword, newPassword }, auth());
+      setCurrentPassword('');
       setNewPassword('');
       setConfirm('');
     });
@@ -35,6 +38,17 @@ const PasswordScreen = ({ embedded }: PasswordProps) => {
         ? <Text style={`${styles.statusMsg} ${styles.error}`}>{validationMsg}</Text>
         : <StatusMessage status={status} styles={styles} />
       }
+
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Current password</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="••••••••"
+          secureTextEntry
+          value={currentPassword}
+          onChangeText={setCurrentPassword}
+        />
+      </View>
 
       <View style={styles.formGroup}>
         <Text style={styles.label}>New password</Text>
@@ -58,7 +72,7 @@ const PasswordScreen = ({ embedded }: PasswordProps) => {
         />
       </View>
 
-      <Pressable style={styles.saveBtn} onPress={save} disabled={loading}>
+      <Pressable style={styles.saveBtn} onPress={save} disabled={loading || !currentPassword}>
         <Text>{loading ? 'Updating…' : 'Update password'}</Text>
       </Pressable>
     </ScreenShell>

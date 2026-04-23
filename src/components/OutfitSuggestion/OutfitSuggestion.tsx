@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+
+import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { ClothingArticle, CurrentWeather, Settings } from '../../types';
 import { useClosets } from '../../hooks/useClosets';
 import { generateOutfits, OutfitRole, OutfitResult, ScoreBreakdown } from '../../lib/outfitEngine';
@@ -112,7 +113,7 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
   const [activeIdx,     setActiveIdx]     = useState(0);
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [wornLogged,    setWornLogged]    = useState(false);
-  const navigate = useNavigate();
+  const nav = useAppNavigation();
 
   const setPreferredCloset = async (id: string) => {
     setSettingPref(true);
@@ -145,7 +146,7 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
     setTimeout(() => setWornLogged(false), 3000);
   };
 
-  const goToCloset = () => navigate(preferred ? `/closet?open=${preferred._id}` : '/closet');
+  const goToCloset = () => nav.push(preferred ? `/closet?open=${preferred._id}` : '/closet');
 
   if (loading) return <div className={styles.root}><div className={styles.skeleton} /></div>;
 
@@ -153,7 +154,7 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
     <div className={styles.root}>
       <Prompt icon={<HangerIcon />} title="No closet yet"
         body="Create a closet and add your clothes to get outfit suggestions."
-        action={<button className={styles.ctaBtn} onClick={() => navigate('/closet')}>Create closet</button>} />
+        action={<button className={styles.ctaBtn} onClick={() => nav.push('/closet')}>Create closet</button>} />
     </div>
   );
 
@@ -301,11 +302,11 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
 // ─── Shared sub-component ─────────────────────────────────────────────────────
 
 const PreferredBadge = ({ name, closetId }: { name: string; closetId: string }) => {
-  const navigate = useNavigate();
+  const nav = useAppNavigation();
   return (
     <button
       className={styles.preferredBadge}
-      onClick={() => navigate(`/closet?open=${closetId}`)}
+      onClick={() => nav.push(`/closet?open=${closetId}`)}
       title="Open this closet"
     >
       <svg width="11" height="11" viewBox="0 0 24 24" fill="none">

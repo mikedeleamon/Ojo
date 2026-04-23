@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+
+import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { useSettings } from '../../hooks/useSettings';
 import { SETTINGS_CONFIG, SettingsAction, SettingsSectionConfig } from './config';
 import SettingsSection from './components/SettingsSection';
@@ -49,7 +50,7 @@ const getSublabel = (key: SettingsSectionConfig['items'][0]['sublabelKey'], sett
 };
 
 const SettingsScreen = ({ onLogout }: Props) => {
-  const navigate                        = useNavigate();
+  const nav = useAppNavigation();
   const { settings }                    = useSettings();
   const [activeScreen, setActiveScreen] = useState<ScreenKey>(DEFAULT_SCREEN);
   const [legalDoc, setLegalDoc]         = useState<'privacy' | 'terms' | null>(null);
@@ -71,21 +72,21 @@ const SettingsScreen = ({ onLogout }: Props) => {
     if (action.type === 'legal') { setLegalDoc(action.doc); return; }
     if (action.type === 'external') { window.open(action.url, '_blank', 'noopener,noreferrer'); return; }
     if (action.type === 'navigate') {
-      if (action.to === 'closet') { navigate('/closet'); return; }
+      if (action.to === 'closet') { nav.push('/closet'); return; }
       if (isDesktop) {
         setActiveScreen(action.to as ScreenKey);
       } else {
-        navigate(`/account/${action.to}`);
+        nav.push(`/account/${action.to}`);
       }
     }
   };
 
-  const handleLogoutConfirm = () => { onLogout(); navigate('/login'); };
+  const handleLogoutConfirm = () => { onLogout(); nav.push('/login'); };
 
   // ── Sidebar shared across layouts ─────────────────────────────────────────
   const Sidebar = () => (
     <aside className={styles.sidebar}>
-      <button className={styles.backBtn} onClick={() => navigate('/')} aria-label="Back to home">
+      <button className={styles.backBtn} onClick={() => nav.push('/')} aria-label="Back to home">
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
           <path d="M11 14l-5-5 5-5" stroke="currentColor" strokeWidth="1.5"
             strokeLinecap="round" strokeLinejoin="round"/>
@@ -149,7 +150,7 @@ const SettingsScreen = ({ onLogout }: Props) => {
       {/* ── Mobile: back button header + flat list ────────────────────── */}
       <div className={styles.mobileLayout}>
         <header className={styles.mobileHeader}>
-          <button className={styles.backBtn} onClick={() => navigate('/')} aria-label="Back">
+          <button className={styles.backBtn} onClick={() => nav.push('/')} aria-label="Back">
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
               <path d="M11 14l-5-5 5-5" stroke="currentColor" strokeWidth="1.5"
                 strokeLinecap="round" strokeLinejoin="round"/>

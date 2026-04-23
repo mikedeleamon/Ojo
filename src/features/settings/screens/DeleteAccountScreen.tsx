@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+
+import { useAppNavigation } from '../../../hooks/useAppNavigation';
+import axios from '../../../api/client';
 import ScreenShell from '../components/ScreenShell';
 import { auth, getErrorMessage } from '../../../lib/auth';
 import styles from './screens.module.css';
@@ -8,7 +9,7 @@ import styles from './screens.module.css';
 interface Props { onLogout: () => void; }
 
 const DeleteAccountScreen = ({ onLogout }: Props) => {
-  const navigate = useNavigate();
+  const nav = useAppNavigation();
   const [confirmed, setConfirmed] = useState(false);
   const [loading,   setLoading]   = useState(false);
   const [error,     setError]     = useState<string | null>(null);
@@ -20,7 +21,7 @@ const DeleteAccountScreen = ({ onLogout }: Props) => {
       await axios.delete('/api/user/me', auth());
       localStorage.clear();
       onLogout();
-      navigate('/login');
+      nav.push('/login');
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Could not delete account. Please try again.'));
       setLoading(false);

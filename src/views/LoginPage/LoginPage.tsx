@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
+import { Link } from 'react-router-dom';
+import { useAppNavigation } from '../../hooks/useAppNavigation';
+import axios from '../../api/client';
 import OjoLogo from '../../assets/images/logos/Ojo word logo 2.png';
 import { AuthState, Settings } from '../../types';
 import { getErrorMessage, saveAuth } from '../../lib/auth';
@@ -14,7 +15,7 @@ const LoginPage = ({ setLoggedIn }: Props) => {
   const [password,   setPassword]   = useState('');
   const [error,      setError]      = useState<string | null>(null);
   const [loading,    setLoading]    = useState(false);
-  const navigate = useNavigate();
+  const nav = useAppNavigation();
 
   const handleSubmit = async () => {
     setError(null);
@@ -30,7 +31,7 @@ const LoginPage = ({ setLoggedIn }: Props) => {
       );
       await saveAuth(data.token, data.user);
       setLoggedIn(true);
-      navigate('/');
+      nav.push('/');
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Login failed. Please try again.'));
     } finally {
@@ -76,7 +77,7 @@ const LoginPage = ({ setLoggedIn }: Props) => {
           <Text>{loading ? 'Signing in…' : 'Sign in'}</Text>
         </Pressable>
 
-        {/* Link uses React Router — RN migration: replace with navigation.navigate('Signup') */}
+        {/* Link uses React Router — RN migration: replace with navigation.nav.push('Signup') */}
         <Text style={styles.footer}>
           Don't have an account?{' '}
           <Link to="/signup" className={styles.link}>Sign up</Link>

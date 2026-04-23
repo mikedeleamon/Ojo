@@ -1,6 +1,7 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { ClothingArticle } from '../../types';
 import { getErrorMessage } from '../../lib/auth';
+import { pickImage } from '../../lib/imageService';
 import styles from './ArticleModal.module.css';
 
 const CLOTHING_TYPES = ['Shirt', 'T-Shirt', 'Blouse', 'Sweater', 'Hoodie', 'Jacket', 'Coat',
@@ -60,7 +61,6 @@ const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
   const [preview, setPreview] = useState<string>(initialData?.imageUrl ?? '');
   const [error,   setError]   = useState<string | null>(null);
   const [saving,  setSaving]  = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   const set = (key: keyof ArticleFormData) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -68,16 +68,12 @@ const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
     ? (e.target as HTMLInputElement).checked
     : e.target.value }));
 
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const url = reader.result as string;
-      setPreview(url);
-      setForm(f => ({ ...f, imageUrl: url }));
-    };
-    reader.readAsDataURL(file);
+  const handlePickImage = async () => {
+    const result = await pickImage();
+    if (result.error) { setError(result.error); return; }
+    if (!result.uri)  return; // cancelled
+    setPreview(result.uri);
+    setForm(f => ({ ...f, imageUrl: result.uri! }));
   };
 
   const handleSubmit = async () => {
@@ -144,10 +140,9 @@ const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
               />
             ) : (
               <>
-                <button className={styles.uploadBtn} onClick={() => fileRef.current?.click()}>
+                <button className={styles.uploadBtn} onClick={handlePickImage}>
                   Choose file
                 </button>
-                <input ref={fileRef} type="file" accept="image/*" className={styles.hidden} onChange={handleFile} />
               </>
             )}
           </div>

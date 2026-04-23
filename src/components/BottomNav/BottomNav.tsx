@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
+import { useAppNavigation } from '../../hooks/useAppNavigation';
 import SunnyPng from '../../assets/images/weatherIcons/Sunny.png';
 import styles from './BottomNav.module.css';
 
@@ -93,7 +94,7 @@ const isActive = (route: string, pathname: string): boolean => {
 };
 
 const BottomNav = () => {
-  const navigate       = useNavigate();
+  const nav = useAppNavigation();
   const { pathname }   = useLocation();
 
   // Update --footer-bg on every route change
@@ -113,7 +114,7 @@ const BottomNav = () => {
           <button
             key={tab.key}
             className={`${styles.tab} ${active ? styles.tabActive : ''}`}
-            onClick={() => navigate(tab.route)}
+            onClick={() => nav.push(tab.route)}
             aria-label={tab.label}
             aria-current={active ? 'page' : undefined}
           >

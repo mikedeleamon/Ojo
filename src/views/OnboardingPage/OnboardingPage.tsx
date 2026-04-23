@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+
+import { useAppNavigation } from '../../hooks/useAppNavigation';
+import axios from '../../api/client';
 import OjoLogo from '../../assets/images/logos/Ojo word logo 2.png';
 import { Settings } from '../../types';
 import { auth } from '../../lib/auth';
@@ -40,7 +41,7 @@ const StepShell = ({ step, children }: { step: number; children: React.ReactNode
 );
 
 const OnboardingPage = ({ settings, saveSettings, setNeedsOnboarding }: Props) => {
-  const navigate = useNavigate();
+  const nav = useAppNavigation();
   const [step,        setStep]        = useState(1);
   const [direction,   setDirection]   = useState<'forward' | 'back'>('forward');
   const [animating,   setAnimating]   = useState(false);
@@ -112,11 +113,11 @@ const OnboardingPage = ({ settings, saveSettings, setNeedsOnboarding }: Props) =
     if (step === 4) {
       const t = setTimeout(() => {
         setNeedsOnboarding(false);
-        navigate('/');
+        nav.push('/');
       }, 1800);
       return () => clearTimeout(t);
     }
-  }, [step, navigate, setNeedsOnboarding]);
+  }, [step, nav, setNeedsOnboarding]);
 
   const slideClass = animating
     ? direction === 'forward' ? styles.slideOutLeft : styles.slideOutRight
@@ -171,7 +172,7 @@ const OnboardingPage = ({ settings, saveSettings, setNeedsOnboarding }: Props) =
                 <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
-            <p className={styles.skipLink} onClick={() => { storage.setItem(ONBOARD_KEY, 'true'); setNeedsOnboarding(false); navigate('/'); }}>
+            <p className={styles.skipLink} onClick={() => { storage.setItem(ONBOARD_KEY, 'true'); setNeedsOnboarding(false); nav.push('/'); }}>
               Skip setup
             </p>
           </StepShell>

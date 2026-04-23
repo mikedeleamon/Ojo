@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
+import { Link } from 'react-router-dom';
+import { useAppNavigation } from '../../hooks/useAppNavigation';
+import axios from '../../api/client';
 import OjoLogo from '../../assets/images/logos/Ojo word logo 2.png';
 import { formatDate } from '../../helpers/formatTools.js';
 import { AUTH_KEY, getErrorMessage, saveAuth } from '../../lib/auth';
@@ -25,7 +26,7 @@ const SignupPage = ({ setLoggedIn, setNeedsOnboarding }: Props) => {
   });
   const [error,   setError]   = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
+  const nav = useAppNavigation();
 
   const set = (key: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(f => ({ ...f, [key]: e.target.value }));
@@ -47,7 +48,7 @@ const SignupPage = ({ setLoggedIn, setNeedsOnboarding }: Props) => {
       await saveAuth(data.token, data.user);
       setNeedsOnboarding(true);
       setLoggedIn(true);
-      navigate('/onboarding');
+      nav.push('/onboarding');
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Sign up failed. Please try again.'));
     } finally {

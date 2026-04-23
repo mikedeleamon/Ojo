@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import axios from '../api/client';
 import { Closet } from '../types';
 import { auth, getToken } from '../lib/auth';
 import { ArticleFormData } from '../components/ArticleModal/ArticleModal';
