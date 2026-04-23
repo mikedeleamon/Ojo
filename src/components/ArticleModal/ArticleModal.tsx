@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { ClothingArticle } from '../../types';
 import { getErrorMessage } from '../../lib/auth';
-import { pickImage } from '../../lib/imageService';
 import styles from './ArticleModal.module.css';
 
 const CLOTHING_TYPES = ['Shirt', 'T-Shirt', 'Blouse', 'Sweater', 'Hoodie', 'Jacket', 'Coat',
@@ -57,7 +56,6 @@ const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
   const isEditing = !!initialData;
 
   const [form,    setForm]    = useState<ArticleFormData>(initialData ? articleToForm(initialData) : empty);
-  const [imgMode, setImgMode] = useState<'url' | 'file'>('url');
   const [preview, setPreview] = useState<string>(initialData?.imageUrl ?? '');
   const [error,   setError]   = useState<string | null>(null);
   const [saving,  setSaving]  = useState(false);
@@ -67,14 +65,6 @@ const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
   ) => setForm(f => ({ ...f, [key]: e.target.type === 'checkbox'
     ? (e.target as HTMLInputElement).checked
     : e.target.value }));
-
-  const handlePickImage = async () => {
-    const result = await pickImage();
-    if (result.error) { setError(result.error); return; }
-    if (!result.uri)  return; // cancelled
-    setPreview(result.uri);
-    setForm(f => ({ ...f, imageUrl: result.uri! }));
-  };
 
   const handleSubmit = async () => {
     setError(null);
@@ -126,11 +116,6 @@ const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
             )}
 
             <div className={styles.imgToggle}>
-              <button className={`${styles.imgTab} ${imgMode === 'url'  ? styles.imgTabActive : ''}`} onClick={() => setImgMode('url')}>URL</button>
-              <button className={`${styles.imgTab} ${imgMode === 'file' ? styles.imgTabActive : ''}`} onClick={() => setImgMode('file')}>Upload</button>
-            </div>
-
-            {imgMode === 'url' ? (
               <input
                 className={styles.input}
                 type="url"
@@ -138,13 +123,7 @@ const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
                 value={form.imageUrl}
                 onChange={e => { setForm(f => ({ ...f, imageUrl: e.target.value })); setPreview(e.target.value); }}
               />
-            ) : (
-              <>
-                <button className={styles.uploadBtn} onClick={handlePickImage}>
-                  Choose file
-                </button>
-              </>
-            )}
+            </div>
           </div>
 
           {/* Form grid */}
