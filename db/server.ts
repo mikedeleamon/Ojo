@@ -40,7 +40,7 @@ if (!MONGO_URI) {
   mongoose
     .connect(MONGO_URI)
     .then(() => console.log('[Ojo] Connected to MongoDB'))
-    .catch((err) => console.warn('[Ojo] MongoDB unavailable:', err.message));
+    .catch((err) => console.warn('[Ojo] MongoDB unavailable:', (err instanceof Error ? err.message : String(err))));
 }
 
 // ─── AccuWeather proxy guard ──────────────────────────────────────────────────
@@ -124,14 +124,21 @@ app.post('/api/auth/signup', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'You must be 13 or older to use Ojo.' });
     }
 
-    const existing = await User.findOne({ email });
-    if (existing) {
-      return res.status(409).json({ error: 'An account with this email already exists' });
+    const existingEmail = await User.findOne({ email });
+    if (existingEmail) {
+      return res.status(409).json({ error: 'An account with this email already exists.' });
+    }
+
+    if (username?.trim()) {
+      const existingUsername = await User.findOne({ username: username.trim() });
+      if (existingUsername) {
+        return res.status(409).json({ error: 'That username is already taken.' });
+      }
     }
 
     const hashed = await bcrypt.hash(password, 12);
     const user = await User.create({
-      firstName, lastName, username, email, birthday,
+      firstName, lastName, username: username?.trim() ?? '', email, birthday,
       password: hashed,
     });
 
@@ -147,9 +154,10 @@ app.post('/api/auth/signup', async (req: Request, res: Response) => {
       },
       settings: user.settings,
     });
-  } catch (err: any) {
-    console.error('[Ojo] Signup failed:', err.message);
-    res.status(500).json({ error: 'Signup failed', detail: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[Ojo] Signup failed:', message);
+    res.status(500).json({ error: 'Signup failed', detail: message });
   }
 });
 
@@ -183,9 +191,30 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
       },
       settings: user.settings,
     });
-  } catch (err: any) {
-    console.error('[Ojo] Login failed:', err.message);
-    res.status(500).json({ error: 'Login failed', detail: err.message });
+  } catch (err: unknown) {
+    console.error('[Ojo] Login failed:', (err instanceof Error ? err.message : String(err)));
+    res.status(500).json({ error: 'Login failed', detail: (err instanceof Error ? err.message : String(err)) });
+  }
+});
+
+// POST /api/auth/refresh — issues a new 7-day token from a valid existing one.
+// Called proactively when the token is within 24 h of expiry.
+// No password required — the existing token IS the credential.
+app.post('/api/auth/refresh', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await User.findById(req.userId).select('_id');
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+
+    const token = jwt.sign(
+      { userId: user._id.toString() },
+      JWT_SECRET_RESOLVED,
+      { expiresIn: '7d' },
+    );
+    res.json({ token });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[Ojo] Token refresh failed:', message);
+    res.status(500).json({ error: 'Token refresh failed.', detail: message });
   }
 });
 
@@ -197,8 +226,8 @@ app.get('/api/user/me', requireAuth, async (req: AuthRequest, res: Response) => 
     const user = await User.findById(req.userId).select('firstName lastName username email');
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json({ firstName: user.firstName, lastName: user.lastName, username: user.username ?? '', email: user.email });
-  } catch (err: any) {
-    res.status(500).json({ error: 'Failed to load profile', detail: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ error: 'Failed to load profile', detail: (err instanceof Error ? err.message : String(err)) });
   }
 });
 
@@ -223,9 +252,9 @@ app.put('/api/user/profile', requireAuth, async (req: AuthRequest, res: Response
 
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json({ firstName: user.firstName, lastName: user.lastName, username: user.username ?? '', email: user.email });
-  } catch (err: any) {
-    console.error('[Ojo] Profile update failed:', err.message);
-    res.status(500).json({ error: 'Profile update failed', detail: err.message });
+  } catch (err: unknown) {
+    console.error('[Ojo] Profile update failed:', (err instanceof Error ? err.message : String(err)));
+    res.status(500).json({ error: 'Profile update failed', detail: (err instanceof Error ? err.message : String(err)) });
   }
 });
 
@@ -251,9 +280,9 @@ app.put('/api/user/password', requireAuth, async (req: AuthRequest, res: Respons
     await user.save();
 
     res.json({ message: 'Password updated.' });
-  } catch (err: any) {
-    console.error('[Ojo] Password update failed:', err.message);
-    res.status(500).json({ error: 'Password update failed', detail: err.message });
+  } catch (err: unknown) {
+    console.error('[Ojo] Password update failed:', (err instanceof Error ? err.message : String(err)));
+    res.status(500).json({ error: 'Password update failed', detail: (err instanceof Error ? err.message : String(err)) });
   }
 });
 
@@ -265,8 +294,8 @@ app.get('/api/user/settings', requireAuth, async (req: AuthRequest, res: Respons
     const user = await User.findById(req.userId).select('settings');
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json(user.settings);
-  } catch (err: any) {
-    res.status(500).json({ error: 'Failed to load settings', detail: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ error: 'Failed to load settings', detail: (err instanceof Error ? err.message : String(err)) });
   }
 });
 
@@ -281,9 +310,9 @@ app.put('/api/user/settings', requireAuth, async (req: AuthRequest, res: Respons
 
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json(user.settings);
-  } catch (err: any) {
-    console.error('[Ojo] Save settings failed:', err.message);
-    res.status(500).json({ error: 'Failed to save settings', detail: err.message });
+  } catch (err: unknown) {
+    console.error('[Ojo] Save settings failed:', (err instanceof Error ? err.message : String(err)));
+    res.status(500).json({ error: 'Failed to save settings', detail: (err instanceof Error ? err.message : String(err)) });
   }
 });
 
@@ -294,9 +323,9 @@ app.delete('/api/user/me', requireAuth, async (req: AuthRequest, res: Response) 
     const deleted = await User.findByIdAndDelete(req.userId);
     if (!deleted) return res.status(404).json({ error: 'User not found.' });
     res.json({ message: 'Account deleted.' });
-  } catch (err: any) {
-    console.error('[Ojo] Account deletion failed:', err.message);
-    res.status(500).json({ error: 'Could not delete account.', detail: err.message });
+  } catch (err: unknown) {
+    console.error('[Ojo] Account deletion failed:', (err instanceof Error ? err.message : String(err)));
+    res.status(500).json({ error: 'Could not delete account.', detail: (err instanceof Error ? err.message : String(err)) });
   }
 });
 
@@ -332,9 +361,9 @@ app.get('/api/user/export', requireAuth, async (req: AuthRequest, res: Response)
     res.setHeader('Content-Disposition', 'attachment; filename="ojo-data-export.json"');
     res.setHeader('Content-Type', 'application/json');
     res.json(exportData);
-  } catch (err: any) {
-    console.error('[Ojo] Data export failed:', err.message);
-    res.status(500).json({ error: 'Data export failed.', detail: err.message });
+  } catch (err: unknown) {
+    console.error('[Ojo] Data export failed:', (err instanceof Error ? err.message : String(err)));
+    res.status(500).json({ error: 'Data export failed.', detail: (err instanceof Error ? err.message : String(err)) });
   }
 });
 
@@ -356,9 +385,9 @@ app.get('/api/weather/city', async (req: Request, res: Response) => {
     });
     CITY_CACHE.set(q, { data, expires: now + CITY_CACHE_TTL * 1000 });
     res.json(data);
-  } catch (err: any) {
-    console.error('[Ojo] City lookup failed:', err.message);
-    res.status(502).json({ error: 'City lookup failed', detail: err.message });
+  } catch (err: unknown) {
+    console.error('[Ojo] City lookup failed:', (err instanceof Error ? err.message : String(err)));
+    res.status(502).json({ error: 'City lookup failed', detail: (err instanceof Error ? err.message : String(err)) });
   }
 });
 
@@ -368,9 +397,9 @@ app.get('/api/weather/current/:cityKey', async (req: Request, res: Response) => 
       params: { apikey: API_KEY, details: true },
     });
     res.json(data);
-  } catch (err: any) {
-    console.error('[Ojo] Current weather failed:', err.message);
-    res.status(502).json({ error: 'Current weather failed', detail: err.message });
+  } catch (err: unknown) {
+    console.error('[Ojo] Current weather failed:', (err instanceof Error ? err.message : String(err)));
+    res.status(502).json({ error: 'Current weather failed', detail: (err instanceof Error ? err.message : String(err)) });
   }
 });
 
@@ -380,9 +409,9 @@ app.get('/api/weather/forecast/:cityKey', async (req: Request, res: Response) =>
       params: { apikey: API_KEY },
     });
     res.json(data);
-  } catch (err: any) {
-    console.error('[Ojo] Forecast failed:', err.message);
-    res.status(502).json({ error: 'Forecast failed', detail: err.message });
+  } catch (err: unknown) {
+    console.error('[Ojo] Forecast failed:', (err instanceof Error ? err.message : String(err)));
+    res.status(502).json({ error: 'Forecast failed', detail: (err instanceof Error ? err.message : String(err)) });
   }
 });
 
@@ -421,8 +450,8 @@ app.post('/api/closets', requireAuth, async (req: AuthRequest, res: Response) =>
     if (!name?.trim()) return res.status(400).json({ error: 'Closet name is required.' });
     const closet = await Closet.create({ name: name.trim(), userId: req.userId, articles: [] });
     res.status(201).json(closet);
-  } catch (err: any) {
-    res.status(500).json({ error: 'Failed to create closet', detail: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ error: 'Failed to create closet', detail: (err instanceof Error ? err.message : String(err)) });
   }
 });
 
@@ -430,8 +459,8 @@ app.get('/api/closets', requireAuth, async (req: AuthRequest, res: Response) => 
   try {
     const closets = await Closet.find({ userId: req.userId }).sort({ createdAt: -1 });
     res.json(closets);
-  } catch (err: any) {
-    res.status(500).json({ error: 'Failed to fetch closets', detail: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ error: 'Failed to fetch closets', detail: (err instanceof Error ? err.message : String(err)) });
   }
 });
 
@@ -446,8 +475,8 @@ app.put('/api/closets/:id', requireAuth, async (req: AuthRequest, res: Response)
     );
     if (!closet) return res.status(404).json({ error: 'Closet not found.' });
     res.json(closet);
-  } catch (err: any) {
-    res.status(500).json({ error: 'Failed to update closet', detail: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ error: 'Failed to update closet', detail: (err instanceof Error ? err.message : String(err)) });
   }
 });
 
@@ -461,8 +490,8 @@ app.put('/api/closets/:id/preferred', requireAuth, async (req: AuthRequest, res:
     );
     if (!closet) return res.status(404).json({ error: 'Closet not found.' });
     res.json(closet);
-  } catch (err: any) {
-    res.status(500).json({ error: 'Failed to set preferred closet.', detail: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ error: 'Failed to set preferred closet.', detail: (err instanceof Error ? err.message : String(err)) });
   }
 });
 
@@ -471,8 +500,8 @@ app.delete('/api/closets/:id', requireAuth, async (req: AuthRequest, res: Respon
     const closet = await Closet.findOneAndDelete({ _id: req.params.id, userId: req.userId });
     if (!closet) return res.status(404).json({ error: 'Closet not found.' });
     res.json({ message: 'Closet deleted.' });
-  } catch (err: any) {
-    res.status(500).json({ error: 'Failed to delete closet', detail: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ error: 'Failed to delete closet', detail: (err instanceof Error ? err.message : String(err)) });
   }
 });
 
@@ -487,8 +516,8 @@ app.post('/api/closets/:id/articles', requireAuth, async (req: AuthRequest, res:
     closet.articles.push({ clothingType, ...rest } as any);
     await closet.save();
     res.status(201).json(closet);
-  } catch (err: any) {
-    res.status(500).json({ error: 'Failed to add article', detail: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ error: 'Failed to add article', detail: (err instanceof Error ? err.message : String(err)) });
   }
 });
 
@@ -505,8 +534,8 @@ app.delete('/api/closets/:closetId/articles/:articleId', requireAuth, async (req
 
     await closet.save();
     res.json(closet);
-  } catch (err: any) {
-    res.status(500).json({ error: 'Failed to remove article', detail: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ error: 'Failed to remove article', detail: (err instanceof Error ? err.message : String(err)) });
   }
 });
 
@@ -535,8 +564,8 @@ app.put('/api/closets/:closetId/articles/:articleId', requireAuth, async (req: A
 
     await closet.save();
     res.json(closet);
-  } catch (err: any) {
-    res.status(500).json({ error: 'Failed to update article', detail: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ error: 'Failed to update article', detail: (err instanceof Error ? err.message : String(err)) });
   }
 });
 
