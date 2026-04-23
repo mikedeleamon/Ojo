@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BrowserRouter as Router } from 'react-router-dom';
 import AppRoutes from './routes/AppRoutes';
 import BottomNav from './components/BottomNav/BottomNav';
 import { useSettings, clearSettingsCache } from './hooks/useSettings';
-import { AUTH_KEY, clearAuth } from './lib/auth';
+import { AUTH_KEY, clearAuth, isTokenExpiringSoon, refreshToken } from './lib/auth';
 import { storage } from './lib/storage';
 import { clearCookiesIfOversized } from './helpers/cookieUtils';
 
@@ -32,6 +32,15 @@ const App = () => {
   const [loggedIn,        setLoggedIn]        = useState<boolean>(isLoggedIn);
   const [needsOnboarding, setNeedsOnboarding] = useState<boolean>(false);
   const { settings, settingsReady, saveSettings } = useSettings();
+
+  // Proactively refresh the JWT if it will expire within 24 hours.
+  // Runs once on mount — silent, never logs the user out on failure.
+  useEffect(() => {
+    if (!loggedIn) return;
+    if (isTokenExpiringSoon(86_400)) {
+      refreshToken().catch(() => {/* silent — user stays logged in until expiry */});
+    }
+  }, [loggedIn]);
 
   const handleLogout = async () => {
     await clearAuth();

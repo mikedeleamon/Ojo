@@ -10,28 +10,49 @@ const client = axios.create({
 });
 
 /**
- * Response interceptor — catches 431 Request Header Fields Too Large.
+ * Response interceptor — handles two error cases:
  *
- * 431 is almost always caused by oversized browser cookies being forwarded
- * through the dev proxy. The fix is to clear cookies and retry once.
+ * 431 Request Header Fields Too Large (dev only):
+ *   Caused by oversized localhost cookies forwarded through the dev proxy.
+ *   Fix: clear cookies and retry the request once.
  *
- * In production (where there is no proxy), 431 can't happen this way because
- * withCredentials: false prevents cross-origin cookies. This interceptor is
- * therefore a dev-time safety net.
+ * 401 Unauthorised:
+ *   Token has expired mid-session. Attempt a silent refresh, then retry
+ *   the original request with the new token. If the refresh also fails
+ *   (e.g. the refresh token itself is expired) the 401 propagates and
+ *   callers can handle logout.
  */
 client.interceptors.response.use(
   res => res,
   async (err: AxiosError) => {
     const status = err.response?.status;
+    const config = err.config as any;
 
-    if (status === 431 && !(err.config as any)?._retried431) {
-      // Import lazily to avoid circular dep
+    // ── 431: clear cookies and retry once ─────────────────────────────────
+    if (status === 431 && !config?._retried431) {
       const { clearAllCookies } = await import('../helpers/cookieUtils');
       clearAllCookies();
       console.warn('[Ojo] 431 intercepted — cleared cookies and retrying request.');
+      return client.request({ ...config, _retried431: true });
+    }
 
-      const retryConfig = { ...err.config, _retried431: true };
-      return client.request(retryConfig);
+    // ── 401: attempt silent token refresh, then retry once ────────────────
+    if (status === 401 && !config?._retried401) {
+      const { refreshToken, getToken, authHeaders } = await import('../lib/auth');
+      const newToken = await refreshToken();
+      if (newToken) {
+        // Update Authorization header with the fresh token and retry
+        const retryConfig = {
+          ...config,
+          _retried401: true,
+          headers: {
+            ...config.headers,
+            ...authHeaders().headers,
+          },
+        };
+        return client.request(retryConfig);
+      }
+      // Refresh failed — let the 401 propagate so the caller can log out
     }
 
     return Promise.reject(err);
