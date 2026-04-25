@@ -49,8 +49,10 @@ package-lock.json
 yarn.lock
 pnpm-lock.yaml
 
-# Environment variables - local overrides only
-.env*.local
+# Environment variables - keep .env.example but ignore actual secrets
+.env
+.env.*
+!.env.example
 
 # IDE
 .vscode/
