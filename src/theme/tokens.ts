@@ -89,8 +89,13 @@ export const radius = {
 // RN migration: load fonts via expo-font, then use fontFamily strings here
 
 export const fonts = {
-  display: "'DM Serif Display', Georgia, serif",  // → 'DMSerifDisplay' in RN
-  body:    "'Outfit', system-ui, sans-serif",      // → 'Outfit' in RN
+  display:        'DMSerifDisplay',
+  body:           'Outfit',           // 400 Regular
+  bodyLight:      'Outfit-Light',     // 300
+  bodyRegular:    'Outfit-Regular',   // 400
+  bodyMedium:     'Outfit-Medium',    // 500
+  bodySemiBold:   'Outfit-SemiBold',  // 600
+  bodyBold:       'Outfit-Bold',      // 700
 } as const;
 
 export const fontSizes = {
@@ -115,15 +120,21 @@ export const fontWeights = {
 // RN migration: decompose into { shadowColor, shadowOffset, shadowOpacity, shadowRadius, elevation }
 
 export const shadows = {
-  glass: '0 8px 32px rgba(0, 0, 0, 0.25)',
+  glass: {
+    shadowColor:   '#000000',
+    shadowOffset:  { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius:  16,
+    elevation:     8,
+  },
 } as const;
 
 // ─── Animation ────────────────────────────────────────────────────────────────
-// RN migration: translate to Animated.timing / Reanimated withTiming duration+easing
+// Use with Reanimated: withTiming(value, { duration, easing: Easing.bezier(...) })
 
 export const animation = {
-  durationMs: 250,
-  easing: 'cubic-bezier(0.4, 0, 0.2, 1)',  // → Easing.bezier(0.4, 0, 0.2, 1) in RN
+  durationMs:   250,
+  easingParams: [0.4, 0, 0.2, 1] as [number, number, number, number],
 } as const;
 
 // ─── Convenience re-exports ───────────────────────────────────────────────────

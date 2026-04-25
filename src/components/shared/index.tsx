@@ -1,38 +1,95 @@
 import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import { colors, spacing, radius, fonts, fontSizes } from '../../theme/tokens';
 
 // ─── StatusMessage ─────────────────────────────────────────────────────────────
-// Replaces the identical inline status <p> in every AccountPage tab.
 
 interface StatusMessageProps {
   status: { type: 'success' | 'error'; msg: string } | null;
-  styles: Record<string, string>;
 }
 
-export const StatusMessage = ({ status, styles }: StatusMessageProps) => {
+export const StatusMessage = ({ status }: StatusMessageProps) => {
   if (!status) return null;
+  const isSuccess = status.type === 'success';
   return (
-    <p className={`${styles.statusMsg} ${styles[status.type]}`}>
-      {status.msg}
-    </p>
+    <View style={[styles.base, isSuccess ? styles.success : styles.error]}>
+      <Text style={[styles.text, isSuccess ? styles.successText : styles.errorText]}>
+        {status.msg}
+      </Text>
+    </View>
   );
 };
 
 // ─── EmptyState ────────────────────────────────────────────────────────────────
-// Shared empty / prompt state used in OutfitSuggestion and ClosetView.
 
 interface EmptyStateProps {
   icon:    React.ReactNode;
   title:   string;
   body:    string;
   action?: React.ReactNode;
-  styles:  Record<string, string>;
 }
 
-export const EmptyState = ({ icon, title, body, action, styles }: EmptyStateProps) => (
-  <div className={styles.promptState}>
-    <span className={styles.promptIcon}>{icon}</span>
-    <p className={styles.promptTitle}>{title}</p>
-    <p className={styles.promptBody}>{body}</p>
+export const EmptyState = ({ icon, title, body, action }: EmptyStateProps) => (
+  <View style={styles.emptyContainer}>
+    <View style={styles.emptyIcon}>{icon}</View>
+    <Text style={styles.emptyTitle}>{title}</Text>
+    <Text style={styles.emptyBody}>{body}</Text>
     {action}
-  </div>
+  </View>
 );
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const styles = StyleSheet.create({
+  // StatusMessage
+  base: {
+    paddingVertical:   10,
+    paddingHorizontal: spacing.md,
+    borderRadius:      radius.sm,
+    borderWidth:       1,
+    marginBottom:      8,
+  },
+  text: {
+    fontFamily: fonts.body,
+    fontSize:   fontSizes.sm,
+  },
+  success: {
+    backgroundColor: colors.successBg,
+    borderColor:     colors.successBorder,
+  },
+  successText: {
+    color: colors.successText,
+  },
+  error: {
+    backgroundColor: colors.errorBg,
+    borderColor:     colors.errorBorder,
+  },
+  errorText: {
+    color: colors.errorText,
+  },
+
+  // EmptyState
+  emptyContainer: {
+    flex:           1,
+    alignItems:     'center',
+    justifyContent: 'center',
+    padding:        spacing.xl,
+    gap:            spacing.sm,
+  },
+  emptyIcon: {
+    marginBottom: spacing.sm,
+  },
+  emptyTitle: {
+    fontFamily: fonts.display,
+    fontSize:   fontSizes.xl,
+    color:      colors.textPrimary,
+    textAlign:  'center',
+  },
+  emptyBody: {
+    fontFamily: fonts.body,
+    fontSize:   fontSizes.base,
+    color:      colors.textSecondary,
+    textAlign:  'center',
+    lineHeight: fontSizes.base * 1.6,
+  },
+});

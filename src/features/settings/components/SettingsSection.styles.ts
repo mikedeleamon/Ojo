@@ -10,9 +10,10 @@
  *      or drop it and use a plain semi-transparent backgroundColor
  */
 
+import { StyleSheet } from 'react-native';
 import { colors, spacing, radius, fonts, fontSizes, fontWeights } from '../../../theme/tokens';
 
-export const styles = {
+export const styles = StyleSheet.create({
   section: {
     flexDirection: 'column' as const,
     gap:           6,
@@ -38,4 +39,4 @@ export const styles = {
     // RN: overflow hidden works but clips shadows — use with care
     overflow: 'hidden' as const,
   },
-};
+});

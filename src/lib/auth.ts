@@ -1,26 +1,31 @@
 /**
- * Single source of truth for auth-token access and header construction.
- * Uses secureStorage so the token migrates to Keychain/Keystore in React Native.
+ * Auth library — React Native implementation.
+ * Uses expo-secure-store via the secureStorage abstraction.
+ * Token is cached in-memory after initAuthCache() is called at startup.
  */
 
+import { Buffer } from 'buffer';
 import { secureStorage, storageGetJSON } from './storage';
 
 export const AUTH_KEY = 'ojo_auth';
 
 interface AuthPayload { token?: string; user?: unknown; }
 
-export const getToken = (): string | null => {
-  // Synchronous read for cases that need it (axios interceptors, etc.)
-  // Works on web because secureStorage wraps localStorage synchronously.
-  // RN migration: replace callers with async getTokenAsync() below.
-  try {
-    return JSON.parse(localStorage.getItem(AUTH_KEY) || '{}').token ?? null;
-  } catch {
-    return null;
-  }
+// ─── In-memory cache ──────────────────────────────────────────────────────────
+// getToken() stays synchronous (used in axios interceptors).
+// initAuthCache() must be called once at app startup before rendering.
+
+let _cachedToken: string | null = null;
+
+/** Call once during splash screen before rendering anything. */
+export const initAuthCache = async (): Promise<void> => {
+  _cachedToken = await getTokenAsync();
 };
 
-/** Async version — use this in new code; required in React Native. */
+/** Synchronous — reads the in-memory cache. Safe after initAuthCache() resolves. */
+export const getToken = (): string | null => _cachedToken;
+
+/** Async version — reads directly from SecureStore. */
 export const getTokenAsync = async (): Promise<string | null> => {
   const payload = await storageGetJSON<AuthPayload>(secureStorage, AUTH_KEY, {});
   return payload.token ?? null;
@@ -31,15 +36,13 @@ export const authHeaders = () => {
   return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
 };
 
-/** Convenience alias. */
 export const auth = authHeaders;
 
-/** Save auth payload to secure storage. */
 export const saveAuth = async (token: string, user: unknown): Promise<void> => {
+  _cachedToken = token;
   await secureStorage.setItem(AUTH_KEY, JSON.stringify({ token, user }));
 };
 
-/** Update the stored user object (e.g. after profile edit). */
 export const updateAuthUser = async (patch: Record<string, unknown>): Promise<void> => {
   const payload = await storageGetJSON<AuthPayload>(secureStorage, AUTH_KEY, {});
   await secureStorage.setItem(AUTH_KEY, JSON.stringify({
@@ -48,21 +51,22 @@ export const updateAuthUser = async (patch: Record<string, unknown>): Promise<vo
   }));
 };
 
-/** Clear all auth state. */
 export const clearAuth = async (): Promise<void> => {
+  _cachedToken = null;
   await secureStorage.removeItem(AUTH_KEY);
 };
 
 /**
  * Returns true if the stored token will expire within the next `withinSeconds`.
- * Used to decide whether a proactive refresh is needed.
+ * Uses Buffer instead of atob() which is unavailable in the RN JS engine.
  */
 export const isTokenExpiringSoon = (withinSeconds = 86_400): boolean => {
   try {
     const token = getToken();
     if (!token) return false;
-    // JWT payload is the second base64 segment
-    const payload = JSON.parse(atob(token.split('.')[1]));
+    const payload = JSON.parse(
+      Buffer.from(token.split('.')[1], 'base64').toString('utf8'),
+    );
     if (!payload?.exp) return false;
     return payload.exp - Date.now() / 1000 < withinSeconds;
   } catch {
@@ -70,27 +74,20 @@ export const isTokenExpiringSoon = (withinSeconds = 86_400): boolean => {
   }
 };
 
-/**
- * Calls POST /api/auth/refresh with the current token and saves the new one.
- * Returns the new token string, or null if the refresh failed.
- *
- * RN migration: identical — the endpoint is the same, only storage changes.
- */
 export const refreshToken = async (): Promise<string | null> => {
   try {
-    // Import lazily to avoid circular dependency with api/client
     const { default: client } = await import('../api/client');
     const { data } = await client.post<{ token: string }>('/api/auth/refresh', {}, authHeaders());
     if (!data?.token) return null;
     const payload = await storageGetJSON<AuthPayload>(secureStorage, AUTH_KEY, {});
     await secureStorage.setItem(AUTH_KEY, JSON.stringify({ ...payload, token: data.token }));
+    _cachedToken = data.token;
     return data.token;
   } catch {
     return null;
   }
 };
 
-/** Extracts a human-readable message from an unknown catch value. */
 type ApiError = { response?: { data?: { error?: string } }; message?: string };
 export const getErrorMessage = (err: unknown, fallback = 'Something went wrong.'): string => {
   const e = err as ApiError;

@@ -12,9 +12,10 @@
  *   5. Web-only: cursor, transition, text-overflow are automatically dropped by RN
  */
 
+import { StyleSheet } from 'react-native';
 import { colors, spacing, fonts, fontSizes, fontWeights } from '../../../theme/tokens';
 
-export const styles = {
+export const styles = StyleSheet.create({
   row: {
     flexDirection:   'row'    as const,
     alignItems:      'center' as const,
@@ -69,4 +70,4 @@ export const styles = {
     opacity:   0.4,
     flexShrink: 0,
   },
-};
+});

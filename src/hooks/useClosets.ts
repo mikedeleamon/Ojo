@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import axios from '../api/client';
 import { Closet } from '../types';
 import { auth, getToken } from '../lib/auth';
-import { ArticleFormData } from '../components/ArticleModal/ArticleModal';
+import { ArticleFormData } from '../types';
 
 interface UseClosetsResult {
   closets:      Closet[];

@@ -1,82 +1,71 @@
 import { useState } from 'react';
-import axios from '../../../api/client';
-import ScreenShell from '../components/ScreenShell';
+import { StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { View, Text, TextInput, Pressable } from '../../../components/primitives';
+import axios from '../../../api/client';
 import { auth } from '../../../lib/auth';
 import { useFormSubmit } from '../../../hooks/useFormSubmit';
 import { StatusMessage } from '../../../components/shared';
-import styles from './screens.module.css';
+import { styles as s } from './screens.styles';
+import { colors, spacing, fonts, fontSizes } from '../../../theme/tokens';
 
-interface PasswordProps { embedded?: boolean; }
-
-const PasswordScreen = ({ embedded }: PasswordProps) => {
+export default function PasswordScreen() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword,     setNewPassword]     = useState('');
   const [confirm,         setConfirm]         = useState('');
-  const { status, loading, submit, clearStatus } = useFormSubmit('Password updated successfully.');
+  const { status, loading, submit, clearStatus } = useFormSubmit('Password updated.');
 
   const validationMsg =
     newPassword && newPassword.length < 8 ? 'New password must be at least 8 characters.' :
-    confirm && newPassword !== confirm     ? 'Passwords do not match.' :
-    null;
+    confirm && newPassword !== confirm     ? 'Passwords do not match.' : null;
 
   const save = () => {
     clearStatus();
-    if (!currentPassword) return;
-    if (newPassword.length < 8 || newPassword !== confirm) return;
+    if (!currentPassword || newPassword.length < 8 || newPassword !== confirm) return;
     submit(async () => {
       await axios.put('/api/user/password', { currentPassword, newPassword }, auth());
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirm('');
+      setCurrentPassword(''); setNewPassword(''); setConfirm('');
     });
   };
 
   return (
-    <ScreenShell title="Change Password" embedded={embedded}>
-      {validationMsg
-        ? <Text style={`${styles.statusMsg} ${styles.error}`}>{validationMsg}</Text>
-        : <StatusMessage status={status} styles={styles} />
-      }
+    <SafeAreaView style={styles.root} edges={['bottom']}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          {validationMsg ? (
+            <View style={[s.statusMsgBase, s.error]}>
+              <Text style={{ color: colors.errorText, fontSize: 13 }}>{validationMsg}</Text>
+            </View>
+          ) : (
+            <StatusMessage status={status} />
+          )}
 
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Current password</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="••••••••"
-          secureTextEntry
-          value={currentPassword}
-          onChangeText={setCurrentPassword}
-        />
-      </View>
+          {[
+            { label: 'Current password', value: currentPassword, set: setCurrentPassword, type: 'current' },
+            { label: 'New password',     value: newPassword,     set: setNewPassword,     type: 'new' },
+            { label: 'Confirm password', value: confirm,         set: setConfirm,         type: 'confirm' },
+          ].map(f => (
+            <View key={f.type} style={s.formGroup}>
+              <Text style={s.label}>{f.label}</Text>
+              <TextInput style={s.input} secureTextEntry
+                placeholder="••••••••" placeholderTextColor={colors.textMuted}
+                textContentType={f.type === 'new' ? 'newPassword' : 'password'}
+                value={f.value} onChangeText={f.set} />
+            </View>
+          ))}
 
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>New password</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="At least 8 characters"
-          secureTextEntry
-          value={newPassword}
-          onChangeText={setNewPassword}
-        />
-      </View>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Confirm new password</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="••••••••"
-          secureTextEntry
-          value={confirm}
-          onChangeText={setConfirm}
-        />
-      </View>
-
-      <Pressable style={styles.saveBtn} onPress={save} disabled={loading || !currentPassword}>
-        <Text>{loading ? 'Updating…' : 'Update password'}</Text>
-      </Pressable>
-    </ScreenShell>
+          <Pressable style={[s.saveBtn, (loading || !currentPassword) && { opacity: 0.5 }]}
+            onPress={save} disabled={loading || !currentPassword}>
+            <Text style={styles.btnText}>{loading ? 'Updating…' : 'Update password'}</Text>
+          </Pressable>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
-};
+}
 
-export default PasswordScreen;
+const styles = StyleSheet.create({
+  root:    { flex: 1, backgroundColor: colors.bgDefault },
+  content: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xl },
+  btnText: { fontFamily: fonts.body, fontSize: fontSizes.base, fontWeight: '600', color: '#0D1B2A' },
+});

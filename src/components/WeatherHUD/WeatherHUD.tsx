@@ -1,244 +1,195 @@
 import { useState, useEffect } from 'react';
+import { StyleSheet, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { View, Text } from '../primitives';
 import api from '../../api/client';
 import weatherConstants from '../../constants/weatherConstants';
 import WeatherIconDisplay from '../WeatherIconDisplay/WeatherIconDisplay';
 import WeatherDetails from '../WeatherDetails/WeatherDetails';
 import MinimizedWeatherDisplay from '../MinimizedWeatherDisplay/MinimizedWeatherDisplay';
-import Loading from '../Loading/Loading';
-import mockWeatherData from '../../mockData/mockWeatherData';
-import { detectOversizedCookies } from '../../helpers/cookieUtils';
+import { useWeatherTheme } from '../../context/WeatherContext';
 import { CityData, CurrentWeather, Forecast, Settings } from '../../types';
-import styles from './WeatherHUD.module.css';
+import { colors, fonts, fontSizes, weatherGradients, spacing } from '../../theme/tokens';
 
-// ─── Toggle mock data — only reads the explicit env var, not NODE_ENV ───────
-const USE_MOCK = process.env.REACT_APP_USE_MOCK === 'true';
+// ─── Gradient + footer colour maps ────────────────────────────────────────────
 
-const BG_MAP: Record<string, string> = {
-    sunny: 'var(--bg-sunny)',
-    'mostly sunny': 'var(--bg-sunny)',
-    clear: 'var(--bg-clear-day)',
-    cloud: 'var(--bg-cloudy)',
-    partly: 'var(--bg-partly-cloudy)',
-    rain: 'var(--bg-rainy)',
-    shower: 'var(--bg-rainy)',
-    thunder: 'var(--bg-stormy)',
-    storm: 'var(--bg-stormy)',
-    snow: 'var(--bg-snow)',
-    flurr: 'var(--bg-snow)',
+const gradientFor = (condition: string, isDay: boolean): string[] => {
+  const c = condition.toLowerCase();
+  if (!isDay && (c.includes('clear') || c.includes('mostly clear'))) return weatherGradients.clearNight;
+  if (c.includes('sunny') || c.includes('mostly sunny'))              return weatherGradients.sunny;
+  if (c.includes('clear'))   return isDay ? weatherGradients.clearDay : weatherGradients.clearNight;
+  if (c.includes('partly') || c.includes('intermittent'))             return weatherGradients.partlyCloudy;
+  if (c.includes('cloud') || c.includes('overcast'))                  return weatherGradients.cloudy;
+  if (c.includes('rain') || c.includes('shower'))                     return weatherGradients.rainy;
+  if (c.includes('thunder') || c.includes('storm'))                   return weatherGradients.stormy;
+  if (c.includes('snow') || c.includes('flurr'))                      return weatherGradients.snow;
+  return isDay ? weatherGradients.clearDay : weatherGradients.clearNight;
 };
 
-/**
- * Solid colours for the footer — derived from each gradient's darkest end stop,
- * shifted darker for day conditions (light backgrounds need more contrast) and
- * slightly lighter for night/dark conditions (so the footer reads against the bg).
- */
-const FOOTER_BG_MAP: Record<string, string> = {
-    sunny:         'rgba(180, 83,  9,  0.97)',  // amber-800 — darker than gradient start
-    'clear-day':   'rgba(2,   78, 142, 0.97)',  // sky-900
-    'clear-night': 'rgba(12,  20,  40, 0.97)',  // slightly lighter than #020617
-    'partly':      'rgba(22,  34,  54, 0.97)',  // slate-900
-    cloudy:        'rgba(16,  24,  39, 0.97)',  // gray-900
-    rainy:         'rgba(6,   18,  36, 0.97)',  // dark navy
-    stormy:        'rgba(10,   8,  28, 0.97)',  // deep indigo-black
-    snow:          'rgba(50,  90, 130, 0.97)',  // muted steel blue
-    default:       'rgba(10,  16,  32, 0.97)',  // dark fallback
+const footerBgFor = (condition: string, isDay: boolean): string => {
+  const c = condition.toLowerCase();
+  if (!isDay && (c.includes('clear') || c.includes('mostly clear'))) return 'rgba(12,20,40,0.97)';
+  if (c.includes('sunny') || c.includes('mostly sunny'))             return 'rgba(180,83,9,0.97)';
+  if (c.includes('clear'))   return isDay ? 'rgba(2,78,142,0.97)' : 'rgba(12,20,40,0.97)';
+  if (c.includes('partly'))  return 'rgba(22,34,54,0.97)';
+  if (c.includes('cloud'))   return 'rgba(16,24,39,0.97)';
+  if (c.includes('rain'))    return 'rgba(6,18,36,0.97)';
+  if (c.includes('thunder') || c.includes('storm')) return 'rgba(10,8,28,0.97)';
+  if (c.includes('snow'))    return 'rgba(50,90,130,0.97)';
+  return isDay ? 'rgba(2,78,142,0.97)' : 'rgba(10,16,32,0.97)';
 };
 
-const footerBgForCondition = (condition: string, isDay: boolean): string => {
-    const c = condition.toLowerCase();
-    if (!isDay && (c.includes('clear') || c.includes('mostly clear')))
-        return FOOTER_BG_MAP['clear-night'];
-    if (c.includes('sunny') || c.includes('mostly sunny')) return FOOTER_BG_MAP['sunny'];
-    if (c.includes('clear'))   return isDay ? FOOTER_BG_MAP['clear-day'] : FOOTER_BG_MAP['clear-night'];
-    if (c.includes('partly') || c.includes('intermittent')) return FOOTER_BG_MAP['partly'];
-    if (c.includes('cloud') || c.includes('overcast'))      return FOOTER_BG_MAP['cloudy'];
-    if (c.includes('rain') || c.includes('shower'))         return FOOTER_BG_MAP['rainy'];
-    if (c.includes('thunder') || c.includes('storm'))       return FOOTER_BG_MAP['stormy'];
-    if (c.includes('snow') || c.includes('flurr'))          return FOOTER_BG_MAP['snow'];
-    return isDay ? FOOTER_BG_MAP['clear-day'] : FOOTER_BG_MAP['default'];
-};
-
-const bgForCondition = (condition: string, isDay: boolean): string => {
-    const c = condition.toLowerCase();
-    if (!isDay && (c.includes('clear') || c.includes('mostly clear')))
-        return 'var(--bg-clear-night)';
-    for (const [key, val] of Object.entries(BG_MAP)) {
-        if (c.includes(key)) return val;
-    }
-    return isDay ? 'var(--bg-clear-day)' : 'var(--bg-clear-night)';
-};
+// ─── Component ────────────────────────────────────────────────────────────────
 
 interface Props {
-    location: string;
-    settings: Settings;
+  location: string;
+  settings: Settings;
+  refreshKey?: number;
+  onRefresh?: () => void;
 }
 
-const WeatherHUD = ({ location, settings }: Props) => {
-    const [city, setCity] = useState<CityData | null>(null);
-    const [weather, setWeather] = useState<CurrentWeather | null>(null);
-    const [forecasts, setForecasts] = useState<Forecast[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
+  const { setFooterBg } = useWeatherTheme();
+  const { top: topInset } = useSafeAreaInsets();
+  const [city,       setCity]       = useState<CityData | null>(null);
+  const [weather,    setWeather]    = useState<CurrentWeather | null>(null);
+  const [forecasts,  setForecasts]  = useState<Forecast[]>([]);
+  const [loading,    setLoading]    = useState(true);
+  const [error,      setError]      = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-    useEffect(() => {
-        // ── Mock data path (no API key / CORS needed) ──────────────────────────
-        if (USE_MOCK) {
-            setWeather(mockWeatherData.currentWeather[0] as CurrentWeather);
-            setForecasts(mockWeatherData.forecast as Forecast[]);
-            setCity({ Key: 'mock', LocalizedName: 'New York' });
-            setIsLoading(false);
-            return;
+  // ── Fetch city ──────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!location) {
+      setError('Location unavailable. Set a default city in Settings → Preferences.');
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    api.get(weatherConstants.GET_CITY, { params: { q: location } })
+      .then(({ data }) => {
+        if (data?.Key) { setCity(data); }
+        else { setError('Location not found. Check your city name.'); setLoading(false); setRefreshing(false); }
+      })
+      .catch(() => { setError('Could not resolve location. Is the server running?'); setLoading(false); setRefreshing(false); });
+  }, [location, refreshKey]);
+
+  // ── Fetch weather ───────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!city?.Key) return;
+    Promise.all([
+      api.get(`${weatherConstants.GET_CURRENT_WEATHER}/${city.Key}`, { params: { details: true } }),
+      api.get(`${weatherConstants.GET_CURRENT_FORECAST}/${city.Key}`),
+    ])
+      .then(([wRes, fRes]) => {
+        const w = wRes.data?.[0];
+        if (!w) throw new Error('Empty response');
+        setWeather(w);
+        setForecasts(fRes.data ?? []);
+        setFooterBg(footerBgFor(w.WeatherText, w.IsDayTime));
+      })
+      .catch(() => setError('Could not load weather. Is the server running?'))
+      .finally(() => { setLoading(false); setRefreshing(false); });
+  }, [city]);
+
+  if (loading) return (
+    <View style={st.center}>
+      <ActivityIndicator size="large" color={colors.textPrimary} />
+    </View>
+  );
+
+  if (error || !weather) return (
+    <View style={st.center}>
+      <Text style={st.errorText}>{error ?? 'Something went wrong.'}</Text>
+    </View>
+  );
+
+  const gradient = gradientFor(weather.WeatherText, weather.IsDayTime) as [string, string, ...string[]];
+  const tempVal  = settings.temperatureScale === 'Metric'
+    ? weather.Temperature.Metric.Value
+    : weather.Temperature.Imperial.Value;
+  const feelsVal = settings.temperatureScale === 'Metric'
+    ? weather.RealFeelTemperature.Metric.Value
+    : weather.RealFeelTemperature.Imperial.Value;
+
+  return (
+    <LinearGradient colors={gradient} style={st.root}>
+      <ScrollView
+        contentContainerStyle={st.scroll}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => { setRefreshing(true); onRefresh?.(); }}
+            tintColor={colors.textPrimary}
+          />
         }
-        // ── No location yet — wait for geolocation to resolve ─────────────────
-        // If location is genuinely empty (geo denied + no default set), surface
-        // an actionable error instead of spinning forever.
-        if (!location) {
-            setError('Location unavailable. Set a default city in Settings → Preferences.');
-            setIsLoading(false);
-            return;
-        }
+      >
+        {/* Header */}
+        <View style={[st.header, { paddingTop: spacing.lg + topInset }]}>
+          <Text style={st.city}>{city?.LocalizedName}</Text>
+          <Text style={st.condition}>{weather.WeatherText}</Text>
+        </View>
 
-        // Detect oversized cookies which commonly cause 431 responses when
-        // forwarded through the dev proxy. If we detect problematic cookies,
-        // surface a helpful error instead of attempting the request.
-        const cookieProblem = detectOversizedCookies();
-        if (cookieProblem) {
-            console.error('[Ojo] Oversized cookies detected:', cookieProblem);
-            setError(
-                'Browser cookies are too large and may be causing server errors (431).\nPlease clear cookies for localhost or set REACT_APP_SERVER_BASE to call the server directly.',
-            );
-            setIsLoading(false);
-            return;
-        }
+        {/* Hero icon + temperature */}
+        <View style={st.hero}>
+          <WeatherIconDisplay
+            condition={weather.WeatherText}
+            isDay={weather.IsDayTime}
+            size="large"
+            temperature={tempVal}
+            feelsLike={feelsVal}
+          />
+        </View>
 
-        const fetchCity = async () => {
-            try {
-                // Call the server proxy; the server appends the AccuWeather API key.
-                const { data } = await api.get(weatherConstants.GET_CITY, {
-                    params: { q: location },
-                });
-                if (data?.Key) {
-                    setCity(data);
-                } else {
-                    setError('Location not found. Check your coordinates.');
-                    setIsLoading(false);
-                }
-            } catch (err) {
-                console.error('[Ojo] City lookup failed:', err);
-                setError(
-                    'Could not resolve your location. Is the server running on port 4000?',
-                );
-                setIsLoading(false);
-            }
-        };
+        {/* Hourly forecast strip */}
+        {forecasts.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}
+            contentContainerStyle={st.forecastStrip}>
+            {forecasts.map((f, i) => (
+              <MinimizedWeatherDisplay
+                key={i}
+                weather={f.IconPhrase}
+                temperature={f.Temperature.Value}
+                time={f.DateTime}
+                tempUnit={f.Temperature.Unit}
+                isDay={f.IsDaylight}
+              />
+            ))}
+          </ScrollView>
+        )}
 
-        fetchCity();
-    }, [location]);
-
-    useEffect(() => {
-        if (!city?.Key || city.Key === 'mock') return;
-
-        const fetchWeather = async () => {
-            try {
-                const [weatherRes, forecastRes] = await Promise.all([
-                    api.get(
-                        `${weatherConstants.GET_CURRENT_WEATHER}/${city.Key}`,
-                        { params: { details: true } },
-                    ),
-                    api.get(
-                        `${weatherConstants.GET_CURRENT_FORECAST}/${city.Key}`,
-                    ),
-                ]);
-                const w = weatherRes.data?.[0];
-                if (!w) throw new Error('Empty weather response');
-                setWeather(w);
-                setForecasts(forecastRes.data ?? []);
-            } catch (err) {
-                console.error('[Ojo] Weather fetch failed:', err);
-                setError(
-                    'Could not load weather data. Is the server running on port 4000?',
-                );
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        fetchWeather();
-    }, [city]);
-
-    if (isLoading) return <Loading />;
-    if (error || !weather)
-        return (
-            <div className={styles.error}>
-                <span>{error ?? 'Something went wrong. Please refresh.'}</span>
-                {process.env.NODE_ENV === 'development' && (
-                    <span className={styles.errorHint}>
-                        Tip: set <code>REACT_APP_USE_MOCK=true</code> in{' '}
-                        <code>.env</code> to use mock data.
-                    </span>
-                )}
-            </div>
-        );
-
-    const bg = bgForCondition(weather.WeatherText, weather.IsDayTime);
-    const footerBg = footerBgForCondition(weather.WeatherText, weather.IsDayTime);
-    document.documentElement.style.setProperty('--footer-bg', footerBg);
-
-    return (
-        <div
-            className={styles.root}
-            style={{ background: bg }}
-        >
-            {/* Header */}
-            <div className={styles.header}>
-                <h1 className={styles.city}>{city?.LocalizedName}</h1>
-                <p className={styles.condition}>{weather.WeatherText}</p>
-            </div>
-
-            {/* Hero icon */}
-            <div className={styles.hero}>
-                <WeatherIconDisplay
-                    condition={weather.WeatherText}
-                    isDay={weather.IsDayTime}
-                    size='large'
-                    temperature={
-                        settings.temperatureScale === 'Metric'
-                            ? weather.Temperature.Metric.Value
-                            : weather.Temperature.Imperial.Value
-                    }
-                    feelsLike={
-                        settings.temperatureScale === 'Metric'
-                            ? weather.RealFeelTemperature.Metric.Value
-                            : weather.RealFeelTemperature.Imperial.Value
-                    }
-                />
-            </div>
-
-            {/* Hourly forecast strip */}
-            {forecasts.length > 0 && (
-                <div className={styles.forecastStrip}>
-                    {forecasts.map((f, i) => (
-                        <MinimizedWeatherDisplay
-                            key={i}
-                            weather={f.IconPhrase}
-                            temperature={f.Temperature.Value}
-                            time={f.DateTime}
-                            tempUnit={f.Temperature.Unit}
-                            isDay={f.IsDaylight}
-                        />
-                    ))}
-                </div>
-            )}
-
-            {/* Details + outfit */}
-            <div className={styles.details}>
-                <WeatherDetails
-                    weather={weather}
-                    settings={settings}
-                />
-            </div>
-        </div>
-    );
+        {/* Details + outfit */}
+        <View style={st.details}>
+          <WeatherDetails weather={weather} settings={settings} />
+        </View>
+      </ScrollView>
+    </LinearGradient>
+  );
 };
 
 export default WeatherHUD;
+
+const st = StyleSheet.create({
+  root:          { flex: 1 },
+  scroll:        { flexGrow: 1, paddingBottom: spacing.xl },
+  center:        { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: spacing.lg },
+  errorText:     { fontFamily: fonts.body, fontSize: fontSizes.base, color: colors.textSecondary, textAlign: 'center', lineHeight: fontSizes.base * 1.5 },
+  header:        { alignItems: 'center', paddingTop: spacing.lg, gap: 4 },
+  city:          { fontFamily: fonts.display, fontSize: 36, color: colors.textPrimary },
+  condition:     { fontFamily: fonts.body, fontSize: fontSizes.base, color: 'rgba(255,255,255,0.75)' },
+  hero:          { alignItems: 'center', paddingVertical: spacing.lg },
+  forecastStrip: { flexDirection: 'row', gap: 8, paddingHorizontal: spacing.md, paddingBottom: spacing.md },
+  details: {
+    marginHorizontal: spacing.md,
+    backgroundColor:  'rgba(15,23,42,0.55)',
+    borderRadius:     18,
+    borderWidth:      1,
+    borderColor:      'rgba(255,255,255,0.12)',
+    padding:          spacing.md,
+    gap:              spacing.md,
+  },
+});

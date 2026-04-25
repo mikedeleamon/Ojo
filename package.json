@@ -1,72 +1,49 @@
 {
-  "name": "ojo",
-  "version": "0.1.0",
-  "private": true,
-  "proxy": "http://localhost:4000",
-  "dependencies": {
-    "@testing-library/jest-dom": "^5.17.0",
-    "@testing-library/react": "^13.4.0",
-    "@testing-library/user-event": "^13.5.0",
-    "@types/bcryptjs": "^2.4.6",
-    "@types/jest": "^27.5.2",
-    "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^16.18.120",
-    "@types/react": "^18.3.12",
-    "@types/react-dom": "^18.3.1",
-    "ajv": "^8.18.0",
-    "ajv-keywords": "^5.1.0",
-    "axios": "^1.10.0",
-    "bcryptjs": "^3.0.3",
-    "cors": "^2.8.5",
-    "dotenv": "^17.4.1",
-    "express-rate-limit": "^8.4.0",
-    "jsonwebtoken": "^9.0.3",
-    "mongoose": "^8.16.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^6.30.1",
-    "react-scripts": "5.0.1",
-    "typescript": "^4.9.5",
-    "web-vitals": "^2.1.4"
-  },
+  "name": "ojo-native",
+  "version": "1.0.0",
+  "main": "index.ts",
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject",
-    "server": "npm run build-server && npm run start-server",
-    "build-server": "tsc -p tsconfig.server.json",
-    "start-server": "node --max-http-header-size=131072 ./dist-server/db/server.js",
-    "dev": "concurrently \"npm run server\" \"npm start\""
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "clean": "chmod -R u+w ios/Pods 2>/dev/null; rm -rf node_modules ios/build ios/Pods ios/.xcode.env.local android/build android/.gradle",
+    "clean-install": "rm -rf node_modules ios/build ios/Pods ios/.xcode.env.local android/build android/.gradle && npx expo install && cd ios && pod install && cd ..",
+    "dev": "concurrently --names \"server,expo\" --prefix-colors \"cyan,magenta\" \"npm run dev --prefix server\" \"expo start\""
   },
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
-  },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-community/slider": "5.0.1",
+    "@react-native-picker/picker": "2.11.1",
+    "@react-navigation/bottom-tabs": "^7.15.9",
+    "@react-navigation/native": "^7.2.2",
+    "@react-navigation/native-stack": "^7.14.11",
+    "axios": "^1.15.2",
+    "babel-preset-expo": "^55.0.18",
+    "buffer": "^6.0.3",
+    "expo": "~54.0.33",
+    "expo-blur": "~15.0.8",
+    "expo-dev-client": "~6.0.20",
+    "expo-font": "~14.0.11",
+    "expo-image-picker": "~17.0.10",
+    "expo-linear-gradient": "~15.0.8",
+    "expo-location": "~19.0.8",
+    "expo-secure-store": "~15.0.8",
+    "expo-splash-screen": "~31.0.13",
+    "expo-status-bar": "~3.0.9",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-gesture-handler": "~2.28.0",
+    "react-native-reanimated": "~4.1.1",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-screens": "~4.16.0",
+    "react-native-svg": "15.12.1",
+    "react-native-webview": "13.15.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.27.4",
-    "@babel/preset-env": "^7.27.2",
-    "@babel/preset-react": "^7.27.1",
-    "@babel/preset-typescript": "^7.27.1",
-    "@types/cors": "^2.8.19",
-    "babel-jest": "^30.0.2",
-    "concurrently": "^9.0.0",
-    "identity-obj-proxy": "^3.0.0",
-    "ts-jest": "^29.4.0",
-    "ts-node": "^10.9.2"
-  }
+    "@types/react": "~19.1.0",
+    "concurrently": "^9.2.1",
+    "typescript": "~5.3.3"
+  },
+  "private": true
 }

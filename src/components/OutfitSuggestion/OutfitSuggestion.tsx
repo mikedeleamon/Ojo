@@ -1,13 +1,15 @@
 import { useState, useMemo, useEffect } from 'react';
-
-import { useAppNavigation } from '../../hooks/useAppNavigation';
-import { ClothingArticle, CurrentWeather, Settings } from '../../types';
+import { StyleSheet, ScrollView, Image, Pressable } from 'react-native';
+import { Svg, Path, Circle } from 'react-native-svg';
+import { View, Text } from '../primitives';
+import { EmptyState } from '../shared';
 import { useClosets } from '../../hooks/useClosets';
+import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { generateOutfits, OutfitRole, OutfitResult, ScoreBreakdown } from '../../lib/outfitEngine';
 import { addHistoryEntry, recentlyWornIds } from '../../lib/outfitHistory';
 import { updatePreferences } from '../../lib/userPreferences';
-import { EmptyState } from '../shared';
-import styles from './OutfitSuggestion.module.css';
+import { ClothingArticle, CurrentWeather, Settings } from '../../types';
+import { colors, fonts, fontSizes, fontWeights, spacing, radius } from '../../theme/tokens';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -15,53 +17,12 @@ const CSS_COLORS: Record<string, string> = {
   Black: '#1a1a1a', White: '#f5f5f5', Grey: '#9ca3af', Navy: '#1e3a5f',
   Blue: '#3b82f6', Green: '#22c55e', Red: '#ef4444', Brown: '#92400e',
   Beige: '#d4b896', Pink: '#f9a8d4', Yellow: '#fbbf24', Purple: '#a855f7',
-  Orange: '#f97316', Multi: 'linear-gradient(135deg, #f97316, #3b82f6, #22c55e)',
+  Orange: '#f97316',
 };
 
-const ROLE_META: Record<OutfitRole, { label: string; icon: React.ReactNode }> = {
-  top:       { label: 'Top',       icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M3 6l4-3h10l4 3-4 4v11H7V10L3 6z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg> },
-  bottom:    { label: 'Bottom',    icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 4h16v4l-4 12H8L4 8V4z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg> },
-  fullBody:  { label: 'Outfit',    icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2a3 3 0 0 1 3 3v1l4 2v14H5V8l4-2V5a3 3 0 0 1 3-3z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg> },
-  outerwear: { label: 'Outerwear', icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 6l3-3 5 3 5-3 3 3v14H4V6z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg> },
-  footwear:  { label: 'Footwear',  icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M3 16l4-8h4l1 4h9v4H3z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg> },
-  accessory: { label: 'Extra',     icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.5"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg> },
-};
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-const ArticleThumb = ({ article, role }: { article: ClothingArticle; role: OutfitRole }) => {
-  const meta = ROLE_META[role];
-  return (
-    <div className={styles.articleCard}>
-      <div className={styles.articleImg}>
-        {article.imageUrl
-          ? <img src={article.imageUrl} alt={article.name || article.clothingType} />
-          : <span className={styles.articleFallbackIcon}>{meta.icon}</span>
-        }
-        {article.color && (
-          <span className={styles.colorDot} title={article.color}
-            style={{ background: CSS_COLORS[article.color] ?? '#888' }} />
-        )}
-      </div>
-      <div className={styles.articleLabel}>
-        <span className={styles.roleLabel}>{meta.label}</span>
-        <span className={styles.articleName}>{article.name || article.clothingType}</span>
-        {article.fabricType && <span className={styles.articleMeta}>{article.fabricType}</span>}
-      </div>
-    </div>
-  );
-};
-
-const ScoreBadge = ({ score }: { score: number }) => {
-  const color =
-    score >= 80 ? 'rgba(52,211,153,0.9)'  :
-    score >= 60 ? 'rgba(251,191,36,0.9)'  :
-                  'rgba(148,163,184,0.9)';
-  return (
-    <span className={styles.scoreBadge} style={{ color, borderColor: color }}>
-      {score}
-    </span>
-  );
+const ROLE_LABELS: Record<OutfitRole, string> = {
+  top: 'Top', bottom: 'Bottom', fullBody: 'Outfit',
+  outerwear: 'Outerwear', footwear: 'Footwear', accessory: 'Extra',
 };
 
 const BREAKDOWN_LABELS: { key: keyof ScoreBreakdown; label: string }[] = [
@@ -72,36 +33,42 @@ const BREAKDOWN_LABELS: { key: keyof ScoreBreakdown; label: string }[] = [
   { key: 'preference', label: 'You'     },
 ];
 
-const ScoreBreakdownRow = ({ breakdown, expanded }: { breakdown: ScoreBreakdown; expanded: boolean }) => {
-  if (!expanded) return null;
-  return (
-    <div className={styles.breakdownRow}>
-      {BREAKDOWN_LABELS.map(({ key, label }) => (
-        <div key={key} className={styles.breakdownItem}>
-          <span className={styles.breakdownLabel}>{label}</span>
-          <div className={styles.breakdownBar}>
-            <div
-              className={styles.breakdownFill}
-              style={{ width: `${breakdown[key]}%` }}
-            />
-          </div>
-          <span className={styles.breakdownValue}>{breakdown[key]}</span>
-        </div>
-      ))}
-    </div>
-  );
-};
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
-const HangerIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-    <path d="M12 4a2 2 0 0 1 2 2c0 .74-.4 1.38-1 1.73V9l8 5.5A1 1 0 0 1 20 16H4a1 1 0 0 1-.99-1.5L11 9V7.73A2 2 0 0 1 12 4Z"
-      stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-  </svg>
+const HangerIcon = ({ size = 24, color = colors.textSecondary }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M12 4a2 2 0 0 1 2 2c0 .74-.4 1.38-1 1.73V9l8 5.5A1 1 0 0 1 20 16H4a1 1 0 0 1-.99-1.5L11 9V7.73A2 2 0 0 1 12 4Z"
+      stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"/>
+  </Svg>
 );
 
-// Alias EmptyState with the local styles object pre-bound
-const Prompt = (props: Omit<Parameters<typeof EmptyState>[0], 'styles'>) =>
-  <EmptyState {...props} styles={styles} />;
+const ArticleThumb = ({ article, role }: { article: ClothingArticle; role: OutfitRole }) => (
+  <View style={st.articleCard}>
+    <View style={st.articleImg}>
+      {article.imageUrl
+        ? <Image source={{ uri: article.imageUrl }} style={st.articleImgFill} resizeMode="cover" />
+        : <HangerIcon size={20} color={colors.textMuted} />
+      }
+      {article.color && CSS_COLORS[article.color] && (
+        <View style={[st.colorDot, { backgroundColor: CSS_COLORS[article.color] }]} />
+      )}
+    </View>
+    <View style={st.articleLabel}>
+      <Text style={st.roleLabel}>{ROLE_LABELS[role]}</Text>
+      <Text style={st.articleName} numberOfLines={1}>{article.name || article.clothingType}</Text>
+      {article.fabricType ? <Text style={st.articleMeta}>{article.fabricType}</Text> : null}
+    </View>
+  </View>
+);
+
+const ScoreBadge = ({ score }: { score: number }) => {
+  const color = score >= 80 ? 'rgba(52,211,153,0.9)' : score >= 60 ? 'rgba(251,191,36,0.9)' : 'rgba(148,163,184,0.9)';
+  return (
+    <View style={[st.scoreBadge, { borderColor: color }]}>
+      <Text style={[st.scoreBadgeText, { color }]}>{score}</Text>
+    </View>
+  );
+};
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
@@ -113,7 +80,10 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
   const [activeIdx,     setActiveIdx]     = useState(0);
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [wornLogged,    setWornLogged]    = useState(false);
+  const [worn,          setWorn]          = useState<Set<string>>(new Set());
   const nav = useAppNavigation();
+
+  useEffect(() => { recentlyWornIds(3).then(setWorn); }, []);
 
   const setPreferredCloset = async (id: string) => {
     setSettingPref(true);
@@ -121,201 +91,212 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
     setSettingPref(false);
   };
 
-  // Load recently worn IDs once on mount (async)
-  const [worn, setWorn] = useState<Set<string>>(new Set());
-  useEffect(() => {
-    recentlyWornIds(3).then(setWorn);
-  }, []);
-
   const { outfits, status } = useMemo(() => {
     if (!preferred) return { outfits: [], status: 'no_preferred' as const };
     const { results, status } = generateOutfits(preferred.articles, weather, settings, worn, 3);
     return { outfits: results, status };
   }, [preferred, weather, settings, worn]);
 
-  const safeIdx    = Math.min(activeIdx, Math.max(0, outfits.length - 1));
+  const safeIdx      = Math.min(activeIdx, Math.max(0, outfits.length - 1));
   const activeOutfit: OutfitResult | null = outfits[safeIdx] ?? null;
 
   const handleWoreThis = async () => {
     if (!preferred || !activeOutfit || activeOutfit.status !== 'ok') return;
     const articles = activeOutfit.slots.map(s => s.article);
-    await addHistoryEntry({ closetId: preferred._id, closetName: preferred.name,
-      articleIds: articles.map(a => a._id), articleSummary: articles.map(a => a.name || a.clothingType).join(', ') });
+    await addHistoryEntry({
+      closetId: preferred._id, closetName: preferred.name,
+      articleIds: articles.map(a => a._id),
+      articleSummary: articles.map(a => a.name || a.clothingType).join(', '),
+    });
     await updatePreferences(articles);
     setWornLogged(true);
     setTimeout(() => setWornLogged(false), 3000);
   };
 
-  const goToCloset = () => nav.push(preferred ? `/closet?open=${preferred._id}` : '/closet');
-
-  if (loading) return <div className={styles.root}><div className={styles.skeleton} /></div>;
+  if (loading) return null;
 
   if (closets.length === 0) return (
-    <div className={styles.root}>
-      <Prompt icon={<HangerIcon />} title="No closet yet"
-        body="Create a closet and add your clothes to get outfit suggestions."
-        action={<button className={styles.ctaBtn} onClick={() => nav.push('/closet')}>Create closet</button>} />
-    </div>
+    <EmptyState
+      icon={<HangerIcon size={32} />}
+      title="No closet yet"
+      body="Create a closet and add your clothes to get outfit suggestions."
+      action={
+        <Pressable style={st.ctaBtn} onPress={() => nav.push('Closet')}>
+          <Text style={st.ctaBtnText}>Create closet</Text>
+        </Pressable>
+      }
+    />
   );
 
   if (!preferred) return (
-    <div className={styles.root}>
-      <p className={styles.sectionLabel}>Outfit</p>
-      <Prompt icon={<HangerIcon />} title="Pick a preferred closet"
+    <View style={st.root}>
+      <Text style={st.sectionLabel}>Outfit</Text>
+      <EmptyState icon={<HangerIcon size={32} />} title="Pick a preferred closet"
         body="Select a closet to use for daily outfit suggestions." />
-      <div className={styles.closetPicker}>
+      <View style={st.closetPicker}>
         {closets.map(c => (
-          <button key={c._id} className={styles.closetPickBtn}
-            onClick={() => setPreferredCloset(c._id)} disabled={settingPref}>
-            <HangerIcon />
-            {c.name}
-            <span className={styles.closetCount}>{c.articles.length}</span>
-          </button>
+          <Pressable key={c._id} style={st.closetPickBtn}
+            onPress={() => setPreferredCloset(c._id)} disabled={settingPref}>
+            <HangerIcon size={14} color={colors.textSecondary} />
+            <Text style={st.closetPickName}>{c.name}</Text>
+            <Text style={st.closetPickCount}>{c.articles.length}</Text>
+          </Pressable>
         ))}
-      </div>
-    </div>
+      </View>
+    </View>
   );
 
-  if (status === 'empty_closet') return (
-    <div className={styles.root}>
-      <div className={styles.badgeRow}>
-        <PreferredBadge name={preferred.name} closetId={preferred._id} />
-        <button className={styles.changePrefBtn} onClick={() => setClosets(prev => prev.map(c => ({ ...c, isPreferred: false })))}>change</button>
-      </div>
-      <Prompt icon={<HangerIcon />} title="This closet is empty"
-        body="Add clothing articles to get outfit suggestions."
-        action={<button className={styles.ctaBtn} onClick={goToCloset}>Add clothes</button>} />
-    </div>
-  );
-
-  if (status === 'insufficient') return (
-    <div className={styles.root}>
-      <div className={styles.badgeRow}>
-        <PreferredBadge name={preferred.name} closetId={preferred._id} />
-        <button className={styles.changePrefBtn} onClick={() => setClosets(prev => prev.map(c => ({ ...c, isPreferred: false })))}>change</button>
-      </div>
-      <Prompt
-        icon={<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>}
-        title="Not enough to build an outfit"
-        body="Add a top and a bottom (or a full-body piece) to get a suggestion."
-        action={<button className={styles.ctaBtn} onClick={goToCloset}>Add more clothes</button>} />
-    </div>
+  if (status === 'empty_closet' || status === 'insufficient') return (
+    <View style={st.root}>
+      <PreferredBadge name={preferred.name} onPress={() => nav.push('Closet')} />
+      <EmptyState
+        icon={<HangerIcon size={32} />}
+        title={status === 'empty_closet' ? 'This closet is empty' : 'Not enough to build an outfit'}
+        body={status === 'empty_closet'
+          ? 'Add clothing articles to get outfit suggestions.'
+          : 'Add a top and a bottom (or a full-body piece) to get a suggestion.'}
+        action={
+          <Pressable style={st.ctaBtn} onPress={() => nav.push('Closet')}>
+            <Text style={st.ctaBtnText}>Add clothes</Text>
+          </Pressable>
+        }
+      />
+    </View>
   );
 
   if (!activeOutfit) return null;
 
   return (
-    <div className={styles.root}>
-      {/* ── Header: preferred badge + score ─────────────────────────────── */}
-      <div className={styles.header}>
-        <div className={styles.badgeRow}>
-          <PreferredBadge name={preferred.name} closetId={preferred._id} />
-          <button className={styles.changePrefBtn} onClick={() => setClosets(prev => prev.map(c => ({ ...c, isPreferred: false })))}>change</button>
-        </div>
+    <View style={st.root}>
+      {/* Header */}
+      <View style={st.header}>
+        <PreferredBadge name={preferred.name} onPress={() => nav.push('Closet')} />
         <ScoreBadge score={activeOutfit.score} />
-      </div>
+      </View>
 
-      {/* ── Top-3 outfit selector tabs ───────────────────────────────────── */}
+      {/* Outfit selector tabs */}
       {outfits.length > 1 && (
-        <div className={styles.outfitTabs}>
-          {outfits.map((o, i) => (
-            <button
-              key={i}
-              className={`${styles.outfitTab} ${i === safeIdx ? styles.outfitTabActive : ''}`}
-              onClick={() => { setActiveIdx(i); setWornLogged(false); setShowBreakdown(false); }}
-            >
-              {i === 0 ? 'Best match' : `Option ${i + 1}`}
-              <span className={styles.tabScore}>{o.score}</span>
-            </button>
-          ))}
-        </div>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={st.tabsScroll}>
+          <View style={st.tabs}>
+            {outfits.map((o, i) => (
+              <Pressable key={i}
+                style={[st.tab, i === safeIdx && st.tabActive]}
+                onPress={() => { setActiveIdx(i); setWornLogged(false); setShowBreakdown(false); }}>
+                <Text style={[st.tabText, i === safeIdx && st.tabTextActive]}>
+                  {i === 0 ? 'Best match' : `Option ${i + 1}`}
+                </Text>
+                <Text style={[st.tabScore, i === safeIdx && st.tabTextActive]}>{o.score}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </ScrollView>
       )}
 
-      {/* ── Headline ─────────────────────────────────────────────────────── */}
-      <p className={styles.headline}>{activeOutfit.headline}</p>
+      {/* Headline */}
+      <Text style={st.headline}>{activeOutfit.headline}</Text>
 
-      {/* ── Article grid ─────────────────────────────────────────────────── */}
-      <div className={styles.articleGrid}>
+      {/* Article grid */}
+      <View style={st.articleGrid}>
         {activeOutfit.slots.map((slot, i) => (
           <ArticleThumb key={`${safeIdx}-${i}`} article={slot.article} role={slot.role} />
         ))}
-      </div>
+      </View>
 
-      {/* ── Score breakdown (expandable) ─────────────────────────────────── */}
-      <button
-        className={styles.breakdownToggle}
-        onClick={() => setShowBreakdown(v => !v)}
-      >
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-          <path d="M2 4h12M4 8h8M6 12h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-        </svg>
-        {showBreakdown ? 'Hide breakdown' : 'Score breakdown'}
-        <svg className={`${styles.chevron} ${showBreakdown ? styles.chevronOpen : ''}`}
-          width="12" height="12" viewBox="0 0 16 16" fill="none">
-          <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      </button>
-      <ScoreBreakdownRow breakdown={activeOutfit.scoreBreakdown} expanded={showBreakdown} />
+      {/* Score breakdown */}
+      <Pressable style={st.breakdownToggle} onPress={() => setShowBreakdown(v => !v)}>
+        <Text style={st.breakdownToggleText}>
+          {showBreakdown ? 'Hide breakdown' : 'Score breakdown'}
+        </Text>
+      </Pressable>
 
-      {/* ── Notes ────────────────────────────────────────────────────────── */}
-      {activeOutfit.notes.length > 0 && (
-        <ul className={styles.notesList}>
-          {activeOutfit.notes.map((n, i) => (
-            <li key={i} className={styles.note}>
-              <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-                <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.2"/>
-                <path d="M8 7v4M8 5.5v.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-              </svg>
-              {n}
-            </li>
+      {showBreakdown && (
+        <View style={st.breakdownRow}>
+          {BREAKDOWN_LABELS.map(({ key, label }) => (
+            <View key={key} style={st.breakdownItem}>
+              <Text style={st.breakdownLabel}>{label}</Text>
+              <View style={st.breakdownBarBg}>
+                <View style={[st.breakdownBarFill, { width: `${activeOutfit.scoreBreakdown[key]}%` as any }]} />
+              </View>
+              <Text style={st.breakdownValue}>{activeOutfit.scoreBreakdown[key]}</Text>
+            </View>
           ))}
-        </ul>
+        </View>
       )}
 
-      {/* ── Wore this today ───────────────────────────────────────────────── */}
-      <button
-        className={`${styles.woreThisBtn} ${wornLogged ? styles.woreThisLogged : ''}`}
-        onClick={handleWoreThis}
-        disabled={wornLogged}
-      >
-        {wornLogged ? (
-          <>
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-              <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.2"/>
-              <path d="M5 8l2.5 2.5L11 5.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            Logged!
-          </>
-        ) : (
-          <>
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-              <path d="M8 2a6 6 0 1 0 0 12A6 6 0 0 0 8 2zm0 3v3l2 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            Wore this today
-          </>
-        )}
-      </button>
-    </div>
+      {/* Notes */}
+      {activeOutfit.notes.length > 0 && (
+        <View style={st.notesList}>
+          {activeOutfit.notes.map((n, i) => (
+            <Text key={i} style={st.note}>· {n}</Text>
+          ))}
+        </View>
+      )}
+
+      {/* Wore this today */}
+      <Pressable
+        style={[st.woreThisBtn, wornLogged && st.woreThisLogged]}
+        onPress={handleWoreThis}
+        disabled={wornLogged}>
+        <Text style={[st.woreThisText, wornLogged && st.woreThisTextLogged]}>
+          {wornLogged ? '✓ Logged!' : '⏱ Wore this today'}
+        </Text>
+      </Pressable>
+    </View>
   );
 };
 
-// ─── Shared sub-component ─────────────────────────────────────────────────────
-
-const PreferredBadge = ({ name, closetId }: { name: string; closetId: string }) => {
-  const nav = useAppNavigation();
-  return (
-    <button
-      className={styles.preferredBadge}
-      onClick={() => nav.push(`/closet?open=${closetId}`)}
-      title="Open this closet"
-    >
-      <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
-        <path d="M12 4a2 2 0 0 1 2 2c0 .74-.4 1.38-1 1.73V9l8 5.5A1 1 0 0 1 20 16H4a1 1 0 0 1-.99-1.5L11 9V7.73A2 2 0 0 1 12 4Z"
-          stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg>
-      <span>{name}</span>
-    </button>
-  );
-};
+const PreferredBadge = ({ name, onPress }: { name: string; onPress: () => void }) => (
+  <Pressable style={st.preferredBadge} onPress={onPress}>
+    <HangerIcon size={11} color={colors.textSecondary} />
+    <Text style={st.preferredBadgeText}>{name}</Text>
+  </Pressable>
+);
 
 export default OutfitSuggestion;
+
+const st = StyleSheet.create({
+  root:           { gap: spacing.sm },
+  sectionLabel:   { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textMuted, fontWeight: fontWeights.medium, textTransform: 'uppercase', letterSpacing: 1 },
+  header:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  preferredBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 5, paddingHorizontal: 10, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: radius.pill, borderWidth: 1, borderColor: colors.glassBorder },
+  preferredBadgeText: { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textSecondary },
+  scoreBadge:     { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, borderWidth: 1 },
+  scoreBadgeText: { fontFamily: fonts.body, fontSize: fontSizes.sm, fontWeight: fontWeights.semibold },
+  tabsScroll:     { marginHorizontal: -spacing.md },
+  tabs:           { flexDirection: 'row', gap: 8, paddingHorizontal: spacing.md, paddingBottom: 4 },
+  tab:            { paddingVertical: 6, paddingHorizontal: 14, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.glassBorder, flexDirection: 'row', gap: 6, alignItems: 'center' },
+  tabActive:      { backgroundColor: 'rgba(255,255,255,0.12)', borderColor: colors.glassBorder },
+  tabText:        { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textSecondary },
+  tabTextActive:  { color: colors.textPrimary },
+  tabScore:       { fontFamily: fonts.body, fontSize: 10, color: colors.textMuted },
+  headline:       { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.textSecondary, lineHeight: fontSizes.sm * 1.5 },
+  articleGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  articleCard:    { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: radius.sm, borderWidth: 1, borderColor: colors.glassBorder, padding: 8, flex: 1, minWidth: 140 },
+  articleImg:     { width: 44, height: 44, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.05)', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  articleImgFill: { width: 44, height: 44 },
+  colorDot:       { position: 'absolute', bottom: 2, right: 2, width: 8, height: 8, borderRadius: 4, borderWidth: 1, borderColor: 'rgba(0,0,0,0.2)' },
+  articleLabel:   { flex: 1, gap: 2 },
+  roleLabel:      { fontFamily: fonts.body, fontSize: 10, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  articleName:    { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textPrimary, fontWeight: fontWeights.medium },
+  articleMeta:    { fontFamily: fonts.body, fontSize: 10, color: colors.textMuted },
+  breakdownToggle:     { paddingVertical: 6, alignSelf: 'flex-start' },
+  breakdownToggleText: { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textSecondary, textDecorationLine: 'underline' },
+  breakdownRow:   { gap: 6 },
+  breakdownItem:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  breakdownLabel: { fontFamily: fonts.body, fontSize: 10, color: colors.textMuted, width: 46 },
+  breakdownBarBg: { flex: 1, height: 4, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' },
+  breakdownBarFill: { height: 4, backgroundColor: colors.textSecondary, borderRadius: 2 },
+  breakdownValue: { fontFamily: fonts.body, fontSize: 10, color: colors.textMuted, width: 24, textAlign: 'right' },
+  notesList:      { gap: 4 },
+  note:           { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textSecondary, lineHeight: fontSizes.xs * 1.5 },
+  woreThisBtn:    { marginTop: 4, paddingVertical: 10, paddingHorizontal: spacing.md, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.glassBorder, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)' },
+  woreThisLogged: { borderColor: 'rgba(52,211,153,0.4)', backgroundColor: 'rgba(52,211,153,0.08)' },
+  woreThisText:   { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.textSecondary },
+  woreThisTextLogged: { color: colors.successText },
+  ctaBtn:         { paddingVertical: 10, paddingHorizontal: spacing.md, backgroundColor: colors.saveBtnBg, borderRadius: radius.sm, alignItems: 'center', marginTop: 4 },
+  ctaBtnText:     { fontFamily: fonts.body, fontSize: fontSizes.sm, fontWeight: fontWeights.semibold, color: colors.saveBtnText },
+  closetPicker:   { gap: 8, marginTop: 4 },
+  closetPickBtn:  { flexDirection: 'row', alignItems: 'center', gap: 8, padding: spacing.sm, backgroundColor: colors.glassBg, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.glassBorder },
+  closetPickName: { flex: 1, fontFamily: fonts.body, fontSize: fontSizes.base, color: colors.textPrimary },
+  closetPickCount:{ fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textMuted },
+});

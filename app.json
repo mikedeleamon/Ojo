@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "Ojo",
+    "slug": "ojo",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0F172A"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.placeholder.ojo",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Ojo uses your location to fetch local weather for outfit suggestions.",
+        "NSPhotoLibraryUsageDescription": "Ojo uses your photo library so you can add images of your clothing items."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0F172A"
+      },
+      "package": "com.placeholder.ojo",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "READ_MEDIA_IMAGES"
+      ]
+    },
+    "plugins": [
+      "expo-secure-store",
+      ["expo-location", {
+        "locationWhenInUsePermission": "Ojo uses your location for local weather."
+      }],
+      ["expo-image-picker", {
+        "photosPermission": "Ojo uses your photo library to add clothing images."
+      }]
+    ]
+  }
+}

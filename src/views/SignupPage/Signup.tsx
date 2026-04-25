@@ -1,99 +1,264 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useAppNavigation } from '../../hooks/useAppNavigation';
+import {
+    StyleSheet,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, TextInput, Pressable } from '../../components/primitives';
 import axios from '../../api/client';
-import OjoLogo from '../../assets/images/logos/Ojo word logo 2.png';
-import { formatDate } from '../../helpers/formatTools.js';
-import { AUTH_KEY, getErrorMessage, saveAuth } from '../../lib/auth';
-import styles from './SignupPage.module.css';
+import { AuthState, Settings } from '../../types';
+import { getErrorMessage, saveAuth } from '../../lib/auth';
+import { useAppNavigation } from '../../hooks/useAppNavigation';
+import {
+    colors,
+    spacing,
+    radius,
+    fonts,
+    fontSizes,
+    fontWeights,
+} from '../../theme/tokens';
 
-interface Props {
-  setLoggedIn: (v: boolean) => void;
-  setNeedsOnboarding: (v: boolean) => void;
+interface FormState {
+    firstName: string;
+    lastName: string;
+    username: string;
+    email: string;
+    password: string;
+    confirmPassword: string;
+    birthday: string;
 }
 
-const Field = ({ label, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) => (
-  <label className={styles.field}>
-    <span className={styles.fieldLabel}>{label}</span>
-    <input className={styles.input} {...props} />
-  </label>
-);
+interface Props {
+    onLogin?: () => void;
+}
 
-const SignupPage = ({ setLoggedIn, setNeedsOnboarding }: Props) => {
-  const [form, setForm] = useState({
-    firstName: '', lastName: '', birthday: '',
-    email: '', username: '', password: '', passwordConfirmation: '',
-  });
-  const [error,   setError]   = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const nav = useAppNavigation();
+export default function SignupPage({ onLogin }: Props) {
+    const nav = useAppNavigation();
+    const [form, setForm] = useState<FormState>({
+        firstName: '',
+        lastName: '',
+        username: '',
+        email: '',
+        password: '',
+        confirmPassword: '',
+        birthday: '',
+    });
+    const [error, setError] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
 
-  const set = (key: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm(f => ({ ...f, [key]: e.target.value }));
+    const set = (key: keyof FormState) => (val: string) =>
+        setForm((f) => ({ ...f, [key]: val }));
 
-  const onSubmit = async () => {
-    setError(null);
-    if (form.password !== form.passwordConfirmation) { setError('Passwords do not match.'); return; }
-    if (form.password.length < 8) { setError('Password must be at least 8 characters.'); return; }
-    setLoading(true);
-    try {
-      const { data } = await axios.post('/api/auth/signup', {
-        firstName: form.firstName,
-        lastName:  form.lastName,
-        username:  form.username,
-        email:     form.email,
-        password:  form.password,
-        birthday:  form.birthday,
-      });
-      await saveAuth(data.token, data.user);
-      setNeedsOnboarding(true);
-      setLoggedIn(true);
-      nav.push('/onboarding');
-    } catch (err: unknown) {
-      setError(getErrorMessage(err, 'Sign up failed. Please try again.'));
-    } finally {
-      setLoading(false);
-    }
-  };
+    const handleSubmit = async () => {
+        setError(null);
+        if (
+            !form.firstName ||
+            !form.lastName ||
+            !form.email ||
+            !form.password ||
+            !form.birthday
+        ) {
+            setError('All fields are required.');
+            return;
+        }
+        if (form.password.length < 8) {
+            setError('Password must be at least 8 characters.');
+            return;
+        }
+        setLoading(true);
+        try {
+            const { data } = await axios.post<
+                AuthState & { settings: Settings }
+            >('/api/auth/signup', form);
+            await saveAuth(data.token, data.user);
+            onLogin?.();
+            nav.replace('Onboarding');
+        } catch (err: unknown) {
+            setError(getErrorMessage(err, 'Sign up failed. Please try again.'));
+        } finally {
+            setLoading(false);
+        }
+    };
 
-  return (
-    <div className={styles.root}>
-      <div className={styles.card}>
-        <Link to='/login' className={styles.backBtn} aria-label='Back'>
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <path d="M11 14l-5-5 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </Link>
+    const fields: {
+        label: string;
+        key: keyof FormState;
+        placeholder: string;
+        type?: 'email' | 'password' | 'date';
+    }[] = [
+        { label: 'First name', key: 'firstName', placeholder: 'Jane' },
+        { label: 'Last name', key: 'lastName', placeholder: 'Doe' },
+        {
+            label: 'Date of birth',
+            key: 'birthday',
+            placeholder: 'MM/DD/YYYY',
+            type: 'date',
+        },
+        { label: 'Username', key: 'username', placeholder: '@janedoe' },
+        {
+            label: 'Email',
+            key: 'email',
+            placeholder: 'jane@example.com',
+            type: 'email',
+        },
+        {
+            label: 'Password',
+            key: 'password',
+            placeholder: '8+ characters',
+            type: 'password',
+        },
+        {
+            label: 'Confirm Password',
+            key: 'confirmPassword',
+            placeholder: 'same password',
+            type: 'password',
+        },
+    ];
 
-        <img src={OjoLogo} alt='Ojo' className={styles.logo} />
-        <h1 className={styles.heading}>Create account</h1>
+    return (
+        <SafeAreaView style={styles.root}>
+            <KeyboardAvoidingView
+                style={{ flex: 1 }}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            >
+                <ScrollView
+                    contentContainerStyle={styles.content}
+                    keyboardShouldPersistTaps='handled'
+                >
+                    <Text style={styles.title}>Create account</Text>
+                    {error ? (
+                        <View style={styles.errorBox}>
+                            <Text style={styles.errorText}>{error}</Text>
+                        </View>
+                    ) : null}
 
-        {error && <p className={styles.error}>{error}</p>}
+                    {fields.map((f) => (
+                        <View
+                            key={f.key}
+                            style={styles.field}
+                        >
+                            <Text style={styles.label}>{f.label}</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder={f.placeholder}
+                                placeholderTextColor={colors.textMuted}
+                                secureTextEntry={f.type === 'password'}
+                                keyboardType={
+                                    f.type === 'email'
+                                        ? 'email-address'
+                                        : 'default'
+                                }
+                                autoCapitalize={
+                                    f.type === 'email' || f.key === 'username'
+                                        ? 'none'
+                                        : 'words'
+                                }
+                                textContentType={
+                                    f.type === 'email'
+                                        ? 'emailAddress'
+                                        : f.type === 'password'
+                                          ? 'newPassword'
+                                          : 'none'
+                                }
+                                value={form[f.key]}
+                                onChangeText={set(f.key)}
+                            />
+                        </View>
+                    ))}
 
-        <div className={styles.fields}>
-          <div className={styles.row}>
-            <Field label='First name' type='text' placeholder='Jane' value={form.firstName} onChange={set('firstName')} />
-            <Field label='Last name'  type='text' placeholder='Doe'  value={form.lastName}  onChange={set('lastName')} />
-          </div>
-          <Field label='Date of birth' type='text' placeholder='MM/DD/YYYY' value={form.birthday}
-            onChange={e => setForm(f => ({ ...f, birthday: formatDate(e) }))} />
-          <Field label='Email'    type='email' placeholder='you@example.com' value={form.email}    onChange={set('email')} />
-          <Field label='Username' type='text'  placeholder='@janedoe'        value={form.username} onChange={set('username')} />
-          <Field label='Password'         type='password' placeholder='••••••••' value={form.password}             onChange={set('password')} />
-          <Field label='Confirm password' type='password' placeholder='••••••••' value={form.passwordConfirmation} onChange={set('passwordConfirmation')} />
-        </div>
+                    <Pressable
+                        style={[styles.btn, loading && { opacity: 0.5 }]}
+                        onPress={handleSubmit}
+                        disabled={loading}
+                    >
+                        <Text style={styles.btnText}>
+                            {loading ? 'Creating account…' : 'Create account'}
+                        </Text>
+                    </Pressable>
 
-        <button className={styles.btn} onClick={onSubmit} disabled={loading}>
-          {loading ? 'Creating account…' : 'Create account'}
-        </button>
+                    <View style={styles.footer}>
+                        <Text style={styles.footerText}>
+                            Already have an account?{' '}
+                        </Text>
+                        <Pressable onPress={() => nav.goBack()}>
+                            <Text style={styles.link}>Sign in</Text>
+                        </Pressable>
+                    </View>
+                </ScrollView>
+            </KeyboardAvoidingView>
+        </SafeAreaView>
+    );
+}
 
-        <p className={styles.footer}>
-          Already have an account?{' '}
-          <Link to='/login' className={styles.link}>Sign in</Link>
-        </p>
-      </div>
-    </div>
-  );
-};
-
-export default SignupPage;
+const styles = StyleSheet.create({
+    root: { flex: 1, backgroundColor: colors.bgDefault },
+    content: { flexGrow: 1, padding: spacing.md, gap: spacing.md },
+    title: {
+        fontFamily: 'DMSerifDisplay',
+        fontSize: 32,
+        color: colors.textPrimary,
+        letterSpacing: -0.02 * 32,
+    },
+    errorBox: {
+        padding: spacing.sm,
+        backgroundColor: colors.errorBg,
+        borderRadius: radius.sm,
+        borderWidth: 1,
+        borderColor: colors.errorBorder,
+    },
+    errorText: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.sm,
+        color: colors.errorText,
+    },
+    field: { gap: 6 },
+    label: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs,
+        fontWeight: fontWeights.medium,
+        letterSpacing: 0.1 * fontSizes.xs,
+        textTransform: 'uppercase',
+        color: colors.textMuted,
+    },
+    input: {
+        paddingVertical: 12,
+        paddingHorizontal: spacing.md,
+        backgroundColor: colors.glassBg,
+        borderWidth: 1,
+        borderColor: colors.glassBorder,
+        borderRadius: radius.sm,
+        color: colors.textPrimary,
+        fontFamily: fonts.body,
+        fontSize: fontSizes.base,
+    },
+    btn: {
+        paddingVertical: 14,
+        backgroundColor: colors.saveBtnBg,
+        borderRadius: radius.sm,
+        alignItems: 'center',
+    },
+    btnText: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.base,
+        fontWeight: fontWeights.semibold,
+        color: colors.saveBtnText,
+    },
+    footer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    footerText: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.sm,
+        color: colors.textSecondary,
+    },
+    link: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.sm,
+        color: colors.textPrimary,
+        textDecorationLine: 'underline',
+    },
+});

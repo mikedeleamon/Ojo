@@ -19,6 +19,7 @@
  *   - overflow: hidden on modals → works differently, use Modal component instead
  */
 
+import { StyleSheet } from 'react-native';
 import { colors, spacing, radius, fonts, fontSizes, fontWeights } from '../../../theme/tokens';
 
 // ─── Forms ────────────────────────────────────────────────────────────────────
@@ -79,25 +80,34 @@ const form = {
 // ─── Status messages ──────────────────────────────────────────────────────────
 
 const status = {
+  // Base container — combine with success/error for coloured variants
+  statusMsgBase: {
+    paddingVertical:   10,
+    paddingHorizontal: spacing.md,
+    borderRadius:      radius.sm,
+    fontSize:          14,
+  },
+
+  // Keep statusMsg as alias for backward compat
   statusMsg: {
     paddingVertical:   10,
     paddingHorizontal: spacing.md,
     borderRadius:      radius.sm,
-    fontSize:          14,             // 0.88rem
+    fontSize:          14,
   },
 
   success: {
     backgroundColor: colors.successBg,
     borderWidth:     1,
     borderColor:     colors.successBorder,
-    color:           colors.successText,
+    // Note: color belongs on <Text> inside, not the <View> — use colors.successText
   },
 
   error: {
     backgroundColor: colors.errorBg,
     borderWidth:     1,
     borderColor:     colors.errorBorder,
-    color:           colors.errorText,
+    // Note: color belongs on <Text> inside, not the <View> — use colors.errorText
   },
 };
 
@@ -476,10 +486,14 @@ const danger = {
 //   modalCard     → unchanged — position relative + zIndex works identically in RN
 
 const modal = {
-  // Outer container: position fixed, flex-centers the card
+  // Outer container: fills the screen, flex-centers the card
+  // Wrap with <Modal transparent animationType="fade"> in RN
   modalOverlay: {
-    position:       'fixed'   as const,
-    inset:          0,
+    position:       'absolute' as const,
+    top:            0,
+    left:           0,
+    right:          0,
+    bottom:         0,
     zIndex:         200,
     alignItems:     'center'  as const,
     justifyContent: 'center'  as const,
@@ -490,7 +504,10 @@ const modal = {
   // RN: use StyleSheet.absoluteFillObject + backgroundColor
   modalBackdrop: {
     position:        'absolute' as const,
-    inset:           0,
+    top:             0,
+    left:            0,
+    right:           0,
+    bottom:          0,
     backgroundColor: 'rgba(0, 0, 0, 0.55)',
     // Web-only: backdrop-filter set in CSS module
   },
@@ -583,7 +600,7 @@ const modal = {
 
 // ─── Merged export ────────────────────────────────────────────────────────────
 
-export const styles = {
+export const styles = StyleSheet.create({
   ...form,
   ...status,
   ...sections,
@@ -594,4 +611,4 @@ export const styles = {
   ...history,
   ...danger,
   ...modal,
-};
+});

@@ -1,99 +1,53 @@
 /**
- * imageService.ts — platform-agnostic image picker + validation.
+ * imageService.ts — React Native implementation using expo-image-picker.
+ * File picking is re-enabled (was URL-only on web pending image hosting).
+ * Interface identical to web version — ArticleModal unchanged.
  *
- * Web:  hidden <input type="file"> + FileReader (current)
- * RN:   replace this file with the Expo version below —
- *       ArticleModal and any other caller stays identical.
- *
- * ─── React Native replacement ────────────────────────────────────────────────
- *
- *   import * as ImagePicker from 'expo-image-picker';
- *
- *   export const pickImage = async (): Promise<ImageResult> => {
- *     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
- *     if (status !== 'granted') return { uri: null, error: 'Photo library access denied.' };
- *
- *     const result = await ImagePicker.launchImageLibraryAsync({
- *       mediaTypes: ImagePicker.MediaTypeOptions.Images,
- *       quality:    0.7,    // 70% compression — keeps files under 1MB for most photos
- *       base64:     true,
- *       allowsEditing: true,
- *       aspect: [1, 1],
- *     });
- *
- *     if (result.canceled) return { uri: null, error: null };
- *
- *     const asset = result.assets[0];
- *     if (!asset.base64) return { uri: null, error: 'Could not read image.' };
- *
- *     // Validate size from base64 length (each char ≈ 0.75 bytes)
- *     const approxBytes = asset.base64.length * 0.75;
- *     if (approxBytes > MAX_FILE_BYTES) {
- *       return { uri: null, error: `Image must be under ${MAX_FILE_MB}MB.` };
- *     }
- *
- *     return { uri: `data:image/jpeg;base64,${asset.base64}`, error: null };
- *   };
+ * Note: Images are still stored as base64 in MongoDB.
+ * Add Cloudinary/S3 before launch to avoid the 16MB document limit.
  */
 
-/** Maximum upload size — 5 MB */
+import * as ImagePicker from 'expo-image-picker';
+
 export const MAX_FILE_MB    = 5;
 export const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
 
-/** Allowed MIME types */
-const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-
 export interface ImageResult {
-  /** base64 data URI, or null if cancelled / error */
   uri:   string | null;
-  /** Human-readable error message, or null if success / cancelled */
   error: string | null;
 }
 
-/**
- * Opens the platform image picker and returns a validated base64 data URI.
- *
- * Returns { uri: null, error: null } when the user cancels without selecting.
- * Returns { uri: null, error: <message> } on validation failure.
- */
-export const pickImage = (): Promise<ImageResult> => {
-  return new Promise(resolve => {
-    const input = document.createElement('input');
-    input.type    = 'file';
-    input.accept  = 'image/*';
+export const pickImage = async (): Promise<ImageResult> => {
+  try {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      return { uri: null, error: 'Photo library access denied.' };
+    }
 
-    // Resolve with cancelled state if the dialog closes without a selection
-    const onFocus = () => {
-      window.removeEventListener('focus', onFocus);
-      setTimeout(() => {
-        if (!input.files?.length) resolve({ uri: null, error: null });
-      }, 500);
-    };
-    window.addEventListener('focus', onFocus);
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality:    0.7,
+      base64:     true,
+      allowsEditing: true,
+      aspect:     [1, 1],
+    });
 
-    input.onchange = () => {
-      window.removeEventListener('focus', onFocus);
-      const file = input.files?.[0];
-      if (!file) { resolve({ uri: null, error: null }); return; }
+    if (result.canceled) return { uri: null, error: null };
 
-      // ── Validation ──────────────────────────────────────────────────────────
-      if (!ALLOWED_TYPES.includes(file.type)) {
-        resolve({ uri: null, error: 'Please select a JPEG, PNG, WebP, or GIF image.' });
-        return;
-      }
+    const asset = result.assets[0];
+    if (!asset.base64) return { uri: null, error: 'Could not read image.' };
 
-      if (file.size > MAX_FILE_BYTES) {
-        resolve({ uri: null, error: `Image must be under ${MAX_FILE_MB}MB. This file is ${(file.size / 1024 / 1024).toFixed(1)}MB.` });
-        return;
-      }
+    const approxBytes = asset.base64.length * 0.75;
+    if (approxBytes > MAX_FILE_BYTES) {
+      return {
+        uri:   null,
+        error: `Image must be under ${MAX_FILE_MB}MB.`,
+      };
+    }
 
-      // ── Read ────────────────────────────────────────────────────────────────
-      const reader = new FileReader();
-      reader.onload  = () => resolve({ uri: reader.result as string, error: null });
-      reader.onerror = () => resolve({ uri: null, error: 'Could not read image file.' });
-      reader.readAsDataURL(file);
-    };
-
-    input.click();
-  });
+    return { uri: `data:image/jpeg;base64,${asset.base64}`, error: null };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Failed to pick image.';
+    return { uri: null, error: msg };
+  }
 };

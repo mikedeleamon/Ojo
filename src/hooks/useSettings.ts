@@ -81,5 +81,22 @@ export const useSettings = () => {
     }
   }, [settings]);
 
-  return { settings, settingsReady, saveSettings };
+  const refreshSettings = useCallback(async () => {
+    const cached = await readCache();
+    if (cached) setSettings(cached);
+
+    const token = getToken();
+    if (!token) return;
+
+    try {
+      const { data } = await axios.get('/api/user/settings', authHeaders());
+      const fresh = { ...defaults, ...data };
+      setSettings(fresh);
+      await writeCache(fresh);
+    } catch (err: unknown) {
+      console.warn('[Ojo] Could not refresh settings:', getErrorMessage(err));
+    }
+  }, []);
+
+  return { settings, settingsReady, saveSettings, refreshSettings };
 };

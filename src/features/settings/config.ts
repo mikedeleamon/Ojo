@@ -1,15 +1,3 @@
-/**
- * Settings configuration.
- * UI renders entirely from this structure — no hardcoded rows anywhere.
- *
- * action types:
- *   navigate — handled differently per layout:
- *              desktop → sets activeScreen state (inline render)
- *              mobile  → pushes /account/<to> route
- *   legal    — opens LegalModal inline
- *   external — opens URL in new tab
- */
-
 export type SettingsAction =
   | { type: 'navigate'; to: string }
   | { type: 'legal';    doc: 'privacy' | 'terms' }
@@ -31,33 +19,29 @@ export const SETTINGS_CONFIG: SettingsSectionConfig[] = [
   {
     title: 'Account',
     items: [
-      { key: 'profile',  label: 'Profile',       action: { type: 'navigate', to: 'profile' } },
-      { key: 'password', label: 'Password',      action: { type: 'navigate', to: 'password' } },
-      { key: 'history',  label: 'Outfit History', action: { type: 'navigate', to: 'history' } },
+      { key: 'profile',        label: 'Profile',         action: { type: 'navigate', to: 'Profile' } },
+      { key: 'password',       label: 'Password',        action: { type: 'navigate', to: 'Password' } },
+      { key: 'history',        label: 'Outfit History',  action: { type: 'navigate', to: 'History' } },
+      { key: 'delete-account', label: 'Delete Account',  action: { type: 'navigate', to: 'DeleteAccount' } },
     ],
   },
   {
     title: 'Preferences',
     items: [
-      {
-        key: 'preferences',
-        label: 'Style, Location & Weather',
-        sublabelKey: 'clothingStyle',
-        action: { type: 'navigate', to: 'preferences' },
-      },
+      { key: 'outfit-prefs', label: 'Style preference', sublabelKey: 'clothingStyle', action: { type: 'navigate', to: 'PreferencesScreen' } },
     ],
   },
   {
     title: 'Notifications',
     items: [
-      { key: 'notifications', label: 'Push Notifications', action: { type: 'navigate', to: 'notifications' } },
+      { key: 'notifications', label: 'Push Notifications', action: { type: 'navigate', to: 'Notifications' } },
     ],
   },
   {
     title: 'Privacy & Security',
     items: [
-      { key: 'permissions', label: 'Permissions', action: { type: 'navigate', to: 'permissions' } },
-      { key: 'data-usage',  label: 'Data Usage',  action: { type: 'navigate', to: 'data-usage' } },
+      { key: 'permissions', label: 'Permissions', action: { type: 'navigate', to: 'Permissions' } },
+      { key: 'data-usage',  label: 'Data Usage',  action: { type: 'navigate', to: 'DataUsage' } },
     ],
   },
   {
