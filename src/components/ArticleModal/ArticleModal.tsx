@@ -14,10 +14,27 @@ import { colors, fonts, fontSizes, fontWeights, spacing, radius } from '../../th
 const CLOTHING_TYPES = ['Shirt','T-Shirt','Blouse','Sweater','Hoodie','Jacket','Coat',
   'Pants','Jeans','Shorts','Skirt','Dress','Shoes','Sneakers','Boots','Sandals',
   'Hat','Cap','Scarf','Gloves','Belt','Bag','Watch','Jewelry','Socks','Other'];
-const CATEGORIES  = ['Casual','Formal','Business Casual','Athletic','Lounge','Outdoor'];
-const FABRICS     = ['Cotton','Wool','Linen','Silk','Polyester','Denim','Leather','Synthetic','Other'];
-const COLORS      = ['Black','White','Grey','Navy','Blue','Green','Red','Brown','Beige','Pink','Yellow','Purple','Orange','Multi'];
-const TOP_BOTTOM  = ['Top','Bottom','Full body','Footwear','N/A'];
+const CATEGORIES = ['Casual','Formal','Business Casual','Athletic','Lounge','Outdoor'];
+const FABRICS    = ['Cotton','Wool','Linen','Silk','Polyester','Denim','Leather','Synthetic','Other'];
+const COLORS     = ['Black','White','Grey','Navy','Blue','Green','Red','Brown','Beige','Pink','Yellow','Purple','Orange','Multi'];
+const TOP_BOTTOM = ['Top','Bottom','Full body','Footwear','N/A'];
+
+const SWATCH: Record<string, string> = {
+  Black: '#1a1a1a', White: '#f0f0f0', Grey: '#9ca3af', Navy: '#1e3a5f',
+  Blue: '#3b82f6', Green: '#22c55e', Red: '#ef4444', Brown: '#92400e',
+  Beige: '#d4b896', Pink: '#f9a8d4', Yellow: '#fbbf24', Purple: '#a855f7',
+  Orange: '#f97316',
+};
+
+// Four pie-slice quadrants: red · blue · green · yellow
+const MultiSwatch = () => (
+  <Svg width={28} height={28} viewBox='0 0 28 28'>
+    <Path d='M14,14 L14,0 A14,14 0 0,1 28,14 Z' fill='#ef4444' />
+    <Path d='M14,14 L28,14 A14,14 0 0,1 14,28 Z' fill='#3b82f6' />
+    <Path d='M14,14 L14,28 A14,14 0 0,1 0,14 Z' fill='#22c55e' />
+    <Path d='M14,14 L0,14 A14,14 0 0,1 14,0 Z' fill='#fbbf24' />
+  </Svg>
+);
 
 const EMPTY: ArticleFormData = {
   name:'', clothingType:'', topOrBottom:'', clothingCategory:'',
@@ -39,11 +56,7 @@ interface Props {
   initialData?: ClothingArticle;
 }
 
-interface SheetState {
-  label: string;
-  items: string[];
-  onSelect: (v: string) => void;
-}
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
 const ChevronRight = () => (
   <Svg width={14} height={14} viewBox='0 0 14 14' fill='none'>
@@ -52,41 +65,31 @@ const ChevronRight = () => (
   </Svg>
 );
 
-const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
-  const isEditing = !!initialData;
-  const [form,    setForm]    = useState<ArticleFormData>(initialData ? toForm(initialData) : EMPTY);
-  const [error,   setError]   = useState<string | null>(null);
-  const [saving,  setSaving]  = useState(false);
-  const [sheet,   setSheet]   = useState<SheetState | null>(null);
+const FieldLabel = ({ children }: { children: React.ReactNode }) => (
+  <Text style={st.label}>{children}</Text>
+);
 
-  const set = <K extends keyof ArticleFormData>(key: K, val: ArticleFormData[K]) =>
-    setForm(f => ({ ...f, [key]: val }));
-
-  const openSelect = (label: string, items: string[], onValueChange: (v: string) => void) => {
+// Single tappable row → opens ActionSheet (for large option lists)
+const SelectRow = ({ label, value, items, onValueChange, required = false }: {
+  label: string; value: string; items: string[];
+  onValueChange: (v: string) => void; required?: boolean;
+}) => {
+  const open = () => {
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
         { options: ['Cancel', '—', ...items], cancelButtonIndex: 0, title: label },
-        (i) => {
-          if (i === 0) return;
-          onValueChange(i === 1 ? '' : items[i - 2]);
-        },
+        (i) => { if (i > 0) onValueChange(i === 1 ? '' : items[i - 2]); },
       );
-    } else {
-      setSheet({ label, items, onSelect: (v) => { onValueChange(v); setSheet(null); } });
     }
+    // Android fallback could be added here if needed
   };
 
-  const SelectField = ({ label, value, items, onValueChange, required = false }: {
-    label: string; value: string; items: string[];
-    onValueChange: (v: string) => void; required?: boolean;
-  }) => (
+  return (
     <View style={st.field}>
-      <Text style={st.label}>
-        {label}{required ? ' *' : ''}
-      </Text>
+      <FieldLabel>{label}{required ? ' *' : ''}</FieldLabel>
       <Pressable
         style={({ pressed }) => [st.selectRow, pressed && { opacity: 0.7 }]}
-        onPress={() => openSelect(label, items, onValueChange)}
+        onPress={open}
       >
         <Text style={[st.selectValue, !value && st.selectPlaceholder]}>
           {value || '—'}
@@ -95,12 +98,67 @@ const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
       </Pressable>
     </View>
   );
+};
 
-  const Toggle = ({ label, value, onPress }: { label: string; value: boolean; onPress: () => void }) => (
-    <Pressable style={[st.toggleChip, value && st.toggleChipActive]} onPress={onPress}>
-      <Text style={[st.toggleChipText, value && st.toggleChipTextActive]}>{label}</Text>
-    </Pressable>
-  );
+// Inline chip grid — all options visible, one tap to select/deselect
+const ChipField = ({ label, value, items, onValueChange, required = false }: {
+  label: string; value: string; items: string[];
+  onValueChange: (v: string) => void; required?: boolean;
+}) => (
+  <View style={st.field}>
+    <FieldLabel>{label}{required ? ' *' : ''}</FieldLabel>
+    <View style={st.chipGrid}>
+      {items.map(item => (
+        <Pressable
+          key={item}
+          style={[st.chip, value === item && st.chipActive]}
+          onPress={() => onValueChange(value === item ? '' : item)}
+        >
+          <Text style={[st.chipText, value === item && st.chipTextActive]}>{item}</Text>
+        </Pressable>
+      ))}
+    </View>
+  </View>
+);
+
+// Color swatch dots — visual and compact
+const ColorField = ({ value, onValueChange }: {
+  value: string; onValueChange: (v: string) => void;
+}) => (
+  <View style={st.field}>
+    <FieldLabel>
+      Color{value ? <Text style={st.colorLabel}>  {value}</Text> : ''}
+    </FieldLabel>
+    <View style={st.swatchGrid}>
+      {COLORS.map(c => (
+        <Pressable
+          key={c}
+          onPress={() => onValueChange(value === c ? '' : c)}
+          accessibilityLabel={c}
+          style={[st.swatchRing, value === c && st.swatchRingActive]}
+        >
+          <View style={[
+            st.swatch,
+            c !== 'Multi' && { backgroundColor: SWATCH[c] ?? colors.glassBg },
+          ]}>
+            {c === 'Multi' && <MultiSwatch />}
+          </View>
+        </Pressable>
+      ))}
+    </View>
+  </View>
+);
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
+const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
+  const isEditing = !!initialData;
+  const [form,   setForm]   = useState<ArticleFormData>(initialData ? toForm(initialData) : EMPTY);
+  const [error,  setError]  = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const set = <K extends keyof ArticleFormData>(key: K, val: ArticleFormData[K]) =>
+    setForm(f => ({ ...f, [key]: val }));
 
   const handlePickImage = async () => {
     const result = await pickImage();
@@ -152,36 +210,52 @@ const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
 
           {/* Name */}
           <View style={st.field}>
-            <Text style={st.label}>Name <Text style={st.optional}>(optional)</Text></Text>
+            <FieldLabel>Name <Text style={st.optional}>(optional)</Text></FieldLabel>
             <TextInput style={st.input} placeholder='e.g. "Navy Peacoat"'
               placeholderTextColor={colors.textMuted} value={form.name}
               onChangeText={v => set('name', v)} />
           </View>
 
-          <SelectField label='Type' value={form.clothingType} items={CLOTHING_TYPES}
+          {/* Type — 26 items, keep as action sheet */}
+          <SelectRow label='Type' value={form.clothingType} items={CLOTHING_TYPES}
             onValueChange={v => set('clothingType', v)} required />
-          <SelectField label='Category' value={form.clothingCategory} items={CATEGORIES}
-            onValueChange={v => set('clothingCategory', v)} />
-          <SelectField label='Top / Bottom' value={form.topOrBottom} items={TOP_BOTTOM}
+
+          {/* Top / Bottom — 5 items, chips fit in one row */}
+          <ChipField label='Top / Bottom' value={form.topOrBottom} items={TOP_BOTTOM}
             onValueChange={v => set('topOrBottom', v)} />
-          <SelectField label='Fabric' value={form.fabricType} items={FABRICS}
+
+          {/* Category — 6 items */}
+          <ChipField label='Category' value={form.clothingCategory} items={CATEGORIES}
+            onValueChange={v => set('clothingCategory', v)} />
+
+          {/* Fabric — 9 short words */}
+          <ChipField label='Fabric' value={form.fabricType} items={FABRICS}
             onValueChange={v => set('fabricType', v)} />
-          <SelectField label='Color' value={form.color} items={COLORS}
-            onValueChange={v => set('color', v)} />
+
+          {/* Color — swatches */}
+          <ColorField value={form.color} onValueChange={v => set('color', v)} />
 
           {/* Merchant */}
           <View style={st.field}>
-            <Text style={st.label}>Merchant</Text>
+            <FieldLabel>Merchant</FieldLabel>
             <TextInput style={st.input} placeholder='e.g. Zara'
               placeholderTextColor={colors.textMuted} value={form.merchant}
               onChangeText={v => set('merchant', v)} />
           </View>
 
           {/* Toggles */}
-          <View style={st.toggleRow}>
-            <Toggle label='Accessory'  value={form.isAccessory} onPress={() => set('isAccessory', !form.isAccessory)} />
-            <Toggle label='Wrist wear' value={form.isWristWear} onPress={() => set('isWristWear', !form.isWristWear)} />
-            <Toggle label='Ankle wear' value={form.isAnkleWear} onPress={() => set('isAnkleWear', !form.isAnkleWear)} />
+          <View style={st.chipGrid}>
+            {([
+              ['Accessory',  'isAccessory'],
+              ['Wrist wear', 'isWristWear'],
+              ['Ankle wear', 'isAnkleWear'],
+            ] as const).map(([lbl, key]) => (
+              <Pressable key={key}
+                style={[st.chip, form[key] && st.chipActive]}
+                onPress={() => set(key, !form[key])}>
+                <Text style={[st.chipText, form[key] && st.chipTextActive]}>{lbl}</Text>
+              </Pressable>
+            ))}
           </View>
         </ScrollView>
 
@@ -196,31 +270,6 @@ const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
             </Text>
           </Pressable>
         </View>
-
-        {/* Android option sheet */}
-        {Platform.OS !== 'ios' && sheet && (
-          <Modal transparent animationType='slide' onRequestClose={() => setSheet(null)}>
-            <Pressable style={st.androidBackdrop} onPress={() => setSheet(null)} />
-            <View style={st.androidSheet}>
-              <View style={st.androidSheetHeader}>
-                <Text style={st.androidSheetTitle}>{sheet.label}</Text>
-                <Pressable style={st.closeBtn} onPress={() => setSheet(null)}>
-                  <Text style={st.closeBtnText}>✕</Text>
-                </Pressable>
-              </View>
-              <ScrollView>
-                <Pressable style={st.androidOption} onPress={() => { sheet.onSelect(''); setSheet(null); }}>
-                  <Text style={st.androidOptionText}>—</Text>
-                </Pressable>
-                {sheet.items.map(item => (
-                  <Pressable key={item} style={st.androidOption} onPress={() => sheet.onSelect(item)}>
-                    <Text style={st.androidOptionText}>{item}</Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            </View>
-          </Modal>
-        )}
       </SafeAreaView>
     </Modal>
   );
@@ -240,16 +289,17 @@ const st = StyleSheet.create({
   errorText:     { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.errorText },
   imageSection:  { gap: spacing.sm, alignItems: 'center' },
   previewWrap:   { alignItems: 'center', gap: 8 },
-  preview:       { width: 120, height: 120, borderRadius: radius.sm },
+  preview:       { width: 100, height: 100, borderRadius: radius.sm },
   clearImg:      { paddingVertical: 4, paddingHorizontal: 12, backgroundColor: colors.dangerBg, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.dangerBorder },
   clearImgText:  { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.dangerText },
-  imagePlaceholder: { width: 120, height: 120, borderRadius: radius.sm, backgroundColor: colors.glassBg, borderWidth: 1, borderColor: colors.glassBorder, alignItems: 'center', justifyContent: 'center' },
+  imagePlaceholder: { width: 100, height: 100, borderRadius: radius.sm, backgroundColor: colors.glassBg, borderWidth: 1, borderColor: colors.glassBorder, alignItems: 'center', justifyContent: 'center' },
   imagePlaceholderText: { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textMuted },
-  pickImageBtn:  { paddingVertical: 8, paddingHorizontal: spacing.md, backgroundColor: colors.glassBg, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.glassBorder },
+  pickImageBtn:  { paddingVertical: 7, paddingHorizontal: spacing.md, backgroundColor: colors.glassBg, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.glassBorder },
   pickImageBtnText: { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.textSecondary },
   field:         { gap: 6 },
   label:         { fontFamily: fonts.body, fontSize: fontSizes.xs, fontWeight: fontWeights.medium, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
   optional:      { color: colors.textMuted, fontWeight: fontWeights.regular, textTransform: 'none' },
+  colorLabel:    { color: colors.textSecondary, fontWeight: fontWeights.regular, textTransform: 'none', letterSpacing: 0 },
   input: {
     fontFamily: fonts.body, fontSize: fontSizes.base, color: colors.textPrimary,
     backgroundColor: colors.glassBg, borderWidth: 1, borderColor: colors.glassBorder,
@@ -263,20 +313,18 @@ const st = StyleSheet.create({
   },
   selectValue:       { fontFamily: fonts.body, fontSize: fontSizes.base, color: colors.textPrimary },
   selectPlaceholder: { color: colors.textMuted },
-  toggleRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  toggleChip:    { paddingVertical: 7, paddingHorizontal: 14, backgroundColor: colors.glassBg, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radius.pill },
-  toggleChipActive:     { backgroundColor: colors.saveBtnBg, borderColor: colors.saveBtnBg },
-  toggleChipText:       { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.textSecondary },
-  toggleChipTextActive: { color: colors.saveBtnText, fontWeight: fontWeights.semibold },
+  chipGrid:  { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip:      { paddingVertical: 6, paddingHorizontal: 12, backgroundColor: colors.glassBg, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radius.pill },
+  chipActive:        { backgroundColor: colors.saveBtnBg, borderColor: colors.saveBtnBg },
+  chipText:          { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.textSecondary },
+  chipTextActive:    { color: colors.saveBtnText, fontWeight: fontWeights.semibold },
+  swatchGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  swatchRing:     { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'transparent' },
+  swatchRingActive: { borderColor: colors.textPrimary },
+  swatch:         { width: 26, height: 26, borderRadius: 13, overflow: 'hidden' },
   footer:        { flexDirection: 'row', gap: spacing.sm, padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.glassBorder },
   cancelBtn:     { flex: 1, paddingVertical: 14, backgroundColor: colors.glassBg, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.glassBorder, alignItems: 'center' },
   cancelBtnText: { fontFamily: fonts.body, fontSize: fontSizes.base, color: colors.textSecondary },
   submitBtn:     { flex: 2, paddingVertical: 14, backgroundColor: colors.saveBtnBg, borderRadius: radius.sm, alignItems: 'center' },
   submitBtnText: { fontFamily: fonts.body, fontSize: fontSizes.base, fontWeight: fontWeights.semibold, color: colors.saveBtnText },
-  androidBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
-  androidSheet:  { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: colors.bgDefault, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, borderWidth: 1, borderColor: colors.glassBorder, maxHeight: '60%' },
-  androidSheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.glassBorder },
-  androidSheetTitle: { fontFamily: fonts.body, fontSize: fontSizes.base, fontWeight: fontWeights.semibold, color: colors.textPrimary },
-  androidOption: { paddingVertical: 14, paddingHorizontal: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.glassBorder },
-  androidOptionText: { fontFamily: fonts.body, fontSize: fontSizes.base, color: colors.textPrimary },
 });
