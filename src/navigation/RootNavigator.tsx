@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { getToken } from '../lib/auth';
 import AppTabs from './AppTabs';
+import AccountStack from './AccountStack';
 import LoginPage from '../views/LoginPage/LoginPage';
 import SignupPage from '../views/SignupPage/Signup';
 import OnboardingPage from '../views/OnboardingPage/OnboardingPage';
@@ -21,9 +22,12 @@ export default function RootNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {isLoggedIn ? (
-        <Stack.Screen name="App">
-          {() => <AppTabs onLogout={() => setIsLoggedIn(false)} />}
-        </Stack.Screen>
+        <>
+          <Stack.Screen name="App" component={AppTabs} />
+          <Stack.Screen name="Account">
+            {() => <AccountStack onLogout={() => setIsLoggedIn(false)} />}
+          </Stack.Screen>
+        </>
       ) : (
         <>
           <Stack.Screen name="Login">

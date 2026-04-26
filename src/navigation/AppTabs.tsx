@@ -1,13 +1,12 @@
 import { Image, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Svg, Path, Circle } from 'react-native-svg';
+import { Svg, Path } from 'react-native-svg';
 import { useWeatherTheme } from '../context/WeatherContext';
 import { colors } from '../theme/tokens';
 import MainPage from '../views/MainPage/MainPage';
 import ClosetPage from '../views/ClosetPage/ClosetPage';
 import PreferencesScreen from '../features/settings/screens/PreferencesScreen';
-import AccountStack from './AccountStack';
 
 const Tab = createBottomTabNavigator();
 
@@ -48,31 +47,8 @@ const SparklesIcon = ({ color }: { color: string }) => (
     </Svg>
 );
 
-const GearIcon = ({ color }: { color: string }) => (
-    <Svg
-        width={26}
-        height={26}
-        viewBox='0 0 24 24'
-        fill='none'
-        stroke={color}
-        strokeWidth={1.5}
-        strokeLinecap='round'
-        strokeLinejoin='round'
-    >
-        <Circle
-            cx={12}
-            cy={12}
-            r={3}
-        />
-        <Path d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z' />
-    </Svg>
-);
 
-interface Props {
-    onLogout?: () => void;
-}
-
-export default function AppTabs({ onLogout }: Props) {
+export default function AppTabs() {
     const { footerBg } = useWeatherTheme();
 
     return (
@@ -133,15 +109,6 @@ export default function AppTabs({ onLogout }: Props) {
                         <PreferencesScreen />
                     </SafeAreaView>
                 )}
-            </Tab.Screen>
-            <Tab.Screen
-                name='Account'
-                options={{
-                    tabBarLabel: 'Account',
-                    tabBarIcon: ({ color }) => <GearIcon color={color} />,
-                }}
-            >
-                {() => <AccountStack onLogout={onLogout} />}
             </Tab.Screen>
         </Tab.Navigator>
     );

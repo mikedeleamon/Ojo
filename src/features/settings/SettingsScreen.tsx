@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { StyleSheet, Modal, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
+import { Svg, Path } from 'react-native-svg';
 import { View, Text, Pressable } from '../../components/primitives';
 import { SETTINGS_CONFIG, SettingsAction } from './config';
 import SettingsSection from './components/SettingsSection';
@@ -52,6 +53,21 @@ export default function SettingsScreen({ onLogout }: Props) {
     return (
         <SafeAreaView style={styles.root}>
             <View style={styles.header}>
+                <Pressable
+                    onPress={() => nav.goBack()}
+                    style={styles.homeBtn}
+                    accessibilityLabel='Go to Home'
+                >
+                    <Svg width={18} height={18} viewBox='0 0 18 18' fill='none'>
+                        <Path
+                            d='M11 14l-5-5 5-5'
+                            stroke={colors.textPrimary}
+                            strokeWidth={1.5}
+                            strokeLinecap='round'
+                            strokeLinejoin='round'
+                        />
+                    </Svg>
+                </Pressable>
                 <Text style={styles.title}>Account</Text>
             </View>
 
@@ -110,10 +126,21 @@ export default function SettingsScreen({ onLogout }: Props) {
 const styles = StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.bgDefault },
     header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
         padding: spacing.md,
         paddingBottom: 12,
         borderBottomWidth: 1,
         borderBottomColor: colors.glassBorder,
+    },
+    homeBtn: {
+        padding: 8,
+        paddingHorizontal: 10,
+        backgroundColor: colors.glassBg,
+        borderWidth: 1,
+        borderColor: colors.glassBorder,
+        borderRadius: radius.sm,
     },
     title: {
         fontFamily: 'DMSerifDisplay',

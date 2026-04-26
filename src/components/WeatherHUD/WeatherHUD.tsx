@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { StyleSheet, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
+import { StyleSheet, ScrollView, ActivityIndicator, RefreshControl, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Svg, Circle, Path } from 'react-native-svg';
 import { View, Text } from '../primitives';
 import api from '../../api/client';
 import weatherConstants from '../../constants/weatherConstants';
@@ -9,8 +10,16 @@ import WeatherIconDisplay from '../WeatherIconDisplay/WeatherIconDisplay';
 import WeatherDetails from '../WeatherDetails/WeatherDetails';
 import MinimizedWeatherDisplay from '../MinimizedWeatherDisplay/MinimizedWeatherDisplay';
 import { useWeatherTheme } from '../../context/WeatherContext';
+import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { CityData, CurrentWeather, Forecast, Settings } from '../../types';
 import { colors, fonts, fontSizes, weatherGradients, spacing } from '../../theme/tokens';
+
+const GearIcon = () => (
+  <Svg width={22} height={22} viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.85)' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round'>
+    <Circle cx={12} cy={12} r={3} />
+    <Path d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z' />
+  </Svg>
+);
 
 // ─── Gradient + footer colour maps ────────────────────────────────────────────
 
@@ -52,6 +61,7 @@ interface Props {
 const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
   const { setFooterBg } = useWeatherTheme();
   const { top: topInset } = useSafeAreaInsets();
+  const nav = useAppNavigation();
   const [city,       setCity]       = useState<CityData | null>(null);
   const [weather,    setWeather]    = useState<CurrentWeather | null>(null);
   const [forecasts,  setForecasts]  = useState<Forecast[]>([]);
@@ -130,6 +140,13 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
       >
         {/* Header */}
         <View style={[st.header, { paddingTop: spacing.lg + topInset }]}>
+          <Pressable
+            style={[st.gearBtn, { top: topInset + 8 }]}
+            onPress={() => nav.push('Account')}
+            accessibilityLabel='Account settings'
+          >
+            <GearIcon />
+          </Pressable>
           <Text style={st.city}>{city?.LocalizedName}</Text>
           <Text style={st.condition}>{weather.WeatherText}</Text>
         </View>
@@ -179,6 +196,7 @@ const st = StyleSheet.create({
   center:        { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: spacing.lg },
   errorText:     { fontFamily: fonts.body, fontSize: fontSizes.base, color: colors.textSecondary, textAlign: 'center', lineHeight: fontSizes.base * 1.5 },
   header:        { alignItems: 'center', paddingTop: spacing.lg, gap: 4 },
+  gearBtn:       { position: 'absolute', right: spacing.md, padding: 6 },
   city:          { fontFamily: fonts.display, fontSize: 36, color: colors.textPrimary },
   condition:     { fontFamily: fonts.body, fontSize: fontSizes.base, color: 'rgba(255,255,255,0.75)' },
   hero:          { alignItems: 'center', paddingVertical: spacing.lg },
