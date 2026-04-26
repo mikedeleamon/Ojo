@@ -22,7 +22,6 @@ export const SETTINGS_CONFIG: SettingsSectionConfig[] = [
       { key: 'profile',        label: 'Profile',         action: { type: 'navigate', to: 'Profile' } },
       { key: 'password',       label: 'Password',        action: { type: 'navigate', to: 'Password' } },
       { key: 'history',        label: 'Outfit History',  action: { type: 'navigate', to: 'History' } },
-      { key: 'delete-account', label: 'Delete Account',  action: { type: 'navigate', to: 'DeleteAccount' } },
     ],
   },
   {

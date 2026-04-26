@@ -85,6 +85,12 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
 
   useEffect(() => { recentlyWornIds(3).then(setWorn); }, []);
 
+  useEffect(() => {
+    setActiveIdx(0);
+    setShowBreakdown(false);
+    setWornLogged(false);
+  }, [settings]);
+
   const setPreferredCloset = async (id: string) => {
     setSettingPref(true);
     try { await setPreferred(id); } catch {}
@@ -181,7 +187,7 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
             {outfits.map((o, i) => (
               <Pressable key={i}
                 style={[st.tab, i === safeIdx && st.tabActive]}
-                onPress={() => { setActiveIdx(i); setWornLogged(false); setShowBreakdown(false); }}>
+                onPress={() => { setActiveIdx(i); setWornLogged(false); }}>
                 <Text style={[st.tabText, i === safeIdx && st.tabTextActive]}>
                   {i === 0 ? 'Best match' : `Option ${i + 1}`}
                 </Text>

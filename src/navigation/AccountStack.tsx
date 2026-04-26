@@ -6,7 +6,6 @@ import { colors } from '../theme/tokens';
 import SettingsScreen from '../features/settings/SettingsScreen';
 import ProfileScreen from '../features/settings/screens/ProfileScreen';
 import PasswordScreen from '../features/settings/screens/PasswordScreen';
-import DeleteAccountScreen from '../features/settings/screens/DeleteAccountScreen';
 import PreferencesScreen from '../features/settings/screens/PreferencesScreen';
 import LocationScreen from '../features/settings/screens/LocationScreen';
 import UnitsScreen from '../features/settings/screens/UnitsScreen';
@@ -81,13 +80,6 @@ export default function AccountStack({ onLogout }: Props) {
                 options={subScreen}
                 component={HistoryScreen}
             />
-
-            <Stack.Screen
-                name='DeleteAccount'
-                options={(p) => ({ ...subScreen(p), title: 'Delete Account' })}
-            >
-                {() => <DeleteAccountScreen onLogout={onLogout} />}
-            </Stack.Screen>
 
             <Stack.Screen
                 name='PreferencesScreen'
