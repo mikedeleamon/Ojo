@@ -64,15 +64,17 @@ export const getWeatherBucket = (
 // Eliminates items that are clearly climatically impossible — these never enter
 // the combination space, so the scorer never has to penalise them.
 
-const HARD_EXCLUDE_HOT  = new Set(['Coat', 'Gloves', 'Scarf']);
-const HARD_EXCLUDE_COLD = new Set(['Sandals', 'Shorts']);
+const HARD_EXCLUDE_HOT      = new Set(['Coat', 'Gloves', 'Scarf', 'Sweater']);
+const HARD_EXCLUDE_COLD     = new Set(['Sandals', 'Shorts']);
+const HARD_EXCLUDE_FREEZING = new Set(['Sandals', 'Shorts', 'Skirt']);
 
 const isWeatherAppropriate = (
   a: ClothingArticle,
   bucket: WeatherBucket,
 ): boolean => {
-  if (bucket === 'hot'      && HARD_EXCLUDE_HOT.has(a.clothingType))  return false;
-  if ((bucket === 'cold' || bucket === 'freezing') && HARD_EXCLUDE_COLD.has(a.clothingType)) return false;
+  if (bucket === 'hot'                         && HARD_EXCLUDE_HOT.has(a.clothingType))      return false;
+  if (bucket === 'freezing'                    && HARD_EXCLUDE_FREEZING.has(a.clothingType)) return false;
+  if (bucket === 'cold'                        && HARD_EXCLUDE_COLD.has(a.clothingType))     return false;
   return true;
 };
 
@@ -156,12 +158,35 @@ const outfitFabricScore = (
 // Harmony score is based on the angular distance between two colors.
 
 const COLOR_WHEEL_POSITION: Record<string, number> = {
-  Red: 0, Orange: 2, Yellow: 4, Green: 6,
-  Blue: 8, Navy: 9, Purple: 10, Pink: 11,
+  // Position 0 — Red family
+  Red: 0, Crimson: 0, Maroon: 0, Burgundy: 0,
+  // Position 2 — Orange family
+  Orange: 2, Coral: 2, Salmon: 2, Rust: 2,
+  // Position 3 — Gold/yellow-orange
+  Gold: 3,
+  // Position 4 — Yellow family
+  Yellow: 4,
+  // Position 5 — Yellow-green
+  Olive: 5, Khaki: 5,
+  // Position 6 — Green family
+  Green: 6, Mint: 6,
+  // Position 7 — Blue-green
+  Teal: 7, Cyan: 7,
+  // Position 8 — Blue family
+  Blue: 8, 'Sky Blue': 8, Cobalt: 8,
+  // Position 9 — Blue-purple / dark blue
+  Navy: 9, Indigo: 9,
+  // Position 10 — Purple family
+  Purple: 10, Violet: 10, Plum: 10,
+  // Position 11 — Red-purple / pink
+  Pink: 11, Magenta: 11, Lavender: 11, Rose: 11,
 };
 
 // Neutrals harmonise with everything — they don't interact with the wheel.
-const COLOR_NEUTRALS = new Set(['Black', 'White', 'Grey', 'Beige', 'Brown', 'Multi']);
+const COLOR_NEUTRALS = new Set([
+  'Black', 'White', 'Grey', 'Gray', 'Beige', 'Brown',
+  'Ivory', 'Cream', 'Tan', 'Silver', 'Multi',
+]);
 
 /**
  * Returns 0–1 harmony score for two colors.
@@ -269,17 +294,18 @@ const outfitPreferenceScore = (slots: OutfitSlot[], profile: UserPreferenceProfi
 
 // ─── 4. Outfit composite scorer ───────────────────────────────────────────────
 
-// Scoring weights — must sum to 1.
-const WEIGHTS = {
-  fabric:     0.30,
-  color:      0.25,
-  style:      0.25,
-  simplicity: 0.10,
-  preference: 0.10,
-} as const;
+// Scoring weights vary by weather extremity — fabric matters more when comfort is critical.
+const getWeights = (bucket: WeatherBucket) => {
+  if (bucket === 'freezing' || bucket === 'hot') {
+    return { fabric: 0.40, color: 0.22, style: 0.22, simplicity: 0.08, preference: 0.08 };
+  }
+  return { fabric: 0.30, color: 0.25, style: 0.25, simplicity: 0.10, preference: 0.10 };
+};
 
-// Recency penalty per recently-worn article slot (encourages variety).
-const RECENCY_PENALTY_PER_SLOT = 0.12;
+// Recency penalty per recently-worn slot; capped so a fully-repeated outfit
+// still surfaces rather than disappearing when the closet is small.
+const RECENCY_PENALTY_PER_SLOT = 0.10;
+const RECENCY_PENALTY_MAX      = 0.20;
 
 interface ScoredCombo {
   slots:     OutfitSlot[];
@@ -302,15 +328,19 @@ const scoreCombo = (
   const simplicity = simplicityScore(slots);
   const preference = outfitPreferenceScore(slots, profile);
 
-  const recencyPenalty = slots.filter(s => recentlyWorn.has(s.article._id)).length
-    * RECENCY_PENALTY_PER_SLOT;
+  const weights = getWeights(bucket);
+
+  const recencyPenalty = Math.min(
+    slots.filter(s => recentlyWorn.has(s.article._id)).length * RECENCY_PENALTY_PER_SLOT,
+    RECENCY_PENALTY_MAX,
+  );
 
   const raw =
-    fabric     * WEIGHTS.fabric  +
-    color      * WEIGHTS.color   +
-    style      * WEIGHTS.style   +
-    simplicity * WEIGHTS.simplicity +
-    preference * WEIGHTS.preference
+    fabric     * weights.fabric     +
+    color      * weights.color      +
+    style      * weights.style      +
+    simplicity * weights.simplicity +
+    preference * weights.preference
     - recencyPenalty;
 
   return {
