@@ -5,50 +5,57 @@ import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Font from 'expo-font';
 import { WeatherProvider } from './src/context/WeatherContext';
+import { SettingsProvider } from './src/context/SettingsContext';
 import RootNavigator from './src/navigation/RootNavigator';
-import { initAuthCache, isTokenExpiringSoon, refreshToken } from './src/lib/auth';
+import {
+    initAuthCache,
+    isTokenExpiringSoon,
+    refreshToken,
+} from './src/lib/auth';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function App() {
-  const [ready, setReady] = useState(false);
+    const [ready, setReady] = useState(false);
 
-  useEffect(() => {
-    const init = async () => {
-      try {
-        await Font.loadAsync({
-          // Display font
-          'DMSerifDisplay': require('./assets/fonts/DMSerifDisplay-Regular.ttf'),
-          // Outfit — static weights (variable font unavailable in this env)
-          'Outfit':             require('./assets/fonts/Outfit_400Regular.ttf'),
-          'Outfit-Light':       require('./assets/fonts/Outfit_300Light.ttf'),
-          'Outfit-Regular':     require('./assets/fonts/Outfit_400Regular.ttf'),
-          'Outfit-Medium':      require('./assets/fonts/Outfit_500Medium.ttf'),
-          'Outfit-SemiBold':    require('./assets/fonts/Outfit_600SemiBold.ttf'),
-          'Outfit-Bold':        require('./assets/fonts/Outfit_700Bold.ttf'),
-        });
-        await initAuthCache();
-        if (isTokenExpiringSoon(86_400)) {
-          await refreshToken().catch(() => {});
-        }
-      } finally {
-        setReady(true);
-        await SplashScreen.hideAsync();
-      }
-    };
-    init();
-  }, []);
+    useEffect(() => {
+        const init = async () => {
+            try {
+                await Font.loadAsync({
+                    // Display font
+                    DMSerifDisplay: require('./assets/fonts/DMSerifDisplay-Regular.ttf'),
+                    // Outfit — static weights (variable font unavailable in this env)
+                    Outfit: require('./assets/fonts/Outfit_400Regular.ttf'),
+                    'Outfit-Light': require('./assets/fonts/Outfit_300Light.ttf'),
+                    'Outfit-Regular': require('./assets/fonts/Outfit_400Regular.ttf'),
+                    'Outfit-Medium': require('./assets/fonts/Outfit_500Medium.ttf'),
+                    'Outfit-SemiBold': require('./assets/fonts/Outfit_600SemiBold.ttf'),
+                    'Outfit-Bold': require('./assets/fonts/Outfit_700Bold.ttf'),
+                });
+                await initAuthCache();
+                if (isTokenExpiringSoon(86_400)) {
+                    await refreshToken().catch(() => {});
+                }
+            } finally {
+                setReady(true);
+                await SplashScreen.hideAsync();
+            }
+        };
+        init();
+    }, []);
 
-  if (!ready) return null;
+    if (!ready) return null;
 
-  return (
-    <SafeAreaProvider>
-      <WeatherProvider>
-        <NavigationContainer>
-          <StatusBar style="light" />
-          <RootNavigator />
-        </NavigationContainer>
-      </WeatherProvider>
-    </SafeAreaProvider>
-  );
+    return (
+        <SafeAreaProvider>
+            <SettingsProvider>
+                <WeatherProvider>
+                    <NavigationContainer>
+                        <StatusBar style='light' />
+                        <RootNavigator />
+                    </NavigationContainer>
+                </WeatherProvider>
+            </SettingsProvider>
+        </SafeAreaProvider>
+    );
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
     StyleSheet,
     ScrollView,
@@ -14,8 +14,6 @@ import {
     Pressable,
 } from '../../../components/primitives';
 import { useSettings } from '../../../hooks/useSettings';
-import { useFormSubmit } from '../../../hooks/useFormSubmit';
-import { StatusMessage } from '../../../components/shared';
 import {
     colors,
     spacing,
@@ -29,6 +27,9 @@ const STYLES = [
     'Casual',
     'Business Casual',
     'Formal',
+    'Athletic',
+    'Streetwear',
+    'Minimalist',
     'Urban',
     'Cozy',
     'Preppy',
@@ -41,6 +42,7 @@ interface SliderFieldProps {
     min: number;
     max: number;
     onChange: (v: number) => void;
+    onSave: (v: number) => void;
 }
 
 const SliderField = ({
@@ -50,6 +52,7 @@ const SliderField = ({
     min,
     max,
     onChange,
+    onSave,
 }: SliderFieldProps) => (
     <View style={styles.sliderRow}>
         <View style={styles.sliderMeta}>
@@ -65,6 +68,7 @@ const SliderField = ({
             value={value}
             step={1}
             onValueChange={onChange}
+            onSlidingComplete={onSave}
             minimumTrackTintColor={colors.textPrimary}
             maximumTrackTintColor={colors.glassBorder}
             thumbTintColor={colors.saveBtnBg}
@@ -83,10 +87,8 @@ export default function PreferencesScreen() {
     const [hiTemp, setHiTemp] = useState(settings.hiTempThreshold);
     const [lowTemp, setLowTemp] = useState(settings.lowTempThreshold);
     const [humidity, setHumidity] = useState(settings.humidityPreference);
-    const { status, loading, submit } = useFormSubmit(
-        'Preferences saved.',
-        2500,
-    );
+
+    const locationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         if (!settingsReady) return;
@@ -96,19 +98,35 @@ export default function PreferencesScreen() {
         setHiTemp(settings.hiTempThreshold);
         setLowTemp(settings.lowTempThreshold);
         setHumidity(settings.humidityPreference);
-    }, [settingsReady]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [settings, settingsReady]);
 
-    const save = () =>
-        submit(() =>
-            saveSettings({
-                clothingStyle,
-                location,
-                temperatureScale: tempScale,
-                hiTempThreshold: hiTemp,
-                lowTempThreshold: lowTemp,
-                humidityPreference: humidity,
-            }),
-        );
+    const currentSettings = (overrides: Partial<typeof settings>) => ({
+        clothingStyle,
+        location,
+        temperatureScale: tempScale,
+        hiTempThreshold: hiTemp,
+        lowTempThreshold: lowTemp,
+        humidityPreference: humidity,
+        ...overrides,
+    });
+
+    const handleStyleChange = (s: string) => {
+        setClothingStyle(s);
+        saveSettings(currentSettings({ clothingStyle: s })).catch(() => {});
+    };
+
+    const handleScaleChange = (scale: 'Imperial' | 'Metric') => {
+        setTempScale(scale);
+        saveSettings(currentSettings({ temperatureScale: scale })).catch(() => {});
+    };
+
+    const handleLocationChange = (text: string) => {
+        setLocation(text);
+        if (locationTimer.current) clearTimeout(locationTimer.current);
+        locationTimer.current = setTimeout(() => {
+            saveSettings(currentSettings({ location: text })).catch(() => {});
+        }, 800);
+    };
 
     return (
         <SafeAreaView
@@ -137,7 +155,7 @@ export default function PreferencesScreen() {
                                         clothingStyle === s &&
                                             styles.chipActive,
                                     ]}
-                                    onPress={() => setClothingStyle(s)}
+                                    onPress={() => handleStyleChange(s)}
                                 >
                                     <Text
                                         style={[
@@ -163,7 +181,7 @@ export default function PreferencesScreen() {
                             placeholder='City name'
                             placeholderTextColor={colors.textMuted}
                             value={location}
-                            onChangeText={setLocation}
+                            onChangeText={handleLocationChange}
                             returnKeyType='done'
                         />
                     </View>
@@ -181,7 +199,7 @@ export default function PreferencesScreen() {
                                         styles.seg,
                                         tempScale === scale && styles.segActive,
                                     ]}
-                                    onPress={() => setTempScale(scale)}
+                                    onPress={() => handleScaleChange(scale)}
                                 >
                                     <Text
                                         style={[
@@ -209,6 +227,11 @@ export default function PreferencesScreen() {
                             min={50}
                             max={120}
                             onChange={setHiTemp}
+                            onSave={(v) =>
+                                saveSettings(
+                                    currentSettings({ hiTempThreshold: v }),
+                                ).catch(() => {})
+                            }
                         />
                         <SliderField
                             label='Cold below'
@@ -217,6 +240,11 @@ export default function PreferencesScreen() {
                             min={0}
                             max={70}
                             onChange={setLowTemp}
+                            onSave={(v) =>
+                                saveSettings(
+                                    currentSettings({ lowTempThreshold: v }),
+                                ).catch(() => {})
+                            }
                         />
                     </View>
 
@@ -232,20 +260,13 @@ export default function PreferencesScreen() {
                             min={0}
                             max={100}
                             onChange={setHumidity}
+                            onSave={(v) =>
+                                saveSettings(
+                                    currentSettings({ humidityPreference: v }),
+                                ).catch(() => {})
+                            }
                         />
                     </View>
-
-                    <StatusMessage status={status} />
-
-                    <Pressable
-                        style={[styles.saveBtn, loading && { opacity: 0.5 }]}
-                        onPress={save}
-                        disabled={loading}
-                    >
-                        <Text style={styles.saveBtnText}>
-                            {loading ? 'Saving…' : 'Save changes'}
-                        </Text>
-                    </Pressable>
                 </ScrollView>
             </KeyboardAvoidingView>
         </SafeAreaView>
@@ -337,18 +358,5 @@ const styles = StyleSheet.create({
         fontSize: fontSizes.base,
         fontWeight: fontWeights.medium,
         color: colors.textPrimary,
-    },
-    saveBtn: {
-        width: '100%',
-        paddingVertical: 14,
-        backgroundColor: colors.saveBtnBg,
-        borderRadius: radius.sm,
-        alignItems: 'center',
-    },
-    saveBtnText: {
-        fontFamily: fonts.body,
-        fontSize: fontSizes.base,
-        fontWeight: fontWeights.semibold,
-        color: colors.saveBtnText,
     },
 });
