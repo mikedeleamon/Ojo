@@ -8,7 +8,7 @@
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/ojo_splash_icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#0F172A"
     },
@@ -22,7 +22,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/ojo_splash_icon.png",
         "backgroundColor": "#0F172A"
       },
       "package": "com.placeholder.ojo",
