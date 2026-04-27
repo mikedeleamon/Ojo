@@ -14,8 +14,9 @@
  * by replacing scoreOutfit() with a model inference call.
  */
 
-import { ClothingArticle, CurrentWeather, Settings } from '../types';
+import { ClothingArticle, CurrentWeather, Forecast, Settings } from '../types';
 import { articlePreferenceScore, UserPreferenceProfile } from './userPreferences';
+import { generateLayeringRecommendation, LayeringResult } from './layeringEngine';
 
 // ─── Core types ───────────────────────────────────────────────────────────────
 
@@ -44,6 +45,7 @@ export interface OutfitResult {
   notes:          string[];
   score:          number;        // 0–100 composite
   scoreBreakdown: ScoreBreakdown;
+  layering?:      LayeringResult;
 }
 
 // ─── Weather bucketing ────────────────────────────────────────────────────────
@@ -441,6 +443,7 @@ export const generateOutfits = (
   recentlyWorn: Set<string>          = new Set(),
   topK:         number               = 3,
   profile:      UserPreferenceProfile = { colors: {}, fabrics: {}, categories: {}, totalOutfits: 0 },
+  forecasts:    Forecast[]           = [],
 ): { results: OutfitResult[]; status: OutfitStatus } => {
 
   // ── Early exits ──────────────────────────────────────────────────────────
@@ -636,6 +639,7 @@ export const generateOutfits = (
     notes:          buildNotes(combo.slots, combo.breakdown),
     score:          combo.score,
     scoreBreakdown: combo.breakdown,
+    layering:       generateLayeringRecommendation({ weather, forecasts, slots: combo.slots }),
   }));
 
   return { results, status: 'ok' };
@@ -648,8 +652,9 @@ export const generateOutfit = (
   weather:      CurrentWeather,
   settings:     Settings,
   recentlyWorn: Set<string> = new Set(),
+  forecasts:    Forecast[]  = [],
 ): OutfitResult => {
-  const { results, status } = generateOutfits(articles, weather, settings, recentlyWorn, 1);
+  const { results, status } = generateOutfits(articles, weather, settings, recentlyWorn, 1, undefined, forecasts);
   return results[0] ?? {
     status,
     headline:       '',

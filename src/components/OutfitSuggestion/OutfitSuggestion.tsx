@@ -6,9 +6,10 @@ import { EmptyState } from '../shared';
 import { useClosets } from '../../hooks/useClosets';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { generateOutfits, OutfitRole, OutfitResult, ScoreBreakdown } from '../../lib/outfitEngine';
+import { LayeringResult } from '../../lib/layeringEngine';
 import { addHistoryEntry, recentlyWornIds } from '../../lib/outfitHistory';
 import { updatePreferences } from '../../lib/userPreferences';
-import { ClothingArticle, CurrentWeather, Settings } from '../../types';
+import { ClothingArticle, CurrentWeather, Forecast, Settings } from '../../types';
 import { colors, fonts, fontSizes, fontWeights, spacing, radius } from '../../theme/tokens';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -70,11 +71,44 @@ const ScoreBadge = ({ score }: { score: number }) => {
   );
 };
 
+// ─── Layering section ─────────────────────────────────────────────────────────
+
+const ConfidencePip = ({ value }: { value: number }) => {
+  const pct = Math.round(value * 100);
+  const col = pct >= 80 ? 'rgba(52,211,153,0.85)' : pct >= 60 ? 'rgba(251,191,36,0.85)' : 'rgba(148,163,184,0.75)';
+  return (
+    <View style={[laySt.confidencePip, { borderColor: col }]}>
+      <Text style={[laySt.confidenceText, { color: col }]}>{pct}%</Text>
+    </View>
+  );
+};
+
+const LayeringSection = ({ layering }: { layering: LayeringResult }) => (
+  <View style={laySt.root}>
+    <View style={laySt.header}>
+      <Text style={laySt.title}>Layering</Text>
+      <ConfidencePip value={layering.confidence} />
+    </View>
+    <Text style={laySt.recommendation}>{layering.recommendation}</Text>
+    {layering.timeline && layering.timeline.length > 0 && (
+      <View style={laySt.timeline}>
+        {layering.timeline.map((step, i) => (
+          <View key={i} style={laySt.timelineRow}>
+            <Text style={laySt.timelineTime}>{step.time}</Text>
+            <View style={laySt.timelineDivider} />
+            <Text style={laySt.timelineAction}>{step.action}</Text>
+          </View>
+        ))}
+      </View>
+    )}
+  </View>
+);
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
-interface Props { weather: CurrentWeather; settings: Settings; }
+interface Props { weather: CurrentWeather; settings: Settings; forecasts: Forecast[]; }
 
-const OutfitSuggestion = ({ weather, settings }: Props) => {
+const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
   const { closets, loading, preferred, setPreferred, setClosets } = useClosets();
   const [settingPref,   setSettingPref]   = useState(false);
   const [activeIdx,     setActiveIdx]     = useState(0);
@@ -99,9 +133,9 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
 
   const { outfits, status } = useMemo(() => {
     if (!preferred) return { outfits: [], status: 'no_preferred' as const };
-    const { results, status } = generateOutfits(preferred.articles, weather, settings, worn, 3);
+    const { results, status } = generateOutfits(preferred.articles, weather, settings, worn, 3, undefined, forecasts);
     return { outfits: results, status };
-  }, [preferred, weather, settings, worn]);
+  }, [preferred, weather, settings, worn, forecasts]);
 
   const safeIdx      = Math.min(activeIdx, Math.max(0, outfits.length - 1));
   const activeOutfit: OutfitResult | null = outfits[safeIdx] ?? null;
@@ -238,6 +272,11 @@ const OutfitSuggestion = ({ weather, settings }: Props) => {
         </View>
       )}
 
+      {/* Layering recommendation */}
+      {activeOutfit.layering && (
+        <LayeringSection layering={activeOutfit.layering} />
+      )}
+
       {/* Wore this today */}
       <Pressable
         style={[st.woreThisBtn, wornLogged && st.woreThisLogged]}
@@ -305,4 +344,20 @@ const st = StyleSheet.create({
   closetPickBtn:  { flexDirection: 'row', alignItems: 'center', gap: 8, padding: spacing.sm, backgroundColor: colors.glassBg, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.glassBorder },
   closetPickName: { flex: 1, fontFamily: fonts.body, fontSize: fontSizes.base, color: colors.textPrimary },
   closetPickCount:{ fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textMuted },
+});
+
+// ─── Layering section styles ──────────────────────────────────────────────────
+
+const laySt = StyleSheet.create({
+  root:            { gap: 8, paddingTop: 4, borderTopWidth: 1, borderTopColor: colors.glassBorder },
+  header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  title:           { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: fontWeights.medium },
+  confidencePip:   { paddingHorizontal: 7, paddingVertical: 2, borderRadius: radius.pill, borderWidth: 1 },
+  confidenceText:  { fontFamily: fonts.body, fontSize: 10, fontWeight: fontWeights.semibold },
+  recommendation:  { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textSecondary, lineHeight: fontSizes.xs * 1.6 },
+  timeline:        { gap: 5, marginTop: 2 },
+  timelineRow:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  timelineTime:    { fontFamily: fonts.body, fontSize: 10, color: colors.textMuted, width: 68, textTransform: 'uppercase', letterSpacing: 0.5 },
+  timelineDivider: { width: 1, height: 10, backgroundColor: colors.glassBorder },
+  timelineAction:  { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textSecondary, flex: 1 },
 });

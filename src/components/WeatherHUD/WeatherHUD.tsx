@@ -264,6 +264,7 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
                     <WeatherDetails
                         weather={weather}
                         settings={settings}
+                        forecasts={forecasts}
                     />
                 </View>
             </ScrollView>

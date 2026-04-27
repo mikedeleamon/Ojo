@@ -3,10 +3,10 @@ import { StyleSheet, Pressable } from 'react-native';
 import { Svg, Path } from 'react-native-svg';
 import { View, Text } from '../primitives';
 import OutfitSuggestion from '../OutfitSuggestion/OutfitSuggestion';
-import { CurrentWeather, Settings } from '../../types';
+import { CurrentWeather, Forecast, Settings } from '../../types';
 import { colors, fonts, fontSizes, fontWeights, spacing, radius } from '../../theme/tokens';
 
-interface Props { weather: CurrentWeather; settings: Settings; }
+interface Props { weather: CurrentWeather; settings: Settings; forecasts: Forecast[]; }
 
 const Stat = ({ label, value }: { label: string; value: string }) => (
   <View style={st.stat}>
@@ -15,13 +15,13 @@ const Stat = ({ label, value }: { label: string; value: string }) => (
   </View>
 );
 
-const WeatherDetails = ({ weather, settings }: Props) => {
+const WeatherDetails = ({ weather, settings, forecasts }: Props) => {
   const [expanded, setExpanded] = useState(false);
   const isMetric = settings.temperatureScale === 'Metric';
 
   return (
     <View style={st.root}>
-      <OutfitSuggestion weather={weather} settings={settings} />
+      <OutfitSuggestion weather={weather} settings={settings} forecasts={forecasts} />
 
       <Pressable style={st.toggle} onPress={() => setExpanded(v => !v)}>
         <Text style={st.toggleText}>{expanded ? 'Less' : 'More details'}</Text>
