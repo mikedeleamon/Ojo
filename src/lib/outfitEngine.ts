@@ -97,6 +97,12 @@ const roleOf = (a: ClothingArticle): OutfitRole =>
 // 0–1 score for how appropriate a fabric is in each weather bucket.
 // Built as a lookup table so new fabrics can be added without changing logic.
 
+// Fabrics that typically require dry-cleaning (used in care notes).
+const DRY_CLEAN_FABRICS = new Set(['Silk', 'Wool']);
+
+// AccuWeather UVIndexText values considered high enough to warrant a hat note.
+const UV_HIGH_LABELS = new Set(['High', 'Very High', 'Extreme']);
+
 const FABRIC_WEATHER: Record<string, Record<WeatherBucket, number>> = {
   Cotton:    { hot: 0.90, warm: 0.80, cool: 0.60, cold: 0.30, freezing: 0.10 },
   Linen:     { hot: 1.00, warm: 0.90, cool: 0.50, cold: 0.15, freezing: 0.05 },
@@ -116,6 +122,8 @@ const fabricScore = (
   raining: boolean,
   humidity: number,
   humidityThreshold: number,
+  windMph: number,
+  isSnowing: boolean,
 ): number => {
   const base = a.fabricType
     ? (FABRIC_WEATHER[a.fabricType]?.[bucket] ?? 0.50)
@@ -135,6 +143,16 @@ const fabricScore = (
     if (a.fabricType === 'Wool'  || a.fabricType === 'Polyester') s -= 0.05;
   }
 
+  // Wind modifier: dense/windproof fabrics score better in cold + breezy conditions
+  if (windMph >= 15 && (bucket === 'cool' || bucket === 'cold' || bucket === 'freezing')) {
+    const bump = windMph >= 25 ? 0.10 : 0.06;
+    if (['Leather', 'Denim', 'Synthetic', 'Wool', 'Fleece'].includes(a.fabricType ?? '')) s += bump;
+    if (['Linen', 'Silk', 'Cotton'].includes(a.fabricType ?? ''))                         s -= bump * 0.7;
+  }
+
+  // Snow modifier: Boots surface naturally to the top of the footwear bucket
+  if (isSnowing && a.clothingType === 'Boots') s += 0.15;
+
   return Math.max(0, Math.min(1, s));
 };
 
@@ -144,10 +162,12 @@ const outfitFabricScore = (
   raining: boolean,
   humidity: number,
   humidityThreshold: number,
+  windMph: number,
+  isSnowing: boolean,
 ): number => {
   if (slots.length === 0) return 0;
   const sum = slots.reduce(
-    (acc, s) => acc + fabricScore(s.article, bucket, raining, humidity, humidityThreshold),
+    (acc, s) => acc + fabricScore(s.article, bucket, raining, humidity, humidityThreshold, windMph, isSnowing),
     0,
   );
   return sum / slots.length;
@@ -228,6 +248,26 @@ const outfitColorScore = (slots: OutfitSlot[]): number => {
     }
   }
   return pairs > 0 ? total / pairs : 0.70;
+};
+
+// Returns the outfit slot whose color clashes most with the rest, or null if
+// no meaningful clash exists. Used to generate targeted swap suggestions.
+const findClashingArticle = (slots: OutfitSlot[]): OutfitSlot | null => {
+  const coloredSlots = slots.filter(
+    s => s.article.color && !COLOR_NEUTRALS.has(s.article.color),
+  );
+  if (coloredSlots.length < 2) return null;
+
+  let minAvg = Infinity, worst: OutfitSlot | null = null;
+  for (const slot of coloredSlots) {
+    const others = slots.filter(s => s !== slot);
+    const avg = others.reduce(
+      (sum, other) => sum + pairHarmony(slot.article.color!, other.article.color ?? 'Black'),
+      0,
+    ) / others.length;
+    if (avg < minAvg) { minAvg = avg; worst = slot; }
+  }
+  return minAvg < 0.65 ? worst : null;
 };
 
 // ─── 3c. Style alignment scoring ─────────────────────────────────────────────
@@ -318,11 +358,13 @@ const scoreCombo = (
   bucket:         WeatherBucket,
   raining:        boolean,
   humidity:       number,
+  windMph:        number,
+  isSnowing:      boolean,
   settings:       Settings,
   recentlyWorn:   Set<string>,
   profile:        UserPreferenceProfile,
 ): ScoredCombo => {
-  const fabric     = outfitFabricScore(slots, bucket, raining, humidity, settings.humidityPreference);
+  const fabric     = outfitFabricScore(slots, bucket, raining, humidity, settings.humidityPreference, windMph, isSnowing);
   const color      = outfitColorScore(slots);
   const style      = outfitStyleScore(slots, settings.clothingStyle);
   const simplicity = simplicityScore(slots);
@@ -371,11 +413,13 @@ const topNByFabric = (
   raining: boolean,
   humidity: number,
   humidityThreshold: number,
+  windMph: number,
+  isSnowing: boolean,
 ): ClothingArticle[] =>
   [...articles]
     .sort((a, b) =>
-      fabricScore(b, bucket, raining, humidity, humidityThreshold) -
-      fabricScore(a, bucket, raining, humidity, humidityThreshold)
+      fabricScore(b, bucket, raining, humidity, humidityThreshold, windMph, isSnowing) -
+      fabricScore(a, bucket, raining, humidity, humidityThreshold, windMph, isSnowing)
     )
     .slice(0, BUCKET_CAP);
 
@@ -415,10 +459,14 @@ export const generateOutfits = (
   if (articles.length === 0) return empty_result('empty_closet');
 
   // ── Weather context ───────────────────────────────────────────────────────
-  const feelsLikeF = weather.RealFeelTemperature.Imperial.Value;
-  const raining    = weather.HasPrecipitation;
-  const humidity   = weather.RelativeHumidity;
-  const bucket     = getWeatherBucket(feelsLikeF, settings.hiTempThreshold, settings.lowTempThreshold);
+  const feelsLikeF  = weather.RealFeelTemperature.Imperial.Value;
+  const raining     = weather.HasPrecipitation;
+  const humidity    = weather.RelativeHumidity;
+  const windMph     = weather.Wind.Speed.Imperial.Value;
+  const uvIndexText = weather.UVIndexText ?? '';
+  const isSnowing   = /snow/i.test(weather.WeatherText ?? '');
+  const uvHigh      = UV_HIGH_LABELS.has(uvIndexText);
+  const bucket      = getWeatherBucket(feelsLikeF, settings.hiTempThreshold, settings.lowTempThreshold);
 
   // ── Phase 1: Hard filter → role bucketing → pre-rank per bucket ───────────
   const byRole = new Map<OutfitRole, ClothingArticle[]>();
@@ -430,7 +478,7 @@ export const generateOutfits = (
   }
 
   const cap = (role: OutfitRole) =>
-    topNByFabric(byRole.get(role) ?? [], bucket, raining, humidity, settings.humidityPreference);
+    topNByFabric(byRole.get(role) ?? [], bucket, raining, humidity, settings.humidityPreference, windMph, isSnowing);
 
   const tops        = cap('top');
   const bottoms     = cap('bottom');
@@ -456,8 +504,16 @@ export const generateOutfits = (
   const shoeOptions: (ClothingArticle | null)[] =
     footwears.length > 0 ? footwears : [null];
 
-  // One accessory slot, optional
-  const accOptions: (ClothingArticle | null)[] = [null, ...accessories.slice(0, 4)];
+  // One accessory slot, optional.
+  // When UV is high, hats and caps float to the front so they appear in top combos.
+  const sortedAccessories = uvHigh
+    ? [...accessories].sort((a, b) => {
+        const aHat = (a.clothingType === 'Hat' || a.clothingType === 'Cap') ? -1 : 1;
+        const bHat = (b.clothingType === 'Hat' || b.clothingType === 'Cap') ? -1 : 1;
+        return aHat - bHat;
+      })
+    : accessories;
+  const accOptions: (ClothingArticle | null)[] = [null, ...sortedAccessories.slice(0, 4)];
 
   // ── Phase 3: Enumerate all valid combinations and score each ──────────────
 
@@ -489,7 +545,7 @@ export const generateOutfits = (
           if (shoe)  slots.push({ role: 'footwear',  article: shoe  });
           if (acc)   slots.push({ role: 'accessory', article: acc   });
 
-          scored.push(scoreCombo(slots, bucket, raining, humidity, settings, recentlyWorn, profile));
+          scored.push(scoreCombo(slots, bucket, raining, humidity, windMph, isSnowing, settings, recentlyWorn, profile));
         }
       }
     }
@@ -513,8 +569,10 @@ export const generateOutfits = (
 
   // ── Phase 5: Attach notes and build OutfitResult[] ───────────────────────
 
-  const buildNotes = (slots: OutfitSlot[]): string[] => {
+  const buildNotes = (slots: OutfitSlot[], breakdown: ScoreBreakdown): string[] => {
     const notes: string[] = [];
+
+    // ── Wardrobe gap notes ────────────────────────────────────────────────
     const needsOuter = bucket === 'cool' || bucket === 'cold' || bucket === 'freezing';
     if (needsOuter && !slots.some(s => s.role === 'outerwear')) {
       notes.push(
@@ -526,7 +584,48 @@ export const generateOutfits = (
     if (!slots.some(s => s.role === 'footwear')) {
       notes.push('No footwear in your closet yet.');
     }
+
+    // ── Condition notes ───────────────────────────────────────────────────
     if (raining) notes.push('Rain expected — waterproof layers recommended.');
+
+    if (isSnowing && !slots.some(s => s.article.clothingType === 'Boots')) {
+      notes.push('Snow expected — boots would serve you better.');
+    }
+
+    if (windMph >= 20 && (bucket === 'cool' || bucket === 'cold' || bucket === 'freezing')) {
+      notes.push('Windy today — wind-resistant fabrics like Denim or Leather help.');
+    }
+
+    if (uvHigh && !slots.some(s => s.article.clothingType === 'Hat' || s.article.clothingType === 'Cap')) {
+      notes.push(`UV is ${uvIndexText} today — a hat would help protect you.`);
+    }
+
+    // ── Score-based notes ─────────────────────────────────────────────────
+    if (breakdown.color < 55) {
+      const worst = findClashingArticle(slots);
+      if (worst) {
+        const name = worst.article.name ?? worst.article.clothingType;
+        notes.push(`Color harmony is low (${breakdown.color}/100) — consider swapping the ${name}.`);
+      }
+    }
+
+    if (breakdown.fabric < 45) {
+      notes.push(`Fabric suitability is low (${breakdown.fabric}/100) — these materials may not suit today's weather.`);
+    }
+
+    if (breakdown.style < 50) {
+      notes.push(`Style alignment is low (${breakdown.style}/100) — some pieces don't fit your ${settings.clothingStyle} style.`);
+    }
+
+    // ── Care notes ────────────────────────────────────────────────────────
+    const dryCleanItems = slots.filter(
+      s => s.article.fabricType && DRY_CLEAN_FABRICS.has(s.article.fabricType),
+    );
+    if (dryCleanItems.length > 0) {
+      const names = dryCleanItems.map(s => s.article.name ?? s.article.clothingType).join(' & ');
+      notes.push(`Dry-clean recommended for: ${names}.`);
+    }
+
     return notes;
   };
 
@@ -534,7 +633,7 @@ export const generateOutfits = (
     status:         'ok',
     headline:       headline(bucket),
     slots:          combo.slots,
-    notes:          buildNotes(combo.slots),
+    notes:          buildNotes(combo.slots, combo.breakdown),
     score:          combo.score,
     scoreBreakdown: combo.breakdown,
   }));
