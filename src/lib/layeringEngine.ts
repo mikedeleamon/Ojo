@@ -185,18 +185,29 @@ const buildTimeline = (
 // Sentence varies based on which layers are active and whether a timeline exists.
 
 const buildRecommendation = (
-  base:        OutfitSlot | null,
-  mid:         OutfitSlot | null,
-  outer:       OutfitSlot | null,
-  currentTemp: number,
-  hasTimeline: boolean,
+  base:         OutfitSlot | null,
+  mid:          OutfitSlot | null,
+  outer:        OutfitSlot | null,
+  currentTemp:  number,
+  hasTimeline:  boolean,
+  missingMid:   boolean,
+  missingOuter: boolean,
+  raining:      boolean,
 ): string => {
   const baseName  = base?.article.name  || base?.article.clothingType  || 'base layer';
   const midName   = mid?.article.name   || mid?.article.clothingType;
   const outerName = outer?.article.name || outer?.article.clothingType;
 
-  // Single layer — warm enough to keep it simple
+  // Single layer — check whether layers are needed but absent before calling it fine
   if (!mid && !outer) {
+    if (missingOuter && raining)
+      return `Your ${baseName} alone won't hold up today — a waterproof outer layer is strongly recommended for the rain and chill.`;
+    if (missingOuter)
+      return `Your ${baseName} may be too light for ${currentTemp}°F — a jacket would make a real difference today.`;
+    if (missingMid && raining)
+      return `Your ${baseName} is light for these conditions — a mid layer and something water-resistant would keep you comfortable.`;
+    if (missingMid)
+      return `Your ${baseName} may feel a bit cool — a mid layer over top would help for ${currentTemp}°F.`;
     return currentTemp > 70
       ? `Your ${baseName} is all you need today — the weather is comfortable enough to keep it simple.`
       : `Your ${baseName} works well on its own for these conditions.`;
@@ -204,23 +215,28 @@ const buildRecommendation = (
 
   // Full three-layer stack
   if (mid && outer) {
+    const rainSuffix = raining ? ` Make sure the ${outerName} can handle rain.` : '';
     return hasTimeline
-      ? `Start with your ${midName} over the ${baseName}, then add the ${outerName} for cooler moments. You can drop the ${outerName} as the day warms up.`
-      : `Layer your ${midName} over the ${baseName} with the ${outerName} on top for full coverage.`;
+      ? `Start with your ${midName} over the ${baseName}, then add the ${outerName} for cooler moments. You can drop the ${outerName} as the day warms up.${rainSuffix}`
+      : `Layer your ${midName} over the ${baseName} with the ${outerName} on top for full coverage.${rainSuffix}`;
   }
 
   // Outer only (mid not needed)
   if (outer && !mid) {
+    const rainNote = raining ? ` Rain is expected — keep the ${outerName} on.` : '';
     return hasTimeline
-      ? `The ${outerName} will be welcome this morning — feel free to shed it once temperatures climb.`
-      : `A ${outerName} over your ${baseName} is the right call for today.`;
+      ? `The ${outerName} will be welcome this morning — feel free to shed it once temperatures climb.${rainNote}`
+      : `A ${outerName} over your ${baseName} is the right call for today.${rainNote}`;
   }
 
   // Mid only (outer not needed)
   if (mid && !outer) {
+    const rainWarning = raining
+      ? ` Rain is in the forecast though — consider grabbing a water-resistant layer too.`
+      : '';
     return hasTimeline
-      ? `Your ${midName} is a smart pick for the morning chill — easy to remove as the day heats up.`
-      : `Keep your ${midName} handy — it suits today's temperature without being too heavy.`;
+      ? `Your ${midName} is a smart pick for the morning chill — easy to remove as the day heats up.${rainWarning}`
+      : `Keep your ${midName} handy — it suits today's temperature without being too heavy.${rainWarning}`;
   }
 
   return 'Layer to your comfort based on how the day feels.';
@@ -270,31 +286,39 @@ export const generateLayeringRecommendation = ({
 }): LayeringResult => {
   const currentTemp = weather.RealFeelTemperature.Imperial.Value;
   const windSpeed   = weather.Wind.Speed.Imperial.Value;
+  const raining     = weather.HasPrecipitation;
 
   const { high, low } = deriveDayRange(forecasts, currentTemp);
   const tempDelta = high - low;
 
   const { base, mid, outer } = extractLayers(slots);
 
+  const needsMid   = layerNeedsMid(currentTemp, tempDelta);
+  const needsOuter = layerNeedsOuter(currentTemp, windSpeed) || raining;
+
   // Apply necessity + removability gates together.
   // An item that is needed but non-removable still surfaces — the removability
   // threshold is deliberately low (0.35 for outer) to avoid silently dropping
   // a coat on a cold day just because it's leather.
   const effectiveMid: OutfitSlot | null =
-    mid && layerNeedsMid(currentTemp, tempDelta) && removabilityOf(mid.article) >= 0.45
+    mid && needsMid && removabilityOf(mid.article) >= 0.45
       ? mid
       : null;
 
   const effectiveOuter: OutfitSlot | null =
-    outer && layerNeedsOuter(currentTemp, windSpeed) && removabilityOf(outer.article) >= 0.35
+    outer && needsOuter && removabilityOf(outer.article) >= 0.35
       ? outer
       : null;
+
+  // Layers that conditions call for but the outfit doesn't have (wardrobe gap)
+  const missingMid   = needsMid   && !effectiveMid;
+  const missingOuter = needsOuter && !effectiveOuter;
 
   const timeline = buildTimeline(forecasts, effectiveMid, effectiveOuter, high, low);
 
   return {
     layers:         { base, mid: effectiveMid, outer: effectiveOuter },
-    recommendation: buildRecommendation(base, effectiveMid, effectiveOuter, currentTemp, !!timeline),
+    recommendation: buildRecommendation(base, effectiveMid, effectiveOuter, currentTemp, !!timeline, missingMid, missingOuter, raining),
     timeline,
     confidence:     computeConfidence(currentTemp, tempDelta, windSpeed, !!effectiveMid, !!effectiveOuter),
   };
