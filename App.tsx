@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
+import { Image, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Font from 'expo-font';
+import { LinearGradient } from 'expo-linear-gradient';
 import { WeatherProvider } from './src/context/WeatherContext';
 import { SettingsProvider } from './src/context/SettingsContext';
 import RootNavigator from './src/navigation/RootNavigator';
@@ -15,10 +17,42 @@ import {
 
 SplashScreen.preventAutoHideAsync();
 
+function CustomSplash() {
+    return (
+        <LinearGradient
+            colors={['#00C853', '#2979FF']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.splashGradient}
+        >
+            <Image
+                source={require('./assets/ojoLogo.png')}
+                style={styles.splashLogo}
+                resizeMode='contain'
+            />
+        </LinearGradient>
+    );
+}
+
+const styles = StyleSheet.create({
+    splashGradient: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    splashLogo: {
+        width: 160,
+        height: 160,
+    },
+});
+
 export default function App() {
     const [ready, setReady] = useState(false);
 
     useEffect(() => {
+        // Dismiss native splash immediately so CustomSplash is visible while loading
+        SplashScreen.hideAsync();
+
         const init = async () => {
             try {
                 await Font.loadAsync({
@@ -37,14 +71,16 @@ export default function App() {
                     await refreshToken().catch(() => {});
                 }
             } finally {
+                await new Promise((r) => setTimeout(r, 2500));
                 setReady(true);
-                await SplashScreen.hideAsync();
+                //TODO:add this line back (maybe?)
+                //await SplashScreen.hideAsync();
             }
         };
         init();
     }, []);
 
-    if (!ready) return null;
+    if (!ready) return <CustomSplash />;
 
     return (
         <SafeAreaProvider>

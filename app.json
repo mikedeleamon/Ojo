@@ -8,9 +8,9 @@
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/ojo_splash_icon.png",
+      "image": "./assets/ojoLogo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0F172A"
+      "backgroundColor": "#87DE5A"
     },
     "ios": {
       "supportsTablet": false,
@@ -22,8 +22,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/ojo_splash_icon.png",
-        "backgroundColor": "#0F172A"
+        "foregroundImage": "./assets/ojoLogo.png",
+        "backgroundColor": "#87DE5A"
       },
       "package": "com.placeholder.ojo",
       "permissions": [
