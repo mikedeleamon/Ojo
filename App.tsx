@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Image, StyleSheet } from 'react-native';
+import { Image, StyleSheet, useColorScheme, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Font from 'expo-font';
-import { LinearGradient } from 'expo-linear-gradient';
 import { WeatherProvider } from './src/context/WeatherContext';
 import { SettingsProvider } from './src/context/SettingsContext';
 import RootNavigator from './src/navigation/RootNavigator';
@@ -18,24 +17,25 @@ import {
 SplashScreen.preventAutoHideAsync();
 
 function CustomSplash() {
+    const scheme = useColorScheme();
+    const dark = scheme === 'dark';
+
     return (
-        <LinearGradient
-            colors={['#00C853', '#2979FF']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.splashGradient}
-        >
+        <View style={[styles.splashContainer, { backgroundColor: dark ? '#000000' : '#FFFFFF' }]}>
             <Image
-                source={require('./assets/ojoLogo.png')}
+                source={dark
+                    ? require('./assets/ojoLogo.png')
+                    : require('./assets/ojo_word_logo_2.png')
+                }
                 style={styles.splashLogo}
                 resizeMode='contain'
             />
-        </LinearGradient>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    splashGradient: {
+    splashContainer: {
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
