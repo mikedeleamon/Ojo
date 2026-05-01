@@ -78,6 +78,17 @@ export interface ClothingArticle {
   createdAt?:       string;
 }
 
+export interface NotificationSettings {
+  morningBriefEnabled:    boolean;
+  morningBriefHourUTC:    number;   // 0–23 in UTC
+  weatherChangeEnabled:   boolean;
+  tempSwingEnabled:       boolean;
+  tempSwingThresholdF:    number;   // degrees F, default 20
+  closetGapEnabled:       boolean;
+  weeklyRecapEnabled:     boolean;
+  weeklyRecapDay:         number;   // 0=Sun … 6=Sat
+}
+
 export interface OutfitHistoryEntry {
   id:        string;
   wornAt:    string;

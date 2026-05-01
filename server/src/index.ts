@@ -9,6 +9,8 @@ import authRoutes from './routes/auth';
 import userRoutes from './routes/user';
 import closetRoutes from './routes/closets';
 import weatherRoutes from './routes/weather';
+import notificationRoutes from './routes/notifications';
+import { startNotificationService } from './services/notificationService';
 
 const app = express();
 const PORT = process.env.PORT ?? 4000;
@@ -20,6 +22,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/closets', closetRoutes);
 app.use('/api/weather', weatherRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err);
@@ -28,6 +31,7 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 
 connectDB().then(() => {
   app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+  startNotificationService();
 }).catch((err) => {
   console.error('Failed to connect to MongoDB:', err);
   process.exit(1);

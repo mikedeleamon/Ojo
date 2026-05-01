@@ -154,8 +154,8 @@ const buildTimeline = (
   const eveningTemp   = tempAt(17, 21);
 
   const primaryLayer = outer ?? mid;
-  const primaryName  = primaryLayer!.article.name ?? primaryLayer!.article.clothingType;
-  const outerName    = outer?.article.name ?? outer?.article.clothingType;
+  const primaryName  = primaryLayer!.article.name || primaryLayer!.article.clothingType;
+  const outerName    = outer?.article.name || outer?.article.clothingType;
 
   const steps: { time: string; action: string }[] = [];
 
@@ -191,9 +191,9 @@ const buildRecommendation = (
   currentTemp: number,
   hasTimeline: boolean,
 ): string => {
-  const baseName  = base?.article.name  ?? base?.article.clothingType  ?? 'base layer';
-  const midName   = mid?.article.name   ?? mid?.article.clothingType;
-  const outerName = outer?.article.name ?? outer?.article.clothingType;
+  const baseName  = base?.article.name  || base?.article.clothingType  || 'base layer';
+  const midName   = mid?.article.name   || mid?.article.clothingType;
+  const outerName = outer?.article.name || outer?.article.clothingType;
 
   // Single layer — warm enough to keep it simple
   if (!mid && !outer) {

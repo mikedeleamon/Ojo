@@ -12,7 +12,9 @@ import {
     initAuthCache,
     isTokenExpiringSoon,
     refreshToken,
+    getToken,
 } from './src/lib/auth';
+import { registerPushToken } from './src/lib/notifications';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -69,6 +71,10 @@ export default function App() {
                 await initAuthCache();
                 if (isTokenExpiringSoon(86_400)) {
                     await refreshToken().catch(() => {});
+                }
+                // Re-register push token on each cold start so it stays current
+                if (getToken()) {
+                    registerPushToken().catch(() => {});
                 }
             } finally {
                 await new Promise((r) => setTimeout(r, 2500));

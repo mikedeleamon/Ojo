@@ -20,15 +20,6 @@ const InfoCard = ({ title, body }: { title: string; body: string }) => (
   </View>
 );
 
-// ─── Notifications ────────────────────────────────────────────────────────────
-
-export const NotificationsScreen = () => (
-  <Root>
-    <InfoCard title="Coming soon"
-      body="Push notifications aren't available yet. Check back in a future update." />
-  </Root>
-);
-
 // ─── Permissions ──────────────────────────────────────────────────────────────
 
 export const PermissionsScreen = () => (

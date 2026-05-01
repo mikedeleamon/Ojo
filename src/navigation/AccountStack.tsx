@@ -10,8 +10,8 @@ import PreferencesScreen from '../features/settings/screens/PreferencesScreen';
 import LocationScreen from '../features/settings/screens/LocationScreen';
 import UnitsScreen from '../features/settings/screens/UnitsScreen';
 import LegalWebViewScreen from '../features/settings/screens/LegalWebViewScreen';
+import NotificationsScreen from '../features/settings/screens/NotificationsScreen';
 import {
-    NotificationsScreen,
     PermissionsScreen,
     DataUsageScreen,
     HistoryScreen,
