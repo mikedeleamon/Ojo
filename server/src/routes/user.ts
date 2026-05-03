@@ -8,59 +8,89 @@ const router = Router();
 router.use(requireAuth);
 
 router.get('/me', async (req: AuthRequest, res: Response): Promise<void> => {
-  const user = await User.findById(req.userId).select('username email');
-  if (!user) { res.status(404).json({ error: 'User not found' }); return; }
-  res.json({ username: user.username, email: user.email });
+  try {
+    const user = await User.findById(req.userId).select('username email');
+    if (!user) { res.status(404).json({ error: 'User not found' }); return; }
+    res.json({ username: user.username, email: user.email });
+  } catch (err) {
+    console.error('[user] me error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 router.put('/profile', async (req: AuthRequest, res: Response): Promise<void> => {
-  const { username, email } = req.body;
-  const conflict = await User.findOne({
-    _id: { $ne: req.userId },
-    $or: [{ email: email?.toLowerCase() }, { username }],
-  });
-  if (conflict) { res.status(409).json({ error: 'Email or username already in use' }); return; }
-  await User.findByIdAndUpdate(req.userId, {
-    ...(username && { username }),
-    ...(email && { email: email.toLowerCase() }),
-  });
-  res.sendStatus(204);
+  try {
+    const { username, email } = req.body;
+    const conflict = await User.findOne({
+      _id: { $ne: req.userId },
+      $or: [{ email: email?.toLowerCase() }, { username }],
+    });
+    if (conflict) { res.status(409).json({ error: 'Email or username already in use' }); return; }
+    await User.findByIdAndUpdate(req.userId, {
+      ...(username && { username }),
+      ...(email && { email: email.toLowerCase() }),
+    });
+    res.sendStatus(204);
+  } catch (err) {
+    console.error('[user] profile update error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 router.put('/password', async (req: AuthRequest, res: Response): Promise<void> => {
-  const { currentPassword, newPassword } = req.body;
-  if (!currentPassword || !newPassword) {
-    res.status(400).json({ error: 'currentPassword and newPassword are required' }); return;
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      res.status(400).json({ error: 'currentPassword and newPassword are required' }); return;
+    }
+    if (newPassword.length < 8) {
+      res.status(400).json({ error: 'Password must be at least 8 characters' }); return;
+    }
+    const user = await User.findById(req.userId);
+    if (!user || !(await bcrypt.compare(currentPassword, user.password))) {
+      res.status(401).json({ error: 'Current password is incorrect' }); return;
+    }
+    user.password = await bcrypt.hash(newPassword, 12);
+    await user.save();
+    res.sendStatus(204);
+  } catch (err) {
+    console.error('[user] password update error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
-  if (newPassword.length < 8) {
-    res.status(400).json({ error: 'Password must be at least 8 characters' }); return;
-  }
-  const user = await User.findById(req.userId);
-  if (!user || !(await bcrypt.compare(currentPassword, user.password))) {
-    res.status(401).json({ error: 'Current password is incorrect' }); return;
-  }
-  user.password = await bcrypt.hash(newPassword, 12);
-  await user.save();
-  res.sendStatus(204);
 });
 
 router.delete('/me', async (req: AuthRequest, res: Response): Promise<void> => {
-  await Promise.all([
-    User.findByIdAndDelete(req.userId),
-    Closet.deleteMany({ userId: req.userId }),
-  ]);
-  res.sendStatus(204);
+  try {
+    await Promise.all([
+      User.findByIdAndDelete(req.userId),
+      Closet.deleteMany({ userId: req.userId }),
+    ]);
+    res.sendStatus(204);
+  } catch (err) {
+    console.error('[user] delete error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 router.get('/settings', async (req: AuthRequest, res: Response): Promise<void> => {
-  const user = await User.findById(req.userId).select('settings');
-  if (!user) { res.status(404).json({ error: 'User not found' }); return; }
-  res.json(user.settings);
+  try {
+    const user = await User.findById(req.userId).select('settings');
+    if (!user) { res.status(404).json({ error: 'User not found' }); return; }
+    res.json(user.settings);
+  } catch (err) {
+    console.error('[user] settings get error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 router.put('/settings', async (req: AuthRequest, res: Response): Promise<void> => {
-  await User.findByIdAndUpdate(req.userId, { settings: req.body });
-  res.sendStatus(204);
+  try {
+    await User.findByIdAndUpdate(req.userId, { settings: req.body });
+    res.sendStatus(204);
+  } catch (err) {
+    console.error('[user] settings update error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 export default router;

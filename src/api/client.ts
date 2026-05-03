@@ -3,6 +3,7 @@ import axios, { AxiosError } from 'axios';
 const client = axios.create({
   baseURL: process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:4000',
   headers: { 'Content-Type': 'application/json' },
+  timeout: 15_000,
 });
 
 /**

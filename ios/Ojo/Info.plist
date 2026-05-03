@@ -52,18 +52,18 @@
     </dict>
     <key>NSCameraUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your camera</string>
-    <key>NSFaceIDUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your Face ID biometric data.</string>
     <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your location</string>
     <key>NSLocationAlwaysUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your location</string>
+    <key>NSFaceIDUsageDescription</key>
+    <string>Ojo uses Face ID to securely access your saved login credentials from the device keychain.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>Ojo uses your location for local weather.</string>
-    <key>NSMicrophoneUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your microphone</string>
+    <string>Ojo uses your location to fetch local weather for outfit suggestions.</string>
     <key>NSPhotoLibraryUsageDescription</key>
-    <string>Ojo uses your photo library to add clothing images.</string>
+    <string>Ojo uses your photo library so you can add images of your clothing items.</string>
+    <key>NSUserNotificationsUsageDescription</key>
+    <string>Ojo sends daily outfit suggestions and weather alerts to help you dress for the day.</string>
     <key>RCTNewArchEnabled</key>
     <true/>
     <key>UILaunchStoryboardName</key>
