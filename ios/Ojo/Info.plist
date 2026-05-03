@@ -50,8 +50,6 @@
       <key>NSAllowsLocalNetworking</key>
       <true/>
     </dict>
-    <key>NSCameraUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your camera</string>
     <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your location</string>
     <key>NSLocationAlwaysUsageDescription</key>

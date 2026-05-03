@@ -13,7 +13,7 @@ export const LEGAL_URLS = {
   termsOfService:  '[REPLACE_WITH_HOSTED_URL]/terms',
 } as const;
 
-export const EFFECTIVE_DATE = '[EFFECTIVE DATE]';
+export const EFFECTIVE_DATE = 'June 15, 2026';
 export const DEVELOPER_NAME = '[DEVELOPER NAME]';
 export const CONTACT_EMAIL  = '[CONTACT EMAIL]';
 export const WEBSITE_URL    = '[WEBSITE URL]';
