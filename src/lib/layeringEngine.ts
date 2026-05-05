@@ -79,17 +79,30 @@ const extractLayers = (
 };
 
 // ─── 2. Day temperature range ─────────────────────────────────────────────────
-// Derive real high and low from the hourly forecast array.
-// Falls back to the current feels-like temp when no forecasts are available,
-// which produces a zero delta — suppressing timeline output gracefully.
+// Derive a feels-like high/low from the hourly forecast array.
+//
+// The Forecast type only carries raw Temperature, but every layering decision
+// downstream is made on a feels-like basis (currentTemp = RealFeel). To keep
+// units consistent we apply the current feels-like offset (RealFeel - airTemp)
+// to each forecast value. This is a coarse approximation — real RealFeel varies
+// with humidity and solar load throughout the day — but it's far better than
+// mixing raw forecast temps with feels-like current temps when computing the
+// day delta.
+//
+// Falls back to currentFeelsLike when no forecasts are available, producing a
+// zero delta and suppressing timeline output gracefully.
 
 const deriveDayRange = (
-  forecasts:    Forecast[],
-  fallbackTemp: number,
-): { high: number; low: number } => {
-  if (forecasts.length === 0) return { high: fallbackTemp, low: fallbackTemp };
-  const temps = forecasts.map(f => f.Temperature.Value);
-  return { high: Math.max(...temps), low: Math.min(...temps) };
+  forecasts:        Forecast[],
+  currentAirTemp:   number,
+  currentFeelsLike: number,
+): { high: number; low: number; offset: number } => {
+  const offset = currentFeelsLike - currentAirTemp;
+  if (forecasts.length === 0) {
+    return { high: currentFeelsLike, low: currentFeelsLike, offset };
+  }
+  const feelsTemps = forecasts.map(f => f.Temperature.Value + offset);
+  return { high: Math.max(...feelsTemps), low: Math.min(...feelsTemps), offset };
 };
 
 // ─── 3. Layer necessity scoring ───────────────────────────────────────────────
@@ -131,22 +144,23 @@ const removabilityOf = (article: ClothingArticle): number => {
 const MEANINGFUL_DELTA_F = 10;
 
 const buildTimeline = (
-  forecasts: Forecast[],
-  mid:       OutfitSlot | null,
-  outer:     OutfitSlot | null,
-  high:      number,
-  low:       number,
+  forecasts:    Forecast[],
+  mid:          OutfitSlot | null,
+  outer:        OutfitSlot | null,
+  high:         number,
+  low:          number,
+  feelsOffset:  number,
 ): { time: string; action: string }[] | undefined => {
   if ((!mid && !outer) || forecasts.length === 0) return undefined;
   if (high - low < MEANINGFUL_DELTA_F) return undefined;
 
-  // Sample one representative reading per time-of-day window
+  // Sample one representative reading per time-of-day window, converted to feels-like
   const tempAt = (fromH: number, toH: number): number | null => {
     const match = forecasts.find(f => {
       const h = new Date(f.DateTime).getHours();
       return h >= fromH && h <= toH;
     });
-    return match?.Temperature.Value ?? null;
+    return match ? match.Temperature.Value + feelsOffset : null;
   };
 
   const morningTemp   = tempAt(6,  10);
@@ -284,11 +298,12 @@ export const generateLayeringRecommendation = ({
   forecasts: Forecast[];
   slots:     OutfitSlot[];
 }): LayeringResult => {
-  const currentTemp = weather.RealFeelTemperature.Imperial.Value;
-  const windSpeed   = weather.Wind.Speed.Imperial.Value;
-  const raining     = weather.HasPrecipitation;
+  const currentTemp    = weather.RealFeelTemperature.Imperial.Value;
+  const currentAirTemp = weather.Temperature.Imperial.Value;
+  const windSpeed      = weather.Wind.Speed.Imperial.Value;
+  const raining        = weather.HasPrecipitation;
 
-  const { high, low } = deriveDayRange(forecasts, currentTemp);
+  const { high, low, offset } = deriveDayRange(forecasts, currentAirTemp, currentTemp);
   const tempDelta = high - low;
 
   const { base, mid, outer } = extractLayers(slots);
@@ -314,7 +329,7 @@ export const generateLayeringRecommendation = ({
   const missingMid   = needsMid   && !effectiveMid;
   const missingOuter = needsOuter && !effectiveOuter;
 
-  const timeline = buildTimeline(forecasts, effectiveMid, effectiveOuter, high, low);
+  const timeline = buildTimeline(forecasts, effectiveMid, effectiveOuter, high, low, offset);
 
   return {
     layers:         { base, mid: effectiveMid, outer: effectiveOuter },

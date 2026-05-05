@@ -118,9 +118,52 @@ const FABRIC_WEATHER: Record<string, Record<WeatherBucket, number>> = {
   Other:     { hot: 0.50, warm: 0.50, cool: 0.50, cold: 0.50, freezing: 0.50 },
 };
 
+// ─── 3a-bis. Garment thermal weight ───────────────────────────────────────────
+// Independent of fabric — accounts for cut, coverage, and construction.
+// 0 = no insulation (tank), 1 = maximum insulation (heavy coat).
+// This is what differentiates a Cotton T-Shirt from a Cotton Hoodie at the same
+// feels-like temperature, where their pure FABRIC_WEATHER score is identical.
+const GARMENT_WARMTH: Record<string, number> = {
+  Tank:       0.00,
+  'T-Shirt':  0.05,
+  Blouse:     0.05,
+  Shirt:      0.15,  // long-sleeve button-up
+  Hoodie:     0.50,
+  Sweater:    0.65,
+  Jacket:     0.70,
+  Coat:       0.95,
+  // Bottoms
+  Shorts:     0.05,
+  Skirt:      0.10,
+  Dress:      0.15,
+  Pants:      0.35,
+  Jeans:      0.45,
+  // Footwear
+  Sandals:    0.00,
+  Sneakers:   0.30,
+  Shoes:      0.40,
+  Boots:      0.70,
+};
+
+/**
+ * Ideal aggregate garment warmth for a given feels-like temperature.
+ * Continuous curve so 51°F and 80°F (both "warm" bucket) get different targets,
+ * fixing the "Cotton tee preferred over Cotton hoodie at 56°F" bug.
+ */
+const idealWarmthForFeelsLike = (feelsLikeF: number): number => {
+  if (feelsLikeF >= 80) return 0.10;
+  if (feelsLikeF >= 70) return 0.25;
+  if (feelsLikeF >= 60) return 0.40;
+  if (feelsLikeF >= 50) return 0.55;
+  if (feelsLikeF >= 40) return 0.70;
+  if (feelsLikeF >= 30) return 0.85;
+  return 1.00;
+};
+
 const fabricScore = (
   a: ClothingArticle,
   bucket: WeatherBucket,
+  feelsLikeF: number,
   raining: boolean,
   humidity: number,
   humidityThreshold: number,
@@ -155,12 +198,23 @@ const fabricScore = (
   // Snow modifier: Boots surface naturally to the top of the footwear bucket
   if (isSnowing && a.clothingType === 'Boots') s += 0.15;
 
+  // ── Thermal alignment (uses feels-like, not raw temp) ─────────────────────
+  // Blends fabric-weather (70%) with garment thermal alignment (30%) so that
+  // within a single bucket, garments closer to the ideal warmth for the actual
+  // feels-like temp are preferred. This is the fix for the bug where a Cotton
+  // tee and Cotton hoodie tied at 56°F.
+  const garmentW   = GARMENT_WARMTH[a.clothingType] ?? 0.30;
+  const ideal      = idealWarmthForFeelsLike(feelsLikeF);
+  const thermalAlign = 1 - Math.min(1, Math.abs(garmentW - ideal));
+  s = s * 0.70 + thermalAlign * 0.30;
+
   return Math.max(0, Math.min(1, s));
 };
 
 const outfitFabricScore = (
   slots: OutfitSlot[],
   bucket: WeatherBucket,
+  feelsLikeF: number,
   raining: boolean,
   humidity: number,
   humidityThreshold: number,
@@ -169,7 +223,7 @@ const outfitFabricScore = (
 ): number => {
   if (slots.length === 0) return 0;
   const sum = slots.reduce(
-    (acc, s) => acc + fabricScore(s.article, bucket, raining, humidity, humidityThreshold, windMph, isSnowing),
+    (acc, s) => acc + fabricScore(s.article, bucket, feelsLikeF, raining, humidity, humidityThreshold, windMph, isSnowing),
     0,
   );
   return sum / slots.length;
@@ -358,6 +412,7 @@ interface ScoredCombo {
 const scoreCombo = (
   slots:          OutfitSlot[],
   bucket:         WeatherBucket,
+  feelsLikeF:     number,
   raining:        boolean,
   humidity:       number,
   windMph:        number,
@@ -366,7 +421,7 @@ const scoreCombo = (
   recentlyWorn:   Set<string>,
   profile:        UserPreferenceProfile,
 ): ScoredCombo => {
-  const fabric     = outfitFabricScore(slots, bucket, raining, humidity, settings.humidityPreference, windMph, isSnowing);
+  const fabric     = outfitFabricScore(slots, bucket, feelsLikeF, raining, humidity, settings.humidityPreference, windMph, isSnowing);
   const color      = outfitColorScore(slots);
   const style      = outfitStyleScore(slots, settings.clothingStyle);
   const simplicity = simplicityScore(slots);
@@ -412,6 +467,7 @@ const BUCKET_CAP = 8;
 const topNByFabric = (
   articles: ClothingArticle[],
   bucket: WeatherBucket,
+  feelsLikeF: number,
   raining: boolean,
   humidity: number,
   humidityThreshold: number,
@@ -420,8 +476,8 @@ const topNByFabric = (
 ): ClothingArticle[] =>
   [...articles]
     .sort((a, b) =>
-      fabricScore(b, bucket, raining, humidity, humidityThreshold, windMph, isSnowing) -
-      fabricScore(a, bucket, raining, humidity, humidityThreshold, windMph, isSnowing)
+      fabricScore(b, bucket, feelsLikeF, raining, humidity, humidityThreshold, windMph, isSnowing) -
+      fabricScore(a, bucket, feelsLikeF, raining, humidity, humidityThreshold, windMph, isSnowing)
     )
     .slice(0, BUCKET_CAP);
 
@@ -481,7 +537,7 @@ export const generateOutfits = (
   }
 
   const cap = (role: OutfitRole) =>
-    topNByFabric(byRole.get(role) ?? [], bucket, raining, humidity, settings.humidityPreference, windMph, isSnowing);
+    topNByFabric(byRole.get(role) ?? [], bucket, feelsLikeF, raining, humidity, settings.humidityPreference, windMph, isSnowing);
 
   const tops        = cap('top');
   const bottoms     = cap('bottom');
@@ -548,7 +604,7 @@ export const generateOutfits = (
           if (shoe)  slots.push({ role: 'footwear',  article: shoe  });
           if (acc)   slots.push({ role: 'accessory', article: acc   });
 
-          scored.push(scoreCombo(slots, bucket, raining, humidity, windMph, isSnowing, settings, recentlyWorn, profile));
+          scored.push(scoreCombo(slots, bucket, feelsLikeF, raining, humidity, windMph, isSnowing, settings, recentlyWorn, profile));
         }
       }
     }
