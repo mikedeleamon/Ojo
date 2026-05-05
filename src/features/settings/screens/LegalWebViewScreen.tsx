@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { StyleSheet, ActivityIndicator } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { View, Text, Pressable, ScrollView } from '../../../components/primitives';
 import { WebView } from 'react-native-webview';
+import Loading from '../../../components/Loading/Loading';
 import { LegalDocument, EFFECTIVE_DATE, shouldUseIframe } from '../../../config/legal';
 import { colors, spacing, radius, fonts, fontSizes } from '../../../theme/tokens';
 
@@ -36,12 +37,7 @@ export default function LegalWebViewScreen({ doc, onClose }: Props) {
       {/* Content */}
       {useWebView ? (
         <>
-          {loadState === 'loading' && (
-            <View style={styles.center}>
-              <ActivityIndicator color={colors.textPrimary} />
-              <Text style={styles.loadingText}>Loading document…</Text>
-            </View>
-          )}
+          {loadState === 'loading' && <Loading />}
           {loadState === 'error' && (
             <View style={styles.center}>
               <Text style={styles.errorText}>Unable to load document.</Text>

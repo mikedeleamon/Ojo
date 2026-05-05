@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { getToken } from '../lib/auth';
 import AppTabs from './AppTabs';
@@ -8,6 +8,7 @@ import LoginPage from '../views/LoginPage/LoginPage';
 import SignupPage from '../views/SignupPage/Signup';
 import OnboardingPage from '../views/OnboardingPage/OnboardingPage';
 import { colors } from '../theme/tokens';
+import Loading from '../components/Loading/Loading';
 
 const Stack = createNativeStackNavigator();
 
@@ -19,13 +20,7 @@ export default function RootNavigator() {
     setIsLoggedIn(!!getToken());
   }, []);
 
-  if (isLoggedIn === null) {
-    return (
-      <View style={st.splash}>
-        <ActivityIndicator color={colors.textSecondary} />
-      </View>
-    );
-  }
+  if (isLoggedIn === null) return <Loading />;
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -51,11 +46,4 @@ export default function RootNavigator() {
   );
 }
 
-const st = StyleSheet.create({
-  splash: {
-    flex:            1,
-    alignItems:      'center',
-    justifyContent:  'center',
-    backgroundColor: colors.bgDefault,
-  },
-});
+const st = StyleSheet.create({});

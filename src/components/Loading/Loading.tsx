@@ -1,25 +1,30 @@
-import { StyleSheet, Image } from 'react-native';
+import { StyleSheet, Animated } from 'react-native';
 import { View } from '../primitives';
 import { colors } from '../../theme/tokens';
+import { useSpinAnimation } from '../../hooks/useSpinAnimation';
 
-const Loading = () => (
-  <View style={styles.root}>
-    <Image
-      source={require('../../assets/images/weatherIcons/Sunny.png')}
-      style={styles.icon}
-      resizeMode="contain"
-    />
-  </View>
-);
+const Loading = () => {
+    const rotate = useSpinAnimation(2_000);
+
+    return (
+        <View style={styles.root}>
+            <Animated.Image
+                source={require('../../assets/images/weatherIcons/Sunny.png')}
+                style={[styles.icon, { transform: [{ rotate }] }]}
+                resizeMode='contain'
+            />
+        </View>
+    );
+};
 
 export default Loading;
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.bgDefault,
-  },
-  icon: { width: 80, height: 80 },
+    root: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.bgDefault,
+    },
+    icon: { width: 80, height: 80 },
 });

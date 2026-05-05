@@ -3,12 +3,14 @@ import {
   StyleSheet,
   ScrollView,
   Switch,
-  ActivityIndicator,
+  Animated,
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Slider from '@react-native-community/slider';
 import { View, Text, Pressable } from '../../../components/primitives';
+import Loading from '../../../components/Loading/Loading';
+import { useSpinAnimation } from '../../../hooks/useSpinAnimation';
 import { NotificationSettings } from '../../../types';
 import {
   NOTIF_DEFAULTS,
@@ -90,6 +92,7 @@ export default function NotificationsScreen() {
   const [localHour, setLocalHour] = useState(7);
 
   const [ns, setNs] = useState<NotificationSettings>(NOTIF_DEFAULTS);
+  const savingRotate = useSpinAnimation(1_500);
 
   const set = useCallback(
     <K extends keyof NotificationSettings>(key: K, val: NotificationSettings[K]) =>
@@ -189,15 +192,7 @@ export default function NotificationsScreen() {
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
-  if (loading) {
-    return (
-      <SafeAreaView style={st.root} edges={['bottom']}>
-        <View style={st.center}>
-          <ActivityIndicator color={colors.textSecondary} />
-        </View>
-      </SafeAreaView>
-    );
-  }
+  if (loading) return <Loading />;
 
   const anyEnabled =
     ns.morningBriefEnabled ||
@@ -384,7 +379,11 @@ export default function NotificationsScreen() {
           disabled={saving}
         >
           {saving
-            ? <ActivityIndicator color={colors.saveBtnText} />
+            ? <Animated.Image
+                source={require('../../../../assets/images/weatherIcons/Sunny.png')}
+                style={{ width: 20, height: 20, transform: [{ rotate: savingRotate }] }}
+                resizeMode='contain'
+              />
             : <Text style={s.saveBtnText}>Save Changes</Text>
           }
         </Pressable>

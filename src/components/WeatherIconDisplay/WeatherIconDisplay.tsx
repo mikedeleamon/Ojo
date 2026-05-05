@@ -1,6 +1,7 @@
-import { StyleSheet, Image } from 'react-native';
+import { StyleSheet, Image, Animated } from 'react-native';
 import { View, Text } from '../primitives';
 import { colors, fonts, fontSizes } from '../../theme/tokens';
+import { useSpinAnimation } from '../../hooks/useSpinAnimation';
 
 // ─── Icon map ─────────────────────────────────────────────────────────────────
 
@@ -54,15 +55,28 @@ const WeatherIconDisplay = ({
 }: Props) => {
     const icon = iconFor(condition, isDay);
     const isLarge = size === 'large';
+    const isSunny = icon === ICONS.Sunny;
+    const rotate = useSpinAnimation(12_000);
+
+    const iconStyle = isLarge ? styles.iconLarge : styles.iconSmall;
 
     return (
         <View style={[styles.root, isLarge ? styles.large : styles.small]}>
-            <Image
-                source={icon}
-                style={isLarge ? styles.iconLarge : styles.iconSmall}
-                resizeMode='contain'
-                accessibilityLabel={condition}
-            />
+            {isSunny ? (
+                <Animated.Image
+                    source={icon}
+                    style={[iconStyle, { transform: [{ rotate }] }]}
+                    resizeMode='contain'
+                    accessibilityLabel={condition}
+                />
+            ) : (
+                <Image
+                    source={icon}
+                    style={iconStyle}
+                    resizeMode='contain'
+                    accessibilityLabel={condition}
+                />
+            )}
             {isLarge && temperature !== undefined && (
                 <View style={styles.temps}>
                     <Text style={styles.temp}>{temperature}°</Text>

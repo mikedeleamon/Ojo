@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import {
     StyleSheet,
     ScrollView,
-    ActivityIndicator,
     RefreshControl,
     Pressable,
 } from 'react-native';
@@ -13,6 +12,7 @@ import { View, Text } from '../primitives';
 import api from '../../api/client';
 import weatherConstants from '../../constants/weatherConstants';
 import WeatherIconDisplay from '../WeatherIconDisplay/WeatherIconDisplay';
+import Loading from '../Loading/Loading';
 import WeatherDetails from '../WeatherDetails/WeatherDetails';
 import MinimizedWeatherDisplay from '../MinimizedWeatherDisplay/MinimizedWeatherDisplay';
 import { useWeatherTheme } from '../../context/WeatherContext';
@@ -161,15 +161,7 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
             });
     }, [city]);
 
-    if (loading)
-        return (
-            <View style={st.center}>
-                <ActivityIndicator
-                    size='large'
-                    color={colors.textPrimary}
-                />
-            </View>
-        );
+    if (loading) return <Loading />;
 
     if (error || !weather)
         return (
