@@ -6,12 +6,12 @@ import {
     Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Slider from '@react-native-community/slider';
 import {
     View,
     Text,
     TextInput,
     Pressable,
+    AppSlider,
 } from '../../../components/primitives';
 import { useSettings } from '../../../hooks/useSettings';
 import {
@@ -22,6 +22,9 @@ import {
     fontSizes,
     fontWeights,
 } from '../../../theme/tokens';
+
+const fToC = (f: number) => Math.round((f - 32) * 5 / 9);
+const cToF = (c: number) => Math.round(c * 9 / 5 + 32);
 
 const STYLES = [
     'Casual',
@@ -62,7 +65,7 @@ const SliderField = ({
                 {unit}
             </Text>
         </View>
-        <Slider
+        <AppSlider
             minimumValue={min}
             maximumValue={max}
             value={value}
@@ -84,19 +87,34 @@ export default function PreferencesScreen() {
     const [tempScale, setTempScale] = useState<'Imperial' | 'Metric'>(
         settings.temperatureScale as 'Imperial' | 'Metric',
     );
+    // Always stored in °F — source of truth for persistence
     const [hiTemp, setHiTemp] = useState(settings.hiTempThreshold);
     const [lowTemp, setLowTemp] = useState(settings.lowTempThreshold);
+    // Display state in the current unit — avoids round-trip F→C→F rounding on every tick
+    const [hiTempDisp, setHiTempDisp] = useState(
+        settings.temperatureScale === 'Metric'
+            ? fToC(settings.hiTempThreshold)
+            : settings.hiTempThreshold,
+    );
+    const [lowTempDisp, setLowTempDisp] = useState(
+        settings.temperatureScale === 'Metric'
+            ? fToC(settings.lowTempThreshold)
+            : settings.lowTempThreshold,
+    );
     const [humidity, setHumidity] = useState(settings.humidityPreference);
 
     const locationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         if (!settingsReady) return;
+        const isCelsius = settings.temperatureScale === 'Metric';
         setClothingStyle(settings.clothingStyle);
         setLocation(settings.location);
         setTempScale(settings.temperatureScale as 'Imperial' | 'Metric');
         setHiTemp(settings.hiTempThreshold);
         setLowTemp(settings.lowTempThreshold);
+        setHiTempDisp(isCelsius ? fToC(settings.hiTempThreshold) : settings.hiTempThreshold);
+        setLowTempDisp(isCelsius ? fToC(settings.lowTempThreshold) : settings.lowTempThreshold);
         setHumidity(settings.humidityPreference);
     }, [settings, settingsReady]);
 
@@ -116,6 +134,9 @@ export default function PreferencesScreen() {
     };
 
     const handleScaleChange = (scale: 'Imperial' | 'Metric') => {
+        const toC = scale === 'Metric';
+        setHiTempDisp(toC ? fToC(hiTemp) : hiTemp);
+        setLowTempDisp(toC ? fToC(lowTemp) : lowTemp);
         setTempScale(scale);
         saveSettings(currentSettings({ temperatureScale: scale })).catch(() => {});
     };
@@ -222,27 +243,33 @@ export default function PreferencesScreen() {
                         </Text>
                         <SliderField
                             label='Hot above'
-                            value={hiTemp}
+                            value={hiTempDisp}
                             unit='°'
-                            min={50}
-                            max={120}
-                            onChange={setHiTemp}
+                            min={tempScale === 'Metric' ? 10 : 50}
+                            max={tempScale === 'Metric' ? 49 : 120}
+                            onChange={(v) => {
+                                setHiTempDisp(v);
+                                setHiTemp(tempScale === 'Metric' ? cToF(v) : v);
+                            }}
                             onSave={(v) =>
                                 saveSettings(
-                                    currentSettings({ hiTempThreshold: v }),
+                                    currentSettings({ hiTempThreshold: tempScale === 'Metric' ? cToF(v) : v }),
                                 ).catch(() => {})
                             }
                         />
                         <SliderField
                             label='Cold below'
-                            value={lowTemp}
+                            value={lowTempDisp}
                             unit='°'
-                            min={0}
-                            max={70}
-                            onChange={setLowTemp}
+                            min={tempScale === 'Metric' ? -18 : 0}
+                            max={tempScale === 'Metric' ? 21 : 70}
+                            onChange={(v) => {
+                                setLowTempDisp(v);
+                                setLowTemp(tempScale === 'Metric' ? cToF(v) : v);
+                            }}
                             onSave={(v) =>
                                 saveSettings(
-                                    currentSettings({ lowTempThreshold: v }),
+                                    currentSettings({ lowTempThreshold: tempScale === 'Metric' ? cToF(v) : v }),
                                 ).catch(() => {})
                             }
                         />
