@@ -1,7 +1,8 @@
 import { useRef, useEffect } from 'react';
 import { Animated, PanResponder, View, StyleSheet, ViewStyle } from 'react-native';
 
-const THUMB = 22;
+const THUMB_W = 30;
+const THUMB_H = 20;
 const TRACK = 3;
 
 interface AppSliderProps {
@@ -130,7 +131,7 @@ export function AppSlider({
         <View
             style={[styles.container, style]}
             onLayout={(e) => {
-                const w = e.nativeEvent.layout.width - THUMB;
+                const w = e.nativeEvent.layout.width - THUMB_W;
                 const changed = w !== trackWidth.current;
                 trackWidth.current = w;
                 if (changed) setX(valueToX(value, w));
@@ -168,8 +169,8 @@ const styles = StyleSheet.create({
     },
     track: {
         position: 'absolute',
-        left: THUMB / 2,
-        right: THUMB / 2,
+        left: THUMB_W / 2,
+        right: THUMB_W / 2,
         height: TRACK,
         borderRadius: TRACK / 2,
         overflow: 'hidden',
@@ -180,11 +181,10 @@ const styles = StyleSheet.create({
     },
     thumb: {
         position: 'absolute',
-        width: THUMB,
-        height: THUMB,
-        borderRadius: THUMB / 2,
-        top: (40 - THUMB) / 2,
-        // subtle shadow so thumb is visible on any background
+        width: THUMB_W,
+        height: THUMB_H,
+        borderRadius: THUMB_H / 2,
+        top: (40 - THUMB_H) / 2,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.25,
