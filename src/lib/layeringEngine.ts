@@ -49,9 +49,11 @@ const LAYER_OF: Record<string, LayerCategory> = {
   // Mid — insulating layer, easy to add or remove
   Sweater: 'mid',
   Hoodie:  'mid',
-  // Outer — protective shell
+  // Outer — protective shell (garments and protective accessories)
   Jacket:  'outer',
   Coat:    'outer',
+  Scarf:   'outer', // neck protection — relevant in cold/wind, appears in layer stack
+  Gloves:  'outer', // hand protection — same reasoning
 };
 
 const layerOf = (article: ClothingArticle): LayerCategory | null =>

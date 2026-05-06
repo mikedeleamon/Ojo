@@ -14,7 +14,7 @@
  * by replacing scoreOutfit() with a model inference call.
  */
 
-import { ClothingArticle, CurrentWeather, Forecast, Settings, OutfitOccasion } from '../types';
+import { ClothingArticle, CurrentWeather, Forecast, Settings, OutfitOccasion, BodyZone } from '../types';
 import { articlePreferenceScore, colorPairingBonus, UserPreferenceProfile } from './userPreferences';
 import { generateLayeringRecommendation, LayeringResult } from './layeringEngine';
 
@@ -95,6 +95,49 @@ const ROLE_MAP: Record<string, OutfitRole> = {
 
 const roleOf = (a: ClothingArticle): OutfitRole =>
   ROLE_MAP[a.clothingType] ?? (a.isAccessory ? 'accessory' : 'top');
+
+// ─── 2b. Accessory body-zone classification ───────────────────────────────────
+// Derives which body zone an accessory occupies, used to build non-competing
+// accessory pairs (a watch and a hat can coexist; two necklaces cannot).
+// Falls back to clothingType heuristics when bodyZone is not explicitly set.
+
+const ZONE_FROM_TYPE: Record<string, BodyZone> = {
+  Hat: 'Head', Cap: 'Head',
+  Scarf: 'Neck', Jewelry: 'Neck',
+  Gloves: 'Hand',
+  Belt: 'Waist',
+  Watch: 'Wrist',
+  Socks: 'Ankle',
+  Bag: 'Carried',
+};
+
+const zoneOf = (a: ClothingArticle): BodyZone =>
+  a.bodyZone ?? ZONE_FROM_TYPE[a.clothingType] ?? 'Carried';
+
+/** Human-readable zone label for an accessory article. */
+export const articleZoneLabel = (a: ClothingArticle): string =>
+  a.bodyZone ?? ZONE_FROM_TYPE[a.clothingType] ?? 'Extra';
+
+/**
+ * Generates all valid accessory combinations:
+ *   - empty (no accessories)
+ *   - single items
+ *   - pairs from different body zones (non-competing)
+ * Capped at 4 input articles to keep the combination space manageable.
+ */
+const buildAccCombos = (accessories: ClothingArticle[]): ClothingArticle[][] => {
+  const items = accessories.slice(0, 4);
+  const combos: ClothingArticle[][] = [[]]; // no accessories
+  for (const a of items) combos.push([a]);
+  for (let i = 0; i < items.length; i++) {
+    for (let j = i + 1; j < items.length; j++) {
+      if (zoneOf(items[i]) !== zoneOf(items[j])) {
+        combos.push([items[i], items[j]]);
+      }
+    }
+  }
+  return combos;
+};
 
 // ─── 3a. Fabric × weather scoring ────────────────────────────────────────────
 // 0–1 score for how appropriate a fabric is in each weather bucket.
@@ -805,8 +848,8 @@ export const generateOutfits = (
   const shoeOptions: (ClothingArticle | null)[] =
     footwears.length > 0 ? footwears : [null];
 
-  // One accessory slot, optional.
-  // When UV is high, hats and caps float to the front so they appear in top combos.
+  // Accessory combos: up to 2 non-competing accessories (different body zones).
+  // When UV is high, hats and caps float to the front to appear in top combos.
   const sortedAccessories = uvHigh
     ? [...accessories].sort((a, b) => {
         const aHat = (a.clothingType === 'Hat' || a.clothingType === 'Cap') ? -1 : 1;
@@ -814,7 +857,7 @@ export const generateOutfits = (
         return aHat - bHat;
       })
     : accessories;
-  const accOptions: (ClothingArticle | null)[] = [null, ...sortedAccessories.slice(0, 4)];
+  const accCombos = buildAccCombos(sortedAccessories);
 
   // ── Phase 3: Enumerate combinations with two-pass optimization ─────────────
   // When the search space is large (>200 core combos), a cheap fabric-only first
@@ -853,17 +896,19 @@ export const generateOutfits = (
     coreCombos = withFabricScore.slice(0, CORE_COMBO_KEEP).map(x => x.slots);
   }
 
-  // Full cross-product with midLayer × outerwear × footwear × accessory
+  // Full cross-product with midLayer × outerwear × footwear × accessory combos
   for (const core of coreCombos) {
     for (const mid of midOptions) {
       for (const outer of outerOptions) {
         for (const shoe of shoeOptions) {
-          for (const acc of accOptions) {
+          for (const accCombo of accCombos) {
             const slots: OutfitSlot[] = [...core];
             if (mid)   slots.push({ role: 'midLayer',  article: mid   });
             if (outer) slots.push({ role: 'outerwear', article: outer });
             if (shoe)  slots.push({ role: 'footwear',  article: shoe  });
-            if (acc)   slots.push({ role: 'accessory', article: acc   });
+            for (const acc of accCombo) {
+              slots.push({ role: 'accessory', article: acc });
+            }
 
             scored.push(scoreCombo(slots, bucket, effectiveFeelsLike, precipIntensity, humidity, windMph, isSnowing, settings, recentlyWorn, profile));
           }

@@ -11,6 +11,7 @@ import {
     OutfitSlot,
     OutfitResult,
     ScoreBreakdown,
+    articleZoneLabel,
 } from '../../lib/outfitEngine';
 import { LayeringResult } from '../../lib/layeringEngine';
 import { addHistoryEntry, recentlyWornWithAge } from '../../lib/outfitHistory';
@@ -156,7 +157,9 @@ const ArticleThumb = ({
             )}
         </View>
         <View style={styles.articleLabel}>
-            <Text style={styles.roleLabel}>{ROLE_LABELS[role]}</Text>
+            <Text style={styles.roleLabel}>
+                {role === 'accessory' ? articleZoneLabel(article) : ROLE_LABELS[role]}
+            </Text>
             <Text
                 style={styles.articleName}
                 numberOfLines={1}

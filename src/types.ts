@@ -1,3 +1,5 @@
+export type BodyZone = 'Head' | 'Neck' | 'Wrist' | 'Hand' | 'Waist' | 'Ankle' | 'Carried';
+
 export interface ArticleFormData {
   name:             string;
   clothingType:     string;
@@ -6,8 +8,7 @@ export interface ArticleFormData {
   fabricType:       string;
   color:            string;
   isAccessory:      boolean;
-  isWristWear:      boolean;
-  isAnkleWear:      boolean;
+  bodyZone?:        BodyZone;
   merchant:         string;
   imageUrl:         string;
 }
@@ -76,8 +77,7 @@ export interface ClothingArticle {
   fabricType?:      string;
   color?:           string;
   isAccessory?:     boolean;
-  isWristWear?:     boolean;
-  isAnkleWear?:     boolean;
+  bodyZone?:        BodyZone;
   merchant?:        string;
   imageUrl?:        string;
   createdAt?:       string;

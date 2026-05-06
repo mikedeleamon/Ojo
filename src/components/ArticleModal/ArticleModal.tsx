@@ -9,13 +9,14 @@ import { Svg, Path } from 'react-native-svg';
 import { View, Text } from '../primitives';
 import { pickImage } from '../../lib/imageService';
 import { getErrorMessage } from '../../lib/auth';
-import { ClothingArticle, ArticleFormData } from '../../types';
+import { ClothingArticle, ArticleFormData, BodyZone } from '../../types';
 import { colors, fonts, fontSizes, fontWeights, spacing, radius } from '../../theme/tokens';
 
 const CLOTHING_TYPES = ['Shirt','T-Shirt','Blouse','Sweater','Hoodie','Jacket','Coat',
   'Pants','Jeans','Shorts','Skirt','Dress','Shoes','Sneakers','Boots','Sandals',
   'Hat','Cap','Scarf','Gloves','Belt','Bag','Watch','Jewelry','Socks','Other'];
-const CATEGORIES = ['Casual','Formal','Business Casual','Athletic','Lounge','Outdoor'];
+const CATEGORIES  = ['Casual','Formal','Business Casual','Athletic','Lounge','Outdoor'];
+const BODY_ZONES: BodyZone[] = ['Head','Neck','Wrist','Hand','Waist','Ankle','Carried'];
 const FABRICS    = ['Cotton','Wool','Linen','Silk','Polyester','Denim','Leather','Synthetic','Other'];
 const COLORS = [
   // Neutrals
@@ -82,15 +83,15 @@ const MultiSwatch = () => (
 
 const EMPTY: ArticleFormData = {
   name:'', clothingType:'', topOrBottom:'', clothingCategory:'',
-  fabricType:'', color:'', isAccessory:false, isWristWear:false,
-  isAnkleWear:false, merchant:'', imageUrl:'',
+  fabricType:'', color:'', isAccessory:false, bodyZone: undefined,
+  merchant:'', imageUrl:'',
 };
 
 const toForm = (a: ClothingArticle): ArticleFormData => ({
   name: a.name ?? '', clothingType: a.clothingType ?? '', topOrBottom: a.topOrBottom ?? '',
   clothingCategory: a.clothingCategory ?? '', fabricType: a.fabricType ?? '',
   color: a.color ?? '', isAccessory: a.isAccessory ?? false,
-  isWristWear: a.isWristWear ?? false, isAnkleWear: a.isAnkleWear ?? false,
+  bodyZone: a.bodyZone,
   merchant: a.merchant ?? '', imageUrl: a.imageUrl ?? '',
 });
 
@@ -293,20 +294,25 @@ const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
               onChangeText={v => set('merchant', v)} />
           </View>
 
-          {/* Toggles */}
+          {/* Accessory toggle */}
           <View style={st.chipGrid}>
-            {([
-              ['Accessory',  'isAccessory'],
-              ['Wrist wear', 'isWristWear'],
-              ['Ankle wear', 'isAnkleWear'],
-            ] as const).map(([lbl, key]) => (
-              <Pressable key={key}
-                style={[st.chip, form[key] && st.chipActive]}
-                onPress={() => set(key, !form[key])}>
-                <Text style={[st.chipText, form[key] && st.chipTextActive]}>{lbl}</Text>
-              </Pressable>
-            ))}
+            <Pressable
+              style={[st.chip, form.isAccessory && st.chipActive]}
+              onPress={() => set('isAccessory', !form.isAccessory)}
+            >
+              <Text style={[st.chipText, form.isAccessory && st.chipTextActive]}>
+                Accessory
+              </Text>
+            </Pressable>
           </View>
+
+          {/* Body zone — which part of the body this is worn on */}
+          <ChipField
+            label='Body Zone'
+            value={form.bodyZone ?? ''}
+            items={BODY_ZONES}
+            onValueChange={v => set('bodyZone', (v as BodyZone) || undefined)}
+          />
         </ScrollView>
 
         {/* Footer */}
