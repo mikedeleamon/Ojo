@@ -408,7 +408,7 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
 
         RNAnimated.timing(animProgress, {
             toValue: 1,
-            duration: isFirstPaint ? 2500 : 1200,
+            duration: isFirstPaint ? 2500 : 2000,
             easing: RNEasing.inOut(RNEasing.cubic),
             useNativeDriver: false,
         }).start(() => {

@@ -5,409 +5,938 @@ import { View, Text } from '../primitives';
 import { EmptyState } from '../shared';
 import { useClosets } from '../../hooks/useClosets';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
-import { generateOutfits, OutfitRole, OutfitSlot, OutfitResult, ScoreBreakdown } from '../../lib/outfitEngine';
+import {
+    generateOutfits,
+    OutfitRole,
+    OutfitSlot,
+    OutfitResult,
+    ScoreBreakdown,
+} from '../../lib/outfitEngine';
 import { LayeringResult } from '../../lib/layeringEngine';
 import { addHistoryEntry, recentlyWornWithAge } from '../../lib/outfitHistory';
 import { updatePreferences } from '../../lib/userPreferences';
-import { ClothingArticle, CurrentWeather, Forecast, Settings } from '../../types';
-import { colors, fonts, fontSizes, fontWeights, spacing, radius } from '../../theme/tokens';
+import {
+    ClothingArticle,
+    CurrentWeather,
+    Forecast,
+    Settings,
+} from '../../types';
+import {
+    colors,
+    fonts,
+    fontSizes,
+    fontWeights,
+    spacing,
+    radius,
+} from '../../theme/tokens';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CSS_COLORS: Record<string, string> = {
-  Black: '#1a1a1a', White: '#f5f5f5', Grey: '#9ca3af', Brown: '#92400e', Beige: '#d4b896', Cream: '#fef3c7',
-  Silver: '#c0c0c0', Gold: '#d4af37', Bronze: '#a0785a', 'Rose Gold': '#c9776a', Champagne: '#f4e4c1',
-  Navy: '#1e3a5f', Indigo: '#4338ca', Cobalt: '#2563eb', Blue: '#3b82f6',
-  'Electric Blue': '#0ea5e9', 'Sky Blue': '#38bdf8', Periwinkle: '#a5b4fc',
-  Teal: '#0d9488', Cyan: '#06b6d4', 'Baby Blue': '#bae6fd',
-  Green: '#22c55e', Mint: '#34d399', Lime: '#a3e635', Sage: '#86efac', Olive: '#65a30d', Khaki: '#a16207',
-  Red: '#ef4444', Scarlet: '#f43f5e', Crimson: '#dc2626', Burgundy: '#9b1c1c',
-  Orange: '#f97316', Coral: '#fb923c', Peach: '#fdba74', Rust: '#c2410c', Yellow: '#fbbf24',
-  Purple: '#a855f7', Plum: '#7c3aed', Lilac: '#d8b4fe', Lavender: '#c4b5fd',
-  Pink: '#f9a8d4', Rose: '#fb7185', 'Dusty Rose': '#fda4af', Blush: '#fecdd3',
-  Magenta: '#e879f9', 'Hot Pink': '#ec4899', Fuchsia: '#d946ef',
+    Black: '#1a1a1a',
+    White: '#f5f5f5',
+    Grey: '#9ca3af',
+    Brown: '#92400e',
+    Beige: '#d4b896',
+    Cream: '#fef3c7',
+    Silver: '#c0c0c0',
+    Gold: '#d4af37',
+    Bronze: '#a0785a',
+    'Rose Gold': '#c9776a',
+    Champagne: '#f4e4c1',
+    Navy: '#1e3a5f',
+    Indigo: '#4338ca',
+    Cobalt: '#2563eb',
+    Blue: '#3b82f6',
+    'Electric Blue': '#0ea5e9',
+    'Sky Blue': '#38bdf8',
+    Periwinkle: '#a5b4fc',
+    Teal: '#0d9488',
+    Cyan: '#06b6d4',
+    'Baby Blue': '#bae6fd',
+    Green: '#22c55e',
+    Mint: '#34d399',
+    Lime: '#a3e635',
+    Sage: '#86efac',
+    Olive: '#65a30d',
+    Khaki: '#a16207',
+    Red: '#ef4444',
+    Scarlet: '#f43f5e',
+    Crimson: '#dc2626',
+    Burgundy: '#9b1c1c',
+    Orange: '#f97316',
+    Coral: '#fb923c',
+    Peach: '#fdba74',
+    Rust: '#c2410c',
+    Yellow: '#fbbf24',
+    Purple: '#a855f7',
+    Plum: '#7c3aed',
+    Lilac: '#d8b4fe',
+    Lavender: '#c4b5fd',
+    Pink: '#f9a8d4',
+    Rose: '#fb7185',
+    'Dusty Rose': '#fda4af',
+    Blush: '#fecdd3',
+    Magenta: '#e879f9',
+    'Hot Pink': '#ec4899',
+    Fuchsia: '#d946ef',
 };
 
 const ROLE_LABELS: Record<OutfitRole, string> = {
-  top: 'Top', bottom: 'Bottom', fullBody: 'Outfit',
-  midLayer: 'Mid Layer', outerwear: 'Outerwear', footwear: 'Footwear', accessory: 'Extra',
+    top: 'Top',
+    bottom: 'Bottom',
+    fullBody: 'Outfit',
+    midLayer: 'Mid Layer',
+    outerwear: 'Outerwear',
+    footwear: 'Footwear',
+    accessory: 'Extra',
 };
 
 const BREAKDOWN_LABELS: { key: keyof ScoreBreakdown; label: string }[] = [
-  { key: 'fabric',     label: 'Weather' },
-  { key: 'color',      label: 'Color'   },
-  { key: 'style',      label: 'Style'   },
-  { key: 'simplicity', label: 'Simple'  },
-  { key: 'preference', label: 'You'     },
+    { key: 'fabric', label: 'Weather' },
+    { key: 'color', label: 'Color' },
+    { key: 'style', label: 'Style' },
+    { key: 'simplicity', label: 'Simple' },
+    { key: 'preference', label: 'You' },
 ];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-const HangerIcon = ({ size = 24, color = colors.textSecondary }: { size?: number; color?: string }) => (
-  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Path d="M12 4a2 2 0 0 1 2 2c0 .74-.4 1.38-1 1.73V9l8 5.5A1 1 0 0 1 20 16H4a1 1 0 0 1-.99-1.5L11 9V7.73A2 2 0 0 1 12 4Z"
-      stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"/>
-  </Svg>
+const HangerIcon = ({
+    size = 24,
+    color = colors.textSecondary,
+}: {
+    size?: number;
+    color?: string;
+}) => (
+    <Svg
+        width={size}
+        height={size}
+        viewBox='0 0 24 24'
+        fill='none'
+    >
+        <Path
+            d='M12 4a2 2 0 0 1 2 2c0 .74-.4 1.38-1 1.73V9l8 5.5A1 1 0 0 1 20 16H4a1 1 0 0 1-.99-1.5L11 9V7.73A2 2 0 0 1 12 4Z'
+            stroke={color}
+            strokeWidth={1.5}
+            strokeLinecap='round'
+            strokeLinejoin='round'
+        />
+    </Svg>
 );
 
-const ArticleThumb = ({ article, role }: { article: ClothingArticle; role: OutfitRole }) => (
-  <View style={st.articleCard}>
-    <View style={st.articleImg}>
-      {article.imageUrl
-        ? <Image source={{ uri: article.imageUrl }} style={st.articleImgFill} resizeMode="cover" />
-        : <HangerIcon size={20} color={colors.textMuted} />
-      }
-      {article.color && CSS_COLORS[article.color] && (
-        <View style={[st.colorDot, { backgroundColor: CSS_COLORS[article.color] }]} />
-      )}
+const ArticleThumb = ({
+    article,
+    role,
+}: {
+    article: ClothingArticle;
+    role: OutfitRole;
+}) => (
+    <View style={styles.articleCard}>
+        <View style={styles.articleImg}>
+            {article.imageUrl ? (
+                <Image
+                    source={{ uri: article.imageUrl }}
+                    style={styles.articleImgFill}
+                    resizeMode='cover'
+                />
+            ) : (
+                <HangerIcon
+                    size={20}
+                    color={colors.textMuted}
+                />
+            )}
+            {article.color && CSS_COLORS[article.color] && (
+                <View
+                    style={[
+                        styles.colorDot,
+                        { backgroundColor: CSS_COLORS[article.color] },
+                    ]}
+                />
+            )}
+        </View>
+        <View style={styles.articleLabel}>
+            <Text style={styles.roleLabel}>{ROLE_LABELS[role]}</Text>
+            <Text
+                style={styles.articleName}
+                numberOfLines={1}
+            >
+                {article.name || article.clothingType}
+            </Text>
+            {article.fabricType ? (
+                <Text style={styles.articleMeta}>{article.fabricType}</Text>
+            ) : null}
+        </View>
     </View>
-    <View style={st.articleLabel}>
-      <Text style={st.roleLabel}>{ROLE_LABELS[role]}</Text>
-      <Text style={st.articleName} numberOfLines={1}>{article.name || article.clothingType}</Text>
-      {article.fabricType ? <Text style={st.articleMeta}>{article.fabricType}</Text> : null}
-    </View>
-  </View>
 );
 
 const ScoreBadge = ({ score }: { score: number }) => {
-  const color = score >= 80 ? 'rgba(52,211,153,0.9)' : score >= 60 ? 'rgba(251,191,36,0.9)' : 'rgba(148,163,184,0.9)';
-  return (
-    <View style={[st.scoreBadge, { borderColor: color }]}>
-      <Text style={[st.scoreBadgeText, { color }]}>{score}</Text>
-    </View>
-  );
+    const color =
+        score >= 80
+            ? 'rgba(52,211,153,0.9)'
+            : score >= 60
+              ? 'rgba(251,191,36,0.9)'
+              : 'rgba(148,163,184,0.9)';
+    return (
+        <View style={[styles.scoreBadge, { borderColor: color }]}>
+            <Text style={[styles.scoreBadgeText, { color }]}>{score}</Text>
+        </View>
+    );
 };
 
 // ─── Layering section ─────────────────────────────────────────────────────────
 
 const ConfidencePip = ({ value }: { value: number }) => {
-  const pct = Math.round(value * 100);
-  const col = pct >= 80 ? 'rgba(52,211,153,0.85)' : pct >= 60 ? 'rgba(251,191,36,0.85)' : 'rgba(148,163,184,0.75)';
-  return (
-    <View style={[laySt.confidencePip, { borderColor: col }]}>
-      <Text style={[laySt.confidenceText, { color: col }]}>{pct}%</Text>
-    </View>
-  );
+    const pct = Math.round(value * 100);
+    const col =
+        pct >= 80
+            ? 'rgba(52,211,153,0.85)'
+            : pct >= 60
+              ? 'rgba(251,191,36,0.85)'
+              : 'rgba(148,163,184,0.75)';
+    return (
+        <View style={[layerStyles.confidencePip, { borderColor: col }]}>
+            <Text style={[layerStyles.confidenceText, { color: col }]}>
+                {pct}%
+            </Text>
+        </View>
+    );
 };
 
 const LAYER_TIERS: { key: keyof LayeringResult['layers']; label: string }[] = [
-  { key: 'base',  label: 'Base'  },
-  { key: 'mid',   label: 'Mid'   },
-  { key: 'outer', label: 'Outer' },
+    { key: 'base', label: 'Base' },
+    { key: 'mid', label: 'Mid' },
+    { key: 'outer', label: 'Outer' },
 ];
 
-const LayerRow = ({ label, slot }: { label: string; slot: OutfitSlot | null }) => {
-  if (!slot) return null;
-  const name = slot.article.name || slot.article.clothingType;
-  const dotColor = slot.article.color ? CSS_COLORS[slot.article.color] : null;
-  return (
-    <View style={laySt.layerRow}>
-      <Text style={laySt.layerTierLabel}>{label}</Text>
-      <View style={laySt.layerRowDivider} />
-      {dotColor && <View style={[laySt.layerDot, { backgroundColor: dotColor }]} />}
-      <Text style={laySt.layerName} numberOfLines={1}>{name}</Text>
-      {slot.article.fabricType
-        ? <Text style={laySt.layerFabric}>{slot.article.fabricType}</Text>
-        : null}
-    </View>
-  );
+const LayerRow = ({
+    label,
+    slot,
+}: {
+    label: string;
+    slot: OutfitSlot | null;
+}) => {
+    if (!slot) return null;
+    const name = slot.article.name || slot.article.clothingType;
+    const dotColor = slot.article.color ? CSS_COLORS[slot.article.color] : null;
+    return (
+        <View style={layerStyles.layerRow}>
+            <Text style={layerStyles.layerTierLabel}>{label}</Text>
+            <View style={layerStyles.layerRowDivider} />
+            {dotColor && (
+                <View
+                    style={[
+                        layerStyles.layerDot,
+                        { backgroundColor: dotColor },
+                    ]}
+                />
+            )}
+            <Text
+                style={layerStyles.layerName}
+                numberOfLines={1}
+            >
+                {name}
+            </Text>
+            {slot.article.fabricType ? (
+                <Text style={layerStyles.layerFabric}>
+                    {slot.article.fabricType}
+                </Text>
+            ) : null}
+        </View>
+    );
 };
 
 const LayeringSection = ({ layering }: { layering: LayeringResult }) => {
-  const hasLayers = layering.layers.base || layering.layers.mid || layering.layers.outer;
-  return (
-    <View style={laySt.root}>
-      <View style={laySt.header}>
-        <Text style={laySt.title}>Layering</Text>
-        <ConfidencePip value={layering.confidence} />
-      </View>
-
-      {hasLayers && (
-        <View style={laySt.layerStack}>
-          {LAYER_TIERS.map(({ key, label }) => (
-            <LayerRow key={key} label={label} slot={layering.layers[key]} />
-          ))}
-        </View>
-      )}
-
-      <Text style={laySt.recommendation}>{layering.recommendation}</Text>
-
-      {layering.timeline && layering.timeline.length > 0 && (
-        <View style={laySt.timeline}>
-          {layering.timeline.map((step, i) => (
-            <View key={i} style={laySt.timelineRow}>
-              <Text style={laySt.timelineTime}>{step.time}</Text>
-              <View style={laySt.timelineDivider} />
-              <Text style={laySt.timelineAction}>{step.action}</Text>
+    const hasLayers =
+        layering.layers.base || layering.layers.mid || layering.layers.outer;
+    return (
+        <View style={layerStyles.root}>
+            <View style={layerStyles.header}>
+                <Text style={layerStyles.title}>Layering</Text>
+                <ConfidencePip value={layering.confidence} />
             </View>
-          ))}
+
+            {hasLayers && (
+                <View style={layerStyles.layerStack}>
+                    {LAYER_TIERS.map(({ key, label }) => (
+                        <LayerRow
+                            key={key}
+                            label={label}
+                            slot={layering.layers[key]}
+                        />
+                    ))}
+                </View>
+            )}
+
+            <Text style={layerStyles.recommendation}>
+                {layering.recommendation}
+            </Text>
+
+            {layering.timeline && layering.timeline.length > 0 && (
+                <View style={layerStyles.timeline}>
+                    {layering.timeline.map((step, i) => (
+                        <View
+                            key={i}
+                            style={layerStyles.timelineRow}
+                        >
+                            <Text style={layerStyles.timelineTime}>
+                                {step.time}
+                            </Text>
+                            <View style={layerStyles.timelineDivider} />
+                            <Text style={layerStyles.timelineAction}>
+                                {step.action}
+                            </Text>
+                        </View>
+                    ))}
+                </View>
+            )}
         </View>
-      )}
-    </View>
-  );
+    );
 };
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-interface Props { weather: CurrentWeather; settings: Settings; forecasts: Forecast[]; }
+interface Props {
+    weather: CurrentWeather;
+    settings: Settings;
+    forecasts: Forecast[];
+}
 
 const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
-  const { closets, loading, preferred, setPreferred, setClosets } = useClosets();
-  const [settingPref,   setSettingPref]   = useState(false);
-  const [activeIdx,     setActiveIdx]     = useState(0);
-  const [showBreakdown, setShowBreakdown] = useState(false);
-  const [wornLogged,    setWornLogged]    = useState(false);
-  const [worn,          setWorn]          = useState<Map<string, number>>(new Map());
-  const nav = useAppNavigation();
+    const { closets, loading, preferred, setPreferred, setClosets } =
+        useClosets();
+    const [settingPref, setSettingPref] = useState(false);
+    const [activeIdx, setActiveIdx] = useState(0);
+    const [showBreakdown, setShowBreakdown] = useState(false);
+    const [wornLogged, setWornLogged] = useState(false);
+    const [worn, setWorn] = useState<Map<string, number>>(new Map());
+    const nav = useAppNavigation();
 
-  useEffect(() => { recentlyWornWithAge(7).then(setWorn); }, []);
+    useEffect(() => {
+        recentlyWornWithAge(7).then(setWorn);
+    }, []);
 
-  useEffect(() => {
-    setActiveIdx(0);
-    setShowBreakdown(false);
-    setWornLogged(false);
-  }, [settings]);
+    useEffect(() => {
+        setActiveIdx(0);
+        setShowBreakdown(false);
+        setWornLogged(false);
+    }, [settings]);
 
-  const setPreferredCloset = async (id: string) => {
-    setSettingPref(true);
-    try { await setPreferred(id); } catch {}
-    setSettingPref(false);
-  };
+    const setPreferredCloset = async (id: string) => {
+        setSettingPref(true);
+        try {
+            await setPreferred(id);
+        } catch {}
+        setSettingPref(false);
+    };
 
-  const { outfits, status } = useMemo(() => {
-    if (!preferred) return { outfits: [], status: 'no_preferred' as const };
-    const { results, status } = generateOutfits(preferred.articles, weather, settings, worn, 3, undefined, forecasts);
-    return { outfits: results, status };
-  }, [preferred, weather, settings, worn, forecasts]);
+    const { outfits, status } = useMemo(() => {
+        if (!preferred) return { outfits: [], status: 'no_preferred' as const };
+        const { results, status } = generateOutfits(
+            preferred.articles,
+            weather,
+            settings,
+            worn,
+            3,
+            undefined,
+            forecasts,
+        );
+        return { outfits: results, status };
+    }, [preferred, weather, settings, worn, forecasts]);
 
-  const safeIdx      = Math.min(activeIdx, Math.max(0, outfits.length - 1));
-  const activeOutfit: OutfitResult | null = outfits[safeIdx] ?? null;
+    const safeIdx = Math.min(activeIdx, Math.max(0, outfits.length - 1));
+    const activeOutfit: OutfitResult | null = outfits[safeIdx] ?? null;
 
-  const handleWoreThis = async () => {
-    if (!preferred || !activeOutfit || activeOutfit.status !== 'ok') return;
-    const articles = activeOutfit.slots.map(s => s.article);
-    await addHistoryEntry({
-      closetId: preferred._id, closetName: preferred.name,
-      articleIds: articles.map(a => a._id),
-      articleSummary: articles.map(a => a.name || a.clothingType).join(', '),
-    });
-    await updatePreferences(articles);
-    setWornLogged(true);
-    setTimeout(() => setWornLogged(false), 3000);
-  };
+    const handleWoreThis = async () => {
+        if (!preferred || !activeOutfit || activeOutfit.status !== 'ok') return;
+        const articles = activeOutfit.slots.map((s) => s.article);
+        await addHistoryEntry({
+            closetId: preferred._id,
+            closetName: preferred.name,
+            articleIds: articles.map((a) => a._id),
+            articleSummary: articles
+                .map((a) => a.name || a.clothingType)
+                .join(', '),
+        });
+        await updatePreferences(articles);
+        setWornLogged(true);
+        setTimeout(() => setWornLogged(false), 3000);
+    };
 
-  if (loading) return null;
+    if (loading) return null;
 
-  if (closets.length === 0) return (
-    <EmptyState
-      icon={<HangerIcon size={32} />}
-      title="No closet yet"
-      body="Create a closet and add your clothes to get outfit suggestions."
-      action={
-        <Pressable style={st.ctaBtn} onPress={() => nav.push('Closet')}>
-          <Text style={st.ctaBtnText}>Create closet</Text>
-        </Pressable>
-      }
-    />
-  );
+    if (closets.length === 0)
+        return (
+            <EmptyState
+                icon={<HangerIcon size={32} />}
+                title='No closet yet'
+                body='Create a closet and add your clothes to get outfit suggestions.'
+                action={
+                    <Pressable
+                        style={styles.ctaBtn}
+                        onPress={() => nav.push('Closet')}
+                    >
+                        <Text style={styles.ctaBtnText}>Create closet</Text>
+                    </Pressable>
+                }
+            />
+        );
 
-  if (!preferred) return (
-    <View style={st.root}>
-      <Text style={st.sectionLabel}>Outfit</Text>
-      <EmptyState icon={<HangerIcon size={32} />} title="Pick a preferred closet"
-        body="Select a closet to use for daily outfit suggestions." />
-      <View style={st.closetPicker}>
-        {closets.map(c => (
-          <Pressable key={c._id} style={st.closetPickBtn}
-            onPress={() => setPreferredCloset(c._id)} disabled={settingPref}>
-            <HangerIcon size={14} color={colors.textSecondary} />
-            <Text style={st.closetPickName}>{c.name}</Text>
-            <Text style={st.closetPickCount}>{c.articles.length}</Text>
-          </Pressable>
-        ))}
-      </View>
-    </View>
-  );
-
-  if (status === 'empty_closet' || status === 'insufficient') return (
-    <View style={st.root}>
-      <PreferredBadge name={preferred.name} onPress={() => nav.push('Closet')} />
-      <EmptyState
-        icon={<HangerIcon size={32} />}
-        title={status === 'empty_closet' ? 'This closet is empty' : 'Not enough to build an outfit'}
-        body={status === 'empty_closet'
-          ? 'Add clothing articles to get outfit suggestions.'
-          : 'Add a top and a bottom (or a full-body piece) to get a suggestion.'}
-        action={
-          <Pressable style={st.ctaBtn} onPress={() => nav.push('Closet')}>
-            <Text style={st.ctaBtnText}>Add clothes</Text>
-          </Pressable>
-        }
-      />
-    </View>
-  );
-
-  if (!activeOutfit) return null;
-
-  return (
-    <View style={st.root}>
-      {/* Header */}
-      <View style={st.header}>
-        <PreferredBadge name={preferred.name} onPress={() => nav.push('Closet')} />
-        <ScoreBadge score={activeOutfit.score} />
-      </View>
-
-      {/* Outfit selector tabs */}
-      {outfits.length > 1 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={st.tabsScroll}>
-          <View style={st.tabs}>
-            {outfits.map((o, i) => (
-              <Pressable key={i}
-                style={[st.tab, i === safeIdx && st.tabActive]}
-                onPress={() => { setActiveIdx(i); setWornLogged(false); }}>
-                <Text style={[st.tabText, i === safeIdx && st.tabTextActive]}>
-                  {i === 0 ? 'Best match' : `Option ${i + 1}`}
-                </Text>
-                <Text style={[st.tabScore, i === safeIdx && st.tabTextActive]}>{o.score}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </ScrollView>
-      )}
-
-      {/* Headline */}
-      <Text style={st.headline}>{activeOutfit.headline}</Text>
-
-      {/* Article grid */}
-      <View style={st.articleGrid}>
-        {activeOutfit.slots.map((slot, i) => (
-          <ArticleThumb key={`${safeIdx}-${i}`} article={slot.article} role={slot.role} />
-        ))}
-      </View>
-
-      {/* Score breakdown */}
-      <Pressable style={st.breakdownToggle} onPress={() => setShowBreakdown(v => !v)}>
-        <Text style={st.breakdownToggleText}>
-          {showBreakdown ? 'Hide breakdown' : 'Score breakdown'}
-        </Text>
-      </Pressable>
-
-      {showBreakdown && (
-        <View style={st.breakdownRow}>
-          {BREAKDOWN_LABELS.map(({ key, label }) => (
-            <View key={key} style={st.breakdownItem}>
-              <Text style={st.breakdownLabel}>{label}</Text>
-              <View style={st.breakdownBarBg}>
-                <View style={[st.breakdownBarFill, { width: `${activeOutfit.scoreBreakdown[key]}%` as any }]} />
-              </View>
-              <Text style={st.breakdownValue}>{activeOutfit.scoreBreakdown[key]}</Text>
+    if (!preferred)
+        return (
+            <View style={styles.root}>
+                <Text style={styles.sectionLabel}>Outfit</Text>
+                <EmptyState
+                    icon={<HangerIcon size={32} />}
+                    title='Pick a preferred closet'
+                    body='Select a closet to use for daily outfit suggestions.'
+                />
+                <View style={styles.closetPicker}>
+                    {closets.map((c) => (
+                        <Pressable
+                            key={c._id}
+                            style={styles.closetPickBtn}
+                            onPress={() => setPreferredCloset(c._id)}
+                            disabled={settingPref}
+                        >
+                            <HangerIcon
+                                size={14}
+                                color={colors.textSecondary}
+                            />
+                            <Text style={styles.closetPickName}>{c.name}</Text>
+                            <Text style={styles.closetPickCount}>
+                                {c.articles.length}
+                            </Text>
+                        </Pressable>
+                    ))}
+                </View>
             </View>
-          ))}
+        );
+
+    if (status === 'empty_closet' || status === 'insufficient')
+        return (
+            <View style={styles.root}>
+                <PreferredBadge
+                    name={preferred.name}
+                    onPress={() => nav.push('Closet')}
+                />
+                <EmptyState
+                    icon={<HangerIcon size={32} />}
+                    title={
+                        status === 'empty_closet'
+                            ? 'This closet is empty'
+                            : 'Not enough to build an outfit'
+                    }
+                    body={
+                        status === 'empty_closet'
+                            ? 'Add clothing articles to get outfit suggestions.'
+                            : 'Add a top and a bottom (or a full-body piece) to get a suggestion.'
+                    }
+                    action={
+                        <Pressable
+                            style={styles.ctaBtn}
+                            onPress={() => nav.push('Closet')}
+                        >
+                            <Text style={styles.ctaBtnText}>Add clothes</Text>
+                        </Pressable>
+                    }
+                />
+            </View>
+        );
+
+    if (!activeOutfit) return null;
+
+    return (
+        <View style={styles.root}>
+            {/* Header */}
+            <View style={styles.header}>
+                <PreferredBadge
+                    name={preferred.name}
+                    onPress={() => nav.push('Closet')}
+                />
+                <ScoreBadge score={activeOutfit.score} />
+            </View>
+
+            {/* Outfit selector tabs */}
+            {outfits.length > 1 && (
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.tabsScroll}
+                >
+                    <View style={styles.tabs}>
+                        {outfits.map((o, i) => (
+                            <Pressable
+                                key={i}
+                                style={[
+                                    styles.tab,
+                                    i === safeIdx && styles.tabActive,
+                                ]}
+                                onPress={() => {
+                                    setActiveIdx(i);
+                                    setWornLogged(false);
+                                }}
+                            >
+                                <Text
+                                    style={[
+                                        styles.tabText,
+                                        i === safeIdx && styles.tabTextActive,
+                                    ]}
+                                >
+                                    {i === 0 ? 'Best match' : `Option ${i + 1}`}
+                                </Text>
+                                <Text
+                                    style={[
+                                        styles.tabScore,
+                                        i === safeIdx && styles.tabTextActive,
+                                    ]}
+                                >
+                                    {o.score}
+                                </Text>
+                            </Pressable>
+                        ))}
+                    </View>
+                </ScrollView>
+            )}
+
+            {/* Headline */}
+            <Text style={styles.headline}>{activeOutfit.headline}</Text>
+
+            {/* Article grid */}
+            <View style={styles.articleGrid}>
+                {activeOutfit.slots.map((slot, i) => (
+                    <ArticleThumb
+                        key={`${safeIdx}-${i}`}
+                        article={slot.article}
+                        role={slot.role}
+                    />
+                ))}
+            </View>
+
+            {/* Score breakdown */}
+            <Pressable
+                style={styles.breakdownToggle}
+                onPress={() => setShowBreakdown((v) => !v)}
+            >
+                <Text style={styles.breakdownToggleText}>
+                    {showBreakdown ? 'Hide breakdown' : 'Score breakdown'}
+                </Text>
+            </Pressable>
+
+            {showBreakdown && (
+                <View style={styles.breakdownRow}>
+                    {BREAKDOWN_LABELS.map(({ key, label }) => (
+                        <View
+                            key={key}
+                            style={styles.breakdownItem}
+                        >
+                            <Text style={styles.breakdownLabel}>{label}</Text>
+                            <View style={styles.breakdownBarBg}>
+                                <View
+                                    style={[
+                                        styles.breakdownBarFill,
+                                        {
+                                            width: `${activeOutfit.scoreBreakdown[key]}%` as any,
+                                        },
+                                    ]}
+                                />
+                            </View>
+                            <Text style={styles.breakdownValue}>
+                                {activeOutfit.scoreBreakdown[key]}
+                            </Text>
+                        </View>
+                    ))}
+                </View>
+            )}
+
+            {/* Notes */}
+            {activeOutfit.notes.length > 0 && (
+                <View style={styles.notesList}>
+                    {activeOutfit.notes.map((n, i) => (
+                        <Text
+                            key={i}
+                            style={styles.note}
+                        >
+                            · {n}
+                        </Text>
+                    ))}
+                </View>
+            )}
+
+            {/* Layering recommendation */}
+            {activeOutfit.layering && (
+                <LayeringSection layering={activeOutfit.layering} />
+            )}
+
+            {/* Wore this today */}
+            <Pressable
+                style={[
+                    styles.woreThisBtn,
+                    wornLogged && styles.woreThisLogged,
+                ]}
+                onPress={handleWoreThis}
+                disabled={wornLogged}
+            >
+                <Text
+                    style={[
+                        styles.woreThisText,
+                        wornLogged && styles.woreThisTextLogged,
+                    ]}
+                >
+                    {wornLogged ? '✓ Logged!' : '⏱ Wore this today'}
+                </Text>
+            </Pressable>
         </View>
-      )}
-
-      {/* Notes */}
-      {activeOutfit.notes.length > 0 && (
-        <View style={st.notesList}>
-          {activeOutfit.notes.map((n, i) => (
-            <Text key={i} style={st.note}>· {n}</Text>
-          ))}
-        </View>
-      )}
-
-      {/* Layering recommendation */}
-      {activeOutfit.layering && (
-        <LayeringSection layering={activeOutfit.layering} />
-      )}
-
-      {/* Wore this today */}
-      <Pressable
-        style={[st.woreThisBtn, wornLogged && st.woreThisLogged]}
-        onPress={handleWoreThis}
-        disabled={wornLogged}>
-        <Text style={[st.woreThisText, wornLogged && st.woreThisTextLogged]}>
-          {wornLogged ? '✓ Logged!' : '⏱ Wore this today'}
-        </Text>
-      </Pressable>
-    </View>
-  );
+    );
 };
 
-const PreferredBadge = ({ name, onPress }: { name: string; onPress: () => void }) => (
-  <Pressable style={st.preferredBadge} onPress={onPress}>
-    <HangerIcon size={11} color={colors.textSecondary} />
-    <Text style={st.preferredBadgeText}>{name}</Text>
-  </Pressable>
+const PreferredBadge = ({
+    name,
+    onPress,
+}: {
+    name: string;
+    onPress: () => void;
+}) => (
+    <Pressable
+        style={styles.preferredBadge}
+        onPress={onPress}
+    >
+        <HangerIcon
+            size={11}
+            color={colors.textSecondary}
+        />
+        <Text style={styles.preferredBadgeText}>{name}</Text>
+    </Pressable>
 );
 
 export default OutfitSuggestion;
 
-const st = StyleSheet.create({
-  root:           { gap: spacing.sm },
-  sectionLabel:   { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textMuted, fontWeight: fontWeights.medium, textTransform: 'uppercase', letterSpacing: 1 },
-  header:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  preferredBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 5, paddingHorizontal: 10, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: radius.pill, borderWidth: 1, borderColor: colors.glassBorder },
-  preferredBadgeText: { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textSecondary },
-  scoreBadge:     { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill, borderWidth: 1 },
-  scoreBadgeText: { fontFamily: fonts.body, fontSize: fontSizes.sm, fontWeight: fontWeights.semibold },
-  tabsScroll:     { marginHorizontal: -spacing.md },
-  tabs:           { flexDirection: 'row', gap: 8, paddingHorizontal: spacing.md, paddingBottom: 4 },
-  tab:            { paddingVertical: 6, paddingHorizontal: 14, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.glassBorder, flexDirection: 'row', gap: 6, alignItems: 'center' },
-  tabActive:      { backgroundColor: 'rgba(255,255,255,0.12)', borderColor: colors.glassBorder },
-  tabText:        { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textSecondary },
-  tabTextActive:  { color: colors.textPrimary },
-  tabScore:       { fontFamily: fonts.body, fontSize: 10, color: colors.textMuted },
-  headline:       { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.textSecondary, lineHeight: fontSizes.sm * 1.5 },
-  articleGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  articleCard:    { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: radius.sm, borderWidth: 1, borderColor: colors.glassBorder, padding: 8, flex: 1, minWidth: 140 },
-  articleImg:     { width: 44, height: 44, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.05)', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  articleImgFill: { width: 44, height: 44 },
-  colorDot:       { position: 'absolute', bottom: 2, right: 2, width: 8, height: 8, borderRadius: 4, borderWidth: 1, borderColor: 'rgba(0,0,0,0.2)' },
-  articleLabel:   { flex: 1, gap: 2 },
-  roleLabel:      { fontFamily: fonts.body, fontSize: 10, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
-  articleName:    { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textPrimary, fontWeight: fontWeights.medium },
-  articleMeta:    { fontFamily: fonts.body, fontSize: 10, color: colors.textMuted },
-  breakdownToggle:     { paddingVertical: 6, alignSelf: 'flex-start' },
-  breakdownToggleText: { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textSecondary, textDecorationLine: 'underline' },
-  breakdownRow:   { gap: 6 },
-  breakdownItem:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  breakdownLabel: { fontFamily: fonts.body, fontSize: 10, color: colors.textMuted, width: 46 },
-  breakdownBarBg: { flex: 1, height: 4, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' },
-  breakdownBarFill: { height: 4, backgroundColor: colors.textSecondary, borderRadius: 2 },
-  breakdownValue: { fontFamily: fonts.body, fontSize: 10, color: colors.textMuted, width: 24, textAlign: 'right' },
-  notesList:      { gap: 4 },
-  note:           { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textSecondary, lineHeight: fontSizes.xs * 1.5 },
-  woreThisBtn:    { marginTop: 4, paddingVertical: 10, paddingHorizontal: spacing.md, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.glassBorder, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.05)' },
-  woreThisLogged: { borderColor: 'rgba(52,211,153,0.4)', backgroundColor: 'rgba(52,211,153,0.08)' },
-  woreThisText:   { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.textSecondary },
-  woreThisTextLogged: { color: colors.successText },
-  ctaBtn:         { paddingVertical: 10, paddingHorizontal: spacing.md, backgroundColor: colors.saveBtnBg, borderRadius: radius.sm, alignItems: 'center', marginTop: 4 },
-  ctaBtnText:     { fontFamily: fonts.body, fontSize: fontSizes.sm, fontWeight: fontWeights.semibold, color: colors.saveBtnText },
-  closetPicker:   { gap: 8, marginTop: 4 },
-  closetPickBtn:  { flexDirection: 'row', alignItems: 'center', gap: 8, padding: spacing.sm, backgroundColor: colors.glassBg, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.glassBorder },
-  closetPickName: { flex: 1, fontFamily: fonts.body, fontSize: fontSizes.base, color: colors.textPrimary },
-  closetPickCount:{ fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textMuted },
+const styles = StyleSheet.create({
+    root: { gap: spacing.sm },
+    sectionLabel: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs,
+        color: colors.textMuted,
+        fontWeight: fontWeights.medium,
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    preferredBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingVertical: 5,
+        paddingHorizontal: 10,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        borderRadius: radius.pill,
+        borderWidth: 1,
+        borderColor: colors.glassBorder,
+    },
+    preferredBadgeText: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs,
+        color: colors.textSecondary,
+    },
+    scoreBadge: {
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: radius.pill,
+        borderWidth: 1,
+    },
+    scoreBadgeText: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.sm,
+        fontWeight: fontWeights.semibold,
+    },
+    tabsScroll: { marginHorizontal: -spacing.md },
+    tabs: {
+        flexDirection: 'row',
+        gap: 8,
+        paddingHorizontal: spacing.md,
+        paddingBottom: 4,
+    },
+    tab: {
+        paddingVertical: 6,
+        paddingHorizontal: 14,
+        borderRadius: radius.pill,
+        borderWidth: 1,
+        borderColor: colors.glassBorder,
+        flexDirection: 'row',
+        gap: 6,
+        alignItems: 'center',
+    },
+    tabActive: {
+        backgroundColor: 'rgba(255,255,255,0.12)',
+        borderColor: colors.glassBorder,
+    },
+    tabText: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs,
+        color: colors.textSecondary,
+    },
+    tabTextActive: { color: colors.textPrimary },
+    tabScore: { fontFamily: fonts.body, fontSize: 10, color: colors.textMuted },
+    headline: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.sm,
+        color: colors.textSecondary,
+        lineHeight: fontSizes.sm * 1.5,
+    },
+    articleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+    articleCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        backgroundColor: 'rgba(255,255,255,0.06)',
+        borderRadius: radius.sm,
+        borderWidth: 1,
+        borderColor: colors.glassBorder,
+        padding: 8,
+        flex: 1,
+        minWidth: 140,
+    },
+    articleImg: {
+        width: 44,
+        height: 44,
+        borderRadius: 8,
+        backgroundColor: 'rgba(255,255,255,0.05)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+    },
+    articleImgFill: { width: 44, height: 44 },
+    colorDot: {
+        position: 'absolute',
+        bottom: 2,
+        right: 2,
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.2)',
+    },
+    articleLabel: { flex: 1, gap: 2 },
+    roleLabel: {
+        fontFamily: fonts.body,
+        fontSize: 10,
+        color: colors.textMuted,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    articleName: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs,
+        color: colors.textPrimary,
+        fontWeight: fontWeights.medium,
+    },
+    articleMeta: {
+        fontFamily: fonts.body,
+        fontSize: 10,
+        color: colors.textMuted,
+    },
+    breakdownToggle: { paddingVertical: 6, alignSelf: 'flex-start' },
+    breakdownToggleText: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs,
+        color: colors.textSecondary,
+        textDecorationLine: 'underline',
+    },
+    breakdownRow: { gap: 6 },
+    breakdownItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    breakdownLabel: {
+        fontFamily: fonts.body,
+        fontSize: 10,
+        color: colors.textMuted,
+        width: 46,
+    },
+    breakdownBarBg: {
+        flex: 1,
+        height: 4,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        borderRadius: 2,
+        overflow: 'hidden',
+    },
+    breakdownBarFill: {
+        height: 4,
+        backgroundColor: colors.textSecondary,
+        borderRadius: 2,
+    },
+    breakdownValue: {
+        fontFamily: fonts.body,
+        fontSize: 10,
+        color: colors.textMuted,
+        width: 24,
+        textAlign: 'right',
+    },
+    notesList: { gap: 4 },
+    note: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs,
+        color: colors.textSecondary,
+        lineHeight: fontSizes.xs * 1.5,
+    },
+    woreThisBtn: {
+        marginTop: 4,
+        paddingVertical: 10,
+        paddingHorizontal: spacing.md,
+        borderRadius: radius.sm,
+        borderWidth: 1,
+        borderColor: colors.glassBorder,
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.05)',
+    },
+    woreThisLogged: {
+        borderColor: 'rgba(52,211,153,0.4)',
+        backgroundColor: 'rgba(52,211,153,0.08)',
+    },
+    woreThisText: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.sm,
+        color: colors.textSecondary,
+    },
+    woreThisTextLogged: { color: colors.successText },
+    ctaBtn: {
+        paddingVertical: 10,
+        paddingHorizontal: spacing.md,
+        backgroundColor: colors.saveBtnBg,
+        borderRadius: radius.sm,
+        alignItems: 'center',
+        marginTop: 4,
+    },
+    ctaBtnText: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.sm,
+        fontWeight: fontWeights.semibold,
+        color: colors.saveBtnText,
+    },
+    closetPicker: { gap: 8, marginTop: 4 },
+    closetPickBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        padding: spacing.sm,
+        backgroundColor: colors.glassBg,
+        borderRadius: radius.sm,
+        borderWidth: 1,
+        borderColor: colors.glassBorder,
+    },
+    closetPickName: {
+        flex: 1,
+        fontFamily: fonts.body,
+        fontSize: fontSizes.base,
+        color: colors.textPrimary,
+    },
+    closetPickCount: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs,
+        color: colors.textMuted,
+    },
 });
 
 // ─── Layering section styles ──────────────────────────────────────────────────
 
-const laySt = StyleSheet.create({
-  root:            { gap: 8, paddingTop: 4, borderTopWidth: 1, borderTopColor: colors.glassBorder },
-  header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title:           { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: fontWeights.medium },
-  confidencePip:   { paddingHorizontal: 7, paddingVertical: 2, borderRadius: radius.pill, borderWidth: 1 },
-  confidenceText:  { fontFamily: fonts.body, fontSize: 10, fontWeight: fontWeights.semibold },
-  layerStack:      { gap: 4, paddingVertical: 4, paddingHorizontal: 10, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: radius.sm, borderWidth: 1, borderColor: colors.glassBorder },
-  layerRow:        { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  layerTierLabel:  { fontFamily: fonts.body, fontSize: 10, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, width: 36 },
-  layerRowDivider: { width: 1, height: 10, backgroundColor: colors.glassBorder },
-  layerDot:        { width: 8, height: 8, borderRadius: 4, borderWidth: 1, borderColor: 'rgba(0,0,0,0.2)' },
-  layerName:       { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textPrimary, flex: 1 },
-  layerFabric:     { fontFamily: fonts.body, fontSize: 10, color: colors.textMuted },
-  recommendation:  { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textSecondary, lineHeight: fontSizes.xs * 1.6 },
-  timeline:        { gap: 5, marginTop: 2 },
-  timelineRow:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  timelineTime:    { fontFamily: fonts.body, fontSize: 10, color: colors.textMuted, width: 68, textTransform: 'uppercase', letterSpacing: 0.5 },
-  timelineDivider: { width: 1, height: 10, backgroundColor: colors.glassBorder },
-  timelineAction:  { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textSecondary, flex: 1 },
+const layerStyles = StyleSheet.create({
+    root: {
+        gap: 8,
+        paddingTop: 4,
+        borderTopWidth: 1,
+        borderTopColor: colors.glassBorder,
+    },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    title: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs,
+        color: colors.textMuted,
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+        fontWeight: fontWeights.medium,
+    },
+    confidencePip: {
+        paddingHorizontal: 7,
+        paddingVertical: 2,
+        borderRadius: radius.pill,
+        borderWidth: 1,
+    },
+    confidenceText: {
+        fontFamily: fonts.body,
+        fontSize: 10,
+        fontWeight: fontWeights.semibold,
+    },
+    layerStack: {
+        gap: 4,
+        paddingVertical: 4,
+        paddingHorizontal: 10,
+        backgroundColor: 'rgba(255,255,255,0.04)',
+        borderRadius: radius.sm,
+        borderWidth: 1,
+        borderColor: colors.glassBorder,
+    },
+    layerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    layerTierLabel: {
+        fontFamily: fonts.body,
+        fontSize: 10,
+        color: colors.textMuted,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        width: 36,
+    },
+    layerRowDivider: {
+        width: 1,
+        height: 10,
+        backgroundColor: colors.glassBorder,
+    },
+    layerDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.2)',
+    },
+    layerName: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs,
+        color: colors.textPrimary,
+        flex: 1,
+    },
+    layerFabric: {
+        fontFamily: fonts.body,
+        fontSize: 10,
+        color: colors.textMuted,
+    },
+    recommendation: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs,
+        color: colors.textSecondary,
+        lineHeight: fontSizes.xs * 1.6,
+    },
+    timeline: { gap: 5, marginTop: 2 },
+    timelineRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    timelineTime: {
+        fontFamily: fonts.body,
+        fontSize: 10,
+        color: colors.textMuted,
+        width: 68,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    timelineDivider: {
+        width: 1,
+        height: 10,
+        backgroundColor: colors.glassBorder,
+    },
+    timelineAction: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs,
+        color: colors.textSecondary,
+        flex: 1,
+    },
 });
