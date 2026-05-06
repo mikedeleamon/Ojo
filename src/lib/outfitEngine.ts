@@ -930,6 +930,34 @@ export const generateOutfits = (
       notes.push(`UV is ${uvIndexText} today — a hat would help protect you.`);
     }
 
+    // ── Fabric care warnings (rain-sensitive items) ────────────────────────
+    // Proactively warn when delicate fabrics are in the outfit and rain is
+    // expected — even light rain can damage silk or stain suede.
+    if (precipIntensity !== 'none') {
+      const RAIN_FRAGILE: Record<string, string> = {
+        Silk:   'damaged by water and may stain permanently',
+        Linen:  'prone to water marks and heavy wrinkling when wet',
+      };
+      for (const slot of slots) {
+        const fabric = slot.article.fabricType ?? '';
+        const warning = RAIN_FRAGILE[fabric];
+        if (warning) {
+          const name = slot.article.name ?? slot.article.clothingType;
+          if (precipIntensity === 'heavy' || precipIntensity === 'moderate') {
+            notes.push(`⚠ Your ${name} (${fabric}) can be ${warning} — strongly consider swapping it today.`);
+          } else {
+            notes.push(`Your ${name} (${fabric}) can be ${warning} — keep an eye on the sky.`);
+          }
+        }
+      }
+      // Leather gets a softer warning (water-resistant but can stain over time)
+      const leatherItems = slots.filter(s => s.article.fabricType === 'Leather');
+      if (leatherItems.length > 0 && (precipIntensity === 'heavy' || precipIntensity === 'moderate')) {
+        const names = leatherItems.map(s => s.article.name ?? s.article.clothingType).join(' & ');
+        notes.push(`Your ${names} (Leather) can water-stain in heavy rain — treat with protectant or swap.`);
+      }
+    }
+
     // ── Score-based notes ─────────────────────────────────────────────────
     if (breakdown.color < 55) {
       const worst = findClashingArticle(slots);

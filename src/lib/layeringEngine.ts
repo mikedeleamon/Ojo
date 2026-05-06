@@ -175,6 +175,29 @@ const hourLabel = (h: number): string => {
   return 'Night';
 };
 
+/**
+ * Estimates sunset hour from forecast IsDaylight transitions.
+ * Finds the last forecast hour marked as daylight — sunset follows.
+ * Falls back to a seasonal approximation if no IsDaylight data is available.
+ */
+const estimateSunsetHour = (forecasts: Forecast[]): number => {
+  // Find the transition from IsDaylight=true → false
+  let lastDaylightHour = -1;
+  for (const f of forecasts) {
+    if (f.IsDaylight) {
+      lastDaylightHour = new Date(f.DateTime).getHours();
+    }
+  }
+  if (lastDaylightHour >= 0) return lastDaylightHour;
+
+  // Seasonal fallback (Northern Hemisphere approximation):
+  // Summer sunset ~20:30, Winter sunset ~17:00, Spring/Fall ~18:30
+  const month = new Date().getMonth();
+  if (month >= 5 && month <= 7) return 20;  // Jun–Aug
+  if (month >= 11 || month <= 1) return 17; // Dec–Feb
+  return 18; // Mar–May, Sep–Nov
+};
+
 /** Detects precipitation transitions in the forecast. */
 const detectPrecipTransitions = (forecasts: Forecast[]): { hour: number; starting: boolean }[] => {
   const transitions: { hour: number; starting: boolean }[] = [];
@@ -216,9 +239,12 @@ const buildTimeline = (
 
   const steps: { time: string; action: string }[] = [];
 
-  // ── Temperature-based steps ────────────────────────────────────────────────
+  // ── Temperature-based steps (sunset-aware) ──────────────────────────────────
+  // Uses actual sunset detection from IsDaylight forecast data to determine when
+  // evening cool-down starts, rather than a fixed 17:00 assumption.
   if (hasTempSwing) {
-    // Find the hour where temp crosses key thresholds by scanning chronologically
+    const sunsetHour = estimateSunsetHour(forecasts);
+
     let shedStep: { time: string; action: string } | null = null;
     let relayerStep: { time: string; action: string } | null = null;
     let peakReached = false;
@@ -230,8 +256,17 @@ const buildTimeline = (
       if (!peakReached && temp >= TEMP_SHED_THRESHOLD && outer) {
         shedStep = { time: hourLabel(h), action: `Remove ${outerName} — warming up` };
         peakReached = true;
-      } else if (peakReached && temp < TEMP_RELAYER_THRESHOLD && !relayerStep) {
-        relayerStep = { time: hourLabel(h), action: `Add ${primaryName} back — cooling down` };
+      } else if (peakReached && !relayerStep) {
+        // Trigger re-layer when BOTH conditions are met:
+        // 1. Temperature drops below threshold
+        // 2. We're at or past sunset (cooling will accelerate)
+        const pastSunset = h >= sunsetHour - 1; // 1 hour before sunset, cooling begins
+        if (temp < TEMP_RELAYER_THRESHOLD && pastSunset) {
+          relayerStep = { time: hourLabel(h), action: `Add ${primaryName} back — sun is setting, cooling down` };
+        } else if (temp < TEMP_RELAYER_THRESHOLD - 5) {
+          // Hard fallback: if it drops significantly regardless of sunset
+          relayerStep = { time: hourLabel(h), action: `Add ${primaryName} back — cooling down` };
+        }
       }
     }
 
