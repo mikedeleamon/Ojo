@@ -5,7 +5,7 @@ import { View, Text } from '../primitives';
 import { EmptyState } from '../shared';
 import { useClosets } from '../../hooks/useClosets';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
-import { generateOutfits, OutfitRole, OutfitResult, ScoreBreakdown } from '../../lib/outfitEngine';
+import { generateOutfits, OutfitRole, OutfitSlot, OutfitResult, ScoreBreakdown } from '../../lib/outfitEngine';
 import { LayeringResult } from '../../lib/layeringEngine';
 import { addHistoryEntry, recentlyWornWithAge } from '../../lib/outfitHistory';
 import { updatePreferences } from '../../lib/userPreferences';
@@ -15,15 +15,22 @@ import { colors, fonts, fontSizes, fontWeights, spacing, radius } from '../../th
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CSS_COLORS: Record<string, string> = {
-  Black: '#1a1a1a', White: '#f5f5f5', Grey: '#9ca3af', Navy: '#1e3a5f',
-  Blue: '#3b82f6', Green: '#22c55e', Red: '#ef4444', Brown: '#92400e',
-  Beige: '#d4b896', Pink: '#f9a8d4', Yellow: '#fbbf24', Purple: '#a855f7',
-  Orange: '#f97316',
+  Black: '#1a1a1a', White: '#f5f5f5', Grey: '#9ca3af', Brown: '#92400e', Beige: '#d4b896', Cream: '#fef3c7',
+  Silver: '#c0c0c0', Gold: '#d4af37', Bronze: '#a0785a', 'Rose Gold': '#c9776a', Champagne: '#f4e4c1',
+  Navy: '#1e3a5f', Indigo: '#4338ca', Cobalt: '#2563eb', Blue: '#3b82f6',
+  'Electric Blue': '#0ea5e9', 'Sky Blue': '#38bdf8', Periwinkle: '#a5b4fc',
+  Teal: '#0d9488', Cyan: '#06b6d4', 'Baby Blue': '#bae6fd',
+  Green: '#22c55e', Mint: '#34d399', Lime: '#a3e635', Sage: '#86efac', Olive: '#65a30d', Khaki: '#a16207',
+  Red: '#ef4444', Scarlet: '#f43f5e', Crimson: '#dc2626', Burgundy: '#9b1c1c',
+  Orange: '#f97316', Coral: '#fb923c', Peach: '#fdba74', Rust: '#c2410c', Yellow: '#fbbf24',
+  Purple: '#a855f7', Plum: '#7c3aed', Lilac: '#d8b4fe', Lavender: '#c4b5fd',
+  Pink: '#f9a8d4', Rose: '#fb7185', 'Dusty Rose': '#fda4af', Blush: '#fecdd3',
+  Magenta: '#e879f9', 'Hot Pink': '#ec4899', Fuchsia: '#d946ef',
 };
 
 const ROLE_LABELS: Record<OutfitRole, string> = {
   top: 'Top', bottom: 'Bottom', fullBody: 'Outfit',
-  outerwear: 'Outerwear', footwear: 'Footwear', accessory: 'Extra',
+  midLayer: 'Mid Layer', outerwear: 'Outerwear', footwear: 'Footwear', accessory: 'Extra',
 };
 
 const BREAKDOWN_LABELS: { key: keyof ScoreBreakdown; label: string }[] = [
@@ -83,26 +90,62 @@ const ConfidencePip = ({ value }: { value: number }) => {
   );
 };
 
-const LayeringSection = ({ layering }: { layering: LayeringResult }) => (
-  <View style={laySt.root}>
-    <View style={laySt.header}>
-      <Text style={laySt.title}>Layering</Text>
-      <ConfidencePip value={layering.confidence} />
+const LAYER_TIERS: { key: keyof LayeringResult['layers']; label: string }[] = [
+  { key: 'base',  label: 'Base'  },
+  { key: 'mid',   label: 'Mid'   },
+  { key: 'outer', label: 'Outer' },
+];
+
+const LayerRow = ({ label, slot }: { label: string; slot: OutfitSlot | null }) => {
+  if (!slot) return null;
+  const name = slot.article.name || slot.article.clothingType;
+  const dotColor = slot.article.color ? CSS_COLORS[slot.article.color] : null;
+  return (
+    <View style={laySt.layerRow}>
+      <Text style={laySt.layerTierLabel}>{label}</Text>
+      <View style={laySt.layerRowDivider} />
+      {dotColor && <View style={[laySt.layerDot, { backgroundColor: dotColor }]} />}
+      <Text style={laySt.layerName} numberOfLines={1}>{name}</Text>
+      {slot.article.fabricType
+        ? <Text style={laySt.layerFabric}>{slot.article.fabricType}</Text>
+        : null}
     </View>
-    <Text style={laySt.recommendation}>{layering.recommendation}</Text>
-    {layering.timeline && layering.timeline.length > 0 && (
-      <View style={laySt.timeline}>
-        {layering.timeline.map((step, i) => (
-          <View key={i} style={laySt.timelineRow}>
-            <Text style={laySt.timelineTime}>{step.time}</Text>
-            <View style={laySt.timelineDivider} />
-            <Text style={laySt.timelineAction}>{step.action}</Text>
-          </View>
-        ))}
+  );
+};
+
+const LayeringSection = ({ layering }: { layering: LayeringResult }) => {
+  const hasLayers = layering.layers.base || layering.layers.mid || layering.layers.outer;
+  return (
+    <View style={laySt.root}>
+      <View style={laySt.header}>
+        <Text style={laySt.title}>Layering</Text>
+        <ConfidencePip value={layering.confidence} />
       </View>
-    )}
-  </View>
-);
+
+      {hasLayers && (
+        <View style={laySt.layerStack}>
+          {LAYER_TIERS.map(({ key, label }) => (
+            <LayerRow key={key} label={label} slot={layering.layers[key]} />
+          ))}
+        </View>
+      )}
+
+      <Text style={laySt.recommendation}>{layering.recommendation}</Text>
+
+      {layering.timeline && layering.timeline.length > 0 && (
+        <View style={laySt.timeline}>
+          {layering.timeline.map((step, i) => (
+            <View key={i} style={laySt.timelineRow}>
+              <Text style={laySt.timelineTime}>{step.time}</Text>
+              <View style={laySt.timelineDivider} />
+              <Text style={laySt.timelineAction}>{step.action}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+};
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
@@ -354,6 +397,13 @@ const laySt = StyleSheet.create({
   title:           { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 1, fontWeight: fontWeights.medium },
   confidencePip:   { paddingHorizontal: 7, paddingVertical: 2, borderRadius: radius.pill, borderWidth: 1 },
   confidenceText:  { fontFamily: fonts.body, fontSize: 10, fontWeight: fontWeights.semibold },
+  layerStack:      { gap: 4, paddingVertical: 4, paddingHorizontal: 10, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: radius.sm, borderWidth: 1, borderColor: colors.glassBorder },
+  layerRow:        { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  layerTierLabel:  { fontFamily: fonts.body, fontSize: 10, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, width: 36 },
+  layerRowDivider: { width: 1, height: 10, backgroundColor: colors.glassBorder },
+  layerDot:        { width: 8, height: 8, borderRadius: 4, borderWidth: 1, borderColor: 'rgba(0,0,0,0.2)' },
+  layerName:       { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textPrimary, flex: 1 },
+  layerFabric:     { fontFamily: fonts.body, fontSize: 10, color: colors.textMuted },
   recommendation:  { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textSecondary, lineHeight: fontSizes.xs * 1.6 },
   timeline:        { gap: 5, marginTop: 2 },
   timelineRow:     { flexDirection: 'row', alignItems: 'center', gap: 8 },

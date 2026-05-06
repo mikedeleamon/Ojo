@@ -20,7 +20,7 @@ import { generateLayeringRecommendation, LayeringResult } from './layeringEngine
 
 // ─── Core types ───────────────────────────────────────────────────────────────
 
-export type OutfitRole = 'top' | 'bottom' | 'fullBody' | 'outerwear' | 'footwear' | 'accessory';
+export type OutfitRole = 'top' | 'bottom' | 'fullBody' | 'midLayer' | 'outerwear' | 'footwear' | 'accessory';
 export type WeatherBucket = 'hot' | 'warm' | 'cool' | 'cold' | 'freezing';
 
 export interface OutfitSlot {
@@ -66,7 +66,7 @@ export const getWeatherBucket = (
 // Eliminates items that are clearly climatically impossible — these never enter
 // the combination space, so the scorer never has to penalise them.
 
-const HARD_EXCLUDE_HOT      = new Set(['Coat', 'Gloves', 'Scarf', 'Sweater']);
+const HARD_EXCLUDE_HOT      = new Set(['Coat', 'Gloves', 'Scarf', 'Sweater', 'Hoodie']);
 const HARD_EXCLUDE_COLD     = new Set(['Sandals', 'Shorts']);
 const HARD_EXCLUDE_FREEZING = new Set(['Sandals', 'Shorts', 'Skirt']);
 
@@ -83,7 +83,8 @@ const isWeatherAppropriate = (
 // ─── 2. Role classification ───────────────────────────────────────────────────
 
 const ROLE_MAP: Record<string, OutfitRole> = {
-  Shirt: 'top', 'T-Shirt': 'top', Blouse: 'top', Sweater: 'top', Hoodie: 'top',
+  Shirt: 'top', 'T-Shirt': 'top', Blouse: 'top',
+  Hoodie: 'midLayer', Sweater: 'midLayer',   // insulating mid layer, not a base top
   Jacket: 'outerwear', Coat: 'outerwear',
   Pants: 'bottom', Jeans: 'bottom', Shorts: 'bottom', Skirt: 'bottom',
   Dress: 'fullBody',
@@ -772,6 +773,7 @@ export const generateOutfits = (
   const tops        = cap('top');
   const bottoms     = cap('bottom');
   const fullBodies  = cap('fullBody');
+  const midLayers   = cap('midLayer');
   const outerwears  = cap('outerwear');
   const footwears   = cap('footwear');
   const accessories = cap('accessory');
@@ -781,6 +783,16 @@ export const generateOutfits = (
   if (!hasCoreTopBottom && !hasFullBody) return empty_result('insufficient');
 
   // ── Phase 2: Build candidate lists for optional/conditional roles ─────────
+
+  // Mid layer (Hoodie, Sweater): excluded in hot; required in cold/freezing if
+  // available; optional (try with and without) in cool and warm.
+  // Capped at 4 to avoid combinatorial explosion with large wardrobes.
+  const midOptions: (ClothingArticle | null)[] =
+    bucket === 'hot' || midLayers.length === 0
+      ? [null]
+      : bucket === 'cold' || bucket === 'freezing'
+        ? midLayers.slice(0, 4)
+        : [...midLayers.slice(0, 4), null];  // cool/warm: optional
 
   // Outerwear: required in cool/cold/freezing; optional if raining; skip otherwise
   const outerOptions: (ClothingArticle | null)[] =
@@ -841,17 +853,20 @@ export const generateOutfits = (
     coreCombos = withFabricScore.slice(0, CORE_COMBO_KEEP).map(x => x.slots);
   }
 
-  // Full cross-product with outerwear × footwear × accessory
+  // Full cross-product with midLayer × outerwear × footwear × accessory
   for (const core of coreCombos) {
-    for (const outer of outerOptions) {
-      for (const shoe of shoeOptions) {
-        for (const acc of accOptions) {
-          const slots: OutfitSlot[] = [...core];
-          if (outer) slots.push({ role: 'outerwear', article: outer });
-          if (shoe)  slots.push({ role: 'footwear',  article: shoe  });
-          if (acc)   slots.push({ role: 'accessory', article: acc   });
+    for (const mid of midOptions) {
+      for (const outer of outerOptions) {
+        for (const shoe of shoeOptions) {
+          for (const acc of accOptions) {
+            const slots: OutfitSlot[] = [...core];
+            if (mid)   slots.push({ role: 'midLayer',  article: mid   });
+            if (outer) slots.push({ role: 'outerwear', article: outer });
+            if (shoe)  slots.push({ role: 'footwear',  article: shoe  });
+            if (acc)   slots.push({ role: 'accessory', article: acc   });
 
-          scored.push(scoreCombo(slots, bucket, effectiveFeelsLike, precipIntensity, humidity, windMph, isSnowing, settings, recentlyWorn, profile));
+            scored.push(scoreCombo(slots, bucket, effectiveFeelsLike, precipIntensity, humidity, windMph, isSnowing, settings, recentlyWorn, profile));
+          }
         }
       }
     }
@@ -863,7 +878,7 @@ export const generateOutfits = (
   // outfits that only swap an accessory or shoes from dominating the results.
   scored.sort((a, b) => b.score - a.score);
 
-  const CORE_ROLES: OutfitRole[] = ['top', 'bottom', 'fullBody', 'outerwear'];
+  const CORE_ROLES: OutfitRole[] = ['top', 'bottom', 'fullBody', 'midLayer', 'outerwear'];
 
   /** Returns the array of article IDs in "core" roles (non-accessory, non-footwear). */
   const coreIds = (slots: OutfitSlot[]): string[] =>
