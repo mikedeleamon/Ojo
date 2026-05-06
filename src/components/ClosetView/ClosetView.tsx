@@ -32,29 +32,6 @@ import {
 } from '../../lib/outfitEngine';
 import { styles } from './ClosetView.styles';
 
-// ─── Seasonal relevance ───────────────────────────────────────────────────────
-
-const SEASON_WARMTH_TARGET: Record<Season, number> = {
-    summer: 0.1,
-    spring: 0.35,
-    autumn: 0.6,
-    winter: 0.9,
-};
-
-// Items outside these bounds are considered out-of-season for the current month
-const SEASON_OOS_THRESHOLD: Record<Season, { above: number; below: number }> = {
-    summer: { above: 0.65, below: -1 }, // heavy coats/wool in summer
-    spring: { above: 0.82, below: -1 }, // only very heavy winter gear
-    autumn: { above: 2, below: 0.12 }, // only very light summer items
-    winter: { above: 2, below: 0.22 }, // light tanks/shorts in winter
-};
-
-const isOutOfSeason = (article: ClothingArticle, season: Season): boolean => {
-    const w = garmentWarmth(article);
-    const { above, below } = SEASON_OOS_THRESHOLD[season];
-    return w > above || w < below;
-};
-
 const CATEGORIES = [
     'Casual',
     'Formal',
@@ -508,15 +485,7 @@ const ClosetView = ({
             arts = arts.filter(
                 (a) => a.fabricType && activeFabrics.includes(a.fabricType),
             );
-
-        // Sort by proximity to this season's ideal warmth — relevant pieces float up
-        const season = currentSeason();
-        const target = SEASON_WARMTH_TARGET[season];
-        return [...arts].sort(
-            (a, b) =>
-                Math.abs(garmentWarmth(a) - target) -
-                Math.abs(garmentWarmth(b) - target),
-        );
+        return arts;
     }, [selected, query, activeCategories, activeColors, activeFabrics]);
 
     const submitCreate = async () => {
