@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Image, StyleSheet, useColorScheme, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -89,15 +90,17 @@ export default function App() {
     if (!ready) return <CustomSplash />;
 
     return (
-        <SafeAreaProvider>
-            <SettingsProvider>
-                <WeatherProvider>
-                    <NavigationContainer>
-                        <StatusBar style='light' />
-                        <RootNavigator />
-                    </NavigationContainer>
-                </WeatherProvider>
-            </SettingsProvider>
-        </SafeAreaProvider>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+            <SafeAreaProvider>
+                <SettingsProvider>
+                    <WeatherProvider>
+                        <NavigationContainer>
+                            <StatusBar style='light' />
+                            <RootNavigator />
+                        </NavigationContainer>
+                    </WeatherProvider>
+                </SettingsProvider>
+            </SafeAreaProvider>
+        </GestureHandlerRootView>
     );
 }

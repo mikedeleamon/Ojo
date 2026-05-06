@@ -255,6 +255,13 @@ const footerBgFor = (condition: string, isDay: boolean): string => {
     return isDay ? 'rgba(2,78,142,0.97)' : 'rgba(10,16,32,0.97)';
 };
 
+const formatLastUpdated = (date: Date): string => {
+    const mins = Math.floor((Date.now() - date.getTime()) / 60_000);
+    if (mins < 1) return 'Just now';
+    if (mins === 1) return '1 min ago';
+    return `${mins} mins ago`;
+};
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 interface Props {
@@ -274,6 +281,8 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
+    const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+    const [, setTick] = useState(0);
 
     // ── Pull-to-refresh buffering ───────────────────────────────────────────────
     // While a pull-to-refresh is in flight, incoming data is held in pendingRef
@@ -291,9 +300,16 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
             setWeather(w);
             setForecasts(f);
             setFooterBg(footerBgFor(w.WeatherText, w.IsDayTime));
+            setLastUpdated(new Date());
             pendingRef.current = null;
         }
     };
+
+    useEffect(() => {
+        if (!lastUpdated) return;
+        const id = setInterval(() => setTick((n) => n + 1), 60_000);
+        return () => clearInterval(id);
+    }, [lastUpdated]);
 
     // ── Fetch city ──────────────────────────────────────────────────────────────
     useEffect(() => {
@@ -317,8 +333,13 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
                     setRefreshing(false);
                 }
             })
-            .catch(() => {
-                setError('Could not resolve location. Please try again later.');
+            .catch((err) => {
+                const status = err?.response?.status;
+                setError(
+                    status === 429
+                        ? 'Weather API rate limit reached. Wait a few minutes and try again.'
+                        : 'Could not resolve location. Please try again later.',
+                );
                 setLoading(false);
                 setRefreshing(false);
             });
@@ -346,11 +367,17 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
                     setWeather(w);
                     setForecasts(fRes.data ?? []);
                     setFooterBg(footerBgFor(w.WeatherText, w.IsDayTime));
+                    setLastUpdated(new Date());
                 }
             })
-            .catch(() =>
-                setError('Could not load weather.  Please try again later.'),
-            )
+            .catch((err) => {
+                const status = err?.response?.status;
+                setError(
+                    status === 429
+                        ? 'Weather API rate limit reached. Wait a few minutes and try again.'
+                        : 'Could not load weather. Please try again later.',
+                );
+            })
             .finally(() => {
                 flushPending();
                 isRefreshRef.current = false;
@@ -535,6 +562,11 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
                             <Text style={st.condition}>
                                 {weather.WeatherText}
                             </Text>
+                            {lastUpdated && (
+                                <Text style={st.lastUpdated}>
+                                    {formatLastUpdated(lastUpdated)}
+                                </Text>
+                            )}
                         </View>
 
                         {/* Hero icon + temperature */}
@@ -621,6 +653,12 @@ const st = StyleSheet.create({
         fontFamily: fonts.body,
         fontSize: fontSizes.base,
         color: 'rgba(255,255,255,0.75)',
+    },
+    lastUpdated: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs,
+        color: 'rgba(255,255,255,0.35)',
+        marginTop: 2,
     },
     hero: { alignItems: 'center', paddingVertical: spacing.lg },
     forecastStrip: {

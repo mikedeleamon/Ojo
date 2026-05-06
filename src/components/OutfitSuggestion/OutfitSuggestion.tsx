@@ -297,6 +297,45 @@ const LayeringSection = ({ layering }: { layering: LayeringResult }) => {
     );
 };
 
+// ─── Outfit tab subtitle ──────────────────────────────────────────────────────
+
+const outfitTabSubtitle = (outfit: OutfitResult): string => {
+    const roles = outfit.slots.map((s) => s.role);
+    if (roles.includes('outerwear')) return 'Layered up';
+    if (roles.includes('midLayer')) return 'Mid layer';
+    if (outfit.scoreBreakdown.preference >= 75) return 'Your style';
+    if (outfit.scoreBreakdown.color >= 80) return 'Color match';
+    if (outfit.scoreBreakdown.fabric >= 80) return 'Weather-perfect';
+    return 'Light & clean';
+};
+
+// ─── Weather-aware copy helpers ───────────────────────────────────────────────
+
+const weatherAwareAddClothesBody = (weather: CurrentWeather): string => {
+    const tempF = weather.Temperature.Imperial.Value;
+    const cond = weather.WeatherText.toLowerCase();
+    if (cond.includes('rain') || cond.includes('shower') || cond.includes('drizzle'))
+        return 'Add a rain jacket or waterproof layer to get started.';
+    if (cond.includes('snow') || cond.includes('blizzard') || cond.includes('flurr'))
+        return 'Add a winter coat or warm layers to get started.';
+    if (cond.includes('thunder') || cond.includes('storm'))
+        return 'Add a sturdy outer layer to get started.';
+    if (tempF <= 40) return 'Add a coat or sweater to get started.';
+    if (tempF >= 85) return 'Add some light, breathable pieces to get started.';
+    return 'Add clothing articles to get outfit suggestions.';
+};
+
+const weatherAwareInsufficientBody = (weather: CurrentWeather): string => {
+    const tempF = weather.Temperature.Imperial.Value;
+    const cond = weather.WeatherText.toLowerCase();
+    if (cond.includes('rain') || cond.includes('shower') || cond.includes('drizzle'))
+        return 'Add a top, bottom, and a rain jacket to build an outfit.';
+    if (cond.includes('snow') || cond.includes('blizzard'))
+        return 'Add a top, bottom, and a warm coat to build a cold-weather outfit.';
+    if (tempF <= 40) return 'Add a top and a bottom — a warm outer layer would help too.';
+    return 'Add a top and a bottom (or a full-body piece) to get a suggestion.';
+};
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 interface Props {
@@ -432,8 +471,8 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
                     }
                     body={
                         status === 'empty_closet'
-                            ? 'Add clothing articles to get outfit suggestions.'
-                            : 'Add a top and a bottom (or a full-body piece) to get a suggestion.'
+                            ? weatherAwareAddClothesBody(weather)
+                            : weatherAwareInsufficientBody(weather)
                     }
                     action={
                         <Pressable
@@ -480,22 +519,29 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
                                     setWornLogged(false);
                                 }}
                             >
-                                <Text
-                                    style={[
-                                        styles.tabText,
-                                        i === safeIdx && styles.tabTextActive,
-                                    ]}
-                                >
-                                    {i === 0 ? 'Best match' : `Option ${i + 1}`}
-                                </Text>
-                                <Text
-                                    style={[
-                                        styles.tabScore,
-                                        i === safeIdx && styles.tabTextActive,
-                                    ]}
-                                >
-                                    {o.score}
-                                </Text>
+                                <View style={styles.tabInner}>
+                                    <View style={styles.tabLabelRow}>
+                                        <Text
+                                            style={[
+                                                styles.tabText,
+                                                i === safeIdx && styles.tabTextActive,
+                                            ]}
+                                        >
+                                            {i === 0 ? 'Best match' : `Option ${i + 1}`}
+                                        </Text>
+                                        <Text
+                                            style={[
+                                                styles.tabScore,
+                                                i === safeIdx && styles.tabTextActive,
+                                            ]}
+                                        >
+                                            {o.score}
+                                        </Text>
+                                    </View>
+                                    <Text style={styles.tabSubtitle}>
+                                        {outfitTabSubtitle(o)}
+                                    </Text>
+                                </View>
                             </Pressable>
                         ))}
                     </View>
@@ -664,19 +710,18 @@ const styles = StyleSheet.create({
         paddingBottom: 4,
     },
     tab: {
-        paddingVertical: 6,
+        paddingVertical: 7,
         paddingHorizontal: 14,
-        borderRadius: radius.pill,
+        borderRadius: radius.sm,
         borderWidth: 1,
         borderColor: colors.glassBorder,
-        flexDirection: 'row',
-        gap: 6,
-        alignItems: 'center',
     },
     tabActive: {
         backgroundColor: 'rgba(255,255,255,0.12)',
         borderColor: colors.glassBorder,
     },
+    tabInner: { gap: 2 },
+    tabLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     tabText: {
         fontFamily: fonts.body,
         fontSize: fontSizes.xs,
@@ -684,6 +729,11 @@ const styles = StyleSheet.create({
     },
     tabTextActive: { color: colors.textPrimary },
     tabScore: { fontFamily: fonts.body, fontSize: 10, color: colors.textMuted },
+    tabSubtitle: {
+        fontFamily: fonts.body,
+        fontSize: 10,
+        color: colors.textMuted,
+    },
     headline: {
         fontFamily: fonts.body,
         fontSize: fontSizes.sm,

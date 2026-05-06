@@ -1,11 +1,14 @@
 import { useState, useMemo } from 'react';
 import {
+    StyleSheet,
     ScrollView,
     TextInput,
     Pressable,
     Image,
     Alert,
+    Animated,
 } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Svg, Path } from 'react-native-svg';
 import { View, Text } from '../primitives';
@@ -25,8 +28,32 @@ import {
     SEASONAL_COLORS,
     currentSeason,
     garmentWarmth,
+    Season,
 } from '../../lib/outfitEngine';
 import { styles } from './ClosetView.styles';
+
+// ─── Seasonal relevance ───────────────────────────────────────────────────────
+
+const SEASON_WARMTH_TARGET: Record<Season, number> = {
+    summer: 0.1,
+    spring: 0.35,
+    autumn: 0.6,
+    winter: 0.9,
+};
+
+// Items outside these bounds are considered out-of-season for the current month
+const SEASON_OOS_THRESHOLD: Record<Season, { above: number; below: number }> = {
+    summer: { above: 0.65, below: -1 }, // heavy coats/wool in summer
+    spring: { above: 0.82, below: -1 }, // only very heavy winter gear
+    autumn: { above: 2, below: 0.12 }, // only very light summer items
+    winter: { above: 2, below: 0.22 }, // light tanks/shorts in winter
+};
+
+const isOutOfSeason = (article: ClothingArticle, season: Season): boolean => {
+    const w = garmentWarmth(article);
+    const { above, below } = SEASON_OOS_THRESHOLD[season];
+    return w > above || w < below;
+};
 
 const CATEGORIES = [
     'Casual',
@@ -38,17 +65,58 @@ const CATEGORIES = [
 ];
 const COLORS = [
     // Neutrals
-    'Black', 'White', 'Grey', 'Brown', 'Beige', 'Cream',
+    'Black',
+    'White',
+    'Grey',
+    'Brown',
+    'Beige',
+    'Cream',
     // Metallics
-    'Silver', 'Gold', 'Bronze', 'Rose Gold', 'Champagne',
+    'Silver',
+    'Gold',
+    'Bronze',
+    'Rose Gold',
+    'Champagne',
     // Blues
-    'Navy', 'Indigo', 'Cobalt', 'Blue', 'Electric Blue', 'Sky Blue', 'Periwinkle', 'Teal', 'Cyan', 'Baby Blue',
+    'Navy',
+    'Indigo',
+    'Cobalt',
+    'Blue',
+    'Electric Blue',
+    'Sky Blue',
+    'Periwinkle',
+    'Teal',
+    'Cyan',
+    'Baby Blue',
     // Greens
-    'Green', 'Mint', 'Lime', 'Sage', 'Olive', 'Khaki',
+    'Green',
+    'Mint',
+    'Lime',
+    'Sage',
+    'Olive',
+    'Khaki',
     // Reds & warm
-    'Red', 'Scarlet', 'Crimson', 'Burgundy', 'Orange', 'Coral', 'Peach', 'Rust', 'Yellow',
+    'Red',
+    'Scarlet',
+    'Crimson',
+    'Burgundy',
+    'Orange',
+    'Coral',
+    'Peach',
+    'Rust',
+    'Yellow',
     // Purples & pinks
-    'Purple', 'Plum', 'Lilac', 'Lavender', 'Pink', 'Rose', 'Dusty Rose', 'Blush', 'Magenta', 'Hot Pink', 'Fuchsia',
+    'Purple',
+    'Plum',
+    'Lilac',
+    'Lavender',
+    'Pink',
+    'Rose',
+    'Dusty Rose',
+    'Blush',
+    'Magenta',
+    'Hot Pink',
+    'Fuchsia',
     // Other
     'Multi',
 ];
@@ -64,37 +132,73 @@ const FABRICS = [
     'Other',
 ];
 
-const METALLIC_GRADIENTS: Record<string, readonly [string, string, ...string[]]> = {
-    Silver:      ['#f2f2f2', '#c0c0c0', '#f5f5f5', '#8a8a8a'],
-    Gold:        ['#fde68a', '#d4af37', '#f5e27a', '#b8860b'],
-    Bronze:      ['#d4a271', '#8b5c2a', '#cd853f', '#7b3f15'],
+const METALLIC_GRADIENTS: Record<
+    string,
+    readonly [string, string, ...string[]]
+> = {
+    Silver: ['#f2f2f2', '#c0c0c0', '#f5f5f5', '#8a8a8a'],
+    Gold: ['#fde68a', '#d4af37', '#f5e27a', '#b8860b'],
+    Bronze: ['#d4a271', '#8b5c2a', '#cd853f', '#7b3f15'],
     'Rose Gold': ['#f4c2b8', '#c9776a', '#eda99a', '#a0504a'],
-    Champagne:   ['#f8f0d8', '#e4c96e', '#f5e8c0', '#c8a84b'],
+    Champagne: ['#f8f0d8', '#e4c96e', '#f5e8c0', '#c8a84b'],
 };
 const METALLIC_START = { x: 0.15, y: 0 } as const;
-const METALLIC_END   = { x: 0.85, y: 1 } as const;
+const METALLIC_END = { x: 0.85, y: 1 } as const;
 
 const CSS_COLORS: Record<string, string> = {
     // Neutrals
-    Black: '#1a1a1a', White: '#f5f5f5', Grey: '#9ca3af', Brown: '#92400e',
-    Beige: '#d4b896', Cream: '#fef3c7',
+    Black: '#1a1a1a',
+    White: '#f5f5f5',
+    Grey: '#9ca3af',
+    Brown: '#92400e',
+    Beige: '#d4b896',
+    Cream: '#fef3c7',
     // Metallics
-    Silver: '#c0c0c0', Gold: '#d4af37', Bronze: '#a0785a',
-    'Rose Gold': '#c9776a', Champagne: '#f4e4c1',
+    Silver: '#c0c0c0',
+    Gold: '#d4af37',
+    Bronze: '#a0785a',
+    'Rose Gold': '#c9776a',
+    Champagne: '#f4e4c1',
     // Blues
-    Navy: '#1e3a5f', Indigo: '#4338ca', Cobalt: '#2563eb', Blue: '#3b82f6',
-    'Electric Blue': '#0ea5e9', 'Sky Blue': '#38bdf8', Periwinkle: '#a5b4fc',
-    Teal: '#0d9488', Cyan: '#06b6d4', 'Baby Blue': '#bae6fd',
+    Navy: '#1e3a5f',
+    Indigo: '#4338ca',
+    Cobalt: '#2563eb',
+    Blue: '#3b82f6',
+    'Electric Blue': '#0ea5e9',
+    'Sky Blue': '#38bdf8',
+    Periwinkle: '#a5b4fc',
+    Teal: '#0d9488',
+    Cyan: '#06b6d4',
+    'Baby Blue': '#bae6fd',
     // Greens
-    Green: '#22c55e', Mint: '#34d399', Lime: '#a3e635', Sage: '#86efac',
-    Olive: '#65a30d', Khaki: '#a16207',
+    Green: '#22c55e',
+    Mint: '#34d399',
+    Lime: '#a3e635',
+    Sage: '#86efac',
+    Olive: '#65a30d',
+    Khaki: '#a16207',
     // Reds & warm
-    Red: '#ef4444', Scarlet: '#f43f5e', Crimson: '#dc2626', Burgundy: '#9b1c1c',
-    Orange: '#f97316', Coral: '#fb923c', Peach: '#fdba74', Rust: '#c2410c', Yellow: '#fbbf24',
+    Red: '#ef4444',
+    Scarlet: '#f43f5e',
+    Crimson: '#dc2626',
+    Burgundy: '#9b1c1c',
+    Orange: '#f97316',
+    Coral: '#fb923c',
+    Peach: '#fdba74',
+    Rust: '#c2410c',
+    Yellow: '#fbbf24',
     // Purples & pinks
-    Purple: '#a855f7', Plum: '#7c3aed', Lilac: '#d8b4fe', Lavender: '#c4b5fd',
-    Pink: '#f9a8d4', Rose: '#fb7185', 'Dusty Rose': '#fda4af', Blush: '#fecdd3',
-    Magenta: '#e879f9', 'Hot Pink': '#ec4899', Fuchsia: '#d946ef',
+    Purple: '#a855f7',
+    Plum: '#7c3aed',
+    Lilac: '#d8b4fe',
+    Lavender: '#c4b5fd',
+    Pink: '#f9a8d4',
+    Rose: '#fb7185',
+    'Dusty Rose': '#fda4af',
+    Blush: '#fecdd3',
+    Magenta: '#e879f9',
+    'Hot Pink': '#ec4899',
+    Fuchsia: '#d946ef',
 };
 
 interface Props {
@@ -142,18 +246,21 @@ const WARMTH_DOT_COLOR = (w: number) =>
 const ArticleCard = ({
     article,
     harmonyScore,
+    outOfSeason,
     onEdit,
     onRemove,
 }: {
     article: ClothingArticle;
     harmonyScore?: number;
+    outOfSeason?: boolean;
     onEdit: () => void;
     onRemove: () => void;
 }) => {
     const warmth = garmentWarmth(article);
     const warmthColor = WARMTH_DOT_COLOR(warmth);
     const season = currentSeason();
-    const isInSeason = !!article.color && SEASONAL_COLORS[season].has(article.color);
+    const isInSeason =
+        !!article.color && SEASONAL_COLORS[season].has(article.color);
     const lowHarmony =
         harmonyScore !== undefined &&
         harmonyScore < 0.55 &&
@@ -161,7 +268,9 @@ const ArticleCard = ({
         !COLOR_NEUTRALS.has(article.color);
 
     return (
-        <View style={styles.articleCard}>
+        <View
+            style={[styles.articleCard, outOfSeason && styles.articleCardOOS]}
+        >
             <View style={styles.articleImg}>
                 {article.imageUrl ? (
                     <Image
@@ -187,9 +296,7 @@ const ArticleCard = ({
                     >
                         {article.name || article.clothingType}
                     </Text>
-                    {isInSeason && (
-                        <Text style={styles.seasonBadge}>◆</Text>
-                    )}
+                    {isInSeason && <Text style={styles.seasonBadge}>◆</Text>}
                 </View>
                 <Text
                     style={[
@@ -209,8 +316,10 @@ const ArticleCard = ({
                     </Text>
                 ) : null}
             </View>
-            {article.color && (METALLIC_GRADIENTS[article.color] || CSS_COLORS[article.color]) && (
-                METALLIC_GRADIENTS[article.color] ? (
+            {article.color &&
+                (METALLIC_GRADIENTS[article.color] ||
+                    CSS_COLORS[article.color]) &&
+                (METALLIC_GRADIENTS[article.color] ? (
                     <LinearGradient
                         colors={METALLIC_GRADIENTS[article.color]}
                         start={METALLIC_START}
@@ -224,8 +333,7 @@ const ArticleCard = ({
                             { backgroundColor: CSS_COLORS[article.color] },
                         ]}
                     />
-                )
-            )}
+                ))}
             <Pressable
                 style={styles.editBtn}
                 onPress={onEdit}
@@ -241,6 +349,62 @@ const ArticleCard = ({
                 <Text style={styles.microBtnText}>✕</Text>
             </Pressable>
         </View>
+    );
+};
+
+const SwipeableArticleCard = ({
+    article,
+    harmonyScore,
+    outOfSeason,
+    onEdit,
+    onRemove,
+}: {
+    article: ClothingArticle;
+    harmonyScore?: number;
+    outOfSeason?: boolean;
+    onEdit: () => void;
+    onRemove: () => void;
+}) => {
+    const renderRightActions = (
+        _progress: ReturnType<Animated.Value['interpolate']>,
+        dragX: ReturnType<Animated.Value['interpolate']>,
+        swipeable: Swipeable,
+    ) => {
+        const scale = dragX.interpolate({
+            inputRange: [-80, -40],
+            outputRange: [1, 0.85],
+            extrapolate: 'clamp',
+        });
+        return (
+            <Pressable
+                style={swipeStyles.deleteAction}
+                onPress={() => {
+                    swipeable.close();
+                    onRemove();
+                }}
+            >
+                <Animated.Text
+                    style={[swipeStyles.deleteText, { transform: [{ scale }] }]}
+                >
+                    Delete
+                </Animated.Text>
+            </Pressable>
+        );
+    };
+
+    return (
+        <Swipeable
+            renderRightActions={renderRightActions}
+            rightThreshold={40}
+            overshootRight={false}
+        >
+            <ArticleCard
+                article={article}
+                harmonyScore={harmonyScore}
+                onEdit={onEdit}
+                onRemove={onRemove}
+            />
+        </Swipeable>
     );
 };
 
@@ -297,15 +461,20 @@ const ClosetView = ({
                 continue;
             }
             const others = selected.articles.filter(
-                (a) => a._id !== art._id && a.color && !COLOR_NEUTRALS.has(a.color),
+                (a) =>
+                    a._id !== art._id &&
+                    a.color &&
+                    !COLOR_NEUTRALS.has(a.color),
             );
             if (others.length === 0) {
                 map.set(art._id, 1.0);
                 continue;
             }
             const avg =
-                others.reduce((sum, o) => sum + pairHarmony(art.color!, o.color!), 0) /
-                others.length;
+                others.reduce(
+                    (sum, o) => sum + pairHarmony(art.color!, o.color!),
+                    0,
+                ) / others.length;
             map.set(art._id, avg);
         }
         return map;
@@ -339,7 +508,15 @@ const ClosetView = ({
             arts = arts.filter(
                 (a) => a.fabricType && activeFabrics.includes(a.fabricType),
             );
-        return arts;
+
+        // Sort by proximity to this season's ideal warmth — relevant pieces float up
+        const season = currentSeason();
+        const target = SEASON_WARMTH_TARGET[season];
+        return [...arts].sort(
+            (a, b) =>
+                Math.abs(garmentWarmth(a) - target) -
+                Math.abs(garmentWarmth(b) - target),
+        );
     }, [selected, query, activeCategories, activeColors, activeFabrics]);
 
     const submitCreate = async () => {
@@ -414,9 +591,13 @@ const ClosetView = ({
                         style={styles.chipColor}
                     />
                 ) : color ? (
-                    <View style={[styles.chipColor, { backgroundColor: color }]} />
+                    <View
+                        style={[styles.chipColor, { backgroundColor: color }]}
+                    />
                 ) : null}
-                <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                <Text
+                    style={[styles.chipText, active && styles.chipTextActive]}
+                >
                     {label}
                 </Text>
             </Pressable>
@@ -690,9 +871,24 @@ const ClosetView = ({
             {selected && selected.articles.length > 0 && (
                 <View style={styles.legend}>
                     <View style={styles.legendItem}>
-                        <View style={[styles.legendDot, { backgroundColor: '#38bdf8' }]} />
-                        <View style={[styles.legendDot, { backgroundColor: '#fbbf24' }]} />
-                        <View style={[styles.legendDot, { backgroundColor: '#f97316' }]} />
+                        <View
+                            style={[
+                                styles.legendDot,
+                                { backgroundColor: '#38bdf8' },
+                            ]}
+                        />
+                        <View
+                            style={[
+                                styles.legendDot,
+                                { backgroundColor: '#fbbf24' },
+                            ]}
+                        />
+                        <View
+                            style={[
+                                styles.legendDot,
+                                { backgroundColor: '#f97316' },
+                            ]}
+                        />
                         <Text style={styles.legendLabel}>warmth</Text>
                     </View>
                     <View style={styles.legendItem}>
@@ -735,7 +931,7 @@ const ClosetView = ({
                     </View>
                 ) : (
                     filteredArticles.map((a) => (
-                        <ArticleCard
+                        <SwipeableArticleCard
                             key={a._id}
                             article={a}
                             harmonyScore={harmonyMap.get(a._id)}
@@ -776,3 +972,22 @@ const ClosetView = ({
 };
 
 export default ClosetView;
+
+const swipeStyles = StyleSheet.create({
+    deleteAction: {
+        width: 80,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: 'rgba(239,68,68,0.15)',
+        borderRadius: radius.sm,
+        borderWidth: 1,
+        borderColor: 'rgba(239,68,68,0.3)',
+        marginLeft: 6,
+    },
+    deleteText: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs,
+        fontWeight: fontWeights.semibold,
+        color: '#ef4444',
+    },
+});

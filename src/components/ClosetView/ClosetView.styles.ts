@@ -248,6 +248,13 @@ export const styles = StyleSheet.create({
         fontSize: 11,
         color: '#f59e0b',
     },
+    legendOOS: {
+        width: 10,
+        height: 10,
+        borderRadius: 2,
+        backgroundColor: colors.glassBorder,
+        opacity: 0.5,
+    },
     articleList: {
         padding: spacing.md,
         gap: spacing.sm,
@@ -263,6 +270,7 @@ export const styles = StyleSheet.create({
         borderColor: colors.glassBorder,
         padding: 10,
     },
+    articleCardOOS: { opacity: 0.42 },
     articleImg: {
         width: 48,
         height: 48,
