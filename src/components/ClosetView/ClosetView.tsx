@@ -245,8 +245,10 @@ const ArticleCard = ({
         !COLOR_NEUTRALS.has(article.color);
 
     return (
-        <View
+        <Pressable
             style={[styles.articleCard, outOfSeason && styles.articleCardOOS]}
+            onPress={onEdit}
+            accessibilityLabel='Edit article'
         >
             <View style={styles.articleImg}>
                 {article.imageUrl ? (
@@ -311,21 +313,7 @@ const ArticleCard = ({
                         ]}
                     />
                 ))}
-            <Pressable
-                style={styles.editBtn}
-                onPress={onEdit}
-                accessibilityLabel='Edit'
-            >
-                <Text style={styles.microBtnText}>✎</Text>
-            </Pressable>
-            <Pressable
-                style={styles.removeBtn}
-                onPress={onRemove}
-                accessibilityLabel='Remove'
-            >
-                <Text style={styles.microBtnText}>✕</Text>
-            </Pressable>
-        </View>
+        </Pressable>
     );
 };
 
@@ -347,25 +335,23 @@ const SwipeableArticleCard = ({
         dragX: ReturnType<Animated.Value['interpolate']>,
         swipeable: Swipeable,
     ) => {
-        const scale = dragX.interpolate({
-            inputRange: [-80, -40],
-            outputRange: [1, 0.85],
+        const translateX = dragX.interpolate({
+            inputRange: [-76, 0],
+            outputRange: [0, 76],
             extrapolate: 'clamp',
         });
         return (
-            <Pressable
-                style={swipeStyles.deleteAction}
-                onPress={() => {
-                    swipeable.close();
-                    onRemove();
-                }}
-            >
-                <Animated.Text
-                    style={[swipeStyles.deleteText, { transform: [{ scale }] }]}
+            <Animated.View style={[swipeStyles.deleteActionWrap, { transform: [{ translateX }] }]}>
+                <Pressable
+                    style={swipeStyles.deleteAction}
+                    onPress={() => {
+                        swipeable.close();
+                        onRemove();
+                    }}
                 >
-                    Delete
-                </Animated.Text>
-            </Pressable>
+                    <Text style={swipeStyles.deleteText}>Delete</Text>
+                </Pressable>
+            </Animated.View>
         );
     };
 
@@ -943,20 +929,22 @@ const ClosetView = ({
 export default ClosetView;
 
 const swipeStyles = StyleSheet.create({
+    deleteActionWrap: {
+        width: 76,
+        alignSelf: 'stretch',
+    },
     deleteAction: {
-        width: 80,
+        flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: 'rgba(239,68,68,0.15)',
-        borderRadius: radius.sm,
-        borderWidth: 1,
-        borderColor: 'rgba(239,68,68,0.3)',
-        marginLeft: 6,
+        backgroundColor: '#FF3B30',
+        borderTopRightRadius: radius.sm,
+        borderBottomRightRadius: radius.sm,
     },
     deleteText: {
         fontFamily: fonts.body,
-        fontSize: fontSizes.xs,
+        fontSize: fontSizes.sm,
         fontWeight: fontWeights.semibold,
-        color: '#ef4444',
+        color: '#ffffff',
     },
 });

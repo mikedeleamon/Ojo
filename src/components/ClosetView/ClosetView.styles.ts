@@ -329,13 +329,6 @@ export const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(0,0,0,0.2)',
     },
-    editBtn: { padding: 8 },
-    removeBtn: { padding: 8 },
-    microBtnText: {
-        fontFamily: fonts.body,
-        fontSize: 14,
-        color: colors.textMuted,
-    },
     emptyState: {
         flex: 1,
         alignItems: 'center',
