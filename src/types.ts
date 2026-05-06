@@ -32,6 +32,8 @@ export interface CityData {
 export interface CurrentWeather {
   WeatherText: string;
   HasPrecipitation: boolean;
+  PrecipitationType?: string | null;   // "Rain", "Snow", "Ice", "Mixed", or null
+  Precip1hr?: { Imperial?: { Value: number }; Metric?: { Value: number } };  // last-hour amount
   IsDayTime: boolean;
   Temperature: {
     Imperial: { Value: number; Unit: string };

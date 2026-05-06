@@ -7,7 +7,7 @@ import { useClosets } from '../../hooks/useClosets';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { generateOutfits, OutfitRole, OutfitResult, ScoreBreakdown } from '../../lib/outfitEngine';
 import { LayeringResult } from '../../lib/layeringEngine';
-import { addHistoryEntry, recentlyWornIds } from '../../lib/outfitHistory';
+import { addHistoryEntry, recentlyWornWithAge } from '../../lib/outfitHistory';
 import { updatePreferences } from '../../lib/userPreferences';
 import { ClothingArticle, CurrentWeather, Forecast, Settings } from '../../types';
 import { colors, fonts, fontSizes, fontWeights, spacing, radius } from '../../theme/tokens';
@@ -114,10 +114,10 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
   const [activeIdx,     setActiveIdx]     = useState(0);
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [wornLogged,    setWornLogged]    = useState(false);
-  const [worn,          setWorn]          = useState<Set<string>>(new Set());
+  const [worn,          setWorn]          = useState<Map<string, number>>(new Map());
   const nav = useAppNavigation();
 
-  useEffect(() => { recentlyWornIds(3).then(setWorn); }, []);
+  useEffect(() => { recentlyWornWithAge(7).then(setWorn); }, []);
 
   useEffect(() => {
     setActiveIdx(0);

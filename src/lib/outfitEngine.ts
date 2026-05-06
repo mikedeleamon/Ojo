@@ -99,6 +99,35 @@ const roleOf = (a: ClothingArticle): OutfitRole =>
 // 0–1 score for how appropriate a fabric is in each weather bucket.
 // Built as a lookup table so new fabrics can be added without changing logic.
 
+// ─── Precipitation intensity grading ─────────────────────────────────────────
+// Replaces the binary "raining" flag with a 0–1 intensity scale.
+// Light drizzle barely affects fabric scoring; heavy downpours aggressively
+// penalize absorbent fabrics and reward water-resistant ones.
+export type PrecipIntensity = 'none' | 'light' | 'moderate' | 'heavy';
+
+const classifyPrecipitation = (weather: CurrentWeather): PrecipIntensity => {
+  if (!weather.HasPrecipitation) return 'none';
+  const amountInch = weather.Precip1hr?.Imperial?.Value ?? 0;
+  // AccuWeather precipitation rates (inches/hr): light < 0.1, moderate 0.1–0.3, heavy > 0.3
+  if (amountInch >= 0.30) return 'heavy';
+  if (amountInch >= 0.10) return 'moderate';
+  // If HasPrecipitation but no amount data, infer from WeatherText
+  const text = (weather.WeatherText ?? '').toLowerCase();
+  if (text.includes('heavy') || text.includes('downpour')) return 'heavy';
+  if (text.includes('shower') || text.includes('storm'))   return 'moderate';
+  return 'light';
+};
+
+/** Multiplier for rain-related fabric adjustments based on intensity. */
+const precipMultiplier = (intensity: PrecipIntensity): number => {
+  switch (intensity) {
+    case 'none':     return 0;
+    case 'light':    return 0.4;
+    case 'moderate': return 0.7;
+    case 'heavy':    return 1.0;
+  }
+};
+
 // Fabrics that typically require dry-cleaning (used in care notes).
 const DRY_CLEAN_FABRICS = new Set(['Silk', 'Wool']);
 
@@ -119,19 +148,20 @@ const FABRIC_WEATHER: Record<string, Record<WeatherBucket, number>> = {
 };
 
 // ─── 3a-bis. Garment thermal weight ───────────────────────────────────────────
-// Independent of fabric — accounts for cut, coverage, and construction.
+// Base warmth from cut/coverage/construction + fabric modifier for material
+// insulating properties. A fleece hoodie is significantly warmer than a cotton
+// hoodie — the fabric modifier captures this.
 // 0 = no insulation (tank), 1 = maximum insulation (heavy coat).
-// This is what differentiates a Cotton T-Shirt from a Cotton Hoodie at the same
-// feels-like temperature, where their pure FABRIC_WEATHER score is identical.
-const GARMENT_WARMTH: Record<string, number> = {
+
+const GARMENT_WARMTH_BASE: Record<string, number> = {
   Tank:       0.00,
   'T-Shirt':  0.05,
   Blouse:     0.05,
   Shirt:      0.15,  // long-sleeve button-up
-  Hoodie:     0.50,
-  Sweater:    0.65,
-  Jacket:     0.70,
-  Coat:       0.95,
+  Hoodie:     0.45,
+  Sweater:    0.60,
+  Jacket:     0.65,
+  Coat:       0.88,
   // Bottoms
   Shorts:     0.05,
   Skirt:      0.10,
@@ -145,26 +175,47 @@ const GARMENT_WARMTH: Record<string, number> = {
   Boots:      0.70,
 };
 
+// Fabric contribution to garment warmth — added to base.
+// Positive = insulates more; negative = breathes more / less warm.
+const FABRIC_WARMTH_MOD: Record<string, number> = {
+  Fleece:     0.15,
+  Wool:       0.12,
+  Leather:    0.08,
+  Polyester:  0.03,
+  Synthetic:  0.03,
+  Denim:      0.02,
+  Cotton:     0.00,
+  Silk:      -0.03,
+  Linen:     -0.05,
+  Other:      0.00,
+};
+
+/** Effective garment warmth = base (from clothingType) + modifier (from fabricType), clamped [0, 1]. */
+const garmentWarmth = (article: ClothingArticle): number => {
+  const base = GARMENT_WARMTH_BASE[article.clothingType] ?? 0.30;
+  const mod  = FABRIC_WARMTH_MOD[article.fabricType ?? 'Other'] ?? 0.00;
+  return Math.max(0, Math.min(1, base + mod));
+};
+
 /**
  * Ideal aggregate garment warmth for a given feels-like temperature.
- * Continuous curve so 51°F and 80°F (both "warm" bucket) get different targets,
- * fixing the "Cotton tee preferred over Cotton hoodie at 56°F" bug.
+ * True linear interpolation so every degree produces a unique target —
+ * no boundary artifacts between e.g. 59°F and 60°F.
+ *
+ * Range: 1.00 at ≤20°F (maximum insulation) → 0.05 at ≥90°F (near-nothing).
+ * Clamped at both ends so extreme inputs don't produce nonsensical values.
  */
 const idealWarmthForFeelsLike = (feelsLikeF: number): number => {
-  if (feelsLikeF >= 80) return 0.10;
-  if (feelsLikeF >= 70) return 0.25;
-  if (feelsLikeF >= 60) return 0.40;
-  if (feelsLikeF >= 50) return 0.55;
-  if (feelsLikeF >= 40) return 0.70;
-  if (feelsLikeF >= 30) return 0.85;
-  return 1.00;
+  const clamped = Math.max(20, Math.min(90, feelsLikeF));
+  // Linear from 1.00 (at 20°F) to 0.05 (at 90°F)
+  return 1.00 - ((clamped - 20) / 70) * 0.95;
 };
 
 const fabricScore = (
   a: ClothingArticle,
   bucket: WeatherBucket,
   feelsLikeF: number,
-  raining: boolean,
+  precipIntensity: PrecipIntensity,
   humidity: number,
   humidityThreshold: number,
   windMph: number,
@@ -176,14 +227,35 @@ const fabricScore = (
 
   let s = base;
 
-  // Rain modifier: water-resistant fabrics get a bonus
-  if (raining) {
-    if (a.fabricType === 'Leather' || a.fabricType === 'Synthetic') s += 0.10;
-    if (a.fabricType === 'Linen'   || a.fabricType === 'Silk')      s -= 0.10;
+  // Rain modifier: scaled by precipitation intensity.
+  // Heavy rain strongly penalizes absorbent fabrics; light drizzle barely matters.
+  const pMul = precipMultiplier(precipIntensity);
+  if (pMul > 0) {
+    if (a.fabricType === 'Leather' || a.fabricType === 'Synthetic') s += 0.12 * pMul;
+    if (a.fabricType === 'Linen'   || a.fabricType === 'Silk')      s -= 0.12 * pMul;
+    if (a.fabricType === 'Cotton')                                   s -= 0.06 * pMul;
   }
 
-  // Humidity modifier: breathable fabrics preferred in humid conditions
-  if (humidity > humidityThreshold) {
+  // Humidity × temperature interaction (heat index).
+  // High humidity at high temps is far more oppressive than at low temps.
+  // We compute a simplified heat index and scale fabric modifiers accordingly.
+  // NWS simplified formula: HI = 0.5 * (T + 61.0 + (T-68)*1.2 + RH*0.094)
+  // Only meaningful above ~80°F; below that, humidity affects comfort less.
+  const heatIndex = feelsLikeF >= 75
+    ? 0.5 * (feelsLikeF + 61.0 + (feelsLikeF - 68) * 1.2 + humidity * 0.094)
+    : feelsLikeF;
+  const heatStress = heatIndex >= 95 ? 'extreme' : heatIndex >= 85 ? 'high' : 'normal';
+
+  if (heatStress !== 'normal') {
+    // In heat-stress conditions, moisture-wicking is critical
+    const intensity = heatStress === 'extreme' ? 1.0 : 0.6;
+    if (a.fabricType === 'Synthetic' || a.fabricType === 'Polyester') s += 0.12 * intensity;
+    if (a.fabricType === 'Linen')                                     s += 0.10 * intensity;
+    if (a.fabricType === 'Cotton')                                    s += 0.04 * intensity;  // breathable but absorbs
+    if (a.fabricType === 'Wool'  || a.fabricType === 'Fleece')        s -= 0.12 * intensity;
+    if (a.fabricType === 'Leather')                                   s -= 0.10 * intensity;
+  } else if (humidity > humidityThreshold) {
+    // Standard humidity modifier for non-heat-stress conditions
     if (a.fabricType === 'Linen' || a.fabricType === 'Cotton') s += 0.08;
     if (a.fabricType === 'Wool'  || a.fabricType === 'Polyester') s -= 0.05;
   }
@@ -201,9 +273,9 @@ const fabricScore = (
   // ── Thermal alignment (uses feels-like, not raw temp) ─────────────────────
   // Blends fabric-weather (70%) with garment thermal alignment (30%) so that
   // within a single bucket, garments closer to the ideal warmth for the actual
-  // feels-like temp are preferred. This is the fix for the bug where a Cotton
-  // tee and Cotton hoodie tied at 56°F.
-  const garmentW   = GARMENT_WARMTH[a.clothingType] ?? 0.30;
+  // feels-like temp are preferred. Garment warmth now accounts for both the
+  // clothing type AND fabric material (e.g. fleece hoodie > cotton hoodie).
+  const garmentW   = garmentWarmth(a);
   const ideal      = idealWarmthForFeelsLike(feelsLikeF);
   const thermalAlign = 1 - Math.min(1, Math.abs(garmentW - ideal));
   s = s * 0.70 + thermalAlign * 0.30;
@@ -215,7 +287,7 @@ const outfitFabricScore = (
   slots: OutfitSlot[],
   bucket: WeatherBucket,
   feelsLikeF: number,
-  raining: boolean,
+  precipIntensity: PrecipIntensity,
   humidity: number,
   humidityThreshold: number,
   windMph: number,
@@ -223,7 +295,7 @@ const outfitFabricScore = (
 ): number => {
   if (slots.length === 0) return 0;
   const sum = slots.reduce(
-    (acc, s) => acc + fabricScore(s.article, bucket, feelsLikeF, raining, humidity, humidityThreshold, windMph, isSnowing),
+    (acc, s) => acc + fabricScore(s.article, bucket, feelsLikeF, precipIntensity, humidity, humidityThreshold, windMph, isSnowing),
     0,
   );
   return sum / slots.length;
@@ -292,18 +364,57 @@ const pairHarmony = (colorA: string, colorB: string): number => {
   return 0.50;
 };
 
-const outfitColorScore = (slots: OutfitSlot[]): number => {
-  const colors = slots.map(s => s.article.color).filter(Boolean) as string[];
-  if (colors.length < 2) return 0.70;  // single color → neutral score
+// ─── Seasonal color palette ──────────────────────────────────────────────────
+// Subtle boost for colors that feel season-appropriate. Nothing is penalized —
+// only in-season colors get a small bonus, keeping the scoring additive.
+type Season = 'spring' | 'summer' | 'autumn' | 'winter';
 
-  let total = 0, pairs = 0;
-  for (let i = 0; i < colors.length; i++) {
-    for (let j = i + 1; j < colors.length; j++) {
-      total += pairHarmony(colors[i], colors[j]);
+const currentSeason = (): Season => {
+  const month = new Date().getMonth(); // 0-indexed
+  if (month >= 2 && month <= 4) return 'spring';
+  if (month >= 5 && month <= 7) return 'summer';
+  if (month >= 8 && month <= 10) return 'autumn';
+  return 'winter';
+};
+
+const SEASONAL_COLORS: Record<Season, Set<string>> = {
+  spring: new Set(['Pink', 'Lavender', 'Mint', 'Coral', 'Sky Blue', 'Yellow', 'Rose', 'Cream']),
+  summer: new Set(['White', 'Cyan', 'Coral', 'Yellow', 'Orange', 'Sky Blue', 'Teal', 'Mint']),
+  autumn: new Set(['Rust', 'Burgundy', 'Olive', 'Brown', 'Gold', 'Maroon', 'Orange', 'Khaki', 'Tan']),
+  winter: new Set(['Navy', 'Black', 'Burgundy', 'Plum', 'Indigo', 'Grey', 'Silver', 'Cobalt']),
+};
+
+/** Returns a 0–0.08 seasonal bonus based on how many outfit colors match the season. */
+const seasonalBonus = (outfitColors: string[]): number => {
+  const season = currentSeason();
+  const palette = SEASONAL_COLORS[season];
+  const matchCount = outfitColors.filter(c => palette.has(c)).length;
+  if (outfitColors.length === 0) return 0;
+  // Scale: 1 match = 0.03, 2+ = 0.05–0.08
+  return Math.min(0.08, matchCount * 0.03);
+};
+
+const outfitColorScore = (slots: OutfitSlot[]): number => {
+  const outfitColors = slots.map(s => s.article.color).filter(Boolean) as string[];
+  if (outfitColors.length < 2) return 0.70;  // single color → neutral score
+
+  let total = 0, pairs = 0, minPair = 1.0;
+  for (let i = 0; i < outfitColors.length; i++) {
+    for (let j = i + 1; j < outfitColors.length; j++) {
+      const h = pairHarmony(outfitColors[i], outfitColors[j]);
+      total += h;
       pairs++;
+      if (h < minPair) minPair = h;
     }
   }
-  return pairs > 0 ? total / pairs : 0.70;
+  const harmonyAvg = pairs > 0 ? total / pairs : 0.70;
+
+  // Blend average (70%) with worst pair (30%) so a single clash isn't hidden
+  // in a 4–5 item outfit. This makes swap suggestions more actionable.
+  const blended = harmonyAvg * 0.70 + minPair * 0.30;
+
+  // Add seasonal bonus — additive, capped at 1.0
+  return Math.min(1.0, blended + seasonalBonus(outfitColors));
 };
 
 // Returns the outfit slot whose color clashes most with the rest, or null if
@@ -398,10 +509,26 @@ const getWeights = (bucket: WeatherBucket) => {
   return { fabric: 0.30, color: 0.25, style: 0.25, simplicity: 0.10, preference: 0.10 };
 };
 
-// Recency penalty per recently-worn slot; capped so a fully-repeated outfit
-// still surfaces rather than disappearing when the closet is small.
-const RECENCY_PENALTY_PER_SLOT = 0.10;
-const RECENCY_PENALTY_MAX      = 0.20;
+// ─── Recency decay ─────────────��───────────────────────────���─────────────────
+// Items worn yesterday get a full penalty; items worn 5 days ago get almost none.
+// Exponential decay: penalty = base / (1 + daysSinceWorn).
+// This naturally rotates the wardrobe without hard-blocking repeated items.
+const RECENCY_PENALTY_BASE     = 0.15;   // penalty for item worn today/yesterday
+const RECENCY_PENALTY_MAX      = 0.25;   // cap for entire outfit
+
+/** Accepts either legacy Set<string> or Map<string, number> (id→daysSinceWorn). */
+export type RecentlyWorn = Set<string> | Map<string, number>;
+
+const recencyPenaltyForArticle = (id: string, worn: RecentlyWorn): number => {
+  if (worn instanceof Map) {
+    const days = worn.get(id);
+    if (days === undefined) return 0;
+    // Exponential decay: worn today = full penalty, 3 days ago ≈ 25%, 7 days ago ≈ 12%
+    return RECENCY_PENALTY_BASE / (1 + days);
+  }
+  // Legacy Set — flat penalty if present
+  return worn.has(id) ? RECENCY_PENALTY_BASE * 0.67 : 0;
+};
 
 interface ScoredCombo {
   slots:     OutfitSlot[];
@@ -413,15 +540,15 @@ const scoreCombo = (
   slots:          OutfitSlot[],
   bucket:         WeatherBucket,
   feelsLikeF:     number,
-  raining:        boolean,
+  precipIntensity: PrecipIntensity,
   humidity:       number,
   windMph:        number,
   isSnowing:      boolean,
   settings:       Settings,
-  recentlyWorn:   Set<string>,
+  recentlyWorn:   RecentlyWorn,
   profile:        UserPreferenceProfile,
 ): ScoredCombo => {
-  const fabric     = outfitFabricScore(slots, bucket, feelsLikeF, raining, humidity, settings.humidityPreference, windMph, isSnowing);
+  const fabric     = outfitFabricScore(slots, bucket, feelsLikeF, precipIntensity, humidity, settings.humidityPreference, windMph, isSnowing);
   const color      = outfitColorScore(slots);
   const style      = outfitStyleScore(slots, settings.clothingStyle);
   const simplicity = simplicityScore(slots);
@@ -430,7 +557,7 @@ const scoreCombo = (
   const weights = getWeights(bucket);
 
   const recencyPenalty = Math.min(
-    slots.filter(s => recentlyWorn.has(s.article._id)).length * RECENCY_PENALTY_PER_SLOT,
+    slots.reduce((sum, s) => sum + recencyPenaltyForArticle(s.article._id, recentlyWorn), 0),
     RECENCY_PENALTY_MAX,
   );
 
@@ -468,7 +595,7 @@ const topNByFabric = (
   articles: ClothingArticle[],
   bucket: WeatherBucket,
   feelsLikeF: number,
-  raining: boolean,
+  precipIntensity: PrecipIntensity,
   humidity: number,
   humidityThreshold: number,
   windMph: number,
@@ -476,8 +603,8 @@ const topNByFabric = (
 ): ClothingArticle[] =>
   [...articles]
     .sort((a, b) =>
-      fabricScore(b, bucket, feelsLikeF, raining, humidity, humidityThreshold, windMph, isSnowing) -
-      fabricScore(a, bucket, feelsLikeF, raining, humidity, humidityThreshold, windMph, isSnowing)
+      fabricScore(b, bucket, feelsLikeF, precipIntensity, humidity, humidityThreshold, windMph, isSnowing) -
+      fabricScore(a, bucket, feelsLikeF, precipIntensity, humidity, humidityThreshold, windMph, isSnowing)
     )
     .slice(0, BUCKET_CAP);
 
@@ -496,7 +623,7 @@ export const generateOutfits = (
   articles:     ClothingArticle[],
   weather:      CurrentWeather,
   settings:     Settings,
-  recentlyWorn: Set<string>          = new Set(),
+  recentlyWorn: RecentlyWorn          = new Set(),
   topK:         number               = 3,
   profile:      UserPreferenceProfile = { colors: {}, fabrics: {}, categories: {}, totalOutfits: 0 },
   forecasts:    Forecast[]           = [],
@@ -518,13 +645,30 @@ export const generateOutfits = (
   if (articles.length === 0) return empty_result('empty_closet');
 
   // ── Weather context ───────────────────────────────────────────────────────
-  const feelsLikeF  = weather.RealFeelTemperature.Imperial.Value;
-  const raining     = weather.HasPrecipitation;
-  const humidity    = weather.RelativeHumidity;
-  const windMph     = weather.Wind.Speed.Imperial.Value;
-  const uvIndexText = weather.UVIndexText ?? '';
-  const isSnowing   = /snow/i.test(weather.WeatherText ?? '');
-  const uvHigh      = UV_HIGH_LABELS.has(uvIndexText);
+  const feelsLikeF       = weather.RealFeelTemperature.Imperial.Value;
+  const precipIntensity  = classifyPrecipitation(weather);
+  const raining          = precipIntensity !== 'none';
+  const humidity         = weather.RelativeHumidity;
+  const windMph          = weather.Wind.Speed.Imperial.Value;
+  const uvIndexText      = weather.UVIndexText ?? '';
+  const isSnowing        = /snow/i.test(weather.WeatherText ?? '');
+  const uvHigh           = UV_HIGH_LABELS.has(uvIndexText);
+
+  // ── Time-of-day warmth adjustment ──────────────────────────────────────────
+  // In the morning (before noon) the user is dressing for the full day ahead,
+  // which may include cooler temps later. We blend the current feels-like with
+  // the forecast low so the ideal warmth leans warmer. By afternoon the current
+  // reading is representative — no adjustment needed.
+  const currentHour = new Date().getHours();
+  let effectiveFeelsLike = feelsLikeF;
+  if (forecasts.length > 0 && currentHour < 12) {
+    const feelsOffset = feelsLikeF - weather.Temperature.Imperial.Value;
+    const forecastTemps = forecasts.map(f => f.Temperature.Value + feelsOffset);
+    const forecastLow = Math.min(...forecastTemps);
+    // Blend factor: at 6 AM lean 40% toward the day's low; at 11 AM lean 10%
+    const blendFactor = Math.max(0.10, 0.40 - (currentHour - 6) * 0.05);
+    effectiveFeelsLike = feelsLikeF * (1 - blendFactor) + forecastLow * blendFactor;
+  }
   const bucket      = getWeatherBucket(feelsLikeF, settings.hiTempThreshold, settings.lowTempThreshold);
 
   // ── Phase 1: Hard filter → role bucketing → pre-rank per bucket ───────────
@@ -537,7 +681,7 @@ export const generateOutfits = (
   }
 
   const cap = (role: OutfitRole) =>
-    topNByFabric(byRole.get(role) ?? [], bucket, feelsLikeF, raining, humidity, settings.humidityPreference, windMph, isSnowing);
+    topNByFabric(byRole.get(role) ?? [], bucket, effectiveFeelsLike, precipIntensity, humidity, settings.humidityPreference, windMph, isSnowing);
 
   const tops        = cap('top');
   const bottoms     = cap('bottom');
@@ -604,14 +748,36 @@ export const generateOutfits = (
           if (shoe)  slots.push({ role: 'footwear',  article: shoe  });
           if (acc)   slots.push({ role: 'accessory', article: acc   });
 
-          scored.push(scoreCombo(slots, bucket, feelsLikeF, raining, humidity, windMph, isSnowing, settings, recentlyWorn, profile));
+          scored.push(scoreCombo(slots, bucket, effectiveFeelsLike, precipIntensity, humidity, windMph, isSnowing, settings, recentlyWorn, profile));
         }
       }
     }
   }
 
-  // ── Phase 4: Sort → deduplicate → take top-K ─────────────────────────────
+  // ── Phase 4: Sort → deduplicate → diversity filter → take top-K ──────────
+  // Enforces that each result in the top-K differs from every already-picked
+  // result by at least 2 non-accessory slots. This prevents 3 near-identical
+  // outfits that only swap an accessory or shoes from dominating the results.
   scored.sort((a, b) => b.score - a.score);
+
+  const CORE_ROLES: OutfitRole[] = ['top', 'bottom', 'fullBody', 'outerwear'];
+
+  /** Returns the array of article IDs in "core" roles (non-accessory, non-footwear). */
+  const coreIds = (slots: OutfitSlot[]): string[] =>
+    slots.filter(s => CORE_ROLES.indexOf(s.role) !== -1).map(s => s.article._id);
+
+  /** Count how many core slots differ between two outfits. */
+  const coreDifference = (a: OutfitSlot[], b: OutfitSlot[]): number => {
+    const idsA = coreIds(a);
+    const idsB = coreIds(b);
+    const setB = new Set(idsB);
+    let shared = 0;
+    for (let i = 0; i < idsA.length; i++) {
+      if (setB.has(idsA[i])) shared++;
+    }
+    const totalUnique = idsA.length + idsB.length - shared;
+    return totalUnique - shared; // number of IDs that appear in one but not both
+  };
 
   const seen    = new Set<string>();
   const topList: ScoredCombo[] = [];
@@ -619,11 +785,17 @@ export const generateOutfits = (
   for (const combo of scored) {
     // Dedup key: sorted article IDs (order-independent)
     const key = combo.slots.map(s => s.article._id).sort().join('|');
-    if (!seen.has(key)) {
-      seen.add(key);
-      topList.push(combo);
-      if (topList.length >= topK) break;
-    }
+    if (seen.has(key)) continue;
+
+    // Diversity gate: must differ by at least 2 core slots from every already-picked outfit
+    const diverse = topList.every(
+      picked => coreDifference(combo.slots, picked.slots) >= 2,
+    );
+    if (!diverse) continue;
+
+    seen.add(key);
+    topList.push(combo);
+    if (topList.length >= topK) break;
   }
 
   // ── Phase 5: Attach notes and build OutfitResult[] ───────────────────────
@@ -645,7 +817,12 @@ export const generateOutfits = (
     }
 
     // ── Condition notes ───────────────────────────────────────────────────
-    if (raining) notes.push('Rain expected — waterproof layers recommended.');
+    if (precipIntensity === 'heavy')
+      notes.push('Heavy rain expected — waterproof layers strongly recommended.');
+    else if (precipIntensity === 'moderate')
+      notes.push('Rain expected — a water-resistant layer is recommended.');
+    else if (precipIntensity === 'light')
+      notes.push('Light rain possible — consider a layer you can wipe down.');
 
     if (isSnowing && !slots.some(s => s.article.clothingType === 'Boots')) {
       notes.push('Snow expected — boots would serve you better.');
@@ -707,7 +884,7 @@ export const generateOutfit = (
   articles:     ClothingArticle[],
   weather:      CurrentWeather,
   settings:     Settings,
-  recentlyWorn: Set<string> = new Set(),
+  recentlyWorn: RecentlyWorn = new Set(),
   forecasts:    Forecast[]  = [],
 ): OutfitResult => {
   const { results, status } = generateOutfits(articles, weather, settings, recentlyWorn, 1, undefined, forecasts);

@@ -43,3 +43,29 @@ export const recentlyWornIds = async (withinDays = 3): Promise<Set<string>> => {
   });
   return ids;
 };
+
+/**
+ * Returns a map of article ID → days since last worn (fractional).
+ * Only includes articles worn within the last `withinDays` days.
+ * If an article appears multiple times, the most recent wear date wins.
+ */
+export const recentlyWornWithAge = async (withinDays = 7): Promise<Map<string, number>> => {
+  const cutoff = Date.now() - withinDays * 24 * 60 * 60 * 1000;
+  const map = new Map<string, number>();
+  const now = Date.now();
+
+  (await loadHistory()).forEach(entry => {
+    const wornTime = new Date(entry.wornAt).getTime();
+    if (wornTime >= cutoff) {
+      const daysSince = (now - wornTime) / (24 * 60 * 60 * 1000);
+      entry.articleIds.forEach(id => {
+        // Keep the most recent (smallest daysSince) for each article
+        const existing = map.get(id);
+        if (existing === undefined || daysSince < existing) {
+          map.set(id, daysSince);
+        }
+      });
+    }
+  });
+  return map;
+};

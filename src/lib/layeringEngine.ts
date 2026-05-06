@@ -199,18 +199,24 @@ const buildTimeline = (
 // Sentence varies based on which layers are active and whether a timeline exists.
 
 const buildRecommendation = (
-  base:         OutfitSlot | null,
-  mid:          OutfitSlot | null,
-  outer:        OutfitSlot | null,
-  currentTemp:  number,
-  hasTimeline:  boolean,
-  missingMid:   boolean,
-  missingOuter: boolean,
-  raining:      boolean,
+  base:             OutfitSlot | null,
+  mid:              OutfitSlot | null,
+  outer:            OutfitSlot | null,
+  currentTemp:      number,
+  hasTimeline:      boolean,
+  missingMid:       boolean,
+  missingOuter:     boolean,
+  raining:          boolean,
+  midHardToRemove:  boolean = false,
+  outerHardToRemove: boolean = false,
 ): string => {
   const baseName  = base?.article.name  || base?.article.clothingType  || 'base layer';
   const midName   = mid?.article.name   || mid?.article.clothingType;
   const outerName = outer?.article.name || outer?.article.clothingType;
+
+  // Removability caveat appended when a layer is bulky / hard to shed
+  const midCaveat   = midHardToRemove   ? ` Note: your ${midName} is bulky to carry — plan around it.` : '';
+  const outerCaveat = outerHardToRemove ? ` Your ${outerName} is heavy to carry if you shed it — commit to wearing it or leave it.` : '';
 
   // Single layer — check whether layers are needed but absent before calling it fine
   if (!mid && !outer) {
@@ -230,17 +236,21 @@ const buildRecommendation = (
   // Full three-layer stack
   if (mid && outer) {
     const rainSuffix = raining ? ` Make sure the ${outerName} can handle rain.` : '';
-    return hasTimeline
-      ? `Start with your ${midName} over the ${baseName}, then add the ${outerName} for cooler moments. You can drop the ${outerName} as the day warms up.${rainSuffix}`
-      : `Layer your ${midName} over the ${baseName} with the ${outerName} on top for full coverage.${rainSuffix}`;
+    if (hasTimeline) {
+      return `Start with your ${midName} over the ${baseName}, then add the ${outerName} for cooler moments. You can drop the ${outerName} as the day warms up.${rainSuffix}${outerCaveat}${midCaveat}`;
+    }
+    return `Layer your ${midName} over the ${baseName} with the ${outerName} on top for full coverage.${rainSuffix}${outerCaveat}${midCaveat}`;
   }
 
   // Outer only (mid not needed)
   if (outer && !mid) {
     const rainNote = raining ? ` Rain is expected — keep the ${outerName} on.` : '';
-    return hasTimeline
-      ? `The ${outerName} will be welcome this morning — feel free to shed it once temperatures climb.${rainNote}`
-      : `A ${outerName} over your ${baseName} is the right call for today.${rainNote}`;
+    if (hasTimeline) {
+      return outerHardToRemove
+        ? `The ${outerName} is the right call today, but it's heavy to stow — you may want to commit to it all day.${rainNote}`
+        : `The ${outerName} will be welcome this morning — feel free to shed it once temperatures climb.${rainNote}`;
+    }
+    return `A ${outerName} over your ${baseName} is the right call for today.${rainNote}${outerCaveat}`;
   }
 
   // Mid only (outer not needed)
@@ -248,9 +258,12 @@ const buildRecommendation = (
     const rainWarning = raining
       ? ` Rain is in the forecast though — consider grabbing a water-resistant layer too.`
       : '';
-    return hasTimeline
-      ? `Your ${midName} is a smart pick for the morning chill — easy to remove as the day heats up.${rainWarning}`
-      : `Keep your ${midName} handy — it suits today's temperature without being too heavy.${rainWarning}`;
+    if (hasTimeline) {
+      return midHardToRemove
+        ? `Your ${midName} suits the morning chill, but it's bulky to carry later — plan your day around it.${rainWarning}`
+        : `Your ${midName} is a smart pick for the morning chill — easy to remove as the day heats up.${rainWarning}`;
+    }
+    return `Keep your ${midName} handy — it suits today's temperature without being too heavy.${rainWarning}${midCaveat}`;
   }
 
   return 'Layer to your comfort based on how the day feels.';
@@ -311,30 +324,36 @@ export const generateLayeringRecommendation = ({
   const needsMid   = layerNeedsMid(currentTemp, tempDelta);
   const needsOuter = layerNeedsOuter(currentTemp, windSpeed) || raining;
 
-  // Apply necessity + removability gates together.
-  // An item that is needed but non-removable still surfaces — the removability
-  // threshold is deliberately low (0.35 for outer) to avoid silently dropping
-  // a coat on a cold day just because it's leather.
-  const effectiveMid: OutfitSlot | null =
-    mid && needsMid && removabilityOf(mid.article) >= 0.45
-      ? mid
-      : null;
+  // Apply necessity with soft removability scoring.
+  // Layers are never silently dropped — removability affects the recommendation
+  // text and confidence, not whether the layer is included. A heavy wool coat
+  // that's hard to shed still gets recommended on a cold day; the timeline and
+  // recommendation just acknowledge that it's not easily removable.
+  const midRemovability   = mid   ? removabilityOf(mid.article)   : 0;
+  const outerRemovability = outer ? removabilityOf(outer.article) : 0;
 
-  const effectiveOuter: OutfitSlot | null =
-    outer && needsOuter && removabilityOf(outer.article) >= 0.35
-      ? outer
-      : null;
+  const effectiveMid:   OutfitSlot | null = mid   && needsMid   ? mid   : null;
+  const effectiveOuter: OutfitSlot | null = outer && needsOuter ? outer : null;
+
+  // Low-removability flag — used to adjust recommendation text
+  const midHardToRemove   = effectiveMid   && midRemovability   < 0.45;
+  const outerHardToRemove = effectiveOuter && outerRemovability < 0.35;
 
   // Layers that conditions call for but the outfit doesn't have (wardrobe gap)
-  const missingMid   = needsMid   && !effectiveMid;
-  const missingOuter = needsOuter && !effectiveOuter;
+  const missingMid   = needsMid   && !mid;
+  const missingOuter = needsOuter && !outer;
 
   const timeline = buildTimeline(forecasts, effectiveMid, effectiveOuter, high, low, offset);
 
+  // Reduce confidence when layers are hard to remove on variable days
+  const removabilityPenalty =
+    (midHardToRemove   && tempDelta > 10 ? 0.08 : 0) +
+    (outerHardToRemove && tempDelta > 10 ? 0.08 : 0);
+
   return {
     layers:         { base, mid: effectiveMid, outer: effectiveOuter },
-    recommendation: buildRecommendation(base, effectiveMid, effectiveOuter, currentTemp, !!timeline, missingMid, missingOuter, raining),
+    recommendation: buildRecommendation(base, effectiveMid, effectiveOuter, currentTemp, !!timeline, missingMid, missingOuter, raining, !!midHardToRemove, !!outerHardToRemove),
     timeline,
-    confidence:     computeConfidence(currentTemp, tempDelta, windSpeed, !!effectiveMid, !!effectiveOuter),
+    confidence:     Math.max(0, computeConfidence(currentTemp, tempDelta, windSpeed, !!effectiveMid, !!effectiveOuter) - removabilityPenalty),
   };
 };
