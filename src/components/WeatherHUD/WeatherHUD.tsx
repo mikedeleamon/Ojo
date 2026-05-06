@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
     StyleSheet,
     ScrollView,
@@ -107,6 +107,23 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
     const [error, setError] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
 
+    // ── Pull-to-refresh buffering ───────────────────────────────────────────────
+    // While a pull-to-refresh is in flight, incoming data is held in pendingRef
+    // instead of being applied immediately. In finally() we flush pending + clear
+    // the spinner atomically so new content and the dismissal happen in one render.
+    const pendingRef = useRef<{ weather: CurrentWeather; forecasts: Forecast[] } | null>(null);
+    const isRefreshRef = useRef(false);
+
+    const flushPending = () => {
+        if (pendingRef.current) {
+            const { weather: w, forecasts: f } = pendingRef.current;
+            setWeather(w);
+            setForecasts(f);
+            setFooterBg(footerBgFor(w.WeatherText, w.IsDayTime));
+            pendingRef.current = null;
+        }
+    };
+
     // ── Fetch city ──────────────────────────────────────────────────────────────
     useEffect(() => {
         if (!location) {
@@ -148,14 +165,21 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
             .then(([wRes, fRes]) => {
                 const w = wRes.data?.[0];
                 if (!w) throw new Error('Empty response');
-                setWeather(w);
-                setForecasts(fRes.data ?? []);
-                setFooterBg(footerBgFor(w.WeatherText, w.IsDayTime));
+                if (isRefreshRef.current) {
+                    // Pull-to-refresh in flight — buffer until finally() flushes atomically
+                    pendingRef.current = { weather: w, forecasts: fRes.data ?? [] };
+                } else {
+                    setWeather(w);
+                    setForecasts(fRes.data ?? []);
+                    setFooterBg(footerBgFor(w.WeatherText, w.IsDayTime));
+                }
             })
             .catch(() =>
                 setError('Could not load weather. Is the server running?'),
             )
             .finally(() => {
+                flushPending();
+                isRefreshRef.current = false;
                 setLoading(false);
                 setRefreshing(false);
             });
@@ -198,6 +222,7 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={() => {
+                            isRefreshRef.current = true;
                             setRefreshing(true);
                             onRefresh?.();
                         }}
