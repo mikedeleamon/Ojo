@@ -55,6 +55,8 @@ export interface Forecast {
   IsDaylight: boolean;
 }
 
+export type OutfitOccasion = 'everyday' | 'work' | 'weekend' | 'date' | 'outdoor' | 'athletic';
+
 export interface Settings {
   clothingStyle: string;
   location: string;
@@ -62,6 +64,7 @@ export interface Settings {
   hiTempThreshold: number;
   lowTempThreshold: number;
   humidityPreference: number;
+  occasion?: OutfitOccasion;  // optional — defaults to 'everyday' if not set
 }
 
 export interface ClothingArticle {

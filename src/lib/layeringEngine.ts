@@ -107,12 +107,28 @@ const deriveDayRange = (
 
 // ─── 3. Layer necessity scoring ───────────────────────────────────────────────
 // Flexible signal-based decisions — avoids hardcoded "cold = 3 layers" rules.
+// Wind chill is computed using the NWS formula so that 50°F + 25 mph wind
+// correctly triggers outer layer necessity (effective temp ≈ 43°F).
 
-const layerNeedsMid = (currentTemp: number, tempDelta: number): boolean =>
-  currentTemp < 65 || tempDelta > 10;
+/**
+ * NWS Wind Chill formula (valid for temps ≤ 50°F and wind ≥ 3 mph).
+ * Returns effective temperature accounting for wind exposure.
+ * Above 50°F or below 3 mph wind, returns raw temp (wind chill not applicable).
+ */
+const windChill = (tempF: number, windMph: number): number => {
+  if (tempF > 50 || windMph < 3) return tempF;
+  return 35.74 + 0.6215 * tempF - 35.75 * Math.pow(windMph, 0.16) + 0.4275 * tempF * Math.pow(windMph, 0.16);
+};
 
-const layerNeedsOuter = (currentTemp: number, windSpeed: number): boolean =>
-  currentTemp < 50 || windSpeed > 10;
+const layerNeedsMid = (currentTemp: number, tempDelta: number, windSpeed: number): boolean => {
+  const effective = windChill(currentTemp, windSpeed);
+  return effective < 65 || tempDelta > 10;
+};
+
+const layerNeedsOuter = (currentTemp: number, windSpeed: number): boolean => {
+  const effective = windChill(currentTemp, windSpeed);
+  return effective < 50 || windSpeed > 10;
+};
 
 // ─── 4. Removability scoring ──────────────────────────────────────────────────
 // 0–1 score. Higher = the item is easy to shed mid-day.
@@ -137,11 +153,46 @@ const removabilityOf = (article: ClothingArticle): number => {
 };
 
 // ─── 5. Timeline builder ──────────────────────────────────────────────────────
-// Generates morning / afternoon / evening action steps.
-// Only fires when the day has meaningful temperature variation (>= 10 °F swing).
-// Returns undefined on flat days — callers treat undefined as "no timeline".
+// Generates event-driven action steps based on:
+//   a) Temperature inflection points (warming/cooling beyond thresholds)
+//   b) Precipitation transitions (rain starting/stopping)
+// Produces up to 5 steps for a highly variable day. Returns undefined on flat,
+// dry days — callers treat undefined as "no timeline".
 
 const MEANINGFUL_DELTA_F = 10;
+const TEMP_SHED_THRESHOLD = 68;   // above this, recommend removing outer
+const TEMP_COLD_THRESHOLD = 58;   // below this, recommend keeping layers
+const TEMP_RELAYER_THRESHOLD = 62; // below this in evening, re-layer
+
+/** Formats hour (0–23) as human-readable time label. */
+const hourLabel = (h: number): string => {
+  if (h < 6)  return 'Early morning';
+  if (h < 10) return 'Morning';
+  if (h < 12) return 'Late morning';
+  if (h < 14) return 'Early afternoon';
+  if (h < 17) return 'Afternoon';
+  if (h < 20) return 'Evening';
+  return 'Night';
+};
+
+/** Detects precipitation transitions in the forecast. */
+const detectPrecipTransitions = (forecasts: Forecast[]): { hour: number; starting: boolean }[] => {
+  const transitions: { hour: number; starting: boolean }[] = [];
+  // Check IconPhrase for rain/snow keywords
+  const isWet = (phrase: string) => /rain|shower|storm|snow|sleet|drizzle/i.test(phrase);
+
+  let prevWet = false;
+  for (const f of forecasts) {
+    const wet = isWet(f.IconPhrase);
+    if (wet && !prevWet) {
+      transitions.push({ hour: new Date(f.DateTime).getHours(), starting: true });
+    } else if (!wet && prevWet) {
+      transitions.push({ hour: new Date(f.DateTime).getHours(), starting: false });
+    }
+    prevWet = wet;
+  }
+  return transitions;
+};
 
 const buildTimeline = (
   forecasts:    Forecast[],
@@ -152,20 +203,12 @@ const buildTimeline = (
   feelsOffset:  number,
 ): { time: string; action: string }[] | undefined => {
   if ((!mid && !outer) || forecasts.length === 0) return undefined;
-  if (high - low < MEANINGFUL_DELTA_F) return undefined;
 
-  // Sample one representative reading per time-of-day window, converted to feels-like
-  const tempAt = (fromH: number, toH: number): number | null => {
-    const match = forecasts.find(f => {
-      const h = new Date(f.DateTime).getHours();
-      return h >= fromH && h <= toH;
-    });
-    return match ? match.Temperature.Value + feelsOffset : null;
-  };
+  const hasTempSwing = high - low >= MEANINGFUL_DELTA_F;
+  const precipTransitions = detectPrecipTransitions(forecasts);
 
-  const morningTemp   = tempAt(6,  10);
-  const afternoonTemp = tempAt(12, 16);
-  const eveningTemp   = tempAt(17, 21);
+  // If no temperature swing AND no precipitation transitions, no timeline needed
+  if (!hasTempSwing && precipTransitions.length === 0) return undefined;
 
   const primaryLayer = outer ?? mid;
   const primaryName  = primaryLayer!.article.name || primaryLayer!.article.clothingType;
@@ -173,26 +216,50 @@ const buildTimeline = (
 
   const steps: { time: string; action: string }[] = [];
 
-  // Morning — typically coolest; keep layers on
-  if (morningTemp !== null && morningTemp < 58) {
-    steps.push({ time: 'Morning', action: `Keep your ${primaryName} on` });
+  // ── Temperature-based steps ────────────────────────────────────────────────
+  if (hasTempSwing) {
+    // Find the hour where temp crosses key thresholds by scanning chronologically
+    let shedStep: { time: string; action: string } | null = null;
+    let relayerStep: { time: string; action: string } | null = null;
+    let peakReached = false;
+
+    for (const f of forecasts) {
+      const h = new Date(f.DateTime).getHours();
+      const temp = f.Temperature.Value + feelsOffset;
+
+      if (!peakReached && temp >= TEMP_SHED_THRESHOLD && outer) {
+        shedStep = { time: hourLabel(h), action: `Remove ${outerName} — warming up` };
+        peakReached = true;
+      } else if (peakReached && temp < TEMP_RELAYER_THRESHOLD && !relayerStep) {
+        relayerStep = { time: hourLabel(h), action: `Add ${primaryName} back — cooling down` };
+      }
+    }
+
+    // Morning cold check
+    const firstTemp = forecasts[0] ? forecasts[0].Temperature.Value + feelsOffset : null;
+    if (firstTemp !== null && firstTemp < TEMP_COLD_THRESHOLD) {
+      steps.push({ time: hourLabel(new Date(forecasts[0].DateTime).getHours()), action: `Keep your ${primaryName} on` });
+    }
+
+    if (shedStep) steps.push(shedStep);
+    if (relayerStep) steps.push(relayerStep);
   }
 
-  // Afternoon — peak warmth; recommend shedding
-  if (afternoonTemp !== null) {
-    if (afternoonTemp > 68 && outer) {
-      steps.push({ time: 'Afternoon', action: `Remove ${outerName}` });
-    } else if (afternoonTemp > 74 && mid && !outer) {
-      steps.push({ time: 'Afternoon', action: `Remove ${mid.article.name ?? mid.article.clothingType}` });
+  // ── Precipitation-based steps ──────────────────────────────────────────────
+  for (const t of precipTransitions) {
+    if (t.starting) {
+      const layerName = outerName ?? primaryName;
+      steps.push({ time: hourLabel(t.hour), action: `Rain starts — keep ${layerName} on` });
+    } else {
+      steps.push({ time: hourLabel(t.hour), action: `Rain clears — safe to shed layers` });
     }
   }
 
-  // Evening — cools back down; re-layer
-  if (eveningTemp !== null && eveningTemp < 62) {
-    steps.push({ time: 'Evening', action: `Add ${primaryName} back` });
-  }
+  // Cap at 5 steps, sorted by approximate chronological order
+  const ORDER = ['Early morning', 'Morning', 'Late morning', 'Early afternoon', 'Afternoon', 'Evening', 'Night'];
+  steps.sort((a, b) => ORDER.indexOf(a.time) - ORDER.indexOf(b.time));
 
-  return steps.length > 0 ? steps : undefined;
+  return steps.length > 0 ? steps.slice(0, 5) : undefined;
 };
 
 // ─── 6. Natural language recommendation ───────────────────────────────────────
@@ -316,13 +383,18 @@ export const generateLayeringRecommendation = ({
   const windSpeed      = weather.Wind.Speed.Imperial.Value;
   const raining        = weather.HasPrecipitation;
 
+  // Check if rain is forecast later (even if it's dry now)
+  const rainForecast = forecasts.some(f =>
+    /rain|shower|storm|drizzle|sleet/i.test(f.IconPhrase),
+  );
+
   const { high, low, offset } = deriveDayRange(forecasts, currentAirTemp, currentTemp);
   const tempDelta = high - low;
 
   const { base, mid, outer } = extractLayers(slots);
 
-  const needsMid   = layerNeedsMid(currentTemp, tempDelta);
-  const needsOuter = layerNeedsOuter(currentTemp, windSpeed) || raining;
+  const needsMid   = layerNeedsMid(currentTemp, tempDelta, windSpeed);
+  const needsOuter = layerNeedsOuter(currentTemp, windSpeed) || raining || rainForecast;
 
   // Apply necessity with soft removability scoring.
   // Layers are never silently dropped — removability affects the recommendation
@@ -345,6 +417,9 @@ export const generateLayeringRecommendation = ({
 
   const timeline = buildTimeline(forecasts, effectiveMid, effectiveOuter, high, low, offset);
 
+  // Use combined rain context for recommendation text
+  const rainContext = raining || rainForecast;
+
   // Reduce confidence when layers are hard to remove on variable days
   const removabilityPenalty =
     (midHardToRemove   && tempDelta > 10 ? 0.08 : 0) +
@@ -352,7 +427,7 @@ export const generateLayeringRecommendation = ({
 
   return {
     layers:         { base, mid: effectiveMid, outer: effectiveOuter },
-    recommendation: buildRecommendation(base, effectiveMid, effectiveOuter, currentTemp, !!timeline, missingMid, missingOuter, raining, !!midHardToRemove, !!outerHardToRemove),
+    recommendation: buildRecommendation(base, effectiveMid, effectiveOuter, currentTemp, !!timeline, missingMid, missingOuter, rainContext, !!midHardToRemove, !!outerHardToRemove),
     timeline,
     confidence:     Math.max(0, computeConfidence(currentTemp, tempDelta, windSpeed, !!effectiveMid, !!effectiveOuter) - removabilityPenalty),
   };

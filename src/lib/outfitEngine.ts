@@ -14,8 +14,8 @@
  * by replacing scoreOutfit() with a model inference call.
  */
 
-import { ClothingArticle, CurrentWeather, Forecast, Settings } from '../types';
-import { articlePreferenceScore, UserPreferenceProfile } from './userPreferences';
+import { ClothingArticle, CurrentWeather, Forecast, Settings, OutfitOccasion } from '../types';
+import { articlePreferenceScore, colorPairingBonus, UserPreferenceProfile } from './userPreferences';
 import { generateLayeringRecommendation, LayeringResult } from './layeringEngine';
 
 // ─── Core types ───────────────────────────────────────────────────────────────
@@ -227,13 +227,29 @@ const fabricScore = (
 
   let s = base;
 
-  // Rain modifier: scaled by precipitation intensity.
-  // Heavy rain strongly penalizes absorbent fabrics; light drizzle barely matters.
+  // Rain modifier: scaled by precipitation intensity and per-fabric resilience.
+  // Each fabric has a rain resilience score (0–1): 0 = absorbs instantly, 1 = fully waterproof.
+  // The modifier rewards resilient fabrics and penalizes absorbent ones, proportional to intensity.
+  const RAIN_RESILIENCE: Record<string, number> = {
+    Synthetic: 0.85,  // shell fabrics, nylon — designed for water
+    Polyester: 0.70,  // water-resistant, dries fast
+    Leather:   0.55,  // water-resistant but can stain/damage over time
+    Denim:     0.40,  // absorbs but doesn't disintegrate
+    Fleece:    0.35,  // absorbs, gets heavy
+    Cotton:    0.25,  // absorbs readily
+    Wool:      0.30,  // absorbs slowly but retains warmth when wet
+    Silk:      0.10,  // ruined by water
+    Linen:     0.15,  // absorbs instantly, wrinkles
+    Other:     0.40,
+  };
+
   const pMul = precipMultiplier(precipIntensity);
   if (pMul > 0) {
-    if (a.fabricType === 'Leather' || a.fabricType === 'Synthetic') s += 0.12 * pMul;
-    if (a.fabricType === 'Linen'   || a.fabricType === 'Silk')      s -= 0.12 * pMul;
-    if (a.fabricType === 'Cotton')                                   s -= 0.06 * pMul;
+    const resilience = RAIN_RESILIENCE[a.fabricType ?? 'Other'] ?? 0.40;
+    // Resilient fabrics (>0.5) get a bonus; absorbent fabrics (<0.5) get a penalty
+    // Scaled by intensity: heavy rain = full effect, light drizzle = 40%
+    const rainMod = (resilience - 0.50) * 0.24 * pMul;  // range: -0.10 to +0.10 at full intensity
+    s += rainMod;
   }
 
   // Humidity × temperature interaction (heat index).
@@ -394,7 +410,7 @@ const seasonalBonus = (outfitColors: string[]): number => {
   return Math.min(0.08, matchCount * 0.03);
 };
 
-const outfitColorScore = (slots: OutfitSlot[]): number => {
+const outfitColorScore = (slots: OutfitSlot[], profile?: UserPreferenceProfile): number => {
   const outfitColors = slots.map(s => s.article.color).filter(Boolean) as string[];
   if (outfitColors.length < 2) return 0.70;  // single color → neutral score
 
@@ -413,8 +429,10 @@ const outfitColorScore = (slots: OutfitSlot[]): number => {
   // in a 4–5 item outfit. This makes swap suggestions more actionable.
   const blended = harmonyAvg * 0.70 + minPair * 0.30;
 
-  // Add seasonal bonus — additive, capped at 1.0
-  return Math.min(1.0, blended + seasonalBonus(outfitColors));
+  // Add seasonal bonus + learned color pairing bonus — additive, capped at 1.0
+  const seasonal = seasonalBonus(outfitColors);
+  const pairing  = profile ? colorPairingBonus(outfitColors, profile) : 0;
+  return Math.min(1.0, blended + seasonal + pairing);
 };
 
 // Returns the outfit slot whose color clashes most with the rest, or null if
@@ -468,6 +486,56 @@ const articleStyleScore = (a: ClothingArticle, style: string): number => {
 const outfitStyleScore = (slots: OutfitSlot[], style: string): number => {
   if (slots.length === 0) return 0;
   return slots.reduce((sum, s) => sum + articleStyleScore(s.article, style), 0) / slots.length;
+};
+
+// ─── 3c-bis. Occasion formality scoring ──────────────────────────────────────
+// Optional context signal that adjusts which items feel appropriate.
+// 'work' penalizes very casual items; 'weekend' rewards relaxed pieces;
+// 'date' rewards polished items; 'athletic' strongly rewards sport gear.
+
+const OCCASION_FORMALITY: Record<string, number> = {
+  // 0 = very casual, 1 = very formal
+  'T-Shirt': 0.15, Hoodie: 0.20, Shorts: 0.15, Cap: 0.10,
+  Jeans: 0.30, Sneakers: 0.25, Sandals: 0.10,
+  Shirt: 0.60, Blouse: 0.65, Pants: 0.55, Shoes: 0.60,
+  Belt: 0.55, Watch: 0.50, Dress: 0.70, Coat: 0.60,
+  Jacket: 0.50, Sweater: 0.45, Boots: 0.50, Skirt: 0.50,
+};
+
+/** Target formality range for each occasion (min, ideal, max). */
+const OCCASION_TARGETS: Record<OutfitOccasion, { min: number; ideal: number; max: number }> = {
+  everyday: { min: 0.00, ideal: 0.35, max: 1.00 },  // no penalty
+  work:     { min: 0.40, ideal: 0.60, max: 0.85 },
+  weekend:  { min: 0.00, ideal: 0.25, max: 0.55 },
+  date:     { min: 0.35, ideal: 0.55, max: 0.80 },
+  outdoor:  { min: 0.00, ideal: 0.30, max: 0.60 },
+  athletic: { min: 0.00, ideal: 0.15, max: 0.35 },
+};
+
+/**
+ * Returns 0–1 score for how well an outfit fits an occasion.
+ * Measures average formality of pieces against the occasion's target range.
+ */
+const occasionScore = (slots: OutfitSlot[], occasion: OutfitOccasion): number => {
+  if (occasion === 'everyday') return 0.70; // neutral — no filtering
+  const target = OCCASION_TARGETS[occasion];
+  if (!target || slots.length === 0) return 0.70;
+
+  const avgFormality = slots.reduce(
+    (sum, s) => sum + (OCCASION_FORMALITY[s.article.clothingType] ?? 0.40),
+    0,
+  ) / slots.length;
+
+  // Score based on distance from ideal
+  const dist = Math.abs(avgFormality - target.ideal);
+  // Penalty for being outside the acceptable range
+  const outOfRange = avgFormality < target.min
+    ? target.min - avgFormality
+    : avgFormality > target.max
+      ? avgFormality - target.max
+      : 0;
+
+  return Math.max(0, Math.min(1, 1.0 - dist * 0.8 - outOfRange * 1.5));
 };
 
 // ─── 3d. Simplicity / neutrality scoring ─────────────────────────────────────
@@ -549,10 +617,11 @@ const scoreCombo = (
   profile:        UserPreferenceProfile,
 ): ScoredCombo => {
   const fabric     = outfitFabricScore(slots, bucket, feelsLikeF, precipIntensity, humidity, settings.humidityPreference, windMph, isSnowing);
-  const color      = outfitColorScore(slots);
+  const color      = outfitColorScore(slots, profile);
   const style      = outfitStyleScore(slots, settings.clothingStyle);
   const simplicity = simplicityScore(slots);
   const preference = outfitPreferenceScore(slots, profile);
+  const occasion   = occasionScore(slots, settings.occasion ?? 'everyday');
 
   const weights = getWeights(bucket);
 
@@ -561,12 +630,20 @@ const scoreCombo = (
     RECENCY_PENALTY_MAX,
   );
 
+  // Occasion modifier: when occasion is set (not 'everyday'), it acts as a
+  // multiplier on the style weight — appropriate occasions amplify style fit,
+  // inappropriate ones dampen it. Keeps total weight budget stable.
+  const occasionMod = (settings.occasion && settings.occasion !== 'everyday')
+    ? (occasion - 0.50) * 0.12  // range: -0.06 to +0.06
+    : 0;
+
   const raw =
     fabric     * weights.fabric     +
     color      * weights.color      +
     style      * weights.style      +
     simplicity * weights.simplicity +
     preference * weights.preference
+    + occasionMod
     - recencyPenalty;
 
   return {
@@ -625,7 +702,7 @@ export const generateOutfits = (
   settings:     Settings,
   recentlyWorn: RecentlyWorn          = new Set(),
   topK:         number               = 3,
-  profile:      UserPreferenceProfile = { colors: {}, fabrics: {}, categories: {}, totalOutfits: 0 },
+  profile:      UserPreferenceProfile = { colors: {}, fabrics: {}, categories: {}, colorPairs: {}, totalOutfits: 0 },
   forecasts:    Forecast[]           = [],
 ): { results: OutfitResult[]; status: OutfitStatus } => {
 
@@ -718,12 +795,15 @@ export const generateOutfits = (
     : accessories;
   const accOptions: (ClothingArticle | null)[] = [null, ...sortedAccessories.slice(0, 4)];
 
-  // ── Phase 3: Enumerate all valid combinations and score each ──────────────
+  // ── Phase 3: Enumerate combinations with two-pass optimization ─────────────
+  // When the search space is large (>200 core combos), a cheap fabric-only first
+  // pass prunes to the top 50 cores before the expensive full cross-product.
+  // This keeps performance linear with closet size while preserving quality.
 
   const scored: ScoredCombo[] = [];
 
   // Build core combos (top+bottom, or full-body)
-  const coreCombos: OutfitSlot[][] = [];
+  let coreCombos: OutfitSlot[][] = [];
   for (const fb of fullBodies) {
     coreCombos.push([{ role: 'fullBody', article: fb }]);
   }
@@ -738,7 +818,21 @@ export const generateOutfits = (
     }
   }
 
-  // Cross-product with outerwear × footwear × accessory
+  // Two-pass pruning: if core combos exceed threshold, pre-rank by fabric score
+  const CORE_COMBO_THRESHOLD = 200;
+  const CORE_COMBO_KEEP      = 50;
+
+  if (coreCombos.length > CORE_COMBO_THRESHOLD) {
+    // Cheap pass: score only by fabric appropriateness (no color/style/preference)
+    const withFabricScore = coreCombos.map(slots => ({
+      slots,
+      cheapScore: outfitFabricScore(slots, bucket, effectiveFeelsLike, precipIntensity, humidity, settings.humidityPreference, windMph, isSnowing),
+    }));
+    withFabricScore.sort((a, b) => b.cheapScore - a.cheapScore);
+    coreCombos = withFabricScore.slice(0, CORE_COMBO_KEEP).map(x => x.slots);
+  }
+
+  // Full cross-product with outerwear × footwear × accessory
   for (const core of coreCombos) {
     for (const outer of outerOptions) {
       for (const shoe of shoeOptions) {
@@ -865,15 +959,28 @@ export const generateOutfits = (
     return notes;
   };
 
-  const results: OutfitResult[] = topList.map(combo => ({
-    status:         'ok',
-    headline:       headline(bucket),
-    slots:          combo.slots,
-    notes:          buildNotes(combo.slots, combo.breakdown),
-    score:          combo.score,
-    scoreBreakdown: combo.breakdown,
-    layering:       generateLayeringRecommendation({ weather, forecasts, slots: combo.slots }),
-  }));
+  const results: OutfitResult[] = topList.map(combo => {
+    const layering = generateLayeringRecommendation({ weather, forecasts, slots: combo.slots });
+
+    // Confidence-weighted score boost: outfits with high layering confidence
+    // (well-matched layers, stable weather) get a small bump; low confidence
+    // (wardrobe gaps, high variability) gets nothing. Range: 0 to +3 points.
+    const confidenceBoost = Math.round((layering.confidence - 0.5) * 6);
+    const adjustedScore = Math.max(0, Math.min(100, combo.score + confidenceBoost));
+
+    return {
+      status:         'ok' as OutfitStatus,
+      headline:       headline(bucket),
+      slots:          combo.slots,
+      notes:          buildNotes(combo.slots, combo.breakdown),
+      score:          adjustedScore,
+      scoreBreakdown: combo.breakdown,
+      layering,
+    };
+  });
+
+  // Re-sort after confidence adjustment (may swap adjacent results)
+  results.sort((a, b) => b.score - a.score);
 
   return { results, status: 'ok' };
 };
