@@ -191,7 +191,7 @@ const FABRIC_WARMTH_MOD: Record<string, number> = {
 };
 
 /** Effective garment warmth = base (from clothingType) + modifier (from fabricType), clamped [0, 1]. */
-const garmentWarmth = (article: ClothingArticle): number => {
+export const garmentWarmth = (article: ClothingArticle): number => {
   const base = GARMENT_WARMTH_BASE[article.clothingType] ?? 0.30;
   const mod  = FABRIC_WARMTH_MOD[article.fabricType ?? 'Other'] ?? 0.00;
   return Math.max(0, Math.min(1, base + mod));
@@ -323,40 +323,45 @@ const outfitFabricScore = (
 
 const COLOR_WHEEL_POSITION: Record<string, number> = {
   // Position 0 — Red family
-  Red: 0, Crimson: 0, Maroon: 0, Burgundy: 0,
+  Red: 0, Scarlet: 0, Crimson: 0, Maroon: 0, Burgundy: 0,
   // Position 2 — Orange family
-  Orange: 2, Coral: 2, Salmon: 2, Rust: 2,
+  Orange: 2, Coral: 2, Peach: 2, Salmon: 2, Rust: 2,
   // Position 3 — Gold/yellow-orange
   Gold: 3,
   // Position 4 — Yellow family
-  Yellow: 4,
+  Yellow: 4, Lime: 4,
   // Position 5 — Yellow-green
-  Olive: 5, Khaki: 5,
+  Olive: 5, Khaki: 5, Sage: 5,
   // Position 6 — Green family
   Green: 6, Mint: 6,
   // Position 7 — Blue-green
   Teal: 7, Cyan: 7,
   // Position 8 — Blue family
-  Blue: 8, 'Sky Blue': 8, Cobalt: 8,
+  Blue: 8, 'Sky Blue': 8, 'Baby Blue': 8, Cobalt: 8, 'Electric Blue': 8,
   // Position 9 — Blue-purple / dark blue
-  Navy: 9, Indigo: 9,
+  Navy: 9, Indigo: 9, Periwinkle: 9,
   // Position 10 — Purple family
-  Purple: 10, Violet: 10, Plum: 10,
+  Purple: 10, Violet: 10, Plum: 10, Lilac: 10,
   // Position 11 — Red-purple / pink
-  Pink: 11, Magenta: 11, Lavender: 11, Rose: 11,
+  Pink: 11, 'Hot Pink': 11, Fuchsia: 11, Magenta: 11,
+  Lavender: 11, Rose: 11, 'Dusty Rose': 11, Blush: 11,
 };
 
 // Neutrals harmonise with everything — they don't interact with the wheel.
-const COLOR_NEUTRALS = new Set([
+// Metallics are treated as fashion neutrals — a gold watch or silver earring
+// pairs with virtually any outfit, so they receive the 0.90 neutral bonus.
+export const COLOR_NEUTRALS = new Set([
   'Black', 'White', 'Grey', 'Gray', 'Beige', 'Brown',
-  'Ivory', 'Cream', 'Tan', 'Silver', 'Multi',
+  'Ivory', 'Cream', 'Tan', 'Multi',
+  // Metallics — pair with everything
+  'Silver', 'Gold', 'Bronze', 'Rose Gold', 'Champagne',
 ]);
 
 /**
  * Returns 0–1 harmony score for two colors.
  * Based on standard color theory interval relationships.
  */
-const pairHarmony = (colorA: string, colorB: string): number => {
+export const pairHarmony = (colorA: string, colorB: string): number => {
   // Neutrals pair perfectly with anything
   if (COLOR_NEUTRALS.has(colorA) || COLOR_NEUTRALS.has(colorB)) return 0.90;
 
@@ -383,9 +388,9 @@ const pairHarmony = (colorA: string, colorB: string): number => {
 // ─── Seasonal color palette ──────────────────────────────────────────────────
 // Subtle boost for colors that feel season-appropriate. Nothing is penalized —
 // only in-season colors get a small bonus, keeping the scoring additive.
-type Season = 'spring' | 'summer' | 'autumn' | 'winter';
+export type Season = 'spring' | 'summer' | 'autumn' | 'winter';
 
-const currentSeason = (): Season => {
+export const currentSeason = (): Season => {
   const month = new Date().getMonth(); // 0-indexed
   if (month >= 2 && month <= 4) return 'spring';
   if (month >= 5 && month <= 7) return 'summer';
@@ -393,11 +398,15 @@ const currentSeason = (): Season => {
   return 'winter';
 };
 
-const SEASONAL_COLORS: Record<Season, Set<string>> = {
-  spring: new Set(['Pink', 'Lavender', 'Mint', 'Coral', 'Sky Blue', 'Yellow', 'Rose', 'Cream']),
-  summer: new Set(['White', 'Cyan', 'Coral', 'Yellow', 'Orange', 'Sky Blue', 'Teal', 'Mint']),
-  autumn: new Set(['Rust', 'Burgundy', 'Olive', 'Brown', 'Gold', 'Maroon', 'Orange', 'Khaki', 'Tan']),
-  winter: new Set(['Navy', 'Black', 'Burgundy', 'Plum', 'Indigo', 'Grey', 'Silver', 'Cobalt']),
+export const SEASONAL_COLORS: Record<Season, Set<string>> = {
+  spring: new Set(['Pink', 'Lavender', 'Mint', 'Coral', 'Sky Blue', 'Yellow', 'Rose', 'Cream',
+    'Blush', 'Peach', 'Lilac', 'Sage', 'Periwinkle', 'Baby Blue', 'Dusty Rose']),
+  summer: new Set(['White', 'Cyan', 'Coral', 'Yellow', 'Orange', 'Sky Blue', 'Teal', 'Mint',
+    'Lime', 'Hot Pink', 'Fuchsia', 'Peach', 'Baby Blue', 'Electric Blue']),
+  autumn: new Set(['Rust', 'Burgundy', 'Olive', 'Brown', 'Gold', 'Maroon', 'Orange', 'Khaki', 'Tan',
+    'Scarlet', 'Sage', 'Champagne']),
+  winter: new Set(['Navy', 'Black', 'Burgundy', 'Plum', 'Indigo', 'Grey', 'Silver', 'Cobalt',
+    'Champagne', 'Rose Gold', 'Lilac', 'Periwinkle']),
 };
 
 /** Returns a 0–0.08 seasonal bonus based on how many outfit colors match the season. */

@@ -4,6 +4,7 @@ import {
   Image, Alert, Platform, ActionSheetIOS,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Svg, Path } from 'react-native-svg';
 import { View, Text } from '../primitives';
 import { pickImage } from '../../lib/imageService';
@@ -16,15 +17,58 @@ const CLOTHING_TYPES = ['Shirt','T-Shirt','Blouse','Sweater','Hoodie','Jacket','
   'Hat','Cap','Scarf','Gloves','Belt','Bag','Watch','Jewelry','Socks','Other'];
 const CATEGORIES = ['Casual','Formal','Business Casual','Athletic','Lounge','Outdoor'];
 const FABRICS    = ['Cotton','Wool','Linen','Silk','Polyester','Denim','Leather','Synthetic','Other'];
-const COLORS     = ['Black','White','Grey','Navy','Blue','Green','Red','Brown','Beige','Pink','Yellow','Purple','Orange','Multi'];
+const COLORS = [
+  // Neutrals
+  'Black','White','Grey','Brown','Beige','Cream',
+  // Metallics
+  'Silver','Gold','Bronze','Rose Gold','Champagne',
+  // Blues
+  'Navy','Indigo','Cobalt','Blue','Electric Blue','Sky Blue','Periwinkle','Teal','Cyan','Baby Blue',
+  // Greens
+  'Green','Mint','Lime','Sage','Olive','Khaki',
+  // Reds & warm
+  'Red','Scarlet','Crimson','Burgundy','Orange','Coral','Peach','Rust','Yellow',
+  // Purples & pinks
+  'Purple','Plum','Lilac','Lavender','Pink','Rose','Dusty Rose','Blush','Magenta','Hot Pink','Fuchsia',
+  // Other
+  'Multi',
+];
 const TOP_BOTTOM = ['Top','Bottom','Full body','Footwear','N/A'];
 
 const SWATCH: Record<string, string> = {
-  Black: '#1a1a1a', White: '#f0f0f0', Grey: '#9ca3af', Navy: '#1e3a5f',
-  Blue: '#3b82f6', Green: '#22c55e', Red: '#ef4444', Brown: '#92400e',
-  Beige: '#d4b896', Pink: '#f9a8d4', Yellow: '#fbbf24', Purple: '#a855f7',
-  Orange: '#f97316',
+  // Neutrals
+  Black: '#1a1a1a', White: '#f0f0f0', Grey: '#9ca3af', Brown: '#92400e',
+  Beige: '#d4b896', Cream: '#fef3c7',
+  // Metallics
+  Silver: '#c0c0c0', Gold: '#d4af37', Bronze: '#a0785a',
+  'Rose Gold': '#c9776a', Champagne: '#f4e4c1',
+  // Blues
+  Navy: '#1e3a5f', Indigo: '#4338ca', Cobalt: '#2563eb', Blue: '#3b82f6',
+  'Electric Blue': '#0ea5e9', 'Sky Blue': '#38bdf8', Periwinkle: '#a5b4fc',
+  Teal: '#0d9488', Cyan: '#06b6d4', 'Baby Blue': '#bae6fd',
+  // Greens
+  Green: '#22c55e', Mint: '#34d399', Lime: '#a3e635', Sage: '#86efac',
+  Olive: '#65a30d', Khaki: '#a16207',
+  // Reds & warm
+  Red: '#ef4444', Scarlet: '#f43f5e', Crimson: '#dc2626', Burgundy: '#9b1c1c',
+  Orange: '#f97316', Coral: '#fb923c', Peach: '#fdba74', Rust: '#c2410c', Yellow: '#fbbf24',
+  // Purples & pinks
+  Purple: '#a855f7', Plum: '#7c3aed', Lilac: '#d8b4fe', Lavender: '#c4b5fd',
+  Pink: '#f9a8d4', Rose: '#fb7185', 'Dusty Rose': '#fda4af', Blush: '#fecdd3',
+  Magenta: '#e879f9', 'Hot Pink': '#ec4899', Fuchsia: '#d946ef',
 };
+
+// Diagonal highlight → midtone → shadow stops for each metallic finish.
+// start/end chosen so the bright streak runs top-left to bottom-right.
+const METALLIC_GRADIENTS: Record<string, readonly [string, string, ...string[]]> = {
+  Silver:      ['#f2f2f2', '#c0c0c0', '#f5f5f5', '#8a8a8a'],
+  Gold:        ['#fde68a', '#d4af37', '#f5e27a', '#b8860b'],
+  Bronze:      ['#d4a271', '#8b5c2a', '#cd853f', '#7b3f15'],
+  'Rose Gold': ['#f4c2b8', '#c9776a', '#eda99a', '#a0504a'],
+  Champagne:   ['#f8f0d8', '#e4c96e', '#f5e8c0', '#c8a84b'],
+};
+const METALLIC_START = { x: 0.15, y: 0 } as const;
+const METALLIC_END   = { x: 0.85, y: 1 } as const;
 
 // Four pie-slice quadrants: red · blue · green · yellow
 const MultiSwatch = () => (
@@ -137,12 +181,18 @@ const ColorField = ({ value, onValueChange }: {
           accessibilityLabel={c}
           style={[st.swatchRing, value === c && st.swatchRingActive]}
         >
-          <View style={[
-            st.swatch,
-            c !== 'Multi' && { backgroundColor: SWATCH[c] ?? colors.glassBg },
-          ]}>
-            {c === 'Multi' && <MultiSwatch />}
-          </View>
+          {c === 'Multi' ? (
+            <View style={st.swatch}><MultiSwatch /></View>
+          ) : METALLIC_GRADIENTS[c] ? (
+            <LinearGradient
+              colors={METALLIC_GRADIENTS[c]}
+              start={METALLIC_START}
+              end={METALLIC_END}
+              style={st.swatch}
+            />
+          ) : (
+            <View style={[st.swatch, { backgroundColor: SWATCH[c] ?? colors.glassBg }]} />
+          )}
         </Pressable>
       ))}
     </View>
