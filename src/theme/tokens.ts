@@ -54,14 +54,30 @@ export const colors = {
 // RN migration: use expo-linear-gradient with these stop arrays
 
 export const weatherGradients = {
-  sunny:        ['#F97316', '#FBBF24', '#FDE68A'],
-  clearDay:     ['#0284C7', '#38BDF8', '#7DD3FC'],
-  clearNight:   ['#020617', '#0C1445', '#1D2B6B'],
+  // ── Clear / Sun ───────────────────────────────────────────────────────────
+  sunny:        ['#F97316', '#FBBF24', '#FDE68A'],   // vivid orange-gold
+  clearDay:     ['#0284C7', '#38BDF8', '#7DD3FC'],   // sky blue
+  clearNight:   ['#020617', '#0C1445', '#1D2B6B'],   // deep midnight
+  hot:          ['#7C2D12', '#C2410C', '#FBBF24'],   // scorched amber-gold
+
+  // ── Clouds ────────────────────────────────────────────────────────────────
   partlyCloudy: ['#334155', '#475569', '#64748B'],
   cloudy:       ['#1F2937', '#374151', '#4B5563'],
+
+  // ── Precipitation ─────────────────────────────────────────────────────────
+  drizzle:      ['#0F2236', '#1B4A7A', '#4A90D9'],   // lighter than rainy
   rainy:        ['#0C1A2E', '#1E3A5F', '#1D4ED8'],
   stormy:       ['#0F0C29', '#1E1B4B', '#302B63'],
+
+  // ── Winter ────────────────────────────────────────────────────────────────
   snow:         ['#5B8DB8', '#93C5FD', '#E0F2FE'],
+  ice:          ['#0A1929', '#1B3A5C', '#3A7AB5'],   // cold steel blue
+
+  // ── Atmosphere ────────────────────────────────────────────────────────────
+  foggy:        ['#374151', '#6B7280', '#9CA3AF'],   // cool grey mist
+  hazy:         ['#3B2F1E', '#7A6040', '#BAA07A'],   // warm ochre dust
+
+  // ── Fallback ──────────────────────────────────────────────────────────────
   default:      ['#0F172A', '#1E293B', '#334155'],
 } as const;
 

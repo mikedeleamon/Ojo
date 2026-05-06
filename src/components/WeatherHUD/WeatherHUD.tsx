@@ -189,40 +189,88 @@ const GearIcon = () => (
 
 const gradientFor = (condition: string, isDay: boolean): string[] => {
     const c = condition.toLowerCase();
+
+    // ── Night clear must be checked first ────────────────────────────────────
     if (!isDay && (c.includes('clear') || c.includes('mostly clear')))
         return weatherGradients.clearNight;
+
+    // ── Atmosphere (fog / haze / mist) ────────────────────────────────────────
+    if (c.includes('fog') || c.includes('mist')) return weatherGradients.foggy;
+    if (c.includes('haz') || c.includes('smoke')) return weatherGradients.hazy;
+
+    // ── Hot ───────────────────────────────────────────────────────────────────
+    if (c.includes('hot')) return weatherGradients.hot;
+
+    // ── Sun / clear ───────────────────────────────────────────────────────────
     if (c.includes('sunny') || c.includes('mostly sunny'))
         return weatherGradients.clearDay;
     if (c.includes('clear'))
         return isDay ? weatherGradients.clearDay : weatherGradients.clearNight;
+
+    // ── Clouds ────────────────────────────────────────────────────────────────
     if (c.includes('partly') || c.includes('intermittent'))
         return weatherGradients.partlyCloudy;
     if (c.includes('cloud') || c.includes('overcast'))
         return weatherGradients.cloudy;
+
+    // ── Winter precip ─────────────────────────────────────────────────────────
+    if (c.includes('snow') || c.includes('flurr') || c.includes('blizzard'))
+        return weatherGradients.snow;
+    if (
+        c.includes('sleet') ||
+        c.includes('ice') ||
+        c.includes('freez') ||
+        c.includes('wintry')
+    )
+        return weatherGradients.ice;
+
+    // ── Rain ──────────────────────────────────────────────────────────────────
+    if (c.includes('drizzle') || c.includes('sprinkle'))
+        return weatherGradients.drizzle;
     if (c.includes('rain') || c.includes('shower'))
         return weatherGradients.rainy;
     if (c.includes('thunder') || c.includes('storm'))
         return weatherGradients.stormy;
-    if (c.includes('snow') || c.includes('flurr')) return weatherGradients.snow;
+
     return isDay ? weatherGradients.clearDay : weatherGradients.clearNight;
 };
 
 const footerBgFor = (condition: string, isDay: boolean): string => {
     const c = condition.toLowerCase();
+
     if (!isDay && (c.includes('clear') || c.includes('mostly clear')))
-        return 'rgba(12,20,40,0.97)';
+        return 'rgba(2,6,23,0.97)';
+
+    if (c.includes('fog') || c.includes('mist')) return 'rgba(31,41,55,0.97)';
+    if (c.includes('haz') || c.includes('smoke')) return 'rgba(41,32,20,0.97)';
+    if (c.includes('hot')) return 'rgba(92,35,8,0.97)';
+
     if (c.includes('sunny') || c.includes('mostly sunny'))
-        //for *HOT* sunny days, use a warmer footer color to match the gradient
-        //return 'rgba(180,83,9,0.97)';
         return 'rgba(2,78,142,0.97)';
     if (c.includes('clear'))
-        return isDay ? 'rgba(2,78,142,0.97)' : 'rgba(12,20,40,0.97)';
-    if (c.includes('partly')) return 'rgba(22,34,54,0.97)';
-    if (c.includes('cloud')) return 'rgba(16,24,39,0.97)';
-    if (c.includes('rain')) return 'rgba(6,18,36,0.97)';
+        return isDay ? 'rgba(2,78,142,0.97)' : 'rgba(2,6,23,0.97)';
+
+    if (c.includes('partly') || c.includes('intermittent'))
+        return 'rgba(22,34,54,0.97)';
+    if (c.includes('cloud') || c.includes('overcast'))
+        return 'rgba(16,24,39,0.97)';
+
+    if (c.includes('snow') || c.includes('flurr') || c.includes('blizzard'))
+        return 'rgba(50,90,130,0.97)';
+    if (
+        c.includes('sleet') ||
+        c.includes('ice') ||
+        c.includes('freeze') ||
+        c.includes('wintry')
+    )
+        return 'rgba(10,25,45,0.97)';
+
+    if (c.includes('drizzle') || c.includes('sprinkle'))
+        return 'rgba(10,26,48,0.97)';
+    if (c.includes('rain') || c.includes('shower')) return 'rgba(6,18,36,0.97)';
     if (c.includes('thunder') || c.includes('storm'))
         return 'rgba(10,8,28,0.97)';
-    if (c.includes('snow')) return 'rgba(50,90,130,0.97)';
+
     return isDay ? 'rgba(2,78,142,0.97)' : 'rgba(10,16,32,0.97)';
 };
 
@@ -346,6 +394,8 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
     const fromColorsRef = useRef<string[]>(DEFAULT_GRADIENT);
     const animProgress = useRef(new RNAnimated.Value(1)).current;
     const loadingOpacity = useRef(new RNAnimated.Value(1)).current;
+    // Content fades in from 0 after spinner fades out — cross-dissolve handoff
+    const contentOpacity = useRef(new RNAnimated.Value(0)).current;
 
     // Compute target gradient from weather data
     const targetGradient = weather
@@ -377,7 +427,7 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
 
         RNAnimated.timing(animProgress, {
             toValue: 1,
-            duration: isFirstPaint ? 2600 : 1500,
+            duration: isFirstPaint ? 2500 : 1200,
             easing: RNEasing.inOut(RNEasing.cubic),
             useNativeDriver: false,
         }).start(() => {
@@ -391,18 +441,32 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
         };
     }, [targetGradient.join(',')]);
 
-    // Fade out loading spinner shortly before gradient settles, so the user's
-    // attention shifts to the colors mid-transition rather than at the very end.
+    // Cross-dissolve: spinner fades out while content fades in simultaneously.
+    // A slight delay on contentOpacity means the spinner has started leaving
+    // before the content arrives, which reads as a clean handoff rather than
+    // two things fighting for the same space.
     useEffect(() => {
         if (!loading && weather) {
-            RNAnimated.timing(loadingOpacity, {
-                toValue: 0,
-                duration: 400,
-                easing: RNEasing.out(RNEasing.cubic),
-                useNativeDriver: true,
-            }).start();
+            RNAnimated.parallel([
+                RNAnimated.timing(loadingOpacity, {
+                    toValue: 0,
+                    duration: 380,
+                    easing: RNEasing.out(RNEasing.cubic),
+                    useNativeDriver: true,
+                }),
+                RNAnimated.sequence([
+                    RNAnimated.delay(120),
+                    RNAnimated.timing(contentOpacity, {
+                        toValue: 1,
+                        duration: 420,
+                        easing: RNEasing.out(RNEasing.cubic),
+                        useNativeDriver: true,
+                    }),
+                ]),
+            ]).start();
         } else if (loading) {
             loadingOpacity.setValue(1);
+            contentOpacity.setValue(0);
         }
     }, [loading, weather]);
 
@@ -450,80 +514,89 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
                 />
             </RNAnimated.View>
 
-            {weather && !loading && (
-                <ScrollView
-                    contentContainerStyle={st.scroll}
-                    showsVerticalScrollIndicator={false}
-                    refreshControl={
-                        <RefreshControl
-                            refreshing={refreshing}
-                            onRefresh={() => {
-                                isRefreshRef.current = true;
-                                setRefreshing(true);
-                                onRefresh?.();
-                            }}
-                            tintColor={colors.textPrimary}
-                        />
-                    }
+            {/* Content fades in via contentOpacity — rendered once weather exists,
+                opacity-0 while loading so it's invisible but mounted and ready. */}
+            {weather && (
+                <RNAnimated.View
+                    style={[st.contentLayer, { opacity: contentOpacity }]}
+                    pointerEvents={loading ? 'none' : 'auto'}
                 >
-                    {/* Header */}
-                    <View
-                        style={[
-                            st.header,
-                            { paddingTop: spacing.lg + topInset },
-                        ]}
+                    <ScrollView
+                        contentContainerStyle={st.scroll}
+                        showsVerticalScrollIndicator={false}
+                        refreshControl={
+                            <RefreshControl
+                                refreshing={refreshing}
+                                onRefresh={() => {
+                                    isRefreshRef.current = true;
+                                    setRefreshing(true);
+                                    onRefresh?.();
+                                }}
+                                tintColor={colors.textPrimary}
+                            />
+                        }
                     >
-                        <Pressable
-                            style={[st.gearBtn, { top: topInset + 8 }]}
-                            onPress={() => nav.push('Account')}
-                            accessibilityLabel='Account settings'
+                        {/* Header */}
+                        <View
+                            style={[
+                                st.header,
+                                { paddingTop: spacing.lg + topInset },
+                            ]}
                         >
-                            <GearIcon />
-                        </Pressable>
-                        <Text style={st.city}>{city?.LocalizedName}</Text>
-                        <Text style={st.condition}>{weather.WeatherText}</Text>
-                    </View>
+                            <Pressable
+                                style={[st.gearBtn, { top: topInset + 8 }]}
+                                onPress={() => nav.push('Account')}
+                                accessibilityLabel='Account settings'
+                            >
+                                <GearIcon />
+                            </Pressable>
+                            <Text style={st.city}>{city?.LocalizedName}</Text>
+                            <Text style={st.condition}>
+                                {weather.WeatherText}
+                            </Text>
+                        </View>
 
-                    {/* Hero icon + temperature */}
-                    <View style={st.hero}>
-                        <WeatherIconDisplay
-                            condition={weather.WeatherText}
-                            isDay={weather.IsDayTime}
-                            size='large'
-                            temperature={tempVal}
-                            feelsLike={feelsVal}
-                        />
-                    </View>
+                        {/* Hero icon + temperature */}
+                        <View style={st.hero}>
+                            <WeatherIconDisplay
+                                condition={weather.WeatherText}
+                                isDay={weather.IsDayTime}
+                                size='large'
+                                temperature={tempVal}
+                                feelsLike={feelsVal}
+                            />
+                        </View>
 
-                    {/* Hourly forecast strip */}
-                    {forecasts.length > 0 && (
-                        <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={st.forecastStrip}
-                        >
-                            {forecasts.map((f, i) => (
-                                <MinimizedWeatherDisplay
-                                    key={i}
-                                    weather={f.IconPhrase}
-                                    temperature={f.Temperature.Value}
-                                    time={f.DateTime}
-                                    tempUnit={f.Temperature.Unit}
-                                    isDay={f.IsDaylight}
-                                />
-                            ))}
-                        </ScrollView>
-                    )}
+                        {/* Hourly forecast strip */}
+                        {forecasts.length > 0 && (
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={st.forecastStrip}
+                            >
+                                {forecasts.map((f, i) => (
+                                    <MinimizedWeatherDisplay
+                                        key={i}
+                                        weather={f.IconPhrase}
+                                        temperature={f.Temperature.Value}
+                                        time={f.DateTime}
+                                        tempUnit={f.Temperature.Unit}
+                                        isDay={f.IsDaylight}
+                                    />
+                                ))}
+                            </ScrollView>
+                        )}
 
-                    {/* Details + outfit */}
-                    <View style={st.details}>
-                        <WeatherDetails
-                            weather={weather}
-                            settings={settings}
-                            forecasts={forecasts}
-                        />
-                    </View>
-                </ScrollView>
+                        {/* Details + outfit */}
+                        <View style={st.details}>
+                            <WeatherDetails
+                                weather={weather}
+                                settings={settings}
+                                forecasts={forecasts}
+                            />
+                        </View>
+                    </ScrollView>
+                </RNAnimated.View>
             )}
         </LinearGradient>
     );
@@ -533,6 +606,7 @@ export default WeatherHUD;
 
 const st = StyleSheet.create({
     root: { flex: 1 },
+    contentLayer: { flex: 1 },
     loadingOverlay: {
         ...StyleSheet.absoluteFillObject,
         zIndex: 10,
