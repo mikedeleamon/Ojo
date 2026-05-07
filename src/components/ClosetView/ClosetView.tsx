@@ -341,7 +341,12 @@ const SwipeableArticleCard = ({
             extrapolate: 'clamp',
         });
         return (
-            <Animated.View style={[swipeStyles.deleteActionWrap, { transform: [{ translateX }] }]}>
+            <Animated.View
+                style={[
+                    swipeStyles.deleteActionWrap,
+                    { transform: [{ translateX }] },
+                ]}
+            >
                 <Pressable
                     style={swipeStyles.deleteAction}
                     onPress={() => {
@@ -938,6 +943,8 @@ const swipeStyles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         backgroundColor: '#FF3B30',
+        borderTopLeftRadius: radius.sm,
+        borderBottomLeftRadius: radius.sm,
         borderTopRightRadius: radius.sm,
         borderBottomRightRadius: radius.sm,
     },
