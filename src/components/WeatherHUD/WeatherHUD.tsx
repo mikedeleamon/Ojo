@@ -256,10 +256,20 @@ const footerBgFor = (condition: string, isDay: boolean): string => {
 };
 
 const formatLastUpdated = (date: Date): string => {
-    const mins = Math.floor((Date.now() - date.getTime()) / 60_000);
-    if (mins < 1) return 'Just now';
-    if (mins === 1) return '1 min ago';
-    return `${mins} mins ago`;
+    const totalMins = Math.floor((Date.now() - date.getTime()) / 60_000);
+    
+    if (totalMins < 1) return 'Just now';
+    if (totalMins < 60) {
+        return totalMins === 1 ? '1 min ago' : `${totalMins} mins ago`;
+    }
+    
+    const totalHours = Math.floor(totalMins / 60);
+    if (totalHours < 24) {
+        return totalHours === 1 ? '1 hour ago' : `${totalHours} hours ago`;
+    }
+    
+    const totalDays = Math.floor(totalHours / 24);
+    return totalDays === 1 ? '1 day ago' : `${totalDays} days ago`;
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────

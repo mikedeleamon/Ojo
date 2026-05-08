@@ -1,5 +1,11 @@
-import { useState, useMemo, useEffect } from 'react';
-import { StyleSheet, ScrollView, Image, Pressable } from 'react-native';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import {
+    StyleSheet,
+    ScrollView,
+    Image,
+    Pressable,
+    useWindowDimensions,
+} from 'react-native';
 import { Svg, Path, Circle } from 'react-native-svg';
 import { View, Text } from '../primitives';
 import { EmptyState } from '../shared';
@@ -158,7 +164,9 @@ const ArticleThumb = ({
         </View>
         <View style={styles.articleLabel}>
             <Text style={styles.roleLabel}>
-                {role === 'accessory' ? articleZoneLabel(article) : ROLE_LABELS[role]}
+                {role === 'accessory'
+                    ? articleZoneLabel(article)
+                    : ROLE_LABELS[role]}
             </Text>
             <Text
                 style={styles.articleName}
@@ -182,7 +190,9 @@ const ScoreBadge = ({ score }: { score: number }) => {
               : 'rgba(148,163,184,0.9)';
     return (
         <View style={[styles.scoreBadge, { borderColor: color }]}>
-            <Text style={[styles.scoreBadgeText, { color }]}>{score}</Text>
+            <Text style={[styles.scoreBadgeText, { color }]}>
+                Outfit Score: {score}
+            </Text>
         </View>
     );
 };
@@ -200,7 +210,7 @@ const ConfidencePip = ({ value }: { value: number }) => {
     return (
         <View style={[layerStyles.confidencePip, { borderColor: col }]}>
             <Text style={[layerStyles.confidenceText, { color: col }]}>
-                {pct}%
+                Confidence Score: {pct}%
             </Text>
         </View>
     );
@@ -314,9 +324,17 @@ const outfitTabSubtitle = (outfit: OutfitResult): string => {
 const weatherAwareAddClothesBody = (weather: CurrentWeather): string => {
     const tempF = weather.Temperature.Imperial.Value;
     const cond = weather.WeatherText.toLowerCase();
-    if (cond.includes('rain') || cond.includes('shower') || cond.includes('drizzle'))
+    if (
+        cond.includes('rain') ||
+        cond.includes('shower') ||
+        cond.includes('drizzle')
+    )
         return 'Add a rain jacket or waterproof layer to get started.';
-    if (cond.includes('snow') || cond.includes('blizzard') || cond.includes('flurr'))
+    if (
+        cond.includes('snow') ||
+        cond.includes('blizzard') ||
+        cond.includes('flurr')
+    )
         return 'Add a winter coat or warm layers to get started.';
     if (cond.includes('thunder') || cond.includes('storm'))
         return 'Add a sturdy outer layer to get started.';
@@ -328,11 +346,16 @@ const weatherAwareAddClothesBody = (weather: CurrentWeather): string => {
 const weatherAwareInsufficientBody = (weather: CurrentWeather): string => {
     const tempF = weather.Temperature.Imperial.Value;
     const cond = weather.WeatherText.toLowerCase();
-    if (cond.includes('rain') || cond.includes('shower') || cond.includes('drizzle'))
+    if (
+        cond.includes('rain') ||
+        cond.includes('shower') ||
+        cond.includes('drizzle')
+    )
         return 'Add a top, bottom, and a rain jacket to build an outfit.';
     if (cond.includes('snow') || cond.includes('blizzard'))
         return 'Add a top, bottom, and a warm coat to build a cold-weather outfit.';
-    if (tempF <= 40) return 'Add a top and a bottom — a warm outer layer would help too.';
+    if (tempF <= 40)
+        return 'Add a top and a bottom — a warm outer layer would help too.';
     return 'Add a top and a bottom (or a full-body piece) to get a suggestion.';
 };
 
@@ -353,6 +376,14 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
     const [wornLogged, setWornLogged] = useState(false);
     const [worn, setWorn] = useState<Map<string, number>>(new Map());
     const nav = useAppNavigation();
+
+    // ─── Pager ───────────────────────────────────────────────────────────────
+    // cardWidth = content area width.
+    // The details card in WeatherHUD applies marginHorizontal + padding = spacing.md
+    // on each side (×2 sides ×2 properties = spacing.md * 4.1 total horizontal space).
+    const { width: windowWidth } = useWindowDimensions();
+    const cardWidth = windowWidth - spacing.md * 4.1;
+    const pagerRef = useRef<ScrollView>(null);
 
     useEffect(() => {
         recentlyWornWithAge(7).then(setWorn);
@@ -404,6 +435,11 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
         setWornLogged(true);
         setTimeout(() => setWornLogged(false), 3000);
     };
+
+    // Scroll the pager programmatically when activeIdx changes via dot taps or resets
+    useEffect(() => {
+        pagerRef.current?.scrollTo({ x: safeIdx * cardWidth, animated: true });
+    }, [safeIdx, cardWidth]);
 
     if (loading) return null;
 
@@ -490,7 +526,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
 
     return (
         <View style={styles.root}>
-            {/* Header */}
+            {/* ── Header ── */}
             <View style={styles.header}>
                 <PreferredBadge
                     name={preferred.name}
@@ -499,70 +535,73 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
                 <ScoreBadge score={activeOutfit.score} />
             </View>
 
-            {/* Outfit selector tabs */}
-            {outfits.length > 1 && (
-                <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    style={styles.tabsScroll}
-                >
-                    <View style={styles.tabs}>
-                        {outfits.map((o, i) => (
-                            <Pressable
-                                key={i}
-                                style={[
-                                    styles.tab,
-                                    i === safeIdx && styles.tabActive,
-                                ]}
-                                onPress={() => {
-                                    setActiveIdx(i);
-                                    setWornLogged(false);
-                                }}
-                            >
-                                <View style={styles.tabInner}>
-                                    <View style={styles.tabLabelRow}>
-                                        <Text
-                                            style={[
-                                                styles.tabText,
-                                                i === safeIdx && styles.tabTextActive,
-                                            ]}
-                                        >
-                                            {i === 0 ? 'Best match' : `Option ${i + 1}`}
-                                        </Text>
-                                        <Text
-                                            style={[
-                                                styles.tabScore,
-                                                i === safeIdx && styles.tabTextActive,
-                                            ]}
-                                        >
-                                            {o.score}
-                                        </Text>
-                                    </View>
-                                    <Text style={styles.tabSubtitle}>
-                                        {outfitTabSubtitle(o)}
-                                    </Text>
-                                </View>
-                            </Pressable>
-                        ))}
+            {/* ── Outfit pager: swipe left/right to browse options ── */}
+            <ScrollView
+                ref={pagerRef}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                scrollEventThrottle={16}
+                decelerationRate='fast'
+                onMomentumScrollEnd={(e) => {
+                    const page = Math.round(
+                        e.nativeEvent.contentOffset.x / cardWidth,
+                    );
+                    if (page !== activeIdx) {
+                        setActiveIdx(page);
+                        setWornLogged(false);
+                        setShowBreakdown(false);
+                    }
+                }}
+            >
+                {outfits.map((outfit, i) => (
+                    <View
+                        key={i}
+                        style={[styles.pagerCard, { width: cardWidth }]}
+                    >
+                        <View style={styles.pagerCardArticles}>
+                            {outfit.slots.map((slot, j) => (
+                                <ArticleThumb
+                                    key={j}
+                                    article={slot.article}
+                                    role={slot.role}
+                                />
+                            ))}
+                        </View>
+                        <View style={styles.pagerCardFooter}>
+                            <Text style={styles.pagerSubtitle}>
+                                {outfitTabSubtitle(outfit)}
+                            </Text>
+                        </View>
                     </View>
-                </ScrollView>
+                ))}
+            </ScrollView>
+
+            {/* ── Page dots (also tappable) ── */}
+            {outfits.length > 1 && (
+                <View style={styles.dots}>
+                    {outfits.map((_, i) => (
+                        <Pressable
+                            key={i}
+                            hitSlop={8}
+                            style={[
+                                styles.dot,
+                                i === safeIdx && styles.dotActive,
+                            ]}
+                            onPress={() => {
+                                setActiveIdx(i);
+                                setWornLogged(false);
+                                setShowBreakdown(false);
+                            }}
+                        />
+                    ))}
+                </View>
             )}
 
-            {/* Headline */}
+            {/* ── Headline ── */}
             <Text style={styles.headline}>{activeOutfit.headline}</Text>
 
-            {/* Article grid */}
-            <View style={styles.articleGrid}>
-                {activeOutfit.slots.map((slot, i) => (
-                    <ArticleThumb
-                        key={`${safeIdx}-${i}`}
-                        article={slot.article}
-                        role={slot.role}
-                    />
-                ))}
-            </View>
-
-            {/* Score breakdown */}
+            {/* ── Score breakdown ── */}
             <Pressable
                 style={styles.breakdownToggle}
                 onPress={() => setShowBreakdown((v) => !v)}
@@ -598,7 +637,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
                 </View>
             )}
 
-            {/* Notes */}
+            {/* ── Notes ── */}
             {activeOutfit.notes.length > 0 && (
                 <View style={styles.notesList}>
                     {activeOutfit.notes.map((n, i) => (
@@ -612,12 +651,12 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
                 </View>
             )}
 
-            {/* Layering recommendation */}
+            {/* ── Layering recommendation ── */}
             {activeOutfit.layering && (
                 <LayeringSection layering={activeOutfit.layering} />
             )}
 
-            {/* Wore this today */}
+            {/* ── Wore this today ── */}
             <Pressable
                 style={[
                     styles.woreThisBtn,
@@ -702,37 +741,51 @@ const styles = StyleSheet.create({
         fontSize: fontSizes.sm,
         fontWeight: fontWeights.semibold,
     },
-    tabsScroll: { marginHorizontal: -spacing.md },
-    tabs: {
-        flexDirection: 'row',
-        gap: 8,
-        paddingHorizontal: spacing.md,
+    // ─── Outfit pager ──────────────────────────────────────────────────────────
+    pagerCard: {
+        gap: spacing.sm,
         paddingBottom: 4,
     },
-    tab: {
-        paddingVertical: 7,
-        paddingHorizontal: 14,
-        borderRadius: radius.sm,
+    pagerCardArticles: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: spacing.sm,
+        padding: spacing.sm,
+        backgroundColor: 'rgba(255,255,255,0.04)',
+        borderRadius: radius.md,
         borderWidth: 1,
         borderColor: colors.glassBorder,
     },
-    tabActive: {
-        backgroundColor: 'rgba(255,255,255,0.12)',
-        borderColor: colors.glassBorder,
+    pagerCardFooter: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 2,
     },
-    tabInner: { gap: 2 },
-    tabLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    tabText: {
+    pagerSubtitle: {
         fontFamily: fonts.body,
         fontSize: fontSizes.xs,
-        color: colors.textSecondary,
-    },
-    tabTextActive: { color: colors.textPrimary },
-    tabScore: { fontFamily: fonts.body, fontSize: 10, color: colors.textMuted },
-    tabSubtitle: {
-        fontFamily: fonts.body,
-        fontSize: 10,
         color: colors.textMuted,
+        fontStyle: 'italic',
+    },
+    // ─── Page dots ─────────────────────────────────────────────────────────────
+    dots: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 6,
+        paddingVertical: 2,
+    },
+    dot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: 'rgba(255,255,255,0.22)',
+    },
+    dotActive: {
+        width: 18,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: colors.textPrimary,
     },
     headline: {
         fontFamily: fonts.body,
