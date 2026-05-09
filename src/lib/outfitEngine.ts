@@ -16,7 +16,7 @@
 
 import { ClothingArticle, CurrentWeather, Forecast, Settings, OutfitOccasion, BodyZone } from '../types';
 import { articlePreferenceScore, colorPairingBonus, UserPreferenceProfile } from './userPreferences';
-import { generateLayeringRecommendation, LayeringResult } from './layeringEngine';
+import { buildLayeringContext, generateLayeringRecommendation, LayeringResult } from './layeringEngine';
 
 // ─── Core types ───────────────────────────────────────────────────────────────
 
@@ -498,11 +498,12 @@ const findClashingArticle = (slots: OutfitSlot[]): OutfitSlot | null => {
 
   let minAvg = Infinity, worst: OutfitSlot | null = null;
   for (const slot of coloredSlots) {
-    const others = slots.filter(s => s !== slot);
-    const avg = others.reduce(
-      (sum, other) => sum + pairHarmony(slot.article.color!, other.article.color ?? 'Black'),
+    const coloredOthers = slots.filter(s => s !== slot && s.article.color);
+    if (coloredOthers.length === 0) continue;
+    const avg = coloredOthers.reduce(
+      (sum, other) => sum + pairHarmony(slot.article.color!, other.article.color!),
       0,
-    ) / others.length;
+    ) / coloredOthers.length;
     if (avg < minAvg) { minAvg = avg; worst = slot; }
   }
   return minAvg < 0.65 ? worst : null;
@@ -747,6 +748,113 @@ const headline = (b: WeatherBucket): string =>
   b === 'cold'     ? "Bundle up today."              :
                      "Dress warm — it's freezing.";
 
+// ─── Notes builder ────────────────────────────────────────────────────────────
+
+interface NotesContext {
+  bucket:           WeatherBucket;
+  precipIntensity:  PrecipIntensity;
+  windMph:          number;
+  uvHigh:           boolean;
+  uvIndexText:      string;
+  isSnowing:        boolean;
+  settings:         Settings;
+}
+
+const buildNotes = (
+  slots:     OutfitSlot[],
+  breakdown: ScoreBreakdown,
+  ctx:       NotesContext,
+): string[] => {
+  const notes: string[] = [];
+
+  // ── Wardrobe gap notes ────────────────────────────────────────────────
+  const needsOuter = ctx.bucket === 'cool' || ctx.bucket === 'cold' || ctx.bucket === 'freezing';
+  if (needsOuter && !slots.some(s => s.role === 'outerwear')) {
+    notes.push(
+      ctx.bucket === 'freezing' || ctx.bucket === 'cold'
+        ? 'No coat in your closet — add one for cold days.'
+        : 'A light jacket would work well today.',
+    );
+  }
+  if (!slots.some(s => s.role === 'footwear')) {
+    notes.push('No footwear in your closet yet.');
+  }
+
+  // ── Condition notes ───────────────────────────────────────────────────
+  if (ctx.precipIntensity === 'heavy')
+    notes.push('Heavy rain expected — waterproof layers strongly recommended.');
+  else if (ctx.precipIntensity === 'moderate')
+    notes.push('Rain expected — a water-resistant layer is recommended.');
+  else if (ctx.precipIntensity === 'light')
+    notes.push('Light rain possible — consider a layer you can wipe down.');
+
+  if (ctx.isSnowing && !slots.some(s => s.article.clothingType === 'Boots')) {
+    notes.push('Snow expected — boots would serve you better.');
+  }
+
+  if (ctx.windMph >= 20 && (ctx.bucket === 'cool' || ctx.bucket === 'cold' || ctx.bucket === 'freezing')) {
+    notes.push('Windy today — wind-resistant fabrics like Denim or Leather help.');
+  }
+
+  if (ctx.uvHigh && !slots.some(s => s.article.clothingType === 'Hat' || s.article.clothingType === 'Cap')) {
+    notes.push(`UV is ${ctx.uvIndexText} today — a hat would help protect you.`);
+  }
+
+  // ── Fabric care warnings (rain-sensitive items) ────────────────────────
+  if (ctx.precipIntensity !== 'none') {
+    const RAIN_FRAGILE: Record<string, string> = {
+      Silk:   'damaged by water and may stain permanently',
+      Linen:  'prone to water marks and heavy wrinkling when wet',
+    };
+    for (const slot of slots) {
+      const fabric = slot.article.fabricType ?? '';
+      const warning = RAIN_FRAGILE[fabric];
+      if (warning) {
+        const name = slot.article.name || slot.article.clothingType;
+        if (ctx.precipIntensity === 'heavy' || ctx.precipIntensity === 'moderate') {
+          notes.push(`⚠ Your ${name} (${fabric}) can be ${warning} — strongly consider swapping it today.`);
+        } else {
+          notes.push(`Your ${name} (${fabric}) can be ${warning} — keep an eye on the sky.`);
+        }
+      }
+    }
+    // Leather gets a softer warning (water-resistant but can stain over time)
+    const leatherItems = slots.filter(s => s.article.fabricType === 'Leather');
+    if (leatherItems.length > 0 && (ctx.precipIntensity === 'heavy' || ctx.precipIntensity === 'moderate')) {
+      const names = leatherItems.map(s => s.article.name || s.article.clothingType).join(' & ');
+      notes.push(`Your ${names} (Leather) can water-stain in heavy rain — treat with protectant or swap.`);
+    }
+  }
+
+  // ── Score-based notes ─────────────────────────────────────────────────
+  if (breakdown.color < 55) {
+    const worst = findClashingArticle(slots);
+    if (worst) {
+      const name = worst.article.name || worst.article.clothingType;
+      notes.push(`Color harmony is low (${breakdown.color}/100) — consider swapping the ${name}.`);
+    }
+  }
+
+  if (breakdown.fabric < 45) {
+    notes.push(`Fabric suitability is low (${breakdown.fabric}/100) — these materials may not suit today's weather.`);
+  }
+
+  if (breakdown.style < 50) {
+    notes.push(`Style alignment is low (${breakdown.style}/100) — some pieces don't fit your ${ctx.settings.clothingStyle} style.`);
+  }
+
+  // ── Care notes ────────────────────────────────────────────────────────
+  const dryCleanItems = slots.filter(
+    s => s.article.fabricType && DRY_CLEAN_FABRICS.has(s.article.fabricType),
+  );
+  if (dryCleanItems.length > 0) {
+    const names = dryCleanItems.map(s => s.article.name || s.article.clothingType).join(' & ');
+    notes.push(`Dry-clean recommended for: ${names}.`);
+  }
+
+  return notes;
+};
+
 // ─── Main: generate top-K ranked outfits ──────────────────────────────────────
 
 export const generateOutfits = (
@@ -777,7 +885,6 @@ export const generateOutfits = (
   // ── Weather context ───────────────────────────────────────────────────────
   const feelsLikeF       = weather.RealFeelTemperature.Imperial.Value;
   const precipIntensity  = classifyPrecipitation(weather);
-  const raining          = precipIntensity !== 'none';
   const humidity         = weather.RelativeHumidity;
   const windMph          = weather.Wind.Speed.Imperial.Value;
   const uvIndexText      = weather.UVIndexText ?? '';
@@ -799,7 +906,7 @@ export const generateOutfits = (
     const blendFactor = Math.max(0.10, 0.40 - (currentHour - 6) * 0.05);
     effectiveFeelsLike = feelsLikeF * (1 - blendFactor) + forecastLow * blendFactor;
   }
-  const bucket      = getWeatherBucket(feelsLikeF, settings.hiTempThreshold, settings.lowTempThreshold);
+  const bucket      = getWeatherBucket(effectiveFeelsLike, settings.hiTempThreshold, settings.lowTempThreshold);
 
   // ── Phase 1: Hard filter → role bucketing → pre-rank per bucket ───────────
   const byRole = new Map<OutfitRole, ClothingArticle[]>();
@@ -837,13 +944,16 @@ export const generateOutfits = (
         ? midLayers.slice(0, 4)
         : [...midLayers.slice(0, 4), null];  // cool/warm: optional
 
-  // Outerwear: required in cool/cold/freezing; optional if raining; skip otherwise
+  // Outerwear: required in cool/cold/freezing; required if moderate+ rain;
+  // optional if light rain; skip otherwise
   const outerOptions: (ClothingArticle | null)[] =
     bucket === 'cool' || bucket === 'cold' || bucket === 'freezing'
       ? outerwears.length > 0 ? outerwears : [null]   // null → "missing" note
-      : raining && outerwears.length > 0
-        ? [...outerwears, null]                        // try both with + without
-        : [null];                                      // hot/warm, no rain → skip
+      : (precipIntensity === 'heavy' || precipIntensity === 'moderate') && outerwears.length > 0
+        ? outerwears                                   // moderate+ rain → require
+        : precipIntensity === 'light' && outerwears.length > 0
+          ? [...outerwears, null]                      // light rain → optional
+          : [null];                                    // no rain → skip
 
   const shoeOptions: (ClothingArticle | null)[] =
     footwears.length > 0 ? footwears : [null];
@@ -963,101 +1073,17 @@ export const generateOutfits = (
 
   // ── Phase 5: Attach notes and build OutfitResult[] ───────────────────────
 
-  const buildNotes = (slots: OutfitSlot[], breakdown: ScoreBreakdown): string[] => {
-    const notes: string[] = [];
-
-    // ── Wardrobe gap notes ────────────────────────────────────────────────
-    const needsOuter = bucket === 'cool' || bucket === 'cold' || bucket === 'freezing';
-    if (needsOuter && !slots.some(s => s.role === 'outerwear')) {
-      notes.push(
-        bucket === 'freezing' || bucket === 'cold'
-          ? 'No coat in your closet — add one for cold days.'
-          : 'A light jacket would work well today.',
-      );
-    }
-    if (!slots.some(s => s.role === 'footwear')) {
-      notes.push('No footwear in your closet yet.');
-    }
-
-    // ── Condition notes ───────────────────────────────────────────────────
-    if (precipIntensity === 'heavy')
-      notes.push('Heavy rain expected — waterproof layers strongly recommended.');
-    else if (precipIntensity === 'moderate')
-      notes.push('Rain expected — a water-resistant layer is recommended.');
-    else if (precipIntensity === 'light')
-      notes.push('Light rain possible — consider a layer you can wipe down.');
-
-    if (isSnowing && !slots.some(s => s.article.clothingType === 'Boots')) {
-      notes.push('Snow expected — boots would serve you better.');
-    }
-
-    if (windMph >= 20 && (bucket === 'cool' || bucket === 'cold' || bucket === 'freezing')) {
-      notes.push('Windy today — wind-resistant fabrics like Denim or Leather help.');
-    }
-
-    if (uvHigh && !slots.some(s => s.article.clothingType === 'Hat' || s.article.clothingType === 'Cap')) {
-      notes.push(`UV is ${uvIndexText} today — a hat would help protect you.`);
-    }
-
-    // ── Fabric care warnings (rain-sensitive items) ────────────────────────
-    // Proactively warn when delicate fabrics are in the outfit and rain is
-    // expected — even light rain can damage silk or stain suede.
-    if (precipIntensity !== 'none') {
-      const RAIN_FRAGILE: Record<string, string> = {
-        Silk:   'damaged by water and may stain permanently',
-        Linen:  'prone to water marks and heavy wrinkling when wet',
-      };
-      for (const slot of slots) {
-        const fabric = slot.article.fabricType ?? '';
-        const warning = RAIN_FRAGILE[fabric];
-        if (warning) {
-          const name = slot.article.name ?? slot.article.clothingType;
-          if (precipIntensity === 'heavy' || precipIntensity === 'moderate') {
-            notes.push(`⚠ Your ${name} (${fabric}) can be ${warning} — strongly consider swapping it today.`);
-          } else {
-            notes.push(`Your ${name} (${fabric}) can be ${warning} — keep an eye on the sky.`);
-          }
-        }
-      }
-      // Leather gets a softer warning (water-resistant but can stain over time)
-      const leatherItems = slots.filter(s => s.article.fabricType === 'Leather');
-      if (leatherItems.length > 0 && (precipIntensity === 'heavy' || precipIntensity === 'moderate')) {
-        const names = leatherItems.map(s => s.article.name ?? s.article.clothingType).join(' & ');
-        notes.push(`Your ${names} (Leather) can water-stain in heavy rain — treat with protectant or swap.`);
-      }
-    }
-
-    // ── Score-based notes ─────────────────────────────────────────────────
-    if (breakdown.color < 55) {
-      const worst = findClashingArticle(slots);
-      if (worst) {
-        const name = worst.article.name ?? worst.article.clothingType;
-        notes.push(`Color harmony is low (${breakdown.color}/100) — consider swapping the ${name}.`);
-      }
-    }
-
-    if (breakdown.fabric < 45) {
-      notes.push(`Fabric suitability is low (${breakdown.fabric}/100) — these materials may not suit today's weather.`);
-    }
-
-    if (breakdown.style < 50) {
-      notes.push(`Style alignment is low (${breakdown.style}/100) — some pieces don't fit your ${settings.clothingStyle} style.`);
-    }
-
-    // ── Care notes ────────────────────────────────────────────────────────
-    const dryCleanItems = slots.filter(
-      s => s.article.fabricType && DRY_CLEAN_FABRICS.has(s.article.fabricType),
-    );
-    if (dryCleanItems.length > 0) {
-      const names = dryCleanItems.map(s => s.article.name ?? s.article.clothingType).join(' & ');
-      notes.push(`Dry-clean recommended for: ${names}.`);
-    }
-
-    return notes;
+  const notesCtx: NotesContext = {
+    bucket, precipIntensity, windMph, uvHigh, uvIndexText, isSnowing, settings,
   };
 
+  // Build layering context once — weather/forecast/settings inputs are constant
+  // across all outfit candidates, so deriveDayRange, rainForecast, and necessity
+  // scoring should not be repeated inside the per-outfit map below.
+  const layeringCtx = buildLayeringContext({ weather, forecasts, settings });
+
   const results: OutfitResult[] = topList.map(combo => {
-    const layering = generateLayeringRecommendation({ weather, forecasts, slots: combo.slots });
+    const layering = generateLayeringRecommendation({ context: layeringCtx, slots: combo.slots });
 
     // Confidence-weighted score boost: outfits with high layering confidence
     // (well-matched layers, stable weather) get a small bump; low confidence
@@ -1069,7 +1095,7 @@ export const generateOutfits = (
       status:         'ok' as OutfitStatus,
       headline:       headline(bucket),
       slots:          combo.slots,
-      notes:          buildNotes(combo.slots, combo.breakdown),
+      notes:          buildNotes(combo.slots, combo.breakdown, notesCtx),
       score:          adjustedScore,
       scoreBreakdown: combo.breakdown,
       layering,

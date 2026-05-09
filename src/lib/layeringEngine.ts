@@ -4,7 +4,7 @@
  * Layering Intelligence Engine — extends outfitEngine with layer-aware reasoning.
  *
  * Architecture:
- *  1. Layer classification  — maps clothingType to base / mid / outer
+ *  1. Layer extraction      — maps OutfitRole to base / mid / outer
  *  2. Day range derivation  — extracts real high/low from hourly Forecast[]
  *  3. Layer necessity       — signal-based scoring (no hardcoded cold = 3 layers)
  *  4. Removability scoring  — heuristic from clothingType + fabricType
@@ -18,7 +18,7 @@
  *  - Gracefully degrades when metadata (fabricType, forecasts) is absent
  */
 
-import { ClothingArticle, CurrentWeather, Forecast } from '../types';
+import { ClothingArticle, CurrentWeather, Forecast, Settings } from '../types';
 import { OutfitSlot } from './outfitEngine';
 
 // ─── Public output type ───────────────────────────────────────────────────────
@@ -34,34 +34,16 @@ export interface LayeringResult {
   confidence: number; // 0–1
 }
 
-// ─── 1. Layer classification ──────────────────────────────────────────────────
-// Hoodie and Sweater are intentionally mid, not base — they insulate on top of
-// a shirt rather than serving as the primary skin-contact layer.
-
-type LayerCategory = 'base' | 'mid' | 'outer';
-
-const LAYER_OF: Record<string, LayerCategory> = {
-  // Base — primary coverage worn closest to skin
-  Shirt:   'base',
-  'T-Shirt': 'base',
-  Blouse:  'base',
-  Dress:   'base',
-  // Mid — insulating layer, easy to add or remove
-  Sweater: 'mid',
-  Hoodie:  'mid',
-  // Outer — protective shell (garments and protective accessories)
-  Jacket:  'outer',
-  Coat:    'outer',
-  Scarf:   'outer', // neck protection — relevant in cold/wind, appears in layer stack
-  Gloves:  'outer', // hand protection — same reasoning
-};
-
-const layerOf = (article: ClothingArticle): LayerCategory | null =>
-  LAYER_OF[article.clothingType] ?? null;
+// ─── 1. Layer extraction ──────────────────────────────────────────────────────
+// Reads the role already assigned by outfitEngine — no separate clothingType
+// lookup needed. This keeps the two engines in sync: any new type that
+// outfitEngine classifies as 'midLayer' or 'outerwear' is automatically
+// recognised here without needing a parallel LAYER_OF table update.
 
 /**
- * Pulls the first base, mid, and outer slot from an outfit.
- * Bottoms, footwear, and accessories are layer-neutral and ignored here.
+ * Pulls the first base, mid, and outer slot from an outfit using the role
+ * already assigned by outfitEngine. Bottoms, footwear, and accessories are
+ * layer-neutral and ignored here.
  */
 const extractLayers = (
   slots: OutfitSlot[],
@@ -71,10 +53,9 @@ const extractLayers = (
   let outer: OutfitSlot | null = null;
 
   for (const slot of slots) {
-    const layer = layerOf(slot.article);
-    if (layer === 'base'  && !base)  base  = slot;
-    if (layer === 'mid'   && !mid)   mid   = slot;
-    if (layer === 'outer' && !outer) outer = slot;
+    if ((slot.role === 'top' || slot.role === 'fullBody') && !base) base  = slot;
+    if (slot.role === 'midLayer'  && !mid)                          mid   = slot;
+    if (slot.role === 'outerwear' && !outer)                        outer = slot;
   }
 
   return { base, mid, outer };
@@ -122,14 +103,14 @@ const windChill = (tempF: number, windMph: number): number => {
   return 35.74 + 0.6215 * tempF - 35.75 * Math.pow(windMph, 0.16) + 0.4275 * tempF * Math.pow(windMph, 0.16);
 };
 
-const layerNeedsMid = (currentTemp: number, tempDelta: number, windSpeed: number): boolean => {
+const layerNeedsMid = (currentTemp: number, tempDelta: number, windSpeed: number, threshold: number): boolean => {
   const effective = windChill(currentTemp, windSpeed);
-  return effective < 65 || tempDelta > 10;
+  return effective < threshold || tempDelta > 10;
 };
 
-const layerNeedsOuter = (currentTemp: number, windSpeed: number): boolean => {
+const layerNeedsOuter = (currentTemp: number, windSpeed: number, threshold: number): boolean => {
   const effective = windChill(currentTemp, windSpeed);
-  return effective < 50 || windSpeed > 10;
+  return effective < threshold || windSpeed > 10;
 };
 
 // ─── 4. Removability scoring ──────────────────────────────────────────────────
@@ -406,21 +387,48 @@ const computeConfidence = (
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-export const generateLayeringRecommendation = ({
+/**
+ * Weather-derived context computed once per weather snapshot.
+ * Hoist this outside any per-outfit loop — deriveDayRange, rainForecast, and
+ * necessity scoring all depend only on weather + forecasts + settings, not
+ * on the specific slots in each outfit candidate.
+ */
+export interface LayeringContext {
+  forecasts:    Forecast[];  // passed through so buildTimeline can scan them per-outfit
+  currentTemp:  number;
+  windSpeed:    number;
+  raining:      boolean;
+  rainForecast: boolean;
+  high:         number;
+  low:          number;
+  offset:       number;     // feels-like correction applied to forecast temps
+  tempDelta:    number;
+  needsMid:     boolean;
+  needsOuter:   boolean;
+}
+
+/**
+ * Computes all weather-dependent values that are constant across outfit candidates.
+ * Call once, then pass the result to generateLayeringRecommendation for each outfit.
+ *
+ * Layer thresholds are derived from user settings so someone who runs warm
+ * (lowTempThreshold = 70°F) gets layering advice calibrated to their preference.
+ * The 15°F offset for outerThreshold mirrors getWeatherBucket's cool→cold boundary.
+ */
+export const buildLayeringContext = ({
   weather,
   forecasts,
-  slots,
+  settings,
 }: {
   weather:   CurrentWeather;
   forecasts: Forecast[];
-  slots:     OutfitSlot[];
-}): LayeringResult => {
+  settings:  Settings;
+}): LayeringContext => {
   const currentTemp    = weather.RealFeelTemperature.Imperial.Value;
   const currentAirTemp = weather.Temperature.Imperial.Value;
   const windSpeed      = weather.Wind.Speed.Imperial.Value;
   const raining        = weather.HasPrecipitation;
 
-  // Check if rain is forecast later (even if it's dry now)
   const rainForecast = forecasts.some(f =>
     /rain|shower|storm|drizzle|sleet/i.test(f.IconPhrase),
   );
@@ -428,23 +436,50 @@ export const generateLayeringRecommendation = ({
   const { high, low, offset } = deriveDayRange(forecasts, currentAirTemp, currentTemp);
   const tempDelta = high - low;
 
+  const midThreshold   = settings.lowTempThreshold;       // below "warm" → mid layer
+  const outerThreshold = settings.lowTempThreshold - 15;  // below "cool" → outer layer
+
+  return {
+    forecasts,
+    currentTemp, windSpeed, raining, rainForecast,
+    high, low, offset, tempDelta,
+    needsMid:   layerNeedsMid(currentTemp, tempDelta, windSpeed, midThreshold),
+    needsOuter: layerNeedsOuter(currentTemp, windSpeed, outerThreshold) || raining || rainForecast,
+  };
+};
+
+/**
+ * Generates a layering recommendation for one outfit candidate.
+ * Accepts a pre-built LayeringContext so weather-dependent work is not repeated
+ * for every outfit in the top-K list.
+ */
+export const generateLayeringRecommendation = ({
+  context,
+  slots,
+}: {
+  context: LayeringContext;
+  slots:   OutfitSlot[];
+}): LayeringResult => {
+  const {
+    forecasts,
+    currentTemp, windSpeed, raining, rainForecast,
+    high, low, offset, tempDelta,
+    needsMid, needsOuter,
+  } = context;
+
+  const rainContext = raining || rainForecast;
+
   const { base, mid, outer } = extractLayers(slots);
 
-  const needsMid   = layerNeedsMid(currentTemp, tempDelta, windSpeed);
-  const needsOuter = layerNeedsOuter(currentTemp, windSpeed) || raining || rainForecast;
-
-  // Apply necessity with soft removability scoring.
-  // Layers are never silently dropped — removability affects the recommendation
-  // text and confidence, not whether the layer is included. A heavy wool coat
-  // that's hard to shed still gets recommended on a cold day; the timeline and
-  // recommendation just acknowledge that it's not easily removable.
+  // Removability affects recommendation text only — layers are never silently
+  // dropped. A heavy leather coat still gets recommended in freezing weather;
+  // the text and confidence just acknowledge it's not easily shed mid-day.
   const midRemovability   = mid   ? removabilityOf(mid.article)   : 0;
   const outerRemovability = outer ? removabilityOf(outer.article) : 0;
 
   const effectiveMid:   OutfitSlot | null = mid   && needsMid   ? mid   : null;
   const effectiveOuter: OutfitSlot | null = outer && needsOuter ? outer : null;
 
-  // Low-removability flag — used to adjust recommendation text
   const midHardToRemove   = effectiveMid   && midRemovability   < 0.45;
   const outerHardToRemove = effectiveOuter && outerRemovability < 0.35;
 
@@ -454,10 +489,6 @@ export const generateLayeringRecommendation = ({
 
   const timeline = buildTimeline(forecasts, effectiveMid, effectiveOuter, high, low, offset);
 
-  // Use combined rain context for recommendation text
-  const rainContext = raining || rainForecast;
-
-  // Reduce confidence when layers are hard to remove on variable days
   const removabilityPenalty =
     (midHardToRemove   && tempDelta > 10 ? 0.08 : 0) +
     (outerHardToRemove && tempDelta > 10 ? 0.08 : 0);
