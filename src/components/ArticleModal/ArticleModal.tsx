@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   StyleSheet, Modal, ScrollView, TextInput, Pressable,
-  Image, Alert, Platform, ActionSheetIOS,
+  Image, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -12,55 +12,102 @@ import { getErrorMessage } from '../../lib/auth';
 import { ClothingArticle, ArticleFormData, BodyZone } from '../../types';
 import { colors, fonts, fontSizes, fontWeights, spacing, radius } from '../../theme/tokens';
 
-const CLOTHING_TYPES = ['Shirt','T-Shirt','Blouse','Sweater','Hoodie','Jacket','Coat',
-  'Pants','Jeans','Shorts','Skirt','Dress','Shoes','Sneakers','Boots','Sandals',
-  'Hat','Cap','Scarf','Gloves','Belt','Bag','Watch','Jewelry','Socks','Other'];
-const CATEGORIES  = ['Casual','Formal','Business Casual','Athletic','Lounge','Outdoor'];
-const BODY_ZONES: BodyZone[] = ['Head','Neck','Wrist','Hand','Waist','Ankle','Carried'];
-const FABRICS    = ['Cotton','Wool','Linen','Silk','Polyester','Denim','Leather','Synthetic','Other'];
-const COLORS = [
+// ─── Type classification ───────────────────────────────────────────────────────
+// Grouped for the visual picker — order determines display order in the form.
+
+const TYPE_GROUPS: { label: string; types: string[] }[] = [
+  { label: 'Tops',        types: ['T-Shirt', 'Shirt', 'Blouse'] },
+  { label: 'Layers',      types: ['Sweater', 'Hoodie'] },
+  { label: 'Bottoms',     types: ['Pants', 'Jeans', 'Shorts', 'Skirt'] },
+  { label: 'Outerwear',   types: ['Jacket', 'Coat'] },
+  { label: 'Full Body',   types: ['Dress'] },
+  { label: 'Footwear',    types: ['Shoes', 'Sneakers', 'Boots', 'Sandals'] },
+  { label: 'Accessories', types: ['Hat', 'Cap', 'Scarf', 'Gloves', 'Belt', 'Bag', 'Watch', 'Jewelry', 'Socks'] },
+  { label: 'Other',       types: ['Other'] },
+];
+
+// Defaults inferred the moment a type is selected.
+//  - topOrBottom  → always derived from type
+//  - fabricType   → suggested only when the field is still empty (non-destructive)
+//  - isAccessory  → fully driven by type for all known accessories
+//  - bodyZone     → set for known accessories; cleared when switching to non-accessory
+const TYPE_DEFAULTS: Record<string, Partial<ArticleFormData>> = {
+  Shirt:    { topOrBottom: 'Top' },
+  'T-Shirt':{ topOrBottom: 'Top',      fabricType: 'Cotton' },
+  Blouse:   { topOrBottom: 'Top' },
+  Sweater:  { topOrBottom: 'N/A',      fabricType: 'Wool'   },
+  Hoodie:   { topOrBottom: 'N/A',      fabricType: 'Cotton' },
+  Jacket:   { topOrBottom: 'Top' },
+  Coat:     { topOrBottom: 'Top' },
+  Pants:    { topOrBottom: 'Bottom' },
+  Jeans:    { topOrBottom: 'Bottom',   fabricType: 'Denim'  },
+  Shorts:   { topOrBottom: 'Bottom' },
+  Skirt:    { topOrBottom: 'Bottom' },
+  Dress:    { topOrBottom: 'Full body' },
+  Shoes:    { topOrBottom: 'Footwear' },
+  Sneakers: { topOrBottom: 'Footwear' },
+  Boots:    { topOrBottom: 'Footwear' },
+  Sandals:  { topOrBottom: 'Footwear' },
+  Hat:      { topOrBottom: 'N/A', isAccessory: true, bodyZone: 'Head'    },
+  Cap:      { topOrBottom: 'N/A', isAccessory: true, bodyZone: 'Head'    },
+  Scarf:    { topOrBottom: 'N/A', isAccessory: true, bodyZone: 'Neck'    },
+  Gloves:   { topOrBottom: 'N/A', isAccessory: true, bodyZone: 'Hand'    },
+  Belt:     { topOrBottom: 'N/A', isAccessory: true, bodyZone: 'Waist'   },
+  Bag:      { topOrBottom: 'N/A', isAccessory: true, bodyZone: 'Carried' },
+  Watch:    { topOrBottom: 'N/A', isAccessory: true, bodyZone: 'Wrist'   },
+  Jewelry:  { topOrBottom: 'N/A', isAccessory: true, bodyZone: 'Neck'    },
+  Socks:    { topOrBottom: 'N/A', isAccessory: true, bodyZone: 'Ankle'   },
+};
+
+// Known types whose classification is unambiguous. For these, the manual
+// Accessory toggle and Top/Bottom chip field are hidden — auto-derived from
+// the type selection. Only 'Other' (and an unset type) need manual controls.
+const KNOWN_TYPES = new Set(
+  TYPE_GROUPS.flatMap(g => g.types).filter(t => t !== 'Other'),
+);
+
+// ─── Option lists ──────────────────────────────────────────────────────────────
+
+const CATEGORIES: string[]  = ['Casual', 'Formal', 'Business Casual', 'Athletic', 'Lounge', 'Outdoor'];
+const BODY_ZONES: BodyZone[] = ['Head', 'Neck', 'Wrist', 'Hand', 'Waist', 'Ankle', 'Carried'];
+const FABRICS:    string[]   = ['Cotton', 'Wool', 'Linen', 'Silk', 'Polyester', 'Denim', 'Leather', 'Synthetic', 'Other'];
+const TOP_BOTTOM: string[]   = ['Top', 'Bottom', 'Full body', 'Footwear', 'N/A'];
+
+const COLORS: string[] = [
   // Neutrals
-  'Black','White','Grey','Brown','Beige','Cream',
+  'Black', 'White', 'Grey', 'Brown', 'Beige', 'Cream',
   // Metallics
-  'Silver','Gold','Bronze','Rose Gold','Champagne',
+  'Silver', 'Gold', 'Bronze', 'Rose Gold', 'Champagne',
   // Blues
-  'Navy','Indigo','Cobalt','Blue','Electric Blue','Sky Blue','Periwinkle','Teal','Cyan','Baby Blue',
+  'Navy', 'Indigo', 'Cobalt', 'Blue', 'Electric Blue', 'Sky Blue', 'Periwinkle', 'Teal', 'Cyan', 'Baby Blue',
   // Greens
-  'Green','Mint','Lime','Sage','Olive','Khaki',
+  'Green', 'Mint', 'Lime', 'Sage', 'Olive', 'Khaki',
   // Reds & warm
-  'Red','Scarlet','Crimson','Burgundy','Orange','Coral','Peach','Rust','Yellow',
+  'Red', 'Scarlet', 'Crimson', 'Burgundy', 'Orange', 'Coral', 'Peach', 'Rust', 'Yellow',
   // Purples & pinks
-  'Purple','Plum','Lilac','Lavender','Pink','Rose','Dusty Rose','Blush','Magenta','Hot Pink','Fuchsia',
+  'Purple', 'Plum', 'Lilac', 'Lavender', 'Pink', 'Rose', 'Dusty Rose', 'Blush', 'Magenta', 'Hot Pink', 'Fuchsia',
   // Other
   'Multi',
 ];
-const TOP_BOTTOM = ['Top','Bottom','Full body','Footwear','N/A'];
 
 const SWATCH: Record<string, string> = {
-  // Neutrals
   Black: '#1a1a1a', White: '#f0f0f0', Grey: '#9ca3af', Brown: '#92400e',
   Beige: '#d4b896', Cream: '#fef3c7',
-  // Metallics
   Silver: '#c0c0c0', Gold: '#d4af37', Bronze: '#a0785a',
   'Rose Gold': '#c9776a', Champagne: '#f4e4c1',
-  // Blues
   Navy: '#1e3a5f', Indigo: '#4338ca', Cobalt: '#2563eb', Blue: '#3b82f6',
   'Electric Blue': '#0ea5e9', 'Sky Blue': '#38bdf8', Periwinkle: '#a5b4fc',
   Teal: '#0d9488', Cyan: '#06b6d4', 'Baby Blue': '#bae6fd',
-  // Greens
   Green: '#22c55e', Mint: '#34d399', Lime: '#a3e635', Sage: '#86efac',
   Olive: '#65a30d', Khaki: '#a16207',
-  // Reds & warm
   Red: '#ef4444', Scarlet: '#f43f5e', Crimson: '#dc2626', Burgundy: '#9b1c1c',
   Orange: '#f97316', Coral: '#fb923c', Peach: '#fdba74', Rust: '#c2410c', Yellow: '#fbbf24',
-  // Purples & pinks
   Purple: '#a855f7', Plum: '#7c3aed', Lilac: '#d8b4fe', Lavender: '#c4b5fd',
   Pink: '#f9a8d4', Rose: '#fb7185', 'Dusty Rose': '#fda4af', Blush: '#fecdd3',
   Magenta: '#e879f9', 'Hot Pink': '#ec4899', Fuchsia: '#d946ef',
 };
 
 // Diagonal highlight → midtone → shadow stops for each metallic finish.
-// start/end chosen so the bright streak runs top-left to bottom-right.
 const METALLIC_GRADIENTS: Record<string, readonly [string, string, ...string[]]> = {
   Silver:      ['#f2f2f2', '#c0c0c0', '#f5f5f5', '#8a8a8a'],
   Gold:        ['#fde68a', '#d4af37', '#f5e27a', '#b8860b'],
@@ -70,6 +117,29 @@ const METALLIC_GRADIENTS: Record<string, readonly [string, string, ...string[]]>
 };
 const METALLIC_START = { x: 0.15, y: 0 } as const;
 const METALLIC_END   = { x: 0.85, y: 1 } as const;
+
+// ─── Default state + edit hydration ───────────────────────────────────────────
+
+const EMPTY: ArticleFormData = {
+  name: '', clothingType: '', topOrBottom: '', clothingCategory: '',
+  fabricType: '', color: '', isAccessory: false, bodyZone: undefined,
+  merchant: '', imageUrl: '',
+};
+
+const toForm = (a: ClothingArticle): ArticleFormData => ({
+  name:             a.name             ?? '',
+  clothingType:     a.clothingType     ?? '',
+  topOrBottom:      a.topOrBottom      ?? '',
+  clothingCategory: a.clothingCategory ?? '',
+  fabricType:       a.fabricType       ?? '',
+  color:            a.color            ?? '',
+  isAccessory:      a.isAccessory      ?? false,
+  bodyZone:         a.bodyZone,
+  merchant:         a.merchant         ?? '',
+  imageUrl:         a.imageUrl         ?? '',
+});
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
 // Four pie-slice quadrants: red · blue · green · yellow
 const MultiSwatch = () => (
@@ -81,77 +151,54 @@ const MultiSwatch = () => (
   </Svg>
 );
 
-const EMPTY: ArticleFormData = {
-  name:'', clothingType:'', topOrBottom:'', clothingCategory:'',
-  fabricType:'', color:'', isAccessory:false, bodyZone: undefined,
-  merchant:'', imageUrl:'',
-};
-
-const toForm = (a: ClothingArticle): ArticleFormData => ({
-  name: a.name ?? '', clothingType: a.clothingType ?? '', topOrBottom: a.topOrBottom ?? '',
-  clothingCategory: a.clothingCategory ?? '', fabricType: a.fabricType ?? '',
-  color: a.color ?? '', isAccessory: a.isAccessory ?? false,
-  bodyZone: a.bodyZone,
-  merchant: a.merchant ?? '', imageUrl: a.imageUrl ?? '',
-});
-
-interface Props {
-  onClose:      () => void;
-  onSubmit:     (data: ArticleFormData) => Promise<void>;
-  initialData?: ClothingArticle;
-}
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-const ChevronRight = () => (
-  <Svg width={14} height={14} viewBox='0 0 14 14' fill='none'>
-    <Path d='M5 2l5 5-5 5' stroke={colors.textSecondary} strokeWidth={1.5}
-      strokeLinecap='round' strokeLinejoin='round' opacity={0.5} />
-  </Svg>
-);
-
 const FieldLabel = ({ children }: { children: React.ReactNode }) => (
   <Text style={st.label}>{children}</Text>
 );
 
-// Single tappable row → opens ActionSheet (for large option lists)
-const SelectRow = ({ label, value, items, onValueChange, required = false }: {
-  label: string; value: string; items: string[];
-  onValueChange: (v: string) => void; required?: boolean;
-}) => {
-  const open = () => {
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        { options: ['Cancel', '—', ...items], cancelButtonIndex: 0, title: label },
-        (i) => { if (i > 0) onValueChange(i === 1 ? '' : items[i - 2]); },
-      );
-    }
-    // Android fallback could be added here if needed
-  };
-
-  return (
-    <View style={st.field}>
-      <FieldLabel>{label}{required ? ' *' : ''}</FieldLabel>
-      <Pressable
-        style={({ pressed }) => [st.selectRow, pressed && { opacity: 0.7 }]}
-        onPress={open}
-      >
-        <Text style={[st.selectValue, !value && st.selectPlaceholder]}>
-          {value || '—'}
-        </Text>
-        <ChevronRight />
-      </Pressable>
+// Grouped visual type picker — replaces the flat 26-item ActionSheet.
+// Cross-platform (no ActionSheetIOS), always visible, one tap to select.
+// Tapping the active type again does nothing — a type must always be set.
+const TypePickerField = ({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (type: string) => void;
+}) => (
+  <View style={st.field}>
+    <FieldLabel>Type <Text style={st.required}>*</Text></FieldLabel>
+    <View style={st.typeGroups}>
+      {TYPE_GROUPS.map(group => (
+        <View key={group.label} style={st.typeGroup}>
+          <Text style={st.typeGroupLabel}>{group.label}</Text>
+          <View style={st.chipGrid}>
+            {group.types.map(type => (
+              <Pressable
+                key={type}
+                style={[st.chip, value === type && st.chipActive]}
+                onPress={() => { if (value !== type) onChange(type); }}
+              >
+                <Text style={[st.chipText, value === type && st.chipTextActive]}>{type}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      ))}
     </View>
-  );
-};
+  </View>
+);
 
-// Inline chip grid — all options visible, one tap to select/deselect
-const ChipField = ({ label, value, items, onValueChange, required = false }: {
+// Inline chip grid — all options visible, one tap to select / deselect
+const ChipField = ({
+  label, value, items, onValueChange, required = false,
+}: {
   label: string; value: string; items: string[];
   onValueChange: (v: string) => void; required?: boolean;
 }) => (
   <View style={st.field}>
-    <FieldLabel>{label}{required ? ' *' : ''}</FieldLabel>
+    <FieldLabel>
+      {label}{required && <Text style={st.required}> *</Text>}
+    </FieldLabel>
     <View style={st.chipGrid}>
       {items.map(item => (
         <Pressable
@@ -167,8 +214,12 @@ const ChipField = ({ label, value, items, onValueChange, required = false }: {
 );
 
 // Color swatch dots — visual and compact
-const ColorField = ({ value, onValueChange }: {
-  value: string; onValueChange: (v: string) => void;
+const ColorField = ({
+  value,
+  onValueChange,
+}: {
+  value: string;
+  onValueChange: (v: string) => void;
 }) => (
   <View style={st.field}>
     <FieldLabel>
@@ -202,6 +253,12 @@ const ColorField = ({ value, onValueChange }: {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
+interface Props {
+  onClose:      () => void;
+  onSubmit:     (data: ArticleFormData) => Promise<void>;
+  initialData?: ClothingArticle;
+}
+
 const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
   const isEditing = !!initialData;
   const [form,   setForm]   = useState<ArticleFormData>(initialData ? toForm(initialData) : EMPTY);
@@ -210,6 +267,37 @@ const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
 
   const set = <K extends keyof ArticleFormData>(key: K, val: ArticleFormData[K]) =>
     setForm(f => ({ ...f, [key]: val }));
+
+  // Applies smart defaults when the clothing type changes.
+  //  - topOrBottom is always overwritten (fully derived from type).
+  //  - fabricType is updated when: (a) the field is empty, OR (b) it still holds the
+  //    previous type's auto-suggested value — meaning the user never manually changed it.
+  //    If the user explicitly picked a fabric, switching types preserves their choice.
+  //  - isAccessory + bodyZone are set from TYPE_DEFAULTS for known accessories and
+  //    cleared when switching to a non-accessory type.
+  const handleTypeChange = (type: string) => {
+    const newDefaults  = TYPE_DEFAULTS[type]              ?? {};
+    const prevDefaults = TYPE_DEFAULTS[form.clothingType] ?? {};
+
+    setForm(f => {
+      // Fabric is considered "auto-set" if it's empty or still matches what the
+      // previous type suggested. In that case, follow the new type's suggestion.
+      // If the user picked something else themselves, leave it alone.
+      const fabricIsAutoValue =
+        f.fabricType === '' || f.fabricType === prevDefaults.fabricType;
+
+      return {
+        ...f,
+        clothingType: type,
+        topOrBottom:  newDefaults.topOrBottom ?? f.topOrBottom,
+        fabricType:   fabricIsAutoValue ? (newDefaults.fabricType ?? '') : f.fabricType,
+        isAccessory:  newDefaults.isAccessory ?? false,
+        bodyZone:     newDefaults.isAccessory
+                        ? (newDefaults.bodyZone ?? f.bodyZone)  // accessory → keep or set zone
+                        : undefined,                             // non-accessory → clear zone
+      };
+    });
+  };
 
   const handlePickImage = async () => {
     const result = await pickImage();
@@ -226,9 +314,14 @@ const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
     finally { setSaving(false); }
   };
 
+  // For all named types the classification is unambiguous — the manual Accessory
+  // toggle and Top/Bottom chips are hidden. Only 'Other' (or no type yet) needs them.
+  const typeIsAmbiguous = !KNOWN_TYPES.has(form.clothingType);
+
   return (
     <Modal visible animationType='slide' presentationStyle='pageSheet' onRequestClose={onClose}>
       <SafeAreaView style={st.root} edges={['top', 'bottom']}>
+
         {/* Header */}
         <View style={st.header}>
           <Text style={st.title}>{isEditing ? 'Edit Article' : 'Add Article'}</Text>
@@ -238,7 +331,9 @@ const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
         </View>
 
         <ScrollView contentContainerStyle={st.body} keyboardShouldPersistTaps='handled'>
-          {error ? <View style={st.errorBox}><Text style={st.errorText}>{error}</Text></View> : null}
+          {error
+            ? <View style={st.errorBox}><Text style={st.errorText}>{error}</Text></View>
+            : null}
 
           {/* Image */}
           <View style={st.imageSection}>
@@ -262,57 +357,90 @@ const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
           {/* Name */}
           <View style={st.field}>
             <FieldLabel>Name <Text style={st.optional}>(optional)</Text></FieldLabel>
-            <TextInput style={st.input} placeholder='e.g. "Navy Peacoat"'
-              placeholderTextColor={colors.textMuted} value={form.name}
-              onChangeText={v => set('name', v)} />
+            <TextInput
+              style={st.input}
+              placeholder='e.g. "Navy Peacoat"'
+              placeholderTextColor={colors.textMuted}
+              value={form.name}
+              onChangeText={v => set('name', v)}
+            />
           </View>
 
-          {/* Type — 26 items, keep as action sheet */}
-          <SelectRow label='Type' value={form.clothingType} items={CLOTHING_TYPES}
-            onValueChange={v => set('clothingType', v)} required />
+          {/* Type — grouped visual picker, cross-platform, replaces ActionSheet */}
+          <TypePickerField value={form.clothingType} onChange={handleTypeChange} />
 
-          {/* Top / Bottom — 5 items, chips fit in one row */}
-          <ChipField label='Top / Bottom' value={form.topOrBottom} items={TOP_BOTTOM}
-            onValueChange={v => set('topOrBottom', v)} />
+          {/* Top / Bottom — only shown for 'Other'; auto-derived for all known types */}
+          {typeIsAmbiguous && (
+            <ChipField
+              label='Top / Bottom'
+              value={form.topOrBottom}
+              items={TOP_BOTTOM}
+              onValueChange={v => set('topOrBottom', v)}
+            />
+          )}
 
-          {/* Category — 6 items */}
-          <ChipField label='Category' value={form.clothingCategory} items={CATEGORIES}
-            onValueChange={v => set('clothingCategory', v)} />
+          {/* Category */}
+          <ChipField
+            label='Category'
+            value={form.clothingCategory}
+            items={CATEGORIES}
+            onValueChange={v => set('clothingCategory', v)}
+          />
 
-          {/* Fabric — 9 short words */}
-          <ChipField label='Fabric' value={form.fabricType} items={FABRICS}
-            onValueChange={v => set('fabricType', v)} />
+          {/* Fabric — auto-suggested for some types, always overridable */}
+          <ChipField
+            label='Fabric'
+            value={form.fabricType}
+            items={FABRICS}
+            onValueChange={v => set('fabricType', v)}
+          />
 
-          {/* Color — swatches */}
+          {/* Color */}
           <ColorField value={form.color} onValueChange={v => set('color', v)} />
 
           {/* Merchant */}
           <View style={st.field}>
             <FieldLabel>Merchant</FieldLabel>
-            <TextInput style={st.input} placeholder='e.g. Zara'
-              placeholderTextColor={colors.textMuted} value={form.merchant}
-              onChangeText={v => set('merchant', v)} />
+            <TextInput
+              style={st.input}
+              placeholder='e.g. Zara'
+              placeholderTextColor={colors.textMuted}
+              value={form.merchant}
+              onChangeText={v => set('merchant', v)}
+            />
           </View>
 
-          {/* Accessory toggle */}
-          <View style={st.chipGrid}>
-            <Pressable
-              style={[st.chip, form.isAccessory && st.chipActive]}
-              onPress={() => set('isAccessory', !form.isAccessory)}
-            >
-              <Text style={[st.chipText, form.isAccessory && st.chipTextActive]}>
-                Accessory
-              </Text>
-            </Pressable>
-          </View>
+          {/* Accessory toggle — only for 'Other' / unset type.
+              All named accessories set isAccessory automatically from the type. */}
+          {typeIsAmbiguous && (
+            <View style={st.field}>
+              <FieldLabel>Classification</FieldLabel>
+              <View style={st.chipGrid}>
+                <Pressable
+                  style={[st.chip, form.isAccessory && st.chipActive]}
+                  onPress={() => setForm(f => ({
+                    ...f,
+                    isAccessory: !f.isAccessory,
+                    bodyZone:    f.isAccessory ? undefined : f.bodyZone,
+                  }))}
+                >
+                  <Text style={[st.chipText, form.isAccessory && st.chipTextActive]}>
+                    Accessory
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
 
-          {/* Body zone — which part of the body this is worn on */}
-          <ChipField
-            label='Body Zone'
-            value={form.bodyZone ?? ''}
-            items={BODY_ZONES}
-            onValueChange={v => set('bodyZone', (v as BodyZone) || undefined)}
-          />
+          {/* Body Zone — only relevant (and visible) when the item is an accessory */}
+          {form.isAccessory && (
+            <ChipField
+              label='Body Zone'
+              value={form.bodyZone ?? ''}
+              items={BODY_ZONES}
+              onValueChange={v => set('bodyZone', (v as BodyZone) || undefined)}
+            />
+          )}
         </ScrollView>
 
         {/* Footer */}
@@ -320,12 +448,19 @@ const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
           <Pressable style={st.cancelBtn} onPress={onClose}>
             <Text style={st.cancelBtnText}>Cancel</Text>
           </Pressable>
-          <Pressable style={[st.submitBtn, saving && { opacity: 0.5 }]} onPress={handleSubmit} disabled={saving}>
+          <Pressable
+            style={[st.submitBtn, saving && { opacity: 0.5 }]}
+            onPress={handleSubmit}
+            disabled={saving}
+          >
             <Text style={st.submitBtnText}>
-              {saving ? (isEditing ? 'Saving…' : 'Adding…') : (isEditing ? 'Save changes' : 'Add to closet')}
+              {saving
+                ? (isEditing ? 'Saving…'       : 'Adding…')
+                : (isEditing ? 'Save changes'   : 'Add to closet')}
             </Text>
           </Pressable>
         </View>
+
       </SafeAreaView>
     </Modal>
   );
@@ -343,41 +478,45 @@ const st = StyleSheet.create({
   body:          { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xl },
   errorBox:      { padding: spacing.sm, backgroundColor: colors.errorBg, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.errorBorder },
   errorText:     { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.errorText },
-  imageSection:  { gap: spacing.sm, alignItems: 'center' },
-  previewWrap:   { alignItems: 'center', gap: 8 },
-  preview:       { width: 100, height: 100, borderRadius: radius.sm },
-  clearImg:      { paddingVertical: 4, paddingHorizontal: 12, backgroundColor: colors.dangerBg, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.dangerBorder },
-  clearImgText:  { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.dangerText },
-  imagePlaceholder: { width: 100, height: 100, borderRadius: radius.sm, backgroundColor: colors.glassBg, borderWidth: 1, borderColor: colors.glassBorder, alignItems: 'center', justifyContent: 'center' },
+
+  // Image
+  imageSection:         { gap: spacing.sm, alignItems: 'center' },
+  previewWrap:          { alignItems: 'center', gap: 8 },
+  preview:              { width: 100, height: 100, borderRadius: radius.sm },
+  clearImg:             { paddingVertical: 4, paddingHorizontal: 12, backgroundColor: colors.dangerBg, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.dangerBorder },
+  clearImgText:         { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.dangerText },
+  imagePlaceholder:     { width: 100, height: 100, borderRadius: radius.sm, backgroundColor: colors.glassBg, borderWidth: 1, borderColor: colors.glassBorder, alignItems: 'center', justifyContent: 'center' },
   imagePlaceholderText: { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textMuted },
-  pickImageBtn:  { paddingVertical: 7, paddingHorizontal: spacing.md, backgroundColor: colors.glassBg, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.glassBorder },
-  pickImageBtnText: { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.textSecondary },
+  pickImageBtn:         { paddingVertical: 7, paddingHorizontal: spacing.md, backgroundColor: colors.glassBg, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.glassBorder },
+  pickImageBtnText:     { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.textSecondary },
+
+  // Fields
   field:         { gap: 6 },
   label:         { fontFamily: fonts.body, fontSize: fontSizes.xs, fontWeight: fontWeights.medium, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  required:      { color: colors.errorText, textTransform: 'none' },
   optional:      { color: colors.textMuted, fontWeight: fontWeights.regular, textTransform: 'none' },
   colorLabel:    { color: colors.textSecondary, fontWeight: fontWeights.regular, textTransform: 'none', letterSpacing: 0 },
-  input: {
-    fontFamily: fonts.body, fontSize: fontSizes.base, color: colors.textPrimary,
-    backgroundColor: colors.glassBg, borderWidth: 1, borderColor: colors.glassBorder,
-    borderRadius: radius.sm, paddingVertical: 12, paddingHorizontal: spacing.md,
-  },
-  selectRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingVertical: 12, paddingHorizontal: spacing.md,
-    backgroundColor: colors.glassBg, borderWidth: 1, borderColor: colors.glassBorder,
-    borderRadius: radius.sm,
-  },
-  selectValue:       { fontFamily: fonts.body, fontSize: fontSizes.base, color: colors.textPrimary },
-  selectPlaceholder: { color: colors.textMuted },
-  chipGrid:  { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  chip:      { paddingVertical: 6, paddingHorizontal: 12, backgroundColor: colors.glassBg, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radius.pill },
-  chipActive:        { backgroundColor: colors.saveBtnBg, borderColor: colors.saveBtnBg },
-  chipText:          { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.textSecondary },
-  chipTextActive:    { color: colors.saveBtnText, fontWeight: fontWeights.semibold },
-  swatchGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  swatchRing:     { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'transparent' },
-  swatchRingActive: { borderColor: colors.textPrimary },
-  swatch:         { width: 26, height: 26, borderRadius: 13, overflow: 'hidden' },
+  input:         { fontFamily: fonts.body, fontSize: fontSizes.base, color: colors.textPrimary, backgroundColor: colors.glassBg, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radius.sm, paddingVertical: 12, paddingHorizontal: spacing.md },
+
+  // Chips
+  chipGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip:          { paddingVertical: 6, paddingHorizontal: 12, backgroundColor: colors.glassBg, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radius.pill },
+  chipActive:    { backgroundColor: colors.saveBtnBg, borderColor: colors.saveBtnBg },
+  chipText:      { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.textSecondary },
+  chipTextActive:{ color: colors.saveBtnText, fontWeight: fontWeights.semibold },
+
+  // Type picker groups
+  typeGroups:     { gap: 12 },
+  typeGroup:      { gap: 5 },
+  typeGroupLabel: { fontFamily: fonts.body, fontSize: 10, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: fontWeights.medium },
+
+  // Color swatches
+  swatchGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  swatchRing:      { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'transparent' },
+  swatchRingActive:{ borderColor: colors.textPrimary },
+  swatch:          { width: 26, height: 26, borderRadius: 13, overflow: 'hidden' },
+
+  // Footer
   footer:        { flexDirection: 'row', gap: spacing.sm, padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.glassBorder },
   cancelBtn:     { flex: 1, paddingVertical: 14, backgroundColor: colors.glassBg, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.glassBorder, alignItems: 'center' },
   cancelBtnText: { fontFamily: fonts.body, fontSize: fontSizes.base, color: colors.textSecondary },
