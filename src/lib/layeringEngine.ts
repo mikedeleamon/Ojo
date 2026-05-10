@@ -284,16 +284,18 @@ const buildTimeline = (
 // Sentence varies based on which layers are active and whether a timeline exists.
 
 const buildRecommendation = (
-  base:             OutfitSlot | null,
-  mid:              OutfitSlot | null,
-  outer:            OutfitSlot | null,
-  currentTemp:      number,
-  hasTimeline:      boolean,
-  missingMid:       boolean,
-  missingOuter:     boolean,
-  raining:          boolean,
-  midHardToRemove:  boolean = false,
+  base:              OutfitSlot | null,
+  mid:               OutfitSlot | null,   // weather-needed mid, or null
+  outer:             OutfitSlot | null,   // weather-needed outer, or null
+  currentTemp:       number,
+  hasTimeline:       boolean,
+  missingMid:        boolean,
+  missingOuter:      boolean,
+  raining:           boolean,
+  midHardToRemove:   boolean = false,
   outerHardToRemove: boolean = false,
+  extraMid:          OutfitSlot | null = null,   // present in outfit but not needed
+  extraOuter:        OutfitSlot | null = null,   // present in outfit but not needed
 ): string => {
   const baseName  = base?.article.name  || base?.article.clothingType  || 'base layer';
   const midName   = mid?.article.name   || mid?.article.clothingType;
@@ -302,6 +304,22 @@ const buildRecommendation = (
   // Removability caveat appended when a layer is bulky / hard to shed
   const midCaveat   = midHardToRemove   ? ` Note: your ${midName} is bulky to carry — plan around it.` : '';
   const outerCaveat = outerHardToRemove ? ` Your ${outerName} is heavy to carry if you shed it — commit to wearing it or leave it.` : '';
+
+  // ── Extra layers (in outfit but not strictly needed by weather) ──────────
+  // Acknowledge their presence with a light note instead of ignoring them.
+  if (!mid && !outer && (extraMid || extraOuter)) {
+    const extraMidName   = extraMid?.article.name   || extraMid?.article.clothingType;
+    const extraOuterName = extraOuter?.article.name || extraOuter?.article.clothingType;
+
+    if (extraMid && extraOuter) {
+      return `You probably won't need the ${extraMidName} or ${extraOuterName} today, but they're easy to shed if you want the extra comfort.`;
+    }
+    if (extraOuter) {
+      return `Your ${baseName} should be enough today — the ${extraOuterName} is there if you run cold or it gets breezy.`;
+    }
+    // extraMid only
+    return `Your ${baseName} is fine on its own for ${currentTemp}°F — the ${extraMidName} is a nice-to-have if you get chilly.`;
+  }
 
   // Single layer — check whether layers are needed but absent before calling it fine
   if (!mid && !outer) {
@@ -477,26 +495,34 @@ export const generateLayeringRecommendation = ({
   const midRemovability   = mid   ? removabilityOf(mid.article)   : 0;
   const outerRemovability = outer ? removabilityOf(outer.article) : 0;
 
-  const effectiveMid:   OutfitSlot | null = mid   && needsMid   ? mid   : null;
-  const effectiveOuter: OutfitSlot | null = outer && needsOuter ? outer : null;
+  // Layers the weather actually calls for — used for timeline and text tone
+  const activeMid:   OutfitSlot | null = mid   && needsMid   ? mid   : null;
+  const activeOuter: OutfitSlot | null = outer && needsOuter ? outer : null;
 
-  const midHardToRemove   = effectiveMid   && midRemovability   < 0.45;
-  const outerHardToRemove = effectiveOuter && outerRemovability < 0.35;
+  const midHardToRemove   = activeMid   && midRemovability   < 0.45;
+  const outerHardToRemove = activeOuter && outerRemovability < 0.35;
 
   // Layers that conditions call for but the outfit doesn't have (wardrobe gap)
   const missingMid   = needsMid   && !mid;
   const missingOuter = needsOuter && !outer;
 
-  const timeline = buildTimeline(forecasts, effectiveMid, effectiveOuter, high, low, offset);
+  // Layers present in the outfit but not strictly needed by weather
+  const extraMid   = mid   && !needsMid;
+  const extraOuter = outer && !needsOuter;
+
+  const timeline = buildTimeline(forecasts, activeMid, activeOuter, high, low, offset);
 
   const removabilityPenalty =
     (midHardToRemove   && tempDelta > 10 ? 0.08 : 0) +
     (outerHardToRemove && tempDelta > 10 ? 0.08 : 0);
 
   return {
-    layers:         { base, mid: effectiveMid, outer: effectiveOuter },
-    recommendation: buildRecommendation(base, effectiveMid, effectiveOuter, currentTemp, !!timeline, missingMid, missingOuter, rainContext, !!midHardToRemove, !!outerHardToRemove),
+    // Always report the actual layers present in the outfit so the UI stays
+    // consistent with the outfit card above. Necessity flags shape the
+    // recommendation text and timeline, not the layer visibility.
+    layers:         { base, mid, outer },
+    recommendation: buildRecommendation(base, activeMid, activeOuter, currentTemp, !!timeline, missingMid, missingOuter, rainContext, !!midHardToRemove, !!outerHardToRemove, extraMid ? mid : null, extraOuter ? outer : null),
     timeline,
-    confidence:     Math.max(0, computeConfidence(currentTemp, tempDelta, windSpeed, !!effectiveMid, !!effectiveOuter) - removabilityPenalty),
+    confidence:     Math.max(0, computeConfidence(currentTemp, tempDelta, windSpeed, !!activeMid, !!activeOuter) - removabilityPenalty),
   };
 };
