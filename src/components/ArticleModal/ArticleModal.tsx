@@ -179,6 +179,7 @@ const TypePickerField = ({
                 onPress={() => { if (value !== type) onChange(type); }}
                 accessibilityRole="radio"
                 accessibilityLabel={type}
+                accessibilityState={{ selected: value === type }}
               >
                 <Text style={[st.chipText, value === type && st.chipTextActive]}>{type}</Text>
               </Pressable>
@@ -209,6 +210,7 @@ const ChipField = ({
           onPress={() => onValueChange(value === item ? '' : item)}
           accessibilityRole="radio"
           accessibilityLabel={item}
+          accessibilityState={{ selected: value === item }}
         >
           <Text style={[st.chipText, value === item && st.chipTextActive]}>{item}</Text>
         </Pressable>
@@ -235,6 +237,8 @@ const ColorField = ({
           key={c}
           onPress={() => onValueChange(value === c ? '' : c)}
           accessibilityLabel={c}
+          accessibilityRole="radio"
+          accessibilityState={{ selected: value === c }}
           style={[st.swatchRing, value === c && st.swatchRingActive]}
         >
           {c === 'Multi' ? (
@@ -329,7 +333,7 @@ const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
         {/* Header */}
         <View style={st.header}>
           <Text style={st.title}>{isEditing ? 'Edit Article' : 'Add Article'}</Text>
-          <Pressable style={st.closeBtn} onPress={onClose} accessibilityRole="button">
+          <Pressable style={st.closeBtn} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close">
             <Text style={st.closeBtnText}>✕</Text>
           </Pressable>
         </View>
@@ -438,6 +442,7 @@ const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
                   }))}
                   accessibilityRole="checkbox"
                   accessibilityLabel="Accessory"
+                  accessibilityState={{ checked: form.isAccessory }}
                 >
                   <Text style={[st.chipText, form.isAccessory && st.chipTextActive]}>
                     Accessory

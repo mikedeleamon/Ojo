@@ -26,7 +26,7 @@ export const colors = {
   // Text
   textPrimary:   'rgba(255, 255, 255, 0.97)',
   textSecondary: 'rgba(255, 255, 255, 0.65)',
-  textMuted:     'rgba(255, 255, 255, 0.40)',
+  textMuted:     'rgba(255, 255, 255, 0.55)',
 
   // Semantic — danger
   dangerBg:      'rgba(239, 68, 68, 0.10)',

@@ -76,6 +76,7 @@ const SliderField = ({
             maximumTrackTintColor={colors.glassBorder}
             thumbTintColor={colors.saveBtnBg}
             style={{ width: '100%' }}
+            accessibilityLabel={label}
         />
     </View>
 );
@@ -177,6 +178,9 @@ export default function PreferencesScreen() {
                                             styles.chipActive,
                                     ]}
                                     onPress={() => handleStyleChange(s)}
+                                    accessibilityRole="radio"
+                                    accessibilityLabel={s}
+                                    accessibilityState={{ selected: clothingStyle === s }}
                                 >
                                     <Text
                                         style={[
@@ -221,6 +225,9 @@ export default function PreferencesScreen() {
                                         tempScale === scale && styles.segActive,
                                     ]}
                                     onPress={() => handleScaleChange(scale)}
+                                    accessibilityRole="radio"
+                                    accessibilityLabel={scale === 'Imperial' ? 'Fahrenheit' : 'Celsius'}
+                                    accessibilityState={{ selected: tempScale === scale }}
                                 >
                                     <Text
                                         style={[

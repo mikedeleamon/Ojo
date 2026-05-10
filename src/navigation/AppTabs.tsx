@@ -20,6 +20,8 @@ const HangerIcon = ({ color }: { color: string }) => (
         strokeWidth={1.5}
         strokeLinecap='round'
         strokeLinejoin='round'
+        accessibilityElementsHidden={true}
+        importantForAccessibility="no"
     >
         <Path
             d='M12 4a2 2 0 0 1 2 2c0 .74-.4 1.38-1 1.73V9l8 5.5A1 1 0 0 1 20 16H4a1 1 0 0 1-.99-1.5L11 9V7.73A2 2 0 0 1 12 4Z'
@@ -41,6 +43,8 @@ const SparklesIcon = ({ color }: { color: string }) => (
         strokeWidth={1.5}
         strokeLinecap='round'
         strokeLinejoin='round'
+        accessibilityElementsHidden={true}
+        importantForAccessibility="no"
     >
         <Path d='M15 4l1.5 3L20 8.5 16.5 10 15 13l-1.5-3L10 8.5 13.5 7z' />
         <Path d='M6 14l1 2 2 1-2 1-1 2-1-2-2-1 2-1z' />
@@ -82,6 +86,8 @@ export default function AppTabs() {
                                 height: 26,
                                 opacity: focused ? 1 : 0.45,
                             }}
+                            accessibilityElementsHidden={true}
+                            importantForAccessibility="no"
                         />
                     ),
                 }}
