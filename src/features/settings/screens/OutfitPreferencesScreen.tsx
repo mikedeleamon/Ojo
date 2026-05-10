@@ -47,6 +47,9 @@ export default function OutfitPreferencesScreen() {
                             key={s}
                             style={[st.chip, style === s && st.chipActive]}
                             onPress={() => setStyle(s)}
+                            accessibilityRole="radio"
+                            accessibilityLabel={s}
+                            accessibilityState={{ selected: style === s }}
                         >
                             <Text
                                 style={[
@@ -64,6 +67,9 @@ export default function OutfitPreferencesScreen() {
                     style={[st.saveBtn, loading && { opacity: 0.5 }]}
                     onPress={save}
                     disabled={loading}
+                    accessibilityRole="button"
+                    accessibilityLabel={loading ? 'Saving' : 'Save'}
+                    accessibilityState={{ busy: loading, disabled: loading }}
                 >
                     <Text style={st.saveBtnText}>
                         {loading ? 'Saving…' : 'Save'}

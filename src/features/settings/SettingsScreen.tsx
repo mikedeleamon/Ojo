@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import { StyleSheet, Modal, ScrollView } from 'react-native';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { StyleSheet, Modal, ScrollView, AccessibilityInfo, findNodeHandle, View as RNView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Svg, Path } from 'react-native-svg';
@@ -27,6 +27,18 @@ export default function SettingsScreen({ onLogout }: Props) {
     const nav = useAppNavigation();
     const { settings, refreshSettings } = useSettings();
     const [showLogout, setShowLogout] = useState(false);
+
+    const logoutModalTitleRef = useRef<RNView>(null);
+    useEffect(() => {
+        if (!showLogout) return;
+        const id = setTimeout(() => {
+            if (logoutModalTitleRef.current) {
+                const node = findNodeHandle(logoutModalTitleRef.current);
+                if (node) AccessibilityInfo.setAccessibilityFocus(node);
+            }
+        }, 100);
+        return () => clearTimeout(id);
+    }, [showLogout]);
 
     useFocusEffect(
         useCallback(() => {
@@ -103,7 +115,9 @@ export default function SettingsScreen({ onLogout }: Props) {
                     accessibilityRole="button"
                 />
                 <View style={styles.modalCard}>
-                    <Text style={styles.modalTitle}>Log out?</Text>
+                    <RNView ref={logoutModalTitleRef} accessible={true} accessibilityLabel="Log out?">
+                        <Text style={styles.modalTitle}>Log out?</Text>
+                    </RNView>
                     <Text style={styles.modalBody}>
                         You'll need to sign in again to access your wardrobe.
                     </Text>

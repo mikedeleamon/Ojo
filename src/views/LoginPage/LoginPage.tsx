@@ -100,6 +100,7 @@ export default function LoginPage({ onLogin }: Props) {
                                     autoCapitalize='none'
                                     textContentType='emailAddress'
                                     returnKeyType='next'
+                                    accessibilityLabel="Email or username"
                                 />
                             </View>
                             <View style={styles.field}>
@@ -114,6 +115,7 @@ export default function LoginPage({ onLogin }: Props) {
                                     onChangeText={setPassword}
                                     returnKeyType='done'
                                     onSubmitEditing={handleSubmit}
+                                    accessibilityLabel="Password"
                                 />
                             </View>
                         </View>
@@ -123,6 +125,8 @@ export default function LoginPage({ onLogin }: Props) {
                             onPress={handleSubmit}
                             disabled={loading}
                             accessibilityRole="button"
+                            accessibilityLabel={loading ? 'Signing in' : 'Sign in'}
+                            accessibilityState={{ busy: loading, disabled: loading }}
                         >
                             <Text style={styles.btnText}>
                                 {loading ? 'Signing in…' : 'Sign in'}

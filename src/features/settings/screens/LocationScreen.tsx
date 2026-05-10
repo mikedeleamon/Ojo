@@ -25,10 +25,14 @@ export default function LocationScreen() {
             </Text>
             <TextInput style={st.input} placeholder="City name"
               placeholderTextColor={colors.textMuted}
-              value={city} onChangeText={setCity} returnKeyType="done" onSubmitEditing={save} />
+              value={city} onChangeText={setCity} returnKeyType="done" onSubmitEditing={save}
+              accessibilityLabel="Default city" />
           </View>
           <StatusMessage status={status} />
-          <Pressable style={[st.saveBtn, loading && { opacity: 0.5 }]} onPress={save} disabled={loading}>
+          <Pressable style={[st.saveBtn, loading && { opacity: 0.5 }]} onPress={save} disabled={loading}
+            accessibilityRole="button"
+            accessibilityLabel={loading ? 'Saving' : 'Save'}
+            accessibilityState={{ busy: loading, disabled: loading }}>
             <Text style={st.saveBtnText}>{loading ? 'Saving…' : 'Save'}</Text>
           </Pressable>
         </ScrollView>

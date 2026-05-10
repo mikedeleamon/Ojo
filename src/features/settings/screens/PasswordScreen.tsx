@@ -50,12 +50,16 @@ export default function PasswordScreen() {
               <TextInput style={s.input} secureTextEntry
                 placeholder="••••••••" placeholderTextColor={colors.textMuted}
                 textContentType={f.type === 'new' ? 'newPassword' : 'password'}
-                value={f.value} onChangeText={f.set} />
+                value={f.value} onChangeText={f.set}
+                accessibilityLabel={f.label} />
             </View>
           ))}
 
           <Pressable style={[s.saveBtn, (loading || !currentPassword) && { opacity: 0.5 }]}
-            onPress={save} disabled={loading || !currentPassword}>
+            onPress={save} disabled={loading || !currentPassword}
+            accessibilityRole="button"
+            accessibilityLabel={loading ? 'Updating' : 'Update password'}
+            accessibilityState={{ busy: loading, disabled: loading || !currentPassword }}>
             <Text style={styles.btnText}>{loading ? 'Updating…' : 'Update password'}</Text>
           </Pressable>
         </ScrollView>

@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   StyleSheet, Modal, ScrollView, TextInput, Pressable,
-  Image, Alert,
+  Image, Alert, AccessibilityInfo, findNodeHandle, View as RNView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -273,6 +273,17 @@ const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
   const [error,  setError]  = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const headerRef = useRef<RNView>(null);
+  useEffect(() => {
+    const id = setTimeout(() => {
+      if (headerRef.current) {
+        const node = findNodeHandle(headerRef.current);
+        if (node) AccessibilityInfo.setAccessibilityFocus(node);
+      }
+    }, 350); // allow the slide animation to finish
+    return () => clearTimeout(id);
+  }, []);
+
   const set = <K extends keyof ArticleFormData>(key: K, val: ArticleFormData[K]) =>
     setForm(f => ({ ...f, [key]: val }));
 
@@ -332,7 +343,13 @@ const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
 
         {/* Header */}
         <View style={st.header}>
-          <Text style={st.title}>{isEditing ? 'Edit Article' : 'Add Article'}</Text>
+          <RNView
+            ref={headerRef}
+            accessible={true}
+            accessibilityLabel={isEditing ? 'Edit Article' : 'Add Article'}
+          >
+            <Text style={st.title}>{isEditing ? 'Edit Article' : 'Add Article'}</Text>
+          </RNView>
           <Pressable style={st.closeBtn} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close">
             <Text style={st.closeBtnText}>✕</Text>
           </Pressable>
@@ -380,6 +397,7 @@ const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
               placeholderTextColor={colors.textMuted}
               value={form.name}
               onChangeText={v => set('name', v)}
+              accessibilityLabel="Name (optional)"
             />
           </View>
 
@@ -424,6 +442,7 @@ const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
               placeholderTextColor={colors.textMuted}
               value={form.merchant}
               onChangeText={v => set('merchant', v)}
+              accessibilityLabel="Merchant"
             />
           </View>
 
@@ -473,6 +492,10 @@ const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
             onPress={handleSubmit}
             disabled={saving}
             accessibilityRole="button"
+            accessibilityLabel={saving
+              ? (isEditing ? 'Saving' : 'Adding')
+              : (isEditing ? 'Save changes' : 'Add to closet')}
+            accessibilityState={{ busy: saving, disabled: saving }}
           >
             <Text style={st.submitBtnText}>
               {saving

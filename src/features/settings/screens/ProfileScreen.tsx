@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { StyleSheet, Modal, Alert } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
+import { StyleSheet, Modal, Alert, AccessibilityInfo, findNodeHandle, View as RNView } from 'react-native';
 import { ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { View, Text, TextInput, Pressable } from '../../../components/primitives';
@@ -20,6 +20,18 @@ export default function ProfileScreen({ onLogout }: Props) {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError,  setDeleteError]  = useState<string | null>(null);
   const { status, loading, submit } = useFormSubmit('Profile updated.');
+
+  const deleteModalTitleRef = useRef<RNView>(null);
+  useEffect(() => {
+    if (!deleteStep) return;
+    const id = setTimeout(() => {
+      if (deleteModalTitleRef.current) {
+        const node = findNodeHandle(deleteModalTitleRef.current);
+        if (node) AccessibilityInfo.setAccessibilityFocus(node);
+      }
+    }, 100);
+    return () => clearTimeout(id);
+  }, [deleteStep]);
 
   useEffect(() => {
     if (!getToken()) return;
@@ -58,7 +70,8 @@ export default function ProfileScreen({ onLogout }: Props) {
             <TextInput style={s.input} placeholder="@yourname"
               placeholderTextColor={colors.textMuted}
               value={username} onChangeText={setUsername}
-              autoCapitalize="none" />
+              autoCapitalize="none"
+              accessibilityLabel="Username" />
           </View>
 
           <View style={s.formGroup}>
@@ -67,11 +80,15 @@ export default function ProfileScreen({ onLogout }: Props) {
               placeholderTextColor={colors.textMuted}
               keyboardType="email-address" autoCapitalize="none"
               textContentType="emailAddress"
-              value={email} onChangeText={setEmail} />
+              value={email} onChangeText={setEmail}
+              accessibilityLabel="Email" />
           </View>
 
           <Pressable style={[s.saveBtn, loading && { opacity: 0.5 }]}
-            onPress={save} disabled={loading}>
+            onPress={save} disabled={loading}
+            accessibilityRole="button"
+            accessibilityLabel={loading ? 'Saving' : 'Save changes'}
+            accessibilityState={{ busy: loading, disabled: loading }}>
             <Text style={styles.saveBtnText}>{loading ? 'Saving…' : 'Save changes'}</Text>
           </Pressable>
 
@@ -96,7 +113,9 @@ export default function ProfileScreen({ onLogout }: Props) {
             {/* warning icon placeholder */}
             <Text style={{ fontSize: 20 }}>⚠️</Text>
           </View>
-          <Text style={s.modalTitle}>Are you sure?</Text>
+          <RNView ref={deleteModalTitleRef} accessible={true} accessibilityLabel="Are you sure? This will permanently delete your account.">
+            <Text style={s.modalTitle}>Are you sure?</Text>
+          </RNView>
           <Text style={s.modalBody}>
             This will permanently delete your account and all data. This action cannot be undone.
           </Text>
@@ -108,10 +127,15 @@ export default function ProfileScreen({ onLogout }: Props) {
           <View style={s.modalActions}>
             <Pressable style={s.modalCancel}
               onPress={() => { setDeleteStep(false); setDeleteError(null); }}
-              disabled={deleteLoading}>
+              disabled={deleteLoading}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: deleteLoading }}>
               <Text style={s.modalCancelText}>Cancel</Text>
             </Pressable>
-            <Pressable style={s.modalConfirm} onPress={handleDelete} disabled={deleteLoading}>
+            <Pressable style={s.modalConfirm} onPress={handleDelete} disabled={deleteLoading}
+              accessibilityRole="button"
+              accessibilityLabel={deleteLoading ? 'Deleting' : 'Yes, delete'}
+              accessibilityState={{ busy: deleteLoading, disabled: deleteLoading }}>
               <Text style={s.modalConfirmText}>{deleteLoading ? 'Deleting…' : 'Yes, delete'}</Text>
             </Pressable>
           </View>

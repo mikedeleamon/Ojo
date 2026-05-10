@@ -208,6 +208,7 @@ export default function PreferencesScreen() {
                             value={location}
                             onChangeText={handleLocationChange}
                             returnKeyType='done'
+                            accessibilityLabel="Default location"
                         />
                     </View>
 

@@ -641,16 +641,21 @@ const ClosetView = ({
                                 onSubmitEditing={() =>
                                     submitRename(selected._id)
                                 }
+                                accessibilityLabel="New closet name"
                             />
                             <Pressable
                                 style={styles.inlineOk}
                                 onPress={() => submitRename(selected._id)}
+                                accessibilityRole="button"
+                                accessibilityLabel="Confirm rename"
                             >
                                 <Text style={styles.inlineOkText}>✓</Text>
                             </Pressable>
                             <Pressable
                                 style={styles.inlineCancel}
                                 onPress={() => setEditingId(null)}
+                                accessibilityRole="button"
+                                accessibilityLabel="Cancel rename"
                             >
                                 <Text style={styles.inlineCancelText}>✕</Text>
                             </Pressable>
@@ -710,10 +715,13 @@ const ClosetView = ({
                         placeholder='Closet name…'
                         placeholderTextColor={colors.textMuted}
                         onSubmitEditing={submitCreate}
+                        accessibilityLabel="Closet name"
                     />
                     <Pressable
                         style={styles.inlineOk}
                         onPress={submitCreate}
+                        accessibilityRole="button"
+                        accessibilityLabel="Create closet"
                     >
                         <Text style={styles.inlineOkText}>Add</Text>
                     </Pressable>
@@ -723,6 +731,8 @@ const ClosetView = ({
                             setCreating(false);
                             setNewName('');
                         }}
+                        accessibilityRole="button"
+                        accessibilityLabel="Cancel"
                     >
                         <Text style={styles.inlineCancelText}>✕</Text>
                     </Pressable>
@@ -749,6 +759,7 @@ const ClosetView = ({
                         placeholderTextColor={colors.textMuted}
                         value={query}
                         onChangeText={setQuery}
+                        accessibilityLabel="Search articles"
                     />
                     {query ? (
                         <Pressable onPress={() => setQuery('')}>
