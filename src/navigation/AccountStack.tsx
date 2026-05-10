@@ -29,12 +29,15 @@ const BackButton = ({ onPress }: { onPress: () => void }) => (
         style={{ padding: 8, marginLeft: -8 }}
         accessibilityLabel='Back'
         accessibilityRole="button"
+        hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
     >
         <Svg
             width={18}
             height={18}
             viewBox='0 0 18 18'
             fill='none'
+            accessibilityElementsHidden={true}
+            importantForAccessibility="no"
         >
             <Path
                 d='M11 14l-5-5 5-5'

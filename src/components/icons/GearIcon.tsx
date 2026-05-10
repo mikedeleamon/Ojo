@@ -22,6 +22,8 @@ const GearIcon = ({
         strokeWidth={strokeWidth}
         strokeLinecap='round'
         strokeLinejoin='round'
+        accessibilityElementsHidden={true}
+        importantForAccessibility="no"
     >
         <Circle
             cx={12}

@@ -12,7 +12,10 @@ interface Props {
 }
 
 const Chevron = () => (
-  <Svg width={14} height={14} viewBox="0 0 14 14" fill="none">
+  <Svg width={14} height={14} viewBox="0 0 14 14" fill="none"
+    accessibilityElementsHidden={true}
+    importantForAccessibility="no"
+  >
     <Path d="M5 2l5 5-5 5" stroke={colors.textSecondary} strokeWidth={1.5}
       strokeLinecap="round" strokeLinejoin="round" opacity={0.4} />
   </Svg>

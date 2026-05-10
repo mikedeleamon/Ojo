@@ -71,7 +71,10 @@ export default function SettingsScreen({ onLogout }: Props) {
                     accessibilityLabel='Go to Home'
                     accessibilityRole="button"
                 >
-                    <Svg width={18} height={18} viewBox='0 0 18 18' fill='none'>
+                    <Svg width={18} height={18} viewBox='0 0 18 18' fill='none'
+                        accessibilityElementsHidden={true}
+                        importantForAccessibility="no"
+                    >
                         <Path
                             d='M11 14l-5-5 5-5'
                             stroke={colors.textPrimary}

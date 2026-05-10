@@ -1,5 +1,6 @@
 import { useRef, useEffect } from 'react';
 import { Animated, PanResponder, View, StyleSheet, ViewStyle } from 'react-native';
+import { useReduceMotion } from '../../hooks/useReduceMotion';
 
 const THUMB_W = 30;
 const THUMB_H = 20;
@@ -46,6 +47,7 @@ export function AppSlider({
     onChangeRef.current = onValueChange;
     onCompleteRef.current = onSlidingComplete;
 
+    const reduceMotion = useReduceMotion();
     const trackWidth = useRef(0);
     const animX = useRef(new Animated.Value(0)).current;
     const sliding = useRef(false);
@@ -72,10 +74,15 @@ export function AppSlider({
         animX.setValue(x);
     };
 
-    // Smoothly animate thumb whenever value/min/max changes externally (e.g. unit toggle)
+    // Smoothly animate thumb whenever value/min/max changes externally (e.g. unit toggle).
+    // Snaps immediately when the user prefers reduced motion.
     useEffect(() => {
         if (sliding.current || trackWidth.current === 0) return;
         const target = valueToX(value);
+        if (reduceMotion) {
+            setX(target);
+            return;
+        }
         Animated.timing(animX, {
             toValue: target,
             duration: 200,
@@ -83,9 +90,8 @@ export function AppSlider({
         }).start(({ finished }) => {
             if (finished) lastX.current = target;
         });
-        // Also update immediately for short/skipped animations
         lastX.current = target;
-    }, [value, minimumValue, maximumValue]);
+    }, [value, minimumValue, maximumValue, reduceMotion]);
 
     const panResponder = useRef(
         PanResponder.create({

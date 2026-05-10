@@ -240,6 +240,7 @@ const ColorField = ({
           accessibilityRole="radio"
           accessibilityState={{ selected: value === c }}
           style={[st.swatchRing, value === c && st.swatchRingActive]}
+          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
         >
           {c === 'Multi' ? (
             <View style={st.swatch}><MultiSwatch /></View>
@@ -265,13 +266,15 @@ interface Props {
   onClose:      () => void;
   onSubmit:     (data: ArticleFormData) => Promise<void>;
   initialData?: ClothingArticle;
+  onDelete?:    () => Promise<void>;
 }
 
-const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
+const ArticleModal = ({ onClose, onSubmit, initialData, onDelete }: Props) => {
   const isEditing = !!initialData;
   const [form,   setForm]   = useState<ArticleFormData>(initialData ? toForm(initialData) : EMPTY);
-  const [error,  setError]  = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [error,    setError]   = useState<string | null>(null);
+  const [saving,   setSaving]  = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const headerRef = useRef<RNView>(null);
   useEffect(() => {
@@ -324,6 +327,13 @@ const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
     if (result.uri) set('imageUrl', result.uri);
   };
 
+  const handleDelete = async () => {
+    setDeleting(true);
+    try { await onDelete?.(); }
+    catch (err) { setError(getErrorMessage(err, 'Failed to delete article.')); }
+    finally { setDeleting(false); }
+  };
+
   const handleSubmit = async () => {
     setError(null);
     if (!form.clothingType) { setError('Clothing type is required.'); return; }
@@ -350,7 +360,13 @@ const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
           >
             <Text style={st.title}>{isEditing ? 'Edit Article' : 'Add Article'}</Text>
           </RNView>
-          <Pressable style={st.closeBtn} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close">
+          <Pressable
+            style={st.closeBtn}
+            onPress={onClose}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+            hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
+          >
             <Text style={st.closeBtnText}>✕</Text>
           </Pressable>
         </View>
@@ -480,6 +496,23 @@ const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
               onValueChange={v => set('bodyZone', (v as BodyZone) || undefined)}
             />
           )}
+
+          {isEditing && onDelete && (
+            <View style={st.dangerSection}>
+              <Pressable
+                style={[st.deleteBtn, deleting && { opacity: 0.5 }]}
+                onPress={handleDelete}
+                disabled={deleting}
+                accessibilityRole="button"
+                accessibilityLabel={deleting ? 'Deleting article' : 'Delete article'}
+                accessibilityState={{ busy: deleting, disabled: deleting }}
+              >
+                <Text style={st.deleteBtnText}>
+                  {deleting ? 'Deleting…' : 'Delete article'}
+                </Text>
+              </Pressable>
+            </View>
+          )}
         </ScrollView>
 
         {/* Footer */}
@@ -559,6 +592,11 @@ const st = StyleSheet.create({
   swatchRing:      { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'transparent' },
   swatchRingActive:{ borderColor: colors.textPrimary },
   swatch:          { width: 26, height: 26, borderRadius: 13, overflow: 'hidden' },
+
+  // Danger zone
+  dangerSection: { borderTopWidth: 1, borderTopColor: colors.glassBorder, paddingTop: spacing.md },
+  deleteBtn:     { paddingVertical: 12, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.dangerBorder, backgroundColor: colors.dangerBg, alignItems: 'center' },
+  deleteBtnText: { fontFamily: fonts.body, fontSize: fontSizes.base, color: colors.dangerText, fontWeight: fontWeights.medium },
 
   // Footer
   footer:        { flexDirection: 'row', gap: spacing.sm, padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.glassBorder },
