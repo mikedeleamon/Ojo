@@ -67,13 +67,20 @@ export default function LoginPage({ onLogin }: Props) {
                             source={require('../../assets/images/logos/ojoLogo.png')}
                             style={styles.logo}
                             resizeMode='contain'
+                            accessibilityLabel="Ojo"
+                            accessibilityRole="image"
                         />
                         <Text style={styles.tagline}>
                             Dress for the weather.
                         </Text>
 
                         {error ? (
-                            <View style={styles.errorBox}>
+                            <View
+                                style={styles.errorBox}
+                                accessibilityLiveRegion="assertive"
+                                accessible={true}
+                                accessibilityLabel={error}
+                            >
                                 <Text style={styles.errorText}>{error}</Text>
                             </View>
                         ) : null}
@@ -115,6 +122,7 @@ export default function LoginPage({ onLogin }: Props) {
                             style={[styles.btn, loading && { opacity: 0.5 }]}
                             onPress={handleSubmit}
                             disabled={loading}
+                            accessibilityRole="button"
                         >
                             <Text style={styles.btnText}>
                                 {loading ? 'Signing in…' : 'Sign in'}
@@ -125,7 +133,10 @@ export default function LoginPage({ onLogin }: Props) {
                             <Text style={styles.footerText}>
                                 Don't have an account?{' '}
                             </Text>
-                            <Pressable onPress={() => nav.push('Signup')}>
+                            <Pressable
+                                onPress={() => nav.push('Signup')}
+                                accessibilityRole="link"
+                            >
                                 <Text style={styles.link}>Sign up</Text>
                             </Pressable>
                         </View>

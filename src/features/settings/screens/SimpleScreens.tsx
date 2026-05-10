@@ -87,7 +87,7 @@ export const HistoryScreen = () => {
 
   return (
     <Root>
-      <Pressable style={st.clearBtn} onPress={handleClearAll}>
+      <Pressable style={st.clearBtn} onPress={handleClearAll} accessibilityRole="button">
         <Text style={st.clearBtnText}>Clear all</Text>
       </Pressable>
       {entries.map(entry => (
@@ -98,7 +98,8 @@ export const HistoryScreen = () => {
           </View>
           <Text style={s.historySummary} numberOfLines={2}>{entry.articleSummary}</Text>
           <Pressable style={s.historyDeleteBtn} onPress={() => handleDelete(entry.id)}
-            accessibilityLabel="Remove entry">
+            accessibilityLabel="Remove entry"
+            accessibilityRole="button">
             <Text style={{ color: colors.textMuted, fontSize: 12 }}>✕</Text>
           </Pressable>
         </View>

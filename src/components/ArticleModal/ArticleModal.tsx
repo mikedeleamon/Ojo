@@ -177,6 +177,8 @@ const TypePickerField = ({
                 key={type}
                 style={[st.chip, value === type && st.chipActive]}
                 onPress={() => { if (value !== type) onChange(type); }}
+                accessibilityRole="radio"
+                accessibilityLabel={type}
               >
                 <Text style={[st.chipText, value === type && st.chipTextActive]}>{type}</Text>
               </Pressable>
@@ -205,6 +207,8 @@ const ChipField = ({
           key={item}
           style={[st.chip, value === item && st.chipActive]}
           onPress={() => onValueChange(value === item ? '' : item)}
+          accessibilityRole="radio"
+          accessibilityLabel={item}
         >
           <Text style={[st.chipText, value === item && st.chipTextActive]}>{item}</Text>
         </Pressable>
@@ -325,14 +329,23 @@ const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
         {/* Header */}
         <View style={st.header}>
           <Text style={st.title}>{isEditing ? 'Edit Article' : 'Add Article'}</Text>
-          <Pressable style={st.closeBtn} onPress={onClose}>
+          <Pressable style={st.closeBtn} onPress={onClose} accessibilityRole="button">
             <Text style={st.closeBtnText}>✕</Text>
           </Pressable>
         </View>
 
         <ScrollView contentContainerStyle={st.body} keyboardShouldPersistTaps='handled'>
           {error
-            ? <View style={st.errorBox}><Text style={st.errorText}>{error}</Text></View>
+            ? (
+              <View
+                style={st.errorBox}
+                accessibilityLiveRegion="assertive"
+                accessible={true}
+                accessibilityLabel={error}
+              >
+                <Text style={st.errorText}>{error}</Text>
+              </View>
+            )
             : null}
 
           {/* Image */}
@@ -340,7 +353,7 @@ const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
             {form.imageUrl ? (
               <View style={st.previewWrap}>
                 <Image source={{ uri: form.imageUrl }} style={st.preview} resizeMode='cover' />
-                <Pressable style={st.clearImg} onPress={() => set('imageUrl', '')}>
+                <Pressable style={st.clearImg} onPress={() => set('imageUrl', '')} accessibilityRole="button">
                   <Text style={st.clearImgText}>Remove</Text>
                 </Pressable>
               </View>
@@ -349,7 +362,7 @@ const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
                 <Text style={st.imagePlaceholderText}>No image</Text>
               </View>
             )}
-            <Pressable style={st.pickImageBtn} onPress={handlePickImage}>
+            <Pressable style={st.pickImageBtn} onPress={handlePickImage} accessibilityRole="button">
               <Text style={st.pickImageBtnText}>📷 Pick from library</Text>
             </Pressable>
           </View>
@@ -423,6 +436,8 @@ const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
                     isAccessory: !f.isAccessory,
                     bodyZone:    f.isAccessory ? undefined : f.bodyZone,
                   }))}
+                  accessibilityRole="checkbox"
+                  accessibilityLabel="Accessory"
                 >
                   <Text style={[st.chipText, form.isAccessory && st.chipTextActive]}>
                     Accessory
@@ -445,13 +460,14 @@ const ArticleModal = ({ onClose, onSubmit, initialData }: Props) => {
 
         {/* Footer */}
         <View style={st.footer}>
-          <Pressable style={st.cancelBtn} onPress={onClose}>
+          <Pressable style={st.cancelBtn} onPress={onClose} accessibilityRole="button">
             <Text style={st.cancelBtnText}>Cancel</Text>
           </Pressable>
           <Pressable
             style={[st.submitBtn, saving && { opacity: 0.5 }]}
             onPress={handleSubmit}
             disabled={saving}
+            accessibilityRole="button"
           >
             <Text style={st.submitBtnText}>
               {saving

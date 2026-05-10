@@ -57,6 +57,7 @@ export default function SettingsScreen({ onLogout }: Props) {
                     onPress={() => nav.goBack()}
                     style={styles.homeBtn}
                     accessibilityLabel='Go to Home'
+                    accessibilityRole="button"
                 >
                     <Svg width={18} height={18} viewBox='0 0 18 18' fill='none'>
                         <Path
@@ -84,6 +85,7 @@ export default function SettingsScreen({ onLogout }: Props) {
                 <Pressable
                     style={styles.logoutBtn}
                     onPress={() => setShowLogout(true)}
+                    accessibilityRole="button"
                 >
                     <Text style={styles.logoutText}>Log out</Text>
                 </Pressable>
@@ -97,6 +99,8 @@ export default function SettingsScreen({ onLogout }: Props) {
                 <Pressable
                     style={styles.backdrop}
                     onPress={() => setShowLogout(false)}
+                    accessibilityLabel="Dismiss"
+                    accessibilityRole="button"
                 />
                 <View style={styles.modalCard}>
                     <Text style={styles.modalTitle}>Log out?</Text>
@@ -107,12 +111,14 @@ export default function SettingsScreen({ onLogout }: Props) {
                         <Pressable
                             style={styles.modalCancel}
                             onPress={() => setShowLogout(false)}
+                            accessibilityRole="button"
                         >
                             <Text style={styles.modalCancelText}>Cancel</Text>
                         </Pressable>
                         <Pressable
                             style={styles.modalConfirm}
                             onPress={handleLogout}
+                            accessibilityRole="button"
                         >
                             <Text style={styles.modalConfirmText}>Log out</Text>
                         </Pressable>

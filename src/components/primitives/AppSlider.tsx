@@ -16,6 +16,7 @@ interface AppSliderProps {
     maximumTrackTintColor?: string;
     thumbTintColor?: string;
     style?: ViewStyle;
+    accessibilityLabel?: string;
 }
 
 export function AppSlider({
@@ -29,6 +30,7 @@ export function AppSlider({
     maximumTrackTintColor = '#555555',
     thumbTintColor = '#ffffff',
     style,
+    accessibilityLabel,
 }: AppSliderProps) {
     // Keep always-current refs for values accessed inside PanResponder closures
     const minRef = useRef(minimumValue);
@@ -135,6 +137,21 @@ export function AppSlider({
                 const changed = w !== trackWidth.current;
                 trackWidth.current = w;
                 if (changed) setX(valueToX(value, w));
+            }}
+            accessibilityRole="adjustable"
+            accessibilityLabel={accessibilityLabel}
+            accessibilityValue={{ min: minimumValue, max: maximumValue, now: value }}
+            accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+            onAccessibilityAction={({ nativeEvent }) => {
+                if (nativeEvent.actionName === 'increment') {
+                    const next = Math.min(value + step, maximumValue);
+                    onValueChange?.(next);
+                    onSlidingComplete?.(next);
+                } else if (nativeEvent.actionName === 'decrement') {
+                    const next = Math.max(value - step, minimumValue);
+                    onValueChange?.(next);
+                    onSlidingComplete?.(next);
+                }
             }}
             {...panResponder.panHandlers}
         >

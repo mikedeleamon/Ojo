@@ -249,6 +249,7 @@ const ArticleCard = ({
             style={[styles.articleCard, outOfSeason && styles.articleCardOOS]}
             onPress={onEdit}
             accessibilityLabel='Edit article'
+            accessibilityRole="button"
         >
             <View style={styles.articleImg}>
                 {article.imageUrl ? (

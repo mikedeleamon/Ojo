@@ -28,6 +28,8 @@ const SettingsItem = ({ label, sublabel, onPress, right, disabled = false }: Pro
       pressed && !disabled && { opacity: 0.7 },
     ]}
     accessibilityLabel={label}
+    accessibilityRole="button"
+    accessibilityState={{ disabled }}
   >
     <Text style={styles.label}>{label}</Text>
     <View style={styles.right}>

@@ -28,6 +28,7 @@ const BackButton = ({ onPress }: { onPress: () => void }) => (
         onPress={onPress}
         style={{ padding: 8, marginLeft: -8 }}
         accessibilityLabel='Back'
+        accessibilityRole="button"
     >
         <Svg
             width={18}

@@ -28,7 +28,7 @@ export default function LegalWebViewScreen({ doc, onClose }: Props) {
           <Text style={styles.headerSub}>{doc.subtitle} · Effective: {EFFECTIVE_DATE}</Text>
         </View>
         {onClose && (
-          <Pressable style={styles.closeBtn} onPress={onClose} accessibilityLabel="Close">
+          <Pressable style={styles.closeBtn} onPress={onClose} accessibilityLabel="Close" accessibilityRole="button">
             <Text style={{ color: colors.textSecondary, fontSize: 16 }}>✕</Text>
           </Pressable>
         )}
@@ -41,7 +41,7 @@ export default function LegalWebViewScreen({ doc, onClose }: Props) {
           {loadState === 'error' && (
             <View style={styles.center}>
               <Text style={styles.errorText}>Unable to load document.</Text>
-              <Pressable style={styles.retryBtn} onPress={() => setLoadState('loading')}>
+              <Pressable style={styles.retryBtn} onPress={() => setLoadState('loading')} accessibilityRole="button">
                 <Text style={styles.retryText}>Retry</Text>
               </Pressable>
             </View>
