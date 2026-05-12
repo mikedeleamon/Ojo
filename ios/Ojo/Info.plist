@@ -50,10 +50,6 @@
       <key>NSAllowsLocalNetworking</key>
       <true/>
     </dict>
-    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your location</string>
-    <key>NSLocationAlwaysUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your location</string>
     <key>NSFaceIDUsageDescription</key>
     <string>Ojo uses Face ID to securely access your saved login credentials from the device keychain.</string>
     <key>NSLocationWhenInUseUsageDescription</key>

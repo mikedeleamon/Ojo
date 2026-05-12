@@ -283,90 +283,204 @@ const buildTimeline = (
 // ─── 6. Natural language recommendation ───────────────────────────────────────
 // Sentence varies based on which layers are active and whether a timeline exists.
 
-const buildRecommendation = (
-  base:              OutfitSlot | null,
-  mid:               OutfitSlot | null,   // weather-needed mid, or null
-  outer:             OutfitSlot | null,   // weather-needed outer, or null
-  currentTemp:       number,
-  hasTimeline:       boolean,
-  missingMid:        boolean,
-  missingOuter:      boolean,
-  raining:           boolean,
-  midHardToRemove:   boolean = false,
-  outerHardToRemove: boolean = false,
-  extraMid:          OutfitSlot | null = null,   // present in outfit but not needed
-  extraOuter:        OutfitSlot | null = null,   // present in outfit but not needed
-): string => {
-  const baseName  = base?.article.name  || base?.article.clothingType  || 'base layer';
-  const midName   = mid?.article.name   || mid?.article.clothingType;
-  const outerName = outer?.article.name || outer?.article.clothingType;
+// ── Recommendation context ───────────────────────────────────────────────────
+// Gathers every signal that shapes the recommendation sentence into a single
+// object so the function signature stays clean as new signals are added.
 
-  // Removability caveat appended when a layer is bulky / hard to shed
-  const midCaveat   = midHardToRemove   ? ` Note: your ${midName} is bulky to carry — plan around it.` : '';
-  const outerCaveat = outerHardToRemove ? ` Your ${outerName} is heavy to carry if you shed it — commit to wearing it or leave it.` : '';
+interface RecommendationInput {
+  base:              OutfitSlot | null;
+  activeMid:         OutfitSlot | null;  // weather-needed mid
+  activeOuter:       OutfitSlot | null;  // weather-needed outer
+  extraMid:          OutfitSlot | null;  // present in outfit, not weather-needed
+  extraOuter:        OutfitSlot | null;  // present in outfit, not weather-needed
+  currentTemp:       number;
+  windSpeed:         number;
+  hasTimeline:       boolean;
+  missingMid:        boolean;            // weather needs mid, outfit doesn't have one
+  missingOuter:      boolean;            // weather needs outer, outfit doesn't have one
+  raining:           boolean;
+  snowing:           boolean;
+  midHardToRemove:   boolean;
+  outerHardToRemove: boolean;
+}
 
-  // ── Extra layers (in outfit but not strictly needed by weather) ──────────
-  // Acknowledge their presence with a light note instead of ignoring them.
-  if (!mid && !outer && (extraMid || extraOuter)) {
-    const extraMidName   = extraMid?.article.name   || extraMid?.article.clothingType;
-    const extraOuterName = extraOuter?.article.name || extraOuter?.article.clothingType;
+const buildRecommendation = (ctx: RecommendationInput): string => {
+  const {
+    base, activeMid, activeOuter, extraMid, extraOuter,
+    currentTemp, windSpeed, hasTimeline,
+    missingMid, missingOuter, raining, snowing,
+    midHardToRemove, outerHardToRemove,
+  } = ctx;
 
+  // ── Name helpers ──────────────────────────────────────────────────────────
+  const baseName       = base?.article.name       || base?.article.clothingType       || 'base layer';
+  const midName        = activeMid?.article.name   || activeMid?.article.clothingType;
+  const outerName      = activeOuter?.article.name || activeOuter?.article.clothingType;
+  const extraMidName   = extraMid?.article.name    || extraMid?.article.clothingType;
+  const extraOuterName = extraOuter?.article.name  || extraOuter?.article.clothingType;
+
+  const isFullBody = base?.role === 'fullBody';
+  const overWord   = isFullBody ? 'paired with' : 'over';  // "Hoodie over T-Shirt" vs "Hoodie paired with Dress"
+  const hasPrecip  = raining || snowing;
+  const precipWord = snowing ? 'snow' : 'rain';
+
+  // Composable suffixes
+  const midCaveat   = midHardToRemove
+    ? ` Note: your ${midName} is bulky to carry — plan around it.` : '';
+  const outerCaveat = outerHardToRemove
+    ? ` Your ${outerName} is heavy to carry if you shed it — commit to wearing it or leave it.` : '';
+  const windNote    = windSpeed >= 20
+    ? " It's windy — keep your layers sealed."
+    : windSpeed >= 12 && (activeMid || activeOuter)
+      ? " A bit breezy — your layers will help cut the wind."
+      : '';
+
+  // ── A) No active layers needed (base only) ─────────────────────────────
+  if (!activeMid && !activeOuter) {
+
+    // A1: Both mid AND outer missing — urgent
+    if (missingMid && missingOuter) {
+      return hasPrecip
+        ? `Your ${baseName} isn't enough for ${currentTemp}°F with ${precipWord} — you need both a mid layer and waterproof outerwear.`
+        : `Your ${baseName} alone is too light for ${currentTemp}°F — a mid layer and a jacket would make a real difference.`;
+    }
+
+    // A2: Outer missing (highest-priority gap — outermost protection)
+    if (missingOuter) {
+      const extraNote = extraMid
+        ? ` Your ${extraMidName} helps a bit, but it's not a substitute for a proper outer layer.`
+        : '';
+      return hasPrecip
+        ? `Your ${baseName} alone won't hold up today — a waterproof outer layer is strongly recommended for the ${precipWord}.${extraNote}`
+        : `Your ${baseName} may be too light for ${currentTemp}°F — a jacket would make a real difference today.${extraNote}`;
+    }
+
+    // A3: Mid missing
+    if (missingMid) {
+      const extraNote = extraOuter
+        ? ` The ${extraOuterName} is in your outfit, but a mid layer underneath would help more at this temp.`
+        : '';
+      return hasPrecip
+        ? `Your ${baseName} is light for these conditions — a mid layer and something water-resistant would keep you comfortable.${extraNote}`
+        : `Your ${baseName} may feel a bit cool — a mid layer would help for ${currentTemp}°F.${extraNote}`;
+    }
+
+    // A4: No gaps — acknowledge extras
     if (extraMid && extraOuter) {
       return `You probably won't need the ${extraMidName} or ${extraOuterName} today, but they're easy to shed if you want the extra comfort.`;
     }
     if (extraOuter) {
       return `Your ${baseName} should be enough today — the ${extraOuterName} is there if you run cold or it gets breezy.`;
     }
-    // extraMid only
-    return `Your ${baseName} is fine on its own for ${currentTemp}°F — the ${extraMidName} is a nice-to-have if you get chilly.`;
-  }
+    if (extraMid) {
+      return `Your ${baseName} is fine on its own for ${currentTemp}°F — the ${extraMidName} is a nice-to-have if you get chilly.`;
+    }
 
-  // Single layer — check whether layers are needed but absent before calling it fine
-  if (!mid && !outer) {
-    if (missingOuter && raining)
-      return `Your ${baseName} alone won't hold up today — a waterproof outer layer is strongly recommended for the rain and chill.`;
-    if (missingOuter)
-      return `Your ${baseName} may be too light for ${currentTemp}°F — a jacket would make a real difference today.`;
-    if (missingMid && raining)
-      return `Your ${baseName} is light for these conditions — a mid layer and something water-resistant would keep you comfortable.`;
-    if (missingMid)
-      return `Your ${baseName} may feel a bit cool — a mid layer over top would help for ${currentTemp}°F.`;
+    // A5: Pure base only, no extras, no gaps
     return currentTemp > 70
       ? `Your ${baseName} is all you need today — the weather is comfortable enough to keep it simple.`
       : `Your ${baseName} works well on its own for these conditions.`;
   }
 
-  // Full three-layer stack
-  if (mid && outer) {
-    const rainSuffix = raining ? ` Make sure the ${outerName} can handle rain.` : '';
-    if (hasTimeline) {
-      return `Start with your ${midName} over the ${baseName}, then add the ${outerName} for cooler moments. You can drop the ${outerName} as the day warms up.${rainSuffix}${outerCaveat}${midCaveat}`;
+  // ── B) Full three-layer stack ───────────────────────────────────────────
+  if (activeMid && activeOuter) {
+    const precipSuffix = hasPrecip
+      ? ` Make sure the ${outerName} can handle ${precipWord}.`
+      : '';
+
+    // B1: Extreme cold — firm tone
+    if (currentTemp < 25) {
+      return `Keep everything on today — it's dangerously cold at ${currentTemp}°F. Your ${midName} ${overWord} the ${baseName} with the ${outerName} on top is essential.${precipSuffix}${windNote}`;
     }
-    return `Layer your ${midName} over the ${baseName} with the ${outerName} on top for full coverage.${rainSuffix}${outerCaveat}${midCaveat}`;
+
+    // B2: Variable day (timeline)
+    if (hasTimeline) {
+      return `Start with your ${midName} ${overWord} the ${baseName}, then add the ${outerName} for cooler moments. You can drop the ${outerName} as the day warms up.${precipSuffix}${outerCaveat}${midCaveat}${windNote}`;
+    }
+
+    // B3: Steady day
+    return isFullBody
+      ? `Pair your ${midName} with the ${baseName} and add the ${outerName} on top for full coverage.${precipSuffix}${outerCaveat}${midCaveat}${windNote}`
+      : `Layer your ${midName} over the ${baseName} with the ${outerName} on top for full coverage.${precipSuffix}${outerCaveat}${midCaveat}${windNote}`;
   }
 
-  // Outer only (mid not needed)
-  if (outer && !mid) {
-    const rainNote = raining ? ` Rain is expected — keep the ${outerName} on.` : '';
+  // ── C) Active mid + extra outer ────────────────────────────────────────
+  // Weather needs the mid but not the outer — outfit included both.
+  if (activeMid && !activeOuter && extraOuter) {
+    const precipHint = hasPrecip
+      ? ` ${snowing ? 'Snow' : 'Rain'} is in the forecast — the ${extraOuterName} might come in handy after all.`
+      : '';
+
+    if (hasTimeline) {
+      return `Your ${midName} ${overWord} the ${baseName} is the right combo for the morning. The ${extraOuterName} is optional but easy to grab if you need it.${precipHint}${midCaveat}${windNote}`;
+    }
+    return `Keep your ${midName} — it suits today's temperature. The ${extraOuterName} is there if conditions shift, but you likely won't need it.${precipHint}${midCaveat}${windNote}`;
+  }
+
+  // ── D) Active outer + extra mid ────────────────────────────────────────
+  // Weather needs the outer but not the mid — outfit included both.
+  if (!activeMid && activeOuter && extraMid) {
+    const precipNote = hasPrecip
+      ? (snowing ? ` Keep the ${outerName} sealed for the snow.` : ` Keep the ${outerName} on for the rain.`)
+      : '';
+
+    if (hasTimeline) {
+      return `The ${outerName} is the key layer today. Your ${extraMidName} adds warmth if you need it, but the ${outerName} is doing the heavy lifting.${precipNote}${outerCaveat}${windNote}`;
+    }
+    return isFullBody
+      ? `Pair the ${outerName} with your ${baseName} — that's the right call. The ${extraMidName} adds a bit of warmth but isn't essential.${precipNote}${outerCaveat}${windNote}`
+      : `A ${outerName} over your ${baseName} is the right call. The ${extraMidName} adds a bit of warmth but isn't essential.${precipNote}${outerCaveat}${windNote}`;
+  }
+
+  // ── E) Outer only (active, no mid) ─────────────────────────────────────
+  if (activeOuter && !activeMid) {
+    const precipNote = hasPrecip
+      ? (snowing ? ` ${precipWord[0].toUpperCase() + precipWord.slice(1)} is expected — keep the ${outerName} on.` : ` Rain is expected — keep the ${outerName} on.`)
+      : '';
+    const gapNote = missingMid
+      ? ` A mid layer underneath would round things out if you add one to your closet.`
+      : '';
+
+    // E1: Wind-driven outer on a warm day
+    if (!hasPrecip && windSpeed >= 15 && currentTemp > 50) {
+      if (hasTimeline)
+        return `It's breezy today — your ${outerName} will cut the wind nicely. Shed it if the wind dies down later.${gapNote}`;
+      return isFullBody
+        ? `Your ${outerName} paired with the ${baseName} will cut today's wind — good call.${gapNote}`
+        : `Your ${outerName} over the ${baseName} will cut today's wind — good call.${gapNote}`;
+    }
+
+    // E2: Variable day
     if (hasTimeline) {
       return outerHardToRemove
-        ? `The ${outerName} is the right call today, but it's heavy to stow — you may want to commit to it all day.${rainNote}`
-        : `The ${outerName} will be welcome this morning — feel free to shed it once temperatures climb.${rainNote}`;
+        ? `The ${outerName} is the right call today, but it's heavy to stow — you may want to commit to it all day.${precipNote}${gapNote}${windNote}`
+        : `The ${outerName} will be welcome this morning — feel free to shed it once temperatures climb.${precipNote}${gapNote}${windNote}`;
     }
-    return `A ${outerName} over your ${baseName} is the right call for today.${rainNote}${outerCaveat}`;
+
+    // E3: Steady day
+    return isFullBody
+      ? `Pair the ${outerName} with your ${baseName} — it's the right call for today.${precipNote}${outerCaveat}${gapNote}${windNote}`
+      : `A ${outerName} over your ${baseName} is the right call for today.${precipNote}${outerCaveat}${gapNote}${windNote}`;
   }
 
-  // Mid only (outer not needed)
-  if (mid && !outer) {
-    const rainWarning = raining
-      ? ` Rain is in the forecast though — consider grabbing a water-resistant layer too.`
+  // ── F) Mid only (active, no outer) ─────────────────────────────────────
+  if (activeMid && !activeOuter) {
+    const precipWarning = hasPrecip
+      ? ` ${snowing ? 'Snow' : 'Rain'} is in the forecast though — consider grabbing a water-resistant layer too.`
       : '';
+    const gapNote = missingOuter
+      ? ` Adding outerwear to your closet would help on days like this.`
+      : '';
+
+    // F1: Variable day
     if (hasTimeline) {
       return midHardToRemove
-        ? `Your ${midName} suits the morning chill, but it's bulky to carry later — plan your day around it.${rainWarning}`
-        : `Your ${midName} is a smart pick for the morning chill — easy to remove as the day heats up.${rainWarning}`;
+        ? `Your ${midName} suits the morning chill, but it's bulky to carry later — plan your day around it.${precipWarning}${gapNote}${windNote}`
+        : `Your ${midName} is a smart pick for the morning chill — easy to remove as the day heats up.${precipWarning}${gapNote}${windNote}`;
     }
-    return `Keep your ${midName} handy — it suits today's temperature without being too heavy.${rainWarning}${midCaveat}`;
+
+    // F2: Steady day
+    return `Keep your ${midName} handy — it suits today's temperature without being too heavy.${precipWarning}${midCaveat}${gapNote}${windNote}`;
   }
 
   return 'Layer to your comfort based on how the day feels.';
@@ -417,6 +531,7 @@ export interface LayeringContext {
   windSpeed:    number;
   raining:      boolean;
   rainForecast: boolean;
+  snowing:      boolean;     // currently snowing or snow in forecast
   high:         number;
   low:          number;
   offset:       number;     // feels-like correction applied to forecast temps
@@ -451,6 +566,13 @@ export const buildLayeringContext = ({
     /rain|shower|storm|drizzle|sleet/i.test(f.IconPhrase),
   );
 
+  const currentlySnowing = /snow/i.test(weather.WeatherText ?? '')
+    || weather.PrecipitationType === 'Snow';
+  const snowForecast = forecasts.some(f =>
+    /snow|blizzard|flurr/i.test(f.IconPhrase),
+  );
+  const snowing = currentlySnowing || snowForecast;
+
   const { high, low, offset } = deriveDayRange(forecasts, currentAirTemp, currentTemp);
   const tempDelta = high - low;
 
@@ -459,7 +581,7 @@ export const buildLayeringContext = ({
 
   return {
     forecasts,
-    currentTemp, windSpeed, raining, rainForecast,
+    currentTemp, windSpeed, raining, rainForecast, snowing,
     high, low, offset, tempDelta,
     needsMid:   layerNeedsMid(currentTemp, tempDelta, windSpeed, midThreshold),
     needsOuter: layerNeedsOuter(currentTemp, windSpeed, outerThreshold) || raining || rainForecast,
@@ -480,7 +602,7 @@ export const generateLayeringRecommendation = ({
 }): LayeringResult => {
   const {
     forecasts,
-    currentTemp, windSpeed, raining, rainForecast,
+    currentTemp, windSpeed, raining, rainForecast, snowing,
     high, low, offset, tempDelta,
     needsMid, needsOuter,
   } = context;
@@ -521,7 +643,17 @@ export const generateLayeringRecommendation = ({
     // consistent with the outfit card above. Necessity flags shape the
     // recommendation text and timeline, not the layer visibility.
     layers:         { base, mid, outer },
-    recommendation: buildRecommendation(base, activeMid, activeOuter, currentTemp, !!timeline, missingMid, missingOuter, rainContext, !!midHardToRemove, !!outerHardToRemove, extraMid ? mid : null, extraOuter ? outer : null),
+    recommendation: buildRecommendation({
+      base, activeMid, activeOuter,
+      extraMid:   extraMid   ? mid   : null,
+      extraOuter: extraOuter ? outer : null,
+      currentTemp, windSpeed,
+      hasTimeline: !!timeline,
+      missingMid, missingOuter,
+      raining: rainContext, snowing,
+      midHardToRemove:   !!midHardToRemove,
+      outerHardToRemove: !!outerHardToRemove,
+    }),
     timeline,
     confidence:     Math.max(0, computeConfidence(currentTemp, tempDelta, windSpeed, !!activeMid, !!activeOuter) - removabilityPenalty),
   };

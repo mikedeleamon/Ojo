@@ -9,14 +9,16 @@
  */
 
 export const LEGAL_URLS = {
-  privacyPolicy:   '[REPLACE_WITH_HOSTED_URL]/privacy',
-  termsOfService:  '[REPLACE_WITH_HOSTED_URL]/terms',
+  //privacyPolicy:   '[REPLACE_WITH_HOSTED_URL]/privacy',
+  //termsOfService:  '[REPLACE_WITH_HOSTED_URL]/terms',
+  privacyPolicy:   'https://www.ojoapp.io/privacy',
+  termsOfService:  'https://www.ojoapp.io/terms',
 } as const;
 
 export const EFFECTIVE_DATE = 'June 15, 2026';
-export const DEVELOPER_NAME = '[DEVELOPER NAME]';
-export const CONTACT_EMAIL  = '[CONTACT EMAIL]';
-export const WEBSITE_URL    = '[WEBSITE URL]';
+export const DEVELOPER_NAME = 'Ojo Studio, LLC';
+export const CONTACT_EMAIL  = 'support@ojoapp.io';
+export const WEBSITE_URL    = 'https://www.ojoapp.io';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

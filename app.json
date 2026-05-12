@@ -4,7 +4,7 @@
     "slug": "ojo",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/ojo_app_icon@1x.png",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
@@ -42,7 +42,7 @@
         "photosPermission": "Ojo uses your photo library to add clothing images."
       }],
       ["expo-notifications", {
-        "icon": "./assets/icon.png",
+        "icon": "./assets/ojo_app_icon@1x.png",
         "color": "#87DE5A",
         "sounds": []
       }]
