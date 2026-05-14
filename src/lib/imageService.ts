@@ -63,3 +63,47 @@ export const pickImage = async (): Promise<ImageResult> => {
     return { uri: null, localUri: null, width: null, height: null, error: msg };
   }
 };
+
+export const captureImage = async (): Promise<ImageResult> => {
+  try {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      return { uri: null, localUri: null, width: null, height: null, error: 'Camera access denied.' };
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      quality:    0.7,
+      base64:     true,
+      allowsEditing: true,
+      aspect:     [1, 1],
+    });
+
+    if (result.canceled) return { uri: null, localUri: null, width: null, height: null, error: null };
+
+    const asset = result.assets[0];
+    if (!asset.base64) return { uri: null, localUri: null, width: null, height: null, error: 'Could not read image.' };
+
+    const approxBytes = asset.base64.length * 0.75;
+    if (approxBytes > MAX_FILE_BYTES) {
+      return {
+        uri:      null,
+        localUri: null,
+        width:    null,
+        height:   null,
+        error:    `Image must be under ${MAX_FILE_MB}MB.`,
+      };
+    }
+
+    return {
+      uri:      `data:image/jpeg;base64,${asset.base64}`,
+      localUri: asset.uri,
+      width:    asset.width  ?? null,
+      height:   asset.height ?? null,
+      error:    null,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Failed to capture image.';
+    return { uri: null, localUri: null, width: null, height: null, error: msg };
+  }
+};

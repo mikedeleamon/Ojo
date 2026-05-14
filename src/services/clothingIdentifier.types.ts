@@ -22,6 +22,18 @@ export type GarmentType =
   | 'skirt'
   | 'dress'
   | 'jumpsuit'
+  | 'hat'
+  | 'cap'
+  | 'scarf'
+  | 'gloves'
+  | 'belt'
+  | 'bag'
+  | 'shoes'
+  | 'boots'
+  | 'sneakers'
+  | 'sandals'
+  | 'socks'
+  | 'watch'
   | 'unknown';
 
 // ─── Fabric Types ─────────────────────────────────────────────────────────────
@@ -46,6 +58,8 @@ export interface DetectedColor {
 
 export interface ClothingIdentificationResult {
   garmentType: GarmentType;
+  /** Raw text of the best ML Kit label — displayed when garmentType is 'unknown'. */
+  topLabelText: string;
   colors: DetectedColor[];
   fabric: FabricGuess;
   confidence: number;

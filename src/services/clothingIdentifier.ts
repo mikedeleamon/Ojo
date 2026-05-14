@@ -13,7 +13,7 @@
  */
 
 import { NativeModules } from 'react-native';
-import { getPalette } from 'react-native-palette';
+import RNPalette from 'react-native-palette';
 
 // Resolve ML Kit lazily so that the module can be absent on Simulator
 // without crashing at import time.
@@ -33,27 +33,56 @@ import { paletteToDetectedColors, RawPalette } from './colorUtils';
 // ─── Label → GarmentType Map ─────────────────────────────────────────────────
 
 const LABEL_TO_GARMENT: Array<{ patterns: string[]; type: GarmentType }> = [
+  // ── Accessories — checked FIRST so "Hat"/"Cap" beat generic "Outerwear"/"Jacket" ──
+  { patterns: ['hat', 'fedora', 'beanie', 'beret', 'bucket hat', 'sun hat', 'cowboy hat'], type: 'hat' },
+  { patterns: ['cap', 'baseball cap', 'snapback', 'trucker hat', 'visor'], type: 'cap' },
+  { patterns: ['scarf', 'bandana', 'neckerchief'], type: 'scarf' },
+  { patterns: ['gloves', 'mittens'], type: 'gloves' },
+  { patterns: ['belt'], type: 'belt' },
+  { patterns: ['bag', 'handbag', 'backpack', 'tote', 'purse', 'clutch', 'satchel'], type: 'bag' },
+  { patterns: ['watch', 'wristwatch'], type: 'watch' },
+  { patterns: ['sneaker', 'sneakers', 'trainer', 'running shoe', 'athletic shoe'], type: 'sneakers' },
+  { patterns: ['boot', 'boots', 'ankle boot', 'chelsea boot'], type: 'boots' },
+  { patterns: ['sandal', 'sandals', 'flip-flop', 'flip flop'], type: 'sandals' },
+  { patterns: ['shoe', 'shoes', 'loafer', 'oxford shoe', 'derby'], type: 'shoes' },
+  { patterns: ['sock', 'socks'], type: 'socks' },
+
+  // ── Tops ──
+  // "t-shirt" must come before generic "shirt" / "top" to avoid mismatches.
   { patterns: ['t-shirt', 'tshirt', 't shirt', 'crew neck tee', 'graphic tee'], type: 't-shirt' },
   { patterns: ['long sleeve', 'long-sleeve', 'longsleeve'], type: 'long-sleeve-shirt' },
-  { patterns: ['dress shirt', 'button-up', 'button up', 'oxford', 'poplin shirt'], type: 'dress-shirt' },
+  { patterns: ['dress shirt', 'button-up', 'button up', 'oxford shirt', 'poplin shirt', 'formal shirt'], type: 'dress-shirt' },
   { patterns: ['polo', 'polo shirt'], type: 'polo' },
   { patterns: ['tank', 'tank top', 'sleeveless', 'camisole', 'singlet'], type: 'tank-top' },
+
+  // ── Layers ──
   { patterns: ['hoodie', 'hooded sweatshirt', 'hooded pullover'], type: 'hoodie' },
   { patterns: ['sweatshirt', 'crewneck sweatshirt', 'pullover'], type: 'sweatshirt' },
   { patterns: ['sweater', 'knitwear', 'knit top', 'turtleneck', 'rollneck'], type: 'sweater' },
   { patterns: ['cardigan'], type: 'cardigan' },
-  { patterns: ['blazer', 'sport coat', 'sport jacket'], type: 'blazer' },
+
+  // ── Outerwear — "outerwear" removed (too generic; causes hat→jacket misfires) ──
+  { patterns: ['blazer', 'sport coat', 'sport jacket', 'suit jacket', 'suit'], type: 'blazer' },
   { patterns: ['jacket', 'bomber', 'harrington', 'windbreaker', 'trucker jacket'], type: 'jacket' },
   { patterns: ['coat', 'overcoat', 'trench', 'topcoat', 'peacoat'], type: 'coat' },
   { patterns: ['puffer', 'down jacket', 'quilted jacket', 'parka'], type: 'puffer' },
   { patterns: ['vest', 'waistcoat', 'gilet'], type: 'vest' },
-  { patterns: ['jeans', 'denim pants', 'denim jeans'], type: 'jeans' },
+
+  // ── Bottoms ──
+  { patterns: ['jeans', 'denim pants', 'denim jeans', 'denim'], type: 'jeans' },
   { patterns: ['pants', 'trousers', 'chinos', 'slacks', 'cargo pants'], type: 'pants' },
   { patterns: ['shorts'], type: 'shorts' },
   { patterns: ['leggings', 'tights', 'yoga pants'], type: 'leggings' },
   { patterns: ['skirt', 'mini skirt', 'maxi skirt', 'midi skirt'], type: 'skirt' },
+
+  // ── Full body ──
   { patterns: ['dress', 'sundress', 'maxi dress', 'mini dress', 'midi dress'], type: 'dress' },
   { patterns: ['jumpsuit', 'romper', 'overalls'], type: 'jumpsuit' },
+
+  // ── Generic catch-alls — last so specific patterns above win ──
+  { patterns: ['shirt', 'top', 'jersey', 'sportswear'], type: 't-shirt' },
+  { patterns: ['wool', 'knitwear'], type: 'sweater' },
+  { patterns: ['outerwear'], type: 'jacket' },
 ];
 
 function labelToGarmentType(label: string): GarmentType {
@@ -88,6 +117,18 @@ const GARMENT_TO_FABRIC: Record<GarmentType, FabricGuess> = {
   'skirt':             { type: 'cotton / polyester / satin',        confidence: 'low' },
   'dress':             { type: 'polyester / cotton / silk-like',    confidence: 'low' },
   'jumpsuit':          { type: 'cotton / denim / polyester',        confidence: 'low' },
+  'hat':               { type: 'cotton / wool / polyester',         confidence: 'low' },
+  'cap':               { type: 'cotton / polyester',                confidence: 'medium' },
+  'scarf':             { type: 'wool / cotton / silk',              confidence: 'low' },
+  'gloves':            { type: 'leather / wool / synthetic',        confidence: 'low' },
+  'belt':              { type: 'leather / synthetic',               confidence: 'medium' },
+  'bag':               { type: 'leather / canvas / nylon',          confidence: 'low' },
+  'shoes':             { type: 'leather / synthetic',               confidence: 'medium' },
+  'boots':             { type: 'leather / suede',                   confidence: 'medium' },
+  'sneakers':          { type: 'mesh / synthetic / rubber',         confidence: 'high' },
+  'sandals':           { type: 'leather / synthetic',               confidence: 'medium' },
+  'socks':             { type: 'cotton / polyester blend',          confidence: 'high' },
+  'watch':             { type: 'metal / leather / silicone',        confidence: 'medium' },
   'unknown':           { type: 'unknown',                           confidence: 'low' },
 };
 
@@ -102,6 +143,9 @@ const DEFAULT_CONFIG: Required<ClothingIdentifierConfig> = {
 export async function identifyClothing(
   imageUri: string,
   config: ClothingIdentifierConfig = {},
+  /** Optional separate URI for palette extraction — pass the original picker URI
+   *  on iOS, as react-native-palette reads it more reliably than a manipulated cache path. */
+  paletteUri?: string,
 ): Promise<ClothingIdentificationResult> {
   const cfg = { ...DEFAULT_CONFIG, ...config };
 
@@ -113,28 +157,64 @@ export async function identifyClothing(
     confidence: l.confidence,
   }));
 
-  const best = rawLabels
-    .filter((l) => l.confidence >= cfg.confidenceThreshold)
-    .sort((a, b) => b.confidence - a.confidence)[0] ?? null;
+  // Sort all labels by confidence descending.
+  const sorted = [...rawLabels].sort((a, b) => b.confidence - a.confidence);
 
-  const garmentType = best ? labelToGarmentType(best.text) : 'unknown';
-  const confidence = best?.confidence ?? 0;
+  // Collect EVERY label→pattern match, tagging each with the pattern's index
+  // in LABEL_TO_GARMENT (lower index = higher specificity). Then pick the
+  // match with the best specificity; break ties by label confidence.
+  //
+  // This ensures "Hat (76%)" beats "Outerwear (90%)" when both are present
+  // because hat patterns come before the outerwear catch-all in the list.
+  interface LabelMatch { type: GarmentType; confidence: number; labelText: string; priority: number; }
+  const allMatches: LabelMatch[] = [];
 
-  // Step 2: Dominant colors via react-native-palette
+  for (const label of sorted) {
+    const normalised = label.text.toLowerCase().trim();
+    for (let i = 0; i < LABEL_TO_GARMENT.length; i++) {
+      const { patterns, type } = LABEL_TO_GARMENT[i];
+      if (patterns.some(p => normalised.includes(p))) {
+        allMatches.push({ type, confidence: label.confidence, labelText: label.text, priority: i });
+        break; // one pattern group per label — move on to next label
+      }
+    }
+  }
+
+  // Pick best: lowest priority index wins; break ties with highest confidence.
+  allMatches.sort((a, b) => a.priority - b.priority || b.confidence - a.confidence);
+  const bestMatch = allMatches[0];
+
+  let garmentType: GarmentType = bestMatch?.type ?? 'unknown';
+  let confidence = bestMatch?.confidence ?? (sorted[0]?.confidence ?? 0);
+  let topLabelText = bestMatch?.labelText ?? (sorted[0]?.text ?? '');
+
+  // Step 2: Dominant colors via react-native-palette.
+  // On iOS, react-native-palette reads the original picker URI more reliably than
+  // a manipulated file:// cache path, so we try paletteUri first when provided.
   let colors: ReturnType<typeof paletteToDetectedColors> = [];
-  try {
-    const palette: RawPalette = await new Promise((resolve, reject) =>
-      getPalette(imageUri, (err: Error | null, p: RawPalette) =>
-        err ? reject(err) : resolve(p),
-      ),
-    );
-    colors = paletteToDetectedColors(palette, cfg.maxColors);
-  } catch {
-    colors = [];
+  const urisToTry = paletteUri ? [paletteUri, imageUri] : [imageUri];
+
+  for (const uri of urisToTry) {
+    try {
+      const palette: RawPalette = await new Promise((resolve, reject) =>
+        RNPalette.getPalette(uri, (err: Error | null, p: RawPalette) => {
+          if (err) { reject(err); return; }
+          resolve(p ?? {});
+        }),
+      );
+      console.log(`[Ojo] palette (${uri === paletteUri ? 'original' : 'cropped'}):`, JSON.stringify(palette));
+      const extracted = paletteToDetectedColors(palette, cfg.maxColors);
+      if (extracted.length > 0) {
+        colors = extracted;
+        break; // Got colors — no need to try the fallback URI
+      }
+    } catch (paletteErr) {
+      console.warn(`[Ojo] palette failed for ${uri}:`, paletteErr);
+    }
   }
 
   // Step 3: Fabric heuristic
   const fabric = GARMENT_TO_FABRIC[garmentType];
 
-  return { garmentType, colors, fabric, confidence, rawLabels };
+  return { garmentType, topLabelText, colors, fabric, confidence, rawLabels };
 }

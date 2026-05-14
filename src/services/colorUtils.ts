@@ -86,9 +86,10 @@ export type RawPalette = Partial<Record<
 >>;
 
 export function paletteToDetectedColors(
-  palette: RawPalette,
+  palette: RawPalette | null | undefined,
   maxColors: number = 3,
 ): DetectedColor[] {
+  if (!palette) return [];
   const swatches = Object.values(palette).filter(Boolean) as PaletteSwatch[];
 
   if (swatches.length === 0) return [];

@@ -8,10 +8,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Svg, Path } from 'react-native-svg';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { View, Text } from '../primitives';
-import { pickImage } from '../../lib/imageService';
+import { pickImage, captureImage } from '../../lib/imageService';
 import { getErrorMessage } from '../../lib/auth';
 import { ClothingArticle, ArticleFormData, BodyZone } from '../../types';
 import { identifyClothing } from '../../services/clothingIdentifier';
+import type { GarmentType, FabricGuess, DetectedColor } from '../../services/clothingIdentifier.types';
 import { colors, fonts, fontSizes, fontWeights, spacing, radius } from '../../theme/tokens';
 
 // ─── Type classification ───────────────────────────────────────────────────────
@@ -67,6 +68,78 @@ const TYPE_DEFAULTS: Record<string, Partial<ArticleFormData>> = {
 const KNOWN_TYPES = new Set(
   TYPE_GROUPS.flatMap(g => g.types).filter(t => t !== 'Other'),
 );
+
+// ─── Detection → Form mappings ────────────────────────────────────────────────
+// Maps ML pipeline GarmentType to the form's clothingType values (TYPE_GROUPS).
+
+const GARMENT_TO_FORM_TYPE: Partial<Record<GarmentType, string>> = {
+  't-shirt':           'T-Shirt',
+  'long-sleeve-shirt': 'Shirt',
+  'dress-shirt':       'Shirt',
+  'polo':              'Shirt',
+  'tank-top':          'T-Shirt',
+  'hoodie':            'Hoodie',
+  'sweatshirt':        'Sweater',
+  'sweater':           'Sweater',
+  'cardigan':          'Sweater',
+  'jacket':            'Jacket',
+  'blazer':            'Jacket',
+  'coat':              'Coat',
+  'puffer':            'Jacket',
+  'vest':              'Jacket',
+  'jeans':             'Jeans',
+  'pants':             'Pants',
+  'shorts':            'Shorts',
+  'leggings':          'Pants',
+  'skirt':             'Skirt',
+  'dress':             'Dress',
+  'jumpsuit':          'Dress',
+  'hat':               'Hat',
+  'cap':               'Cap',
+  'scarf':             'Scarf',
+  'gloves':            'Gloves',
+  'belt':              'Belt',
+  'bag':               'Bag',
+  'shoes':             'Shoes',
+  'boots':             'Boots',
+  'sneakers':          'Sneakers',
+  'sandals':           'Sandals',
+  'socks':             'Socks',
+  'watch':             'Watch',
+};
+
+// Maps detected color names (from colorUtils) → the form's COLORS list.
+const DETECTED_COLOR_TO_FORM: Record<string, string> = {
+  'white': 'White', 'off-white': 'Cream', 'cream': 'Cream',
+  'light gray': 'Grey', 'gray': 'Grey', 'charcoal': 'Grey', 'dark gray': 'Grey',
+  'black': 'Black',
+  'navy': 'Navy', 'dark blue': 'Navy', 'blue': 'Blue', 'light blue': 'Sky Blue',
+  'sky blue': 'Sky Blue', 'cobalt': 'Cobalt', 'denim blue': 'Blue',
+  'teal': 'Teal', 'turquoise': 'Teal',
+  'forest green': 'Green', 'olive': 'Olive', 'green': 'Green', 'mint': 'Mint', 'sage': 'Sage',
+  'red': 'Red', 'crimson': 'Crimson', 'burgundy': 'Burgundy', 'wine': 'Burgundy',
+  'coral': 'Coral', 'orange': 'Orange', 'rust': 'Rust',
+  'tan': 'Beige', 'camel': 'Beige', 'khaki': 'Khaki', 'beige': 'Beige',
+  'brown': 'Brown', 'chocolate': 'Brown',
+  'yellow': 'Yellow', 'mustard': 'Yellow',
+  'pink': 'Pink', 'hot pink': 'Hot Pink', 'blush': 'Blush', 'mauve': 'Pink',
+  'purple': 'Purple', 'lavender': 'Lavender', 'plum': 'Plum',
+  'gold': 'Gold', 'silver': 'Silver',
+};
+
+// Extracts the best-matching form fabric from a detected fabric string.
+function detectedFabricToForm(fabric: FabricGuess): string {
+  const t = fabric.type.toLowerCase();
+  if (t.includes('denim'))     return 'Denim';
+  if (t.includes('leather'))   return 'Leather';
+  if (t.includes('silk'))      return 'Silk';
+  if (t.includes('linen'))     return 'Linen';
+  if (t.includes('wool'))      return 'Wool';
+  if (t.includes('cotton'))    return 'Cotton';
+  if (t.includes('polyester')) return 'Polyester';
+  if (t.includes('nylon') || t.includes('spandex') || t.includes('synthetic')) return 'Synthetic';
+  return '';
+}
 
 // ─── Option lists ──────────────────────────────────────────────────────────────
 
@@ -279,10 +352,12 @@ interface Props {
 
 const ArticleModal = ({ onClose, onSubmit, initialData, onDelete }: Props) => {
   const isEditing = !!initialData;
-  const [form,   setForm]   = useState<ArticleFormData>(initialData ? toForm(initialData) : EMPTY);
-  const [error,    setError]   = useState<string | null>(null);
-  const [saving,   setSaving]  = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [form,       setForm]      = useState<ArticleFormData>(initialData ? toForm(initialData) : EMPTY);
+  const [error,      setError]     = useState<string | null>(null);
+  const [saving,     setSaving]    = useState(false);
+  const [deleting,   setDeleting]  = useState(false);
+  const [identifying,    setIdentifying]   = useState(false);
+  const [topLabelText,   setTopLabelText]  = useState<string>('');
 
   const headerRef = useRef<RNView>(null);
   useEffect(() => {
@@ -299,22 +374,72 @@ const ArticleModal = ({ onClose, onSubmit, initialData, onDelete }: Props) => {
     setForm(f => ({ ...f, [key]: val }));
 
   const runIdentification = async (localUri: string, width: number, height: number) => {
+    setIdentifying(true);
     try {
       const cropped = await ImageManipulator.manipulateAsync(
         localUri,
         [{ crop: { originX: width * 0.1, originY: height * 0.1, width: width * 0.8, height: height * 0.8 } }],
         { format: ImageManipulator.SaveFormat.JPEG },
       );
-      const result = await identifyClothing(cropped.uri, { confidenceThreshold: 0.5, maxColors: 3 });
-      setForm(f => ({
-        ...f,
-        detectedGarmentType:      result.garmentType,
-        detectedColors:           result.colors,
-        detectedFabric:           result.fabric,
-        identificationConfidence: result.confidence,
-      }));
-    } catch {
+      // Pass localUri as paletteUri — react-native-palette reads the original
+      // picker URI more reliably than the ImageManipulator cache file on iOS.
+      const result = await identifyClothing(cropped.uri, { confidenceThreshold: 0.5, maxColors: 3 }, localUri);
+
+      // Debug — check Metro console to see what ML Kit + palette returned
+      console.log('[Ojo] identification result:', JSON.stringify({
+        garmentType:  result.garmentType,
+        topLabelText: result.topLabelText,
+        confidence:   result.confidence,
+        colorsCount:  result.colors.length,
+        colors:       result.colors,
+        fabric:       result.fabric.type,
+        rawLabels:    result.rawLabels.slice(0, 6).map(l => `${l.text} (${(l.confidence * 100).toFixed(0)}%)`),
+      }, null, 2));
+
+      setTopLabelText(result.topLabelText);
+
+      setForm(f => {
+        const next = {
+          ...f,
+          // Always store raw detection data
+          detectedGarmentType:      result.garmentType,
+          detectedColors:           result.colors,
+          detectedFabric:           result.fabric,
+          identificationConfidence: result.confidence,
+        };
+
+        // ── Auto-fill clothingType (+ cascading defaults) ──
+        const formType = GARMENT_TO_FORM_TYPE[result.garmentType];
+        if (formType && !f.clothingType) {
+          next.clothingType = formType;
+          const defaults = TYPE_DEFAULTS[formType] ?? {};
+          next.topOrBottom  = defaults.topOrBottom  ?? f.topOrBottom;
+          next.isAccessory  = defaults.isAccessory  ?? false;
+          next.bodyZone     = defaults.isAccessory
+            ? (defaults.bodyZone as BodyZone ?? f.bodyZone)
+            : undefined;
+        }
+
+        // ── Auto-fill color (most prominent detected color) ──
+        if (!f.color && result.colors.length > 0) {
+          const topColor = result.colors[0];
+          const formColor = DETECTED_COLOR_TO_FORM[topColor.name];
+          if (formColor) next.color = formColor;
+        }
+
+        // ── Auto-fill fabric ──
+        if (!f.fabricType && result.fabric.type !== 'unknown') {
+          const formFabric = detectedFabricToForm(result.fabric);
+          if (formFabric) next.fabricType = formFabric;
+        }
+
+        return next;
+      });
+    } catch (err) {
+      console.warn('[Ojo] identification failed:', err);
       // Non-fatal — item saves without detected fields
+    } finally {
+      setIdentifying(false);
     }
   };
 
@@ -355,7 +480,17 @@ const ArticleModal = ({ onClose, onSubmit, initialData, onDelete }: Props) => {
     if (result.uri) {
       set('imageUrl', result.uri);
       if (result.localUri && result.width && result.height) {
-        // Fire-and-forget — identification failure never blocks saving
+        runIdentification(result.localUri, result.width, result.height);
+      }
+    }
+  };
+
+  const handleCaptureImage = async () => {
+    const result = await captureImage();
+    if (result.error) { Alert.alert('Error', result.error); return; }
+    if (result.uri) {
+      set('imageUrl', result.uri);
+      if (result.localUri && result.width && result.height) {
         runIdentification(result.localUri, result.width, result.height);
       }
     }
@@ -433,9 +568,72 @@ const ArticleModal = ({ onClose, onSubmit, initialData, onDelete }: Props) => {
                 <Text style={st.imagePlaceholderText}>No image</Text>
               </View>
             )}
-            <Pressable style={st.pickImageBtn} onPress={handlePickImage} accessibilityRole="button">
-              <Text style={st.pickImageBtnText}>📷 Pick from library</Text>
-            </Pressable>
+
+            {/* Photo source buttons */}
+            <View style={st.imageButtons}>
+              <Pressable style={st.imageBtn} onPress={handleCaptureImage} accessibilityRole="button">
+                <Text style={st.imageBtnText}>📷 Camera</Text>
+              </Pressable>
+              <Pressable style={st.imageBtn} onPress={handlePickImage} accessibilityRole="button">
+                <Text style={st.imageBtnText}>🖼 Library</Text>
+              </Pressable>
+            </View>
+
+            {/* Detection results */}
+            {(identifying || form.detectedGarmentType != null || (form.detectedColors && form.detectedColors.length > 0)) ? (
+              <View style={st.detectionCard}>
+                {identifying ? (
+                  <Text style={st.detectionLabel}>🔍 Identifying…</Text>
+                ) : (
+                  <>
+                    <Text style={st.detectionLabel}>✨ DETECTED</Text>
+
+                    {/* Headline: e.g. "Red T-Shirt" */}
+                    {(() => {
+                      const colorName = form.detectedColors?.[0]
+                        ? DETECTED_COLOR_TO_FORM[form.detectedColors[0].name] ?? form.detectedColors[0].name
+                        : '';
+                      // Prefer the mapped form-type name; fall back to raw ML Kit label text
+                      const garmentName = form.detectedGarmentType && form.detectedGarmentType !== 'unknown'
+                        ? (GARMENT_TO_FORM_TYPE[form.detectedGarmentType] ?? form.detectedGarmentType)
+                        : topLabelText;
+                      const headline = [colorName, garmentName].filter(Boolean).join(' ');
+                      return headline ? (
+                        <Text style={st.detectionHeadline}>{headline}</Text>
+                      ) : null;
+                    })()}
+
+                    {/* Detail chips: fabric + confidence */}
+                    <View style={st.detectionRow}>
+                      {form.detectedFabric && form.detectedFabric.type !== 'unknown' && (
+                        <View style={st.detectionChip}>
+                          <Text style={st.detectionChipText}>{form.detectedFabric.type}</Text>
+                        </View>
+                      )}
+                      {form.identificationConfidence != null && form.identificationConfidence > 0 && (
+                        <View style={[st.detectionChip, st.detectionChipMuted]}>
+                          <Text style={st.detectionChipTextMuted}>
+                            {Math.round(form.identificationConfidence * 100)}% conf.
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Color swatches */}
+                    {form.detectedColors && form.detectedColors.length > 0 && (
+                      <View style={st.detectionColors}>
+                        {form.detectedColors.map((c, i) => (
+                          <View key={i} style={st.detectionSwatchWrap}>
+                            <View style={[st.detectionSwatch, { backgroundColor: c.hex }]} />
+                            <Text style={st.detectionSwatchLabel}>{c.name}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                  </>
+                )}
+              </View>
+            ) : null}
           </View>
 
           {/* Name */}
@@ -598,8 +796,24 @@ const st = StyleSheet.create({
   clearImgText:         { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.dangerText },
   imagePlaceholder:     { width: 100, height: 100, borderRadius: radius.sm, backgroundColor: colors.glassBg, borderWidth: 1, borderColor: colors.glassBorder, alignItems: 'center', justifyContent: 'center' },
   imagePlaceholderText: { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textMuted },
-  pickImageBtn:         { paddingVertical: 7, paddingHorizontal: spacing.md, backgroundColor: colors.glassBg, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.glassBorder },
-  pickImageBtnText:     { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.textSecondary },
+  imageButtons:         { flexDirection: 'row', gap: spacing.sm },
+  imageBtn:             { flex: 1, paddingVertical: 7, paddingHorizontal: spacing.md, backgroundColor: colors.glassBg, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.glassBorder, alignItems: 'center' },
+  imageBtnText:         { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.textSecondary },
+
+  // Detection card
+  detectionCard:        { width: '100%', backgroundColor: colors.glassBg, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radius.sm, padding: spacing.sm, gap: 6 },
+  detectionLabel:       { fontFamily: fonts.body, fontSize: fontSizes.xs, fontWeight: fontWeights.semibold, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  detectionHeadline:    { fontFamily: fonts.display, fontSize: fontSizes.base, color: colors.textPrimary, fontWeight: fontWeights.semibold },
+  detectionRow:         { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  detectionChip:        { paddingVertical: 3, paddingHorizontal: 8, backgroundColor: colors.saveBtnBg, borderRadius: radius.pill },
+  detectionChipText:    { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.saveBtnText, fontWeight: fontWeights.medium },
+  detectionChipMuted:   { backgroundColor: colors.glassBg, borderWidth: 1, borderColor: colors.glassBorder },
+  detectionChipTextMuted: { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textMuted, fontWeight: fontWeights.medium },
+  detectionColors:      { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 2 },
+  detectionSwatchWrap:  { alignItems: 'center', gap: 3 },
+  detectionSwatch:      { width: 22, height: 22, borderRadius: 11, borderWidth: 1, borderColor: colors.glassBorder },
+  detectionSwatchLabel: { fontFamily: fonts.body, fontSize: 9, color: colors.textMuted },
+  detectionConfidence:  { fontFamily: fonts.body, fontSize: 10, color: colors.textMuted, marginTop: 2 },
 
   // Fields
   field:         { gap: 6 },
