@@ -59,5 +59,21 @@ target 'Ojo' do
       :mac_catalyst_enabled => false,
       :ccache_enabled => ccache_enabled?(podfile_properties),
     )
+
+    # Fix: Clang 26 (Xcode 26+) enforces consteval more strictly than older
+    # versions. The `fmt` pod bundled with React Native uses FMT_COMPILE_STRING
+    # which triggers consteval constructors that fail with the new compiler.
+    # Redefining FMT_COMPILE_STRING to empty disables the consteval path and
+    # falls back to the runtime formatting path.
+    # installer.pods_project.targets.each do |target|
+    #   if target.name == 'fmt'
+    #     target.build_configurations.each do |config|
+    #       defs = config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] || ['$(inherited)']
+    #       defs = [defs] if defs.is_a?(String)
+    #       defs << 'FMT_COMPILE_STRING=' unless defs.any? { |d| d.to_s.start_with?('FMT_COMPILE_STRING') }
+    #       config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = defs
+    #     end
+    #   end
+    # end
   end
 end

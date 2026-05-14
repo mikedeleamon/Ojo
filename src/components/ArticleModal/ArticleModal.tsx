@@ -6,10 +6,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Svg, Path } from 'react-native-svg';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { View, Text } from '../primitives';
 import { pickImage } from '../../lib/imageService';
 import { getErrorMessage } from '../../lib/auth';
 import { ClothingArticle, ArticleFormData, BodyZone } from '../../types';
+import { identifyClothing } from '../../services/clothingIdentifier';
 import { colors, fonts, fontSizes, fontWeights, spacing, radius } from '../../theme/tokens';
 
 // ─── Type classification ───────────────────────────────────────────────────────
@@ -124,6 +126,8 @@ const EMPTY: ArticleFormData = {
   name: '', clothingType: '', topOrBottom: '', clothingCategory: '',
   fabricType: '', color: '', isAccessory: false, bodyZone: undefined,
   merchant: '', imageUrl: '',
+  detectedGarmentType: undefined, detectedColors: undefined,
+  detectedFabric: undefined, identificationConfidence: undefined,
 };
 
 const toForm = (a: ClothingArticle): ArticleFormData => ({
@@ -137,6 +141,10 @@ const toForm = (a: ClothingArticle): ArticleFormData => ({
   bodyZone:         a.bodyZone,
   merchant:         a.merchant         ?? '',
   imageUrl:         a.imageUrl         ?? '',
+  detectedGarmentType:      a.detectedGarmentType,
+  detectedColors:           a.detectedColors,
+  detectedFabric:           a.detectedFabric,
+  identificationConfidence: a.identificationConfidence,
 });
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -290,6 +298,26 @@ const ArticleModal = ({ onClose, onSubmit, initialData, onDelete }: Props) => {
   const set = <K extends keyof ArticleFormData>(key: K, val: ArticleFormData[K]) =>
     setForm(f => ({ ...f, [key]: val }));
 
+  const runIdentification = async (localUri: string, width: number, height: number) => {
+    try {
+      const cropped = await ImageManipulator.manipulateAsync(
+        localUri,
+        [{ crop: { originX: width * 0.1, originY: height * 0.1, width: width * 0.8, height: height * 0.8 } }],
+        { format: ImageManipulator.SaveFormat.JPEG },
+      );
+      const result = await identifyClothing(cropped.uri, { confidenceThreshold: 0.5, maxColors: 3 });
+      setForm(f => ({
+        ...f,
+        detectedGarmentType:      result.garmentType,
+        detectedColors:           result.colors,
+        detectedFabric:           result.fabric,
+        identificationConfidence: result.confidence,
+      }));
+    } catch {
+      // Non-fatal — item saves without detected fields
+    }
+  };
+
   // Applies smart defaults when the clothing type changes.
   //  - topOrBottom is always overwritten (fully derived from type).
   //  - fabricType is updated when: (a) the field is empty, OR (b) it still holds the
@@ -324,7 +352,13 @@ const ArticleModal = ({ onClose, onSubmit, initialData, onDelete }: Props) => {
   const handlePickImage = async () => {
     const result = await pickImage();
     if (result.error) { Alert.alert('Error', result.error); return; }
-    if (result.uri) set('imageUrl', result.uri);
+    if (result.uri) {
+      set('imageUrl', result.uri);
+      if (result.localUri && result.width && result.height) {
+        // Fire-and-forget — identification failure never blocks saving
+        runIdentification(result.localUri, result.width, result.height);
+      }
+    }
   };
 
   const handleDelete = async () => {

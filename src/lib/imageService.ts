@@ -13,15 +13,18 @@ export const MAX_FILE_MB    = 5;
 export const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
 
 export interface ImageResult {
-  uri:   string | null;
-  error: string | null;
+  uri:      string | null;   // base64 data URI for storage
+  localUri: string | null;   // local file URI for on-device ML processing
+  width:    number | null;
+  height:   number | null;
+  error:    string | null;
 }
 
 export const pickImage = async (): Promise<ImageResult> => {
   try {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      return { uri: null, error: 'Photo library access denied.' };
+      return { uri: null, localUri: null, width: null, height: null, error: 'Photo library access denied.' };
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -32,22 +35,31 @@ export const pickImage = async (): Promise<ImageResult> => {
       aspect:     [1, 1],
     });
 
-    if (result.canceled) return { uri: null, error: null };
+    if (result.canceled) return { uri: null, localUri: null, width: null, height: null, error: null };
 
     const asset = result.assets[0];
-    if (!asset.base64) return { uri: null, error: 'Could not read image.' };
+    if (!asset.base64) return { uri: null, localUri: null, width: null, height: null, error: 'Could not read image.' };
 
     const approxBytes = asset.base64.length * 0.75;
     if (approxBytes > MAX_FILE_BYTES) {
       return {
-        uri:   null,
-        error: `Image must be under ${MAX_FILE_MB}MB.`,
+        uri:      null,
+        localUri: null,
+        width:    null,
+        height:   null,
+        error:    `Image must be under ${MAX_FILE_MB}MB.`,
       };
     }
 
-    return { uri: `data:image/jpeg;base64,${asset.base64}`, error: null };
+    return {
+      uri:      `data:image/jpeg;base64,${asset.base64}`,
+      localUri: asset.uri,
+      width:    asset.width  ?? null,
+      height:   asset.height ?? null,
+      error:    null,
+    };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Failed to pick image.';
-    return { uri: null, error: msg };
+    return { uri: null, localUri: null, width: null, height: null, error: msg };
   }
 };

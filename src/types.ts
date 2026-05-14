@@ -1,3 +1,6 @@
+import { GarmentType, DetectedColor, FabricGuess } from './services/clothingIdentifier.types';
+export type { GarmentType, DetectedColor, FabricGuess };
+
 export type BodyZone = 'Head' | 'Neck' | 'Wrist' | 'Hand' | 'Waist' | 'Ankle' | 'Carried';
 
 export interface ArticleFormData {
@@ -11,6 +14,10 @@ export interface ArticleFormData {
   bodyZone?:        BodyZone;
   merchant:         string;
   imageUrl:         string;
+  detectedGarmentType?:      GarmentType;
+  detectedColors?:           DetectedColor[];
+  detectedFabric?:           FabricGuess;
+  identificationConfidence?: number;
 }
 
 export interface AuthUser {
@@ -81,6 +88,10 @@ export interface ClothingArticle {
   merchant?:        string;
   imageUrl?:        string;
   createdAt?:       string;
+  detectedGarmentType?:      GarmentType;
+  detectedColors?:           DetectedColor[];
+  detectedFabric?:           FabricGuess;
+  identificationConfidence?: number;
 }
 
 export interface NotificationSettings {
