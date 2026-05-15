@@ -8,12 +8,12 @@
  *      iOS Simulator on Apple Silicon. Step 1 is skipped gracefully and
  *      garmentType / confidence are left as 'unknown' / 0 on Simulator.
  *      The feature works fully on a physical device.
- *   2. react-native-palette   → dominant colors → semantic names
+ *   2. colorExtractor (pure JS) → resize to 8×8 PNG, decode pixels → semantic names
  *   3. Heuristic lookup table → fabric best-guess
  */
 
 import { NativeModules } from 'react-native';
-import RNPalette from 'react-native-palette';
+import { extractColorsFromImage } from './colorExtractor';
 
 // Resolve ML Kit lazily so that the module can be absent on Simulator
 // without crashing at import time.
@@ -28,7 +28,6 @@ import {
   GarmentType,
   RawLabel,
 } from './clothingIdentifier.types';
-import { paletteToDetectedColors, RawPalette } from './colorUtils';
 
 // ─── Label → GarmentType Map ─────────────────────────────────────────────────
 
@@ -143,9 +142,6 @@ const DEFAULT_CONFIG: Required<ClothingIdentifierConfig> = {
 export async function identifyClothing(
   imageUri: string,
   config: ClothingIdentifierConfig = {},
-  /** Optional separate URI for palette extraction — pass the original picker URI
-   *  on iOS, as react-native-palette reads it more reliably than a manipulated cache path. */
-  paletteUri?: string,
 ): Promise<ClothingIdentificationResult> {
   const cfg = { ...DEFAULT_CONFIG, ...config };
 
@@ -160,6 +156,18 @@ export async function identifyClothing(
   // Sort all labels by confidence descending.
   const sorted = [...rawLabels].sort((a, b) => b.confidence - a.confidence);
 
+  // Labels that describe a person, body part, or scene — not a garment.
+  // These are excluded from garment matching so that e.g. "Muscle (90%)" on a
+  // model photo doesn't shadow the actual clothing labels further down the list.
+  const NON_GARMENT = new Set([
+    'person', 'man', 'woman', 'human', 'body', 'people',
+    'muscle', 'muscles', 'arm', 'leg', 'hand', 'foot', 'feet', 'neck', 'chest',
+    'face', 'beard', 'hair', 'skin', 'nose', 'eye', 'head',
+    'dude', 'guy', 'girl', 'boy', 'adult', 'model', 'fashion model',
+    'portrait', 'photo', 'photography', 'stock photo', 'selfie',
+    'finger', 'thumb', 'wrist', 'elbow', 'shoulder', 'knee', 'ankle',
+  ]);
+
   // Collect EVERY label→pattern match, tagging each with the pattern's index
   // in LABEL_TO_GARMENT (lower index = higher specificity). Then pick the
   // match with the best specificity; break ties by label confidence.
@@ -171,6 +179,8 @@ export async function identifyClothing(
 
   for (const label of sorted) {
     const normalised = label.text.toLowerCase().trim();
+    if (NON_GARMENT.has(normalised)) continue; // skip person / body-part labels
+
     for (let i = 0; i < LABEL_TO_GARMENT.length; i++) {
       const { patterns, type } = LABEL_TO_GARMENT[i];
       if (patterns.some(p => normalised.includes(p))) {
@@ -188,30 +198,9 @@ export async function identifyClothing(
   let confidence = bestMatch?.confidence ?? (sorted[0]?.confidence ?? 0);
   let topLabelText = bestMatch?.labelText ?? (sorted[0]?.text ?? '');
 
-  // Step 2: Dominant colors via react-native-palette.
-  // On iOS, react-native-palette reads the original picker URI more reliably than
-  // a manipulated file:// cache path, so we try paletteUri first when provided.
-  let colors: ReturnType<typeof paletteToDetectedColors> = [];
-  const urisToTry = paletteUri ? [paletteUri, imageUri] : [imageUri];
-
-  for (const uri of urisToTry) {
-    try {
-      const palette: RawPalette = await new Promise((resolve, reject) =>
-        RNPalette.getPalette(uri, (err: Error | null, p: RawPalette) => {
-          if (err) { reject(err); return; }
-          resolve(p ?? {});
-        }),
-      );
-      console.log(`[Ojo] palette (${uri === paletteUri ? 'original' : 'cropped'}):`, JSON.stringify(palette));
-      const extracted = paletteToDetectedColors(palette, cfg.maxColors);
-      if (extracted.length > 0) {
-        colors = extracted;
-        break; // Got colors — no need to try the fallback URI
-      }
-    } catch (paletteErr) {
-      console.warn(`[Ojo] palette failed for ${uri}:`, paletteErr);
-    }
-  }
+  // Step 2: Dominant colors via pure-JS pixel sampling (no native modules).
+  // extractColorsFromImage resizes to an 8×8 PNG and reads pixel data directly.
+  const colors = await extractColorsFromImage(imageUri, cfg.maxColors);
 
   // Step 3: Fabric heuristic
   const fabric = GARMENT_TO_FABRIC[garmentType];
