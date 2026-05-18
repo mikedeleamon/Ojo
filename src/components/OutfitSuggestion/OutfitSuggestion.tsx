@@ -132,12 +132,16 @@ const HangerIcon = ({
     </Svg>
 );
 
+const REMOVABLE_ROLES: OutfitRole[] = ['midLayer', 'outerwear'];
+
 const ArticleThumb = ({
     article,
     role,
+    onRemove,
 }: {
     article: ClothingArticle;
     role: OutfitRole;
+    onRemove?: () => void;
 }) => (
     <View style={styles.articleCard}>
         <View style={styles.articleImg}>
@@ -178,6 +182,16 @@ const ArticleThumb = ({
                 <Text style={styles.articleMeta}>{article.fabricType}</Text>
             ) : null}
         </View>
+        {onRemove && (
+            <Pressable
+                style={styles.articleRemoveBtn}
+                onPress={onRemove}
+                hitSlop={8}
+                accessibilityLabel='Remove from outfit'
+            >
+                <Text style={styles.articleRemoveText}>✕</Text>
+            </Pressable>
+        )}
     </View>
 );
 
@@ -375,6 +389,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
     const [showBreakdown, setShowBreakdown] = useState(false);
     const [wornLogged, setWornLogged] = useState(false);
     const [worn, setWorn] = useState<Map<string, number>>(new Map());
+    const [removedByOutfit, setRemovedByOutfit] = useState<Map<number, Set<string>>>(new Map());
     const nav = useAppNavigation();
 
     // ─── Pager ───────────────────────────────────────────────────────────────
@@ -393,6 +408,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
         setActiveIdx(0);
         setShowBreakdown(false);
         setWornLogged(false);
+        setRemovedByOutfit(new Map());
     }, [settings]);
 
     const setPreferredCloset = async (id: string) => {
@@ -420,16 +436,56 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
     const safeIdx = Math.min(activeIdx, Math.max(0, outfits.length - 1));
     const activeOutfit: OutfitResult | null = outfits[safeIdx] ?? null;
 
+    const handleRemoveSlot = (outfitIdx: number, articleId: string) => {
+        setRemovedByOutfit((prev) => {
+            const next = new Map(prev);
+            const existing = new Set(next.get(outfitIdx) ?? []);
+            existing.add(articleId);
+            next.set(outfitIdx, existing);
+            return next;
+        });
+        setWornLogged(false);
+    };
+
+    const removedIds = removedByOutfit.get(safeIdx) ?? new Set<string>();
+
+    const activeSlots = activeOutfit?.slots.filter(
+        (s) => !removedIds.has(s.article._id),
+    ) ?? [];
+
+    const filteredLayering = activeOutfit?.layering
+        ? {
+              ...activeOutfit.layering,
+              layers: {
+                  base: activeOutfit.layering.layers.base,
+                  mid: removedIds.has(
+                      activeOutfit.layering.layers.mid?.article._id ?? '',
+                  )
+                      ? null
+                      : activeOutfit.layering.layers.mid,
+                  outer: removedIds.has(
+                      activeOutfit.layering.layers.outer?.article._id ?? '',
+                  )
+                      ? null
+                      : activeOutfit.layering.layers.outer,
+              },
+          }
+        : null;
+
+    // Hide layering section once all removable layers have been stripped
+    const showLayering =
+        filteredLayering !== null &&
+        (filteredLayering.layers.mid !== null ||
+            filteredLayering.layers.outer !== null);
+
     const handleWoreThis = async () => {
         if (!preferred || !activeOutfit || activeOutfit.status !== 'ok') return;
-        const articles = activeOutfit.slots.map((s) => s.article);
+        const articles = activeSlots.map((s) => s.article);
         await addHistoryEntry({
             closetId: preferred._id,
             closetName: preferred.name,
             articleIds: articles.map((a) => a._id),
-            articleSummary: articles
-                .map((a) => a.name || a.clothingType)
-                .join(', '),
+            articleSummary: articles.map((a) => a.name || a.clothingType).join(', '),
         });
         await updatePreferences(articles);
         setWornLogged(true);
@@ -554,27 +610,37 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
                     }
                 }}
             >
-                {outfits.map((outfit, i) => (
-                    <View
-                        key={i}
-                        style={[styles.pagerCard, { width: cardWidth }]}
-                    >
-                        <View style={styles.pagerCardArticles}>
-                            {outfit.slots.map((slot, j) => (
-                                <ArticleThumb
-                                    key={j}
-                                    article={slot.article}
-                                    role={slot.role}
-                                />
-                            ))}
+                {outfits.map((outfit, i) => {
+                    const cardRemovedIds = removedByOutfit.get(i) ?? new Set<string>();
+                    return (
+                        <View
+                            key={i}
+                            style={[styles.pagerCard, { width: cardWidth }]}
+                        >
+                            <View style={styles.pagerCardArticles}>
+                                {outfit.slots
+                                    .filter((s) => !cardRemovedIds.has(s.article._id))
+                                    .map((slot, j) => (
+                                        <ArticleThumb
+                                            key={j}
+                                            article={slot.article}
+                                            role={slot.role}
+                                            onRemove={
+                                                REMOVABLE_ROLES.includes(slot.role)
+                                                    ? () => handleRemoveSlot(i, slot.article._id)
+                                                    : undefined
+                                            }
+                                        />
+                                    ))}
+                            </View>
+                            <View style={styles.pagerCardFooter}>
+                                <Text style={styles.pagerSubtitle}>
+                                    {outfitTabSubtitle(outfit)}
+                                </Text>
+                            </View>
                         </View>
-                        <View style={styles.pagerCardFooter}>
-                            <Text style={styles.pagerSubtitle}>
-                                {outfitTabSubtitle(outfit)}
-                            </Text>
-                        </View>
-                    </View>
-                ))}
+                    );
+                })}
             </ScrollView>
 
             {/* ── Page dots (also tappable) ── */}
@@ -652,8 +718,8 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
             )}
 
             {/* ── Layering recommendation ── */}
-            {activeOutfit.layering && (
-                <LayeringSection layering={activeOutfit.layering} />
+            {showLayering && filteredLayering && (
+                <LayeringSection layering={filteredLayering} />
             )}
 
             {/* ── Wore this today ── */}
@@ -825,6 +891,15 @@ const styles = StyleSheet.create({
         borderRadius: 4,
         borderWidth: 1,
         borderColor: 'rgba(0,0,0,0.2)',
+    },
+    articleRemoveBtn: {
+        padding: 4,
+        marginLeft: 2,
+    },
+    articleRemoveText: {
+        fontSize: 11,
+        color: colors.textMuted,
+        lineHeight: 14,
     },
     articleLabel: { flex: 1, gap: 2 },
     roleLabel: {

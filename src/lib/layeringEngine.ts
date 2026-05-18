@@ -105,12 +105,19 @@ const windChill = (tempF: number, windMph: number): number => {
 
 const layerNeedsMid = (currentTemp: number, tempDelta: number, windSpeed: number, threshold: number): boolean => {
   const effective = windChill(currentTemp, windSpeed);
-  return effective < threshold || tempDelta > 10;
+  if (effective < threshold) return true;
+  // Big swing only matters if the day's projected low could dip below the
+  // mid-layer threshold — a 103→88°F swing is still hot, no mid needed.
+  return tempDelta > 10 && (effective - tempDelta) < threshold;
 };
 
 const layerNeedsOuter = (currentTemp: number, windSpeed: number, threshold: number): boolean => {
   const effective = windChill(currentTemp, windSpeed);
-  return effective < threshold || windSpeed > 10;
+  if (effective < threshold) return true;
+  // Wind only justifies an outer layer if wind chill could realistically push
+  // into the outer-layer zone — a breeze at 90°F is welcome, not layering weather.
+  // We check the effective temp against a generous buffer above threshold.
+  return windSpeed > 10 && effective < threshold + 15;
 };
 
 // ─── 4. Removability scoring ──────────────────────────────────────────────────
@@ -579,12 +586,25 @@ export const buildLayeringContext = ({
   const midThreshold   = settings.lowTempThreshold;       // below "warm" → mid layer
   const outerThreshold = settings.lowTempThreshold - 15;  // below "cool" → outer layer
 
+  let needsMid   = layerNeedsMid(currentTemp, tempDelta, windSpeed, midThreshold);
+  let needsOuter = layerNeedsOuter(currentTemp, windSpeed, outerThreshold) || raining || rainForecast;
+
+  // ── Hot-weather safety net ──────────────────────────────────────────────
+  // When the effective temperature exceeds the user's hot threshold, no amount
+  // of delta or wind justifies adding layers — override to false. Rain-driven
+  // outerwear is exempt (a waterproof shell still makes sense in 95°F rain).
+  const effective = windChill(currentTemp, windSpeed);
+  if (effective > settings.hiTempThreshold) {
+    needsMid = false;
+    needsOuter = raining || rainForecast || snowing;
+  }
+
   return {
     forecasts,
     currentTemp, windSpeed, raining, rainForecast, snowing,
     high, low, offset, tempDelta,
-    needsMid:   layerNeedsMid(currentTemp, tempDelta, windSpeed, midThreshold),
-    needsOuter: layerNeedsOuter(currentTemp, windSpeed, outerThreshold) || raining || rainForecast,
+    needsMid,
+    needsOuter,
   };
 };
 
