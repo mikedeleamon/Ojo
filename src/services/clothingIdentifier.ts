@@ -2,26 +2,22 @@
  * clothingIdentifier.ts — on-device clothing identification pipeline.
  *
  * Pipeline:
- *   1. ML Kit image labeling  → garment type + confidence
- *      NOTE: @react-native-ml-kit/image-labeling ships no arm64 Simulator
- *      slice, so NativeModules.ImageLabeling will be undefined in the
- *      iOS Simulator on Apple Silicon. Step 1 is skipped gracefully and
- *      garmentType / confidence are left as 'unknown' / 0 on Simulator.
- *      The feature works fully on a physical device.
- *   2. colorExtractor (pure JS) → resize to 8×8 PNG, decode pixels → semantic names
- *   3. Heuristic lookup table → fabric best-guess
+ *   1. TFLite inference (MobileNetV3-Small trained on Fashionpedia)
+ *        → garment type (34 classes) + sleeve length (4 classes)
+ *   2. Sleeve override rules   → e.g. t-shirt + long-sleeve → long-sleeve-shirt
+ *   3. colorExtractor (pure JS) → dominant colors
+ *   4. Heuristic lookup table  → fabric best-guess
+ *
+ * Model file: src/assets/clothing_model.tflite
+ * Copy it there once `python train_clothing.py` writes output/clothing_model.tflite.
  */
 
-import { NativeModules } from 'react-native';
-import { extractColorsFromImage } from './colorExtractor';
+import * as ImageManipulator from 'expo-image-manipulator';
+import { loadTensorflowModel } from 'react-native-fast-tflite';
+import type { TensorflowModel } from 'react-native-fast-tflite';
+import { base64ToBytes, extractColorsFromImage, parsePNGPixels } from './colorExtractor';
 
-// Resolve ML Kit lazily so that the module can be absent on Simulator
-// without crashing at import time.
-interface Label { text: string; confidence: number; index: number; }
-const _mlKit = NativeModules.ImageLabeling as
-  { label: (uri: string) => Promise<Label[]> } | undefined;
-
-import {
+import type {
   ClothingIdentificationResult,
   ClothingIdentifierConfig,
   FabricGuess,
@@ -29,109 +25,277 @@ import {
   RawLabel,
 } from './clothingIdentifier.types';
 
-// ─── Label → GarmentType Map ─────────────────────────────────────────────────
+// ─── Label tables — must match output/labels.json ────────────────────────────
 
-const LABEL_TO_GARMENT: Array<{ patterns: string[]; type: GarmentType }> = [
-  // ── Accessories — checked FIRST so "Hat"/"Cap" beat generic "Outerwear"/"Jacket" ──
-  { patterns: ['hat', 'fedora', 'beanie', 'beret', 'bucket hat', 'sun hat', 'cowboy hat'], type: 'hat' },
-  { patterns: ['cap', 'baseball cap', 'snapback', 'trucker hat', 'visor'], type: 'cap' },
-  { patterns: ['scarf', 'bandana', 'neckerchief'], type: 'scarf' },
-  { patterns: ['gloves', 'mittens'], type: 'gloves' },
-  { patterns: ['belt'], type: 'belt' },
-  { patterns: ['bag', 'handbag', 'backpack', 'tote', 'purse', 'clutch', 'satchel'], type: 'bag' },
-  { patterns: ['watch', 'wristwatch'], type: 'watch' },
-  { patterns: ['sneaker', 'sneakers', 'trainer', 'running shoe', 'athletic shoe'], type: 'sneakers' },
-  { patterns: ['boot', 'boots', 'ankle boot', 'chelsea boot'], type: 'boots' },
-  { patterns: ['sandal', 'sandals', 'flip-flop', 'flip flop'], type: 'sandals' },
-  { patterns: ['shoe', 'shoes', 'loafer', 'oxford shoe', 'derby'], type: 'shoes' },
-  { patterns: ['sock', 'socks'], type: 'socks' },
-
-  // ── Tops ──
-  // "t-shirt" must come before generic "shirt" / "top" to avoid mismatches.
-  { patterns: ['t-shirt', 'tshirt', 't shirt', 'crew neck tee', 'graphic tee'], type: 't-shirt' },
-  { patterns: ['long sleeve', 'long-sleeve', 'longsleeve'], type: 'long-sleeve-shirt' },
-  { patterns: ['dress shirt', 'button-up', 'button up', 'oxford shirt', 'poplin shirt', 'formal shirt'], type: 'dress-shirt' },
-  { patterns: ['polo', 'polo shirt'], type: 'polo' },
-  { patterns: ['tank', 'tank top', 'sleeveless', 'camisole', 'singlet'], type: 'tank-top' },
-
-  // ── Layers ──
-  { patterns: ['hoodie', 'hooded sweatshirt', 'hooded pullover'], type: 'hoodie' },
-  { patterns: ['sweatshirt', 'crewneck sweatshirt', 'pullover'], type: 'sweatshirt' },
-  { patterns: ['sweater', 'knitwear', 'knit top', 'turtleneck', 'rollneck'], type: 'sweater' },
-  { patterns: ['cardigan'], type: 'cardigan' },
-
-  // ── Outerwear — "outerwear" removed (too generic; causes hat→jacket misfires) ──
-  { patterns: ['blazer', 'sport coat', 'sport jacket', 'suit jacket', 'suit'], type: 'blazer' },
-  { patterns: ['jacket', 'bomber', 'harrington', 'windbreaker', 'trucker jacket'], type: 'jacket' },
-  { patterns: ['coat', 'overcoat', 'trench', 'topcoat', 'peacoat'], type: 'coat' },
-  { patterns: ['puffer', 'down jacket', 'quilted jacket', 'parka'], type: 'puffer' },
-  { patterns: ['vest', 'waistcoat', 'gilet'], type: 'vest' },
-
-  // ── Bottoms ──
-  { patterns: ['jeans', 'denim pants', 'denim jeans', 'denim'], type: 'jeans' },
-  { patterns: ['pants', 'trousers', 'chinos', 'slacks', 'cargo pants'], type: 'pants' },
-  { patterns: ['shorts'], type: 'shorts' },
-  { patterns: ['leggings', 'tights', 'yoga pants'], type: 'leggings' },
-  { patterns: ['skirt', 'mini skirt', 'maxi skirt', 'midi skirt'], type: 'skirt' },
-
-  // ── Full body ──
-  { patterns: ['dress', 'sundress', 'maxi dress', 'mini dress', 'midi dress'], type: 'dress' },
-  { patterns: ['jumpsuit', 'romper', 'overalls'], type: 'jumpsuit' },
-
-  // ── Generic catch-alls — last so specific patterns above win ──
-  { patterns: ['shirt', 'top', 'jersey', 'sportswear'], type: 't-shirt' },
-  { patterns: ['wool', 'knitwear'], type: 'sweater' },
-  { patterns: ['outerwear'], type: 'jacket' },
+const GARMENT_LABELS: GarmentType[] = [
+  // Tops
+  't-shirt', 'long-sleeve-shirt', 'dress-shirt', 'polo', 'tank-top',
+  'hoodie', 'sweatshirt', 'sweater', 'cardigan',
+  // Outerwear
+  'jacket', 'blazer', 'coat', 'puffer', 'vest',
+  // Bottoms
+  'jeans', 'pants', 'shorts', 'leggings', 'skirt',
+  // Full body
+  'dress', 'jumpsuit',
+  // Accessories / footwear
+  'hat', 'cap', 'scarf', 'gloves', 'belt', 'bag',
+  'shoes', 'boots', 'sneakers', 'sandals', 'socks', 'watch',
+  // Fallback
+  'unknown',
 ];
 
-function labelToGarmentType(label: string): GarmentType {
-  const normalised = label.toLowerCase().trim();
-  for (const { patterns, type } of LABEL_TO_GARMENT) {
-    if (patterns.some((p) => normalised.includes(p))) return type;
-  }
-  return 'unknown';
-}
+const SLEEVE_LABELS = ['short-sleeve', 'long-sleeve', 'sleeveless', 'n/a'] as const;
 
-// ─── Garment → Fabric Heuristics ─────────────────────────────────────────────
+// Garment types where sleeve output is meaningful
+const TOP_GARMENTS = new Set<GarmentType>([
+  't-shirt', 'long-sleeve-shirt', 'dress-shirt', 'polo', 'tank-top',
+  'hoodie', 'sweatshirt', 'sweater', 'cardigan', 'blazer',
+]);
 
-const GARMENT_TO_FABRIC: Record<GarmentType, FabricGuess> = {
-  't-shirt':           { type: 'cotton / cotton-blend',             confidence: 'high',   note: 'Most tees are jersey knit cotton' },
-  'long-sleeve-shirt': { type: 'cotton / cotton-blend',             confidence: 'high' },
-  'dress-shirt':       { type: 'cotton / poplin',                   confidence: 'high',   note: 'Dress shirts are almost always woven cotton' },
-  'polo':              { type: 'cotton piqué',                      confidence: 'high' },
-  'tank-top':          { type: 'cotton / modal',                    confidence: 'medium' },
-  'hoodie':            { type: 'cotton fleece / french terry',      confidence: 'high' },
-  'sweatshirt':        { type: 'cotton fleece',                     confidence: 'high' },
-  'sweater':           { type: 'wool / acrylic / cotton knit',      confidence: 'medium', note: 'Varies widely — wool, acrylic, and cotton are all common' },
-  'cardigan':          { type: 'wool / acrylic knit',               confidence: 'medium' },
-  'blazer':            { type: 'wool / polyester / linen',          confidence: 'medium' },
-  'jacket':            { type: 'nylon / polyester / cotton canvas', confidence: 'medium' },
-  'coat':              { type: 'wool / wool-blend',                 confidence: 'medium' },
-  'puffer':            { type: 'nylon shell / down or synthetic fill', confidence: 'high', note: 'Outer shell is almost always nylon or polyester' },
-  'vest':              { type: 'polyester / wool',                  confidence: 'low' },
-  'jeans':             { type: 'denim (cotton)',                    confidence: 'high' },
-  'pants':             { type: 'cotton / polyester / wool',         confidence: 'low',   note: 'Fabric varies widely by style' },
-  'shorts':            { type: 'cotton / nylon',                    confidence: 'medium' },
-  'leggings':          { type: 'spandex / polyester blend',         confidence: 'high' },
-  'skirt':             { type: 'cotton / polyester / satin',        confidence: 'low' },
-  'dress':             { type: 'polyester / cotton / silk-like',    confidence: 'low' },
-  'jumpsuit':          { type: 'cotton / denim / polyester',        confidence: 'low' },
-  'hat':               { type: 'cotton / wool / polyester',         confidence: 'low' },
-  'cap':               { type: 'cotton / polyester',                confidence: 'medium' },
-  'scarf':             { type: 'wool / cotton / silk',              confidence: 'low' },
-  'gloves':            { type: 'leather / wool / synthetic',        confidence: 'low' },
-  'belt':              { type: 'leather / synthetic',               confidence: 'medium' },
-  'bag':               { type: 'leather / canvas / nylon',          confidence: 'low' },
-  'shoes':             { type: 'leather / synthetic',               confidence: 'medium' },
-  'boots':             { type: 'leather / suede',                   confidence: 'medium' },
-  'sneakers':          { type: 'mesh / synthetic / rubber',         confidence: 'high' },
-  'sandals':           { type: 'leather / synthetic',               confidence: 'medium' },
-  'socks':             { type: 'cotton / polyester blend',          confidence: 'high' },
-  'watch':             { type: 'metal / leather / silicone',        confidence: 'medium' },
-  'unknown':           { type: 'unknown',                           confidence: 'low' },
+// Combined garment+sleeve → final GarmentType display name
+const SLEEVE_OVERRIDES: Record<string, GarmentType> = {
+  't-shirt+long-sleeve':   'long-sleeve-shirt',
+  't-shirt+sleeveless':    'tank-top',
+  'hoodie+sleeveless':     'tank-top',
+  'sweatshirt+sleeveless': 'tank-top',
 };
 
-// ─── Main Identifier ──────────────────────────────────────────────────────────
+// ─── ImageNet normalisation (must match train_clothing.py) ───────────────────
+
+const NORM_MEAN = [0.485, 0.456, 0.406];
+const NORM_STD  = [0.229, 0.224, 0.225];
+const MODEL_SIZE = 224;
+
+// ─── Model singleton ──────────────────────────────────────────────────────────
+
+let _model: TensorflowModel | null = null;
+
+async function getModel(): Promise<TensorflowModel | null> {
+  if (_model) return _model;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    _model = await loadTensorflowModel(require('../assets/clothing_model.tflite'), []);
+    console.log(
+      '[Ojo] TFLite model loaded.',
+      '\n  inputs :', JSON.stringify(_model.inputs),
+      '\n  outputs:', JSON.stringify(_model.outputs),
+    );
+    return _model;
+  } catch (e) {
+    console.error('[Ojo] TFLite model FAILED to load:', e);
+    return null;
+  }
+}
+
+// ─── Image → Float32 tensor ───────────────────────────────────────────────────
+// onnx2tf transposes PyTorch NCHW → NHWC by default, but we detect the actual
+// layout from model.inputs[0].shape so we never guess wrong.
+
+function buildTensor(
+  pixels: Array<[number, number, number]>,
+  shape: number[],   // e.g. [1,224,224,3] or [1,3,224,224]
+): Float32Array {
+  const isNHWC = shape[shape.length - 1] === 3;  // last dim = channels → NHWC
+  const H = isNHWC ? shape[1] : shape[2];
+  const W = isNHWC ? shape[2] : shape[3];
+  const total = 3 * H * W;
+  const tensor = new Float32Array(total);
+
+  for (let i = 0; i < pixels.length; i++) {
+    const [r, g, b] = pixels[i];
+    const rn = (r / 255 - NORM_MEAN[0]) / NORM_STD[0];
+    const gn = (g / 255 - NORM_MEAN[1]) / NORM_STD[1];
+    const bn = (b / 255 - NORM_MEAN[2]) / NORM_STD[2];
+
+    if (isNHWC) {
+      tensor[i * 3 + 0] = rn;
+      tensor[i * 3 + 1] = gn;
+      tensor[i * 3 + 2] = bn;
+    } else {
+      // NCHW: plane R then G then B
+      const y = Math.floor(i / W);
+      const x = i % W;
+      tensor[0 * H * W + y * W + x] = rn;
+      tensor[1 * H * W + y * W + x] = gn;
+      tensor[2 * H * W + y * W + x] = bn;
+    }
+  }
+  return tensor;
+}
+
+async function imageToTensor(
+  imageUri: string,
+  inputShape: number[],
+): Promise<Float32Array | null> {
+  try {
+    console.log(`[Ojo] imageToTensor: uri=${imageUri?.substring(0, 80)}… shape=${JSON.stringify(inputShape)}`);
+
+    const isNHWC = inputShape[inputShape.length - 1] === 3;
+    const H = isNHWC ? inputShape[1] : inputShape[2];
+    const W = isNHWC ? inputShape[2] : inputShape[3];
+
+    if (!H || !W || isNaN(H) || isNaN(W)) {
+      console.error(`[Ojo] imageToTensor: invalid H=${H} W=${W} from shape=${JSON.stringify(inputShape)}`);
+      return null;
+    }
+
+    console.log(`[Ojo] imageToTensor: resizing to ${W}×${H} (${isNHWC ? 'NHWC' : 'NCHW'})`);
+    const resized = await ImageManipulator.manipulateAsync(
+      imageUri,
+      [{ resize: { width: W, height: H } }],
+      { format: ImageManipulator.SaveFormat.PNG, base64: true },
+    );
+    if (!resized.base64) {
+      console.error('[Ojo] imageToTensor: manipulateAsync returned no base64');
+      return null;
+    }
+    console.log(`[Ojo] imageToTensor: base64 length=${resized.base64.length}`);
+
+    const bytes = base64ToBytes(resized.base64);
+    console.log(`[Ojo] imageToTensor: decoded ${bytes.length} bytes, first 8: [${bytes.slice(0, 8).join(',')}]`);
+
+    const pixels = parsePNGPixels(bytes);
+    if (pixels.length === 0) {
+      console.error('[Ojo] imageToTensor: parsePNGPixels returned 0 pixels');
+      return null;
+    }
+
+    console.log(`[Ojo] imageToTensor: ${pixels.length} pixels decoded, building tensor`);
+    return buildTensor(pixels, inputShape);
+  } catch (e) {
+    console.error('[Ojo] imageToTensor error:', e);
+    return null;
+  }
+}
+
+function argmax(arr: Float32Array): number {
+  let best = 0;
+  for (let i = 1; i < arr.length; i++) {
+    if (arr[i] > arr[best]) best = i;
+  }
+  return best;
+}
+
+/** Softmax-free confidence proxy: sigmoid of the winning logit. */
+function logitToConfidence(logit: number): number {
+  return 1 / (1 + Math.exp(-logit));
+}
+
+// ─── Garment → Fabric heuristics ─────────────────────────────────────────────
+
+const GARMENT_TO_FABRIC: Record<GarmentType, FabricGuess> = {
+  't-shirt':           { type: 'cotton / cotton-blend',                confidence: 'high',   note: 'Most tees are jersey knit cotton' },
+  'long-sleeve-shirt': { type: 'cotton / cotton-blend',                confidence: 'high' },
+  'dress-shirt':       { type: 'cotton / poplin',                      confidence: 'high',   note: 'Dress shirts are almost always woven cotton' },
+  'polo':              { type: 'cotton piqué',                         confidence: 'high' },
+  'tank-top':          { type: 'cotton / modal',                       confidence: 'medium' },
+  'hoodie':            { type: 'cotton fleece / french terry',         confidence: 'high' },
+  'sweatshirt':        { type: 'cotton fleece',                        confidence: 'high' },
+  'sweater':           { type: 'wool / acrylic / cotton knit',         confidence: 'medium', note: 'Varies widely — wool, acrylic, and cotton are all common' },
+  'cardigan':          { type: 'wool / acrylic knit',                  confidence: 'medium' },
+  'blazer':            { type: 'wool / polyester / linen',             confidence: 'medium' },
+  'jacket':            { type: 'nylon / polyester / cotton canvas',    confidence: 'medium' },
+  'coat':              { type: 'wool / wool-blend',                    confidence: 'medium' },
+  'puffer':            { type: 'nylon shell / down or synthetic fill', confidence: 'high',   note: 'Outer shell is almost always nylon or polyester' },
+  'vest':              { type: 'polyester / wool',                     confidence: 'low' },
+  'jeans':             { type: 'denim (cotton)',                       confidence: 'high' },
+  'pants':             { type: 'cotton / polyester / wool',            confidence: 'low',    note: 'Fabric varies widely by style' },
+  'shorts':            { type: 'cotton / nylon',                       confidence: 'medium' },
+  'leggings':          { type: 'spandex / polyester blend',            confidence: 'high' },
+  'skirt':             { type: 'cotton / polyester / satin',           confidence: 'low' },
+  'dress':             { type: 'polyester / cotton / silk-like',       confidence: 'low' },
+  'jumpsuit':          { type: 'cotton / denim / polyester',           confidence: 'low' },
+  'hat':               { type: 'cotton / wool / polyester',            confidence: 'low' },
+  'cap':               { type: 'cotton / polyester',                   confidence: 'medium' },
+  'scarf':             { type: 'wool / cotton / silk',                 confidence: 'low' },
+  'gloves':            { type: 'leather / wool / synthetic',           confidence: 'low' },
+  'belt':              { type: 'leather / synthetic',                  confidence: 'medium' },
+  'bag':               { type: 'leather / canvas / nylon',             confidence: 'low' },
+  'shoes':             { type: 'leather / synthetic',                  confidence: 'medium' },
+  'boots':             { type: 'leather / suede',                      confidence: 'medium' },
+  'sneakers':          { type: 'mesh / synthetic / rubber',            confidence: 'high' },
+  'sandals':           { type: 'leather / synthetic',                  confidence: 'medium' },
+  'socks':             { type: 'cotton / polyester blend',             confidence: 'high' },
+  'watch':             { type: 'metal / leather / silicone',           confidence: 'medium' },
+  'unknown':           { type: 'unknown',                              confidence: 'low' },
+};
+
+// ─── Aspect-ratio & shape heuristics ─────────────────────────────────────────
+// When the model's confidence is low, these geometric cues correct obvious errors.
+// Aspect ratio = width / height of the source image.
+
+type ShapeCategory = 'footwear' | 'top' | 'bottom' | 'full-body' | 'accessory' | 'ambiguous';
+
+const GARMENT_SHAPE_CATEGORY: Record<GarmentType, ShapeCategory> = {
+  'shoes': 'footwear', 'boots': 'footwear', 'sneakers': 'footwear', 'sandals': 'footwear',
+  't-shirt': 'top', 'long-sleeve-shirt': 'top', 'dress-shirt': 'top', 'polo': 'top',
+  'tank-top': 'top', 'hoodie': 'top', 'sweatshirt': 'top', 'sweater': 'top',
+  'cardigan': 'top', 'jacket': 'top', 'blazer': 'top', 'coat': 'top', 'puffer': 'top', 'vest': 'top',
+  'jeans': 'bottom', 'pants': 'bottom', 'shorts': 'bottom', 'leggings': 'bottom', 'skirt': 'bottom',
+  'dress': 'full-body', 'jumpsuit': 'full-body',
+  'hat': 'accessory', 'cap': 'accessory', 'scarf': 'accessory', 'gloves': 'accessory',
+  'belt': 'accessory', 'bag': 'accessory', 'socks': 'accessory', 'watch': 'accessory',
+  'unknown': 'ambiguous',
+};
+
+/** Guess shape category from image aspect ratio */
+function guessShapeFromAspect(aspectRatio: number): ShapeCategory {
+  // Landscape (wider than tall) → strongly suggests footwear or belt
+  if (aspectRatio > 1.5) return 'footwear';
+  // Tall portrait → tops, bottoms, or full-body (never footwear)
+  if (aspectRatio < 0.6) return 'bottom';
+  // Roughly square with slight portrait lean → tops
+  if (aspectRatio >= 0.6 && aspectRatio <= 0.9) return 'top';
+  // Remaining (0.9–1.5) is ambiguous
+  return 'ambiguous';
+}
+
+/** If model prediction contradicts strong geometric signal, pick a better candidate */
+function applyShapeHeuristic(
+  garmentType: GarmentType,
+  confidence: number,
+  logits: Float32Array,
+  aspectRatio: number,
+): { corrected: GarmentType; confidence: number } {
+  const modelCategory = GARMENT_SHAPE_CATEGORY[garmentType];
+  const shapeGuess = guessShapeFromAspect(aspectRatio);
+
+  // If model is highly confident or shape is ambiguous, trust the model
+  if (confidence > 0.75 || shapeGuess === 'ambiguous') {
+    return { corrected: garmentType, confidence };
+  }
+
+  // If model agrees with shape, keep it
+  if (modelCategory === shapeGuess) {
+    return { corrected: garmentType, confidence };
+  }
+
+  // CONFLICT: model says one category but image shape strongly disagrees.
+  // Find the best-scoring label that matches the shape hint.
+  let bestIdx = -1;
+  let bestScore = -Infinity;
+  for (let i = 0; i < logits.length; i++) {
+    const label = GARMENT_LABELS[i];
+    if (GARMENT_SHAPE_CATEGORY[label] === shapeGuess && logits[i] > bestScore) {
+      bestScore = logits[i];
+      bestIdx = i;
+    }
+  }
+
+  if (bestIdx >= 0) {
+    const corrected = GARMENT_LABELS[bestIdx];
+    const newConf = logitToConfidence(bestScore);
+    console.log(
+      `[Ojo] Shape heuristic override: ${garmentType} → ${corrected} `
+      + `(aspect=${aspectRatio.toFixed(2)}, shape=${shapeGuess})`
+    );
+    return { corrected, confidence: newConf };
+  }
+
+  return { corrected: garmentType, confidence };
+}
+
+// ─── Main identifier ──────────────────────────────────────────────────────────
 
 const DEFAULT_CONFIG: Required<ClothingIdentifierConfig> = {
   modelPath: '',
@@ -145,65 +309,76 @@ export async function identifyClothing(
 ): Promise<ClothingIdentificationResult> {
   const cfg = { ...DEFAULT_CONFIG, ...config };
 
-  // Step 1: Garment type via ML Kit (device only — unavailable on Simulator)
-  const mlKitLabels: Label[] = _mlKit ? await _mlKit.label(imageUri) : [];
+  let garmentType: GarmentType = 'unknown';
+  let topLabelText = '';
+  let confidence = 0;
+  const rawLabels: RawLabel[] = [];
 
-  const rawLabels: RawLabel[] = mlKitLabels.map((l: Label) => ({
-    text: l.text,
-    confidence: l.confidence,
-  }));
+  // ── Step 0: Get image dimensions for shape heuristics ─────────
+  let aspectRatio = 1.0;
+  try {
+    const info = await ImageManipulator.manipulateAsync(imageUri, []);
+    if (info.width && info.height) {
+      aspectRatio = info.width / info.height;
+    }
+  } catch { /* fallback to 1.0 */ }
 
-  // Sort all labels by confidence descending.
-  const sorted = [...rawLabels].sort((a, b) => b.confidence - a.confidence);
+  // ── Step 1: TFLite inference ──────────────────────────────────
+  const model = await getModel();
+  const inputShape = model?.inputs[0]?.shape ?? [1, MODEL_SIZE, MODEL_SIZE, 3];
+  const tensor = model ? await imageToTensor(imageUri, inputShape) : null;
 
-  // Labels that describe a person, body part, or scene — not a garment.
-  // These are excluded from garment matching so that e.g. "Muscle (90%)" on a
-  // model photo doesn't shadow the actual clothing labels further down the list.
-  const NON_GARMENT = new Set([
-    'person', 'man', 'woman', 'human', 'body', 'people',
-    'muscle', 'muscles', 'arm', 'leg', 'hand', 'foot', 'feet', 'neck', 'chest',
-    'face', 'beard', 'hair', 'skin', 'nose', 'eye', 'head',
-    'dude', 'guy', 'girl', 'boy', 'adult', 'model', 'fashion model',
-    'portrait', 'photo', 'photography', 'stock photo', 'selfie',
-    'finger', 'thumb', 'wrist', 'elbow', 'shoulder', 'knee', 'ankle',
-  ]);
+  if (!model)  console.error('[Ojo] identifyClothing: model is null — check load errors above');
+  if (!tensor) console.error('[Ojo] identifyClothing: tensor is null — check imageToTensor errors above');
 
-  // Collect EVERY label→pattern match, tagging each with the pattern's index
-  // in LABEL_TO_GARMENT (lower index = higher specificity). Then pick the
-  // match with the best specificity; break ties by label confidence.
-  //
-  // This ensures "Hat (76%)" beats "Outerwear (90%)" when both are present
-  // because hat patterns come before the outerwear catch-all in the list.
-  interface LabelMatch { type: GarmentType; confidence: number; labelText: string; priority: number; }
-  const allMatches: LabelMatch[] = [];
+  if (model && tensor) {
+    try {
+      const outputs = model.runSync([tensor.buffer as ArrayBuffer]);
+      const garmentLogits = new Float32Array(outputs[0]);
+      const sleeveLogits  = new Float32Array(outputs[1]);
 
-  for (const label of sorted) {
-    const normalised = label.text.toLowerCase().trim();
-    if (NON_GARMENT.has(normalised)) continue; // skip person / body-part labels
+      const gIdx = argmax(garmentLogits);
+      const sIdx = argmax(sleeveLogits);
 
-    for (let i = 0; i < LABEL_TO_GARMENT.length; i++) {
-      const { patterns, type } = LABEL_TO_GARMENT[i];
-      if (patterns.some(p => normalised.includes(p))) {
-        allMatches.push({ type, confidence: label.confidence, labelText: label.text, priority: i });
-        break; // one pattern group per label — move on to next label
+      garmentType = GARMENT_LABELS[gIdx] ?? 'unknown';
+      confidence  = logitToConfidence(garmentLogits[gIdx]);
+
+      // ── Step 1b: Geometric heuristic correction ─────────────────
+      const corrected = applyShapeHeuristic(garmentType, confidence, garmentLogits, aspectRatio);
+      garmentType = corrected.corrected;
+      confidence  = corrected.confidence;
+
+      const sleeveLabel = SLEEVE_LABELS[sIdx] ?? 'n/a';
+      topLabelText = garmentType;
+
+      // Apply sleeve override for tops (e.g. t-shirt + long-sleeve → long-sleeve-shirt)
+      if (TOP_GARMENTS.has(garmentType) && sleeveLabel !== 'n/a') {
+        const override = SLEEVE_OVERRIDES[`${garmentType}+${sleeveLabel}`];
+        if (override) garmentType = override;
+        topLabelText = `${garmentType} (${sleeveLabel})`;
       }
+
+      rawLabels.push({ text: topLabelText, confidence });
+    } catch (e) {
+      console.error('[Ojo] TFLite runSync FAILED:', e);
     }
   }
 
-  // Pick best: lowest priority index wins; break ties with highest confidence.
-  allMatches.sort((a, b) => a.priority - b.priority || b.confidence - a.confidence);
-  const bestMatch = allMatches[0];
-
-  let garmentType: GarmentType = bestMatch?.type ?? 'unknown';
-  let confidence = bestMatch?.confidence ?? (sorted[0]?.confidence ?? 0);
-  let topLabelText = bestMatch?.labelText ?? (sorted[0]?.text ?? '');
-
-  // Step 2: Dominant colors via pure-JS pixel sampling (no native modules).
-  // extractColorsFromImage resizes to an 8×8 PNG and reads pixel data directly.
+  // ── Step 2: Dominant colors ───────────────────────────────────
   const colors = await extractColorsFromImage(imageUri, cfg.maxColors);
 
-  // Step 3: Fabric heuristic
-  const fabric = GARMENT_TO_FABRIC[garmentType];
+  // ── Step 3: Color-informed garment refinement ─────────────────
+  // If dominant color is classic denim blue and model says generic "pants", upgrade to "jeans"
+  if (garmentType === 'pants' && colors.length > 0) {
+    const topColor = colors[0].name.toLowerCase();
+    if (topColor.includes('denim') || topColor === 'navy' || topColor === 'dark blue') {
+      garmentType = 'jeans';
+      topLabelText = 'jeans';
+    }
+  }
+
+  // ── Step 4: Fabric heuristic ──────────────────────────────────
+  const fabric = GARMENT_TO_FABRIC[garmentType] ?? GARMENT_TO_FABRIC['unknown'];
 
   return { garmentType, topLabelText, colors, fabric, confidence, rawLabels };
 }
