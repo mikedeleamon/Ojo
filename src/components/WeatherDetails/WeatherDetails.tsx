@@ -23,6 +23,12 @@ const WeatherDetails = ({ weather, settings, forecasts }: Props) => {
     <View style={st.root}>
       <OutfitSuggestion weather={weather} settings={settings} forecasts={forecasts} />
 
+      {/* Always-visible wind + humidity */}
+      <View style={st.grid}>
+        <Stat label="Wind"     value={`${weather.Wind.Speed.Imperial.Value} mph`} />
+        <Stat label="Humidity" value={`${weather.RelativeHumidity}%`} />
+      </View>
+
       <Pressable style={st.toggle} onPress={() => setExpanded(v => !v)}>
         <Text style={st.toggleText}>{expanded ? 'Less' : 'More details'}</Text>
         <Svg width={16} height={16} viewBox="0 0 16 16" fill="none"
@@ -33,8 +39,6 @@ const WeatherDetails = ({ weather, settings, forecasts }: Props) => {
 
       {expanded && (
         <View style={st.grid}>
-          <Stat label="Wind"       value={`${weather.Wind.Speed.Imperial.Value} mph`} />
-          <Stat label="Humidity"   value={`${weather.RelativeHumidity}%`} />
           <Stat label="UV Index"   value={weather.UVIndexText} />
           <Stat label="Feels like" value={`${isMetric
             ? weather.RealFeelTemperature.Metric.Value

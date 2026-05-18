@@ -9,14 +9,15 @@ interface Props {
   time:        string;
   tempUnit:    string;
   isDay:       boolean;
+  isNow?:      boolean;
 }
 
 const formatTime = (iso: string) =>
   new Date(iso).toLocaleString('en-US', { hour: 'numeric', hour12: true });
 
-const MinimizedWeatherDisplay = ({ weather, temperature, time, tempUnit, isDay }: Props) => (
-  <View style={styles.card}>
-    <Text style={styles.time}>{formatTime(time)}</Text>
+const MinimizedWeatherDisplay = ({ weather, temperature, time, tempUnit, isDay, isNow }: Props) => (
+  <View style={[styles.card, isNow && styles.cardNow]}>
+    <Text style={[styles.time, isNow && styles.timeNow]}>{isNow ? 'Now' : formatTime(time)}</Text>
     <WeatherIconDisplay condition={weather} isDay={isDay} size="small" />
     <Text style={styles.temp}>{temperature}° {tempUnit}</Text>
   </View>
@@ -36,6 +37,11 @@ const styles = StyleSheet.create({
     borderColor:     'rgba(255,255,255,0.12)',
     minWidth:        64,
   },
+  cardNow: {
+    borderColor: 'rgba(255,255,255,0.28)',
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
   time: { fontFamily: fonts.body, fontSize: 11, color: colors.textSecondary },
+  timeNow: { color: colors.textPrimary, fontWeight: '600' as const },
   temp: { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textPrimary },
 });

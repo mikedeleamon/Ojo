@@ -1,11 +1,14 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
     StyleSheet,
     ScrollView,
     Image,
     Pressable,
     useWindowDimensions,
+    Animated as RNAnimated,
+    Easing as RNEasing,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { Svg, Path, Circle } from 'react-native-svg';
 import { View, Text } from '../primitives';
 import { EmptyState } from '../shared';
@@ -333,6 +336,26 @@ const outfitTabSubtitle = (outfit: OutfitResult): string => {
     return 'Light & clean';
 };
 
+// ─── #10 — Why this outfit: one-sentence explanation for weakest factor ──
+
+const FACTOR_EXPLANATIONS: Record<keyof ScoreBreakdown, string> = {
+    fabric: 'Some fabrics aren\'t ideal for today\'s weather — layering can help.',
+    color: 'The colors don\'t pair perfectly, but the outfit still works well.',
+    style: 'The mix of styles is a little eclectic — that can be a good thing.',
+    simplicity: 'This outfit has a lot going on — consider swapping a piece or two.',
+    preference: 'This isn\'t your usual style, but it suits the conditions.',
+};
+
+const whyThisOutfit = (breakdown: ScoreBreakdown): string | null => {
+    let weakest: keyof ScoreBreakdown = 'fabric';
+    let min = 100;
+    for (const k of Object.keys(breakdown) as (keyof ScoreBreakdown)[]) {
+        if (breakdown[k] < min) { min = breakdown[k]; weakest = k; }
+    }
+    if (min >= 60) return null; // all scores decent — no explanation needed
+    return FACTOR_EXPLANATIONS[weakest];
+};
+
 // ─── Weather-aware copy helpers ───────────────────────────────────────────────
 
 const weatherAwareAddClothesBody = (weather: CurrentWeather): string => {
@@ -392,10 +415,14 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
     const [removedByOutfit, setRemovedByOutfit] = useState<Map<number, Set<string>>>(new Map());
     const nav = useAppNavigation();
 
+    // ─── #5: Swipe hint bounce (first render only) ──────────────────────────
+    const hintAnim = useRef(new RNAnimated.Value(0)).current;
+    const hintFired = useRef(false);
+
+    // ─── #8: Haptic + green glow on "Wore this today" ──────────────────────
+    const glowAnim = useRef(new RNAnimated.Value(0)).current;
+
     // ─── Pager ───────────────────────────────────────────────────────────────
-    // cardWidth = content area width.
-    // The details card in WeatherHUD applies marginHorizontal + padding = spacing.md
-    // on each side (×2 sides ×2 properties = spacing.md * 4.1 total horizontal space).
     const { width: windowWidth } = useWindowDimensions();
     const cardWidth = windowWidth - spacing.md * 4.1;
     const pagerRef = useRef<ScrollView>(null);
@@ -480,6 +507,8 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
 
     const handleWoreThis = async () => {
         if (!preferred || !activeOutfit || activeOutfit.status !== 'ok') return;
+        // #8 — haptic pulse
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
         const articles = activeSlots.map((s) => s.article);
         await addHistoryEntry({
             closetId: preferred._id,
@@ -489,6 +518,12 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
         });
         await updatePreferences(articles);
         setWornLogged(true);
+        // #8 — green glow animation
+        glowAnim.setValue(0);
+        RNAnimated.sequence([
+            RNAnimated.timing(glowAnim, { toValue: 1, duration: 300, useNativeDriver: false }),
+            RNAnimated.timing(glowAnim, { toValue: 0, duration: 800, useNativeDriver: false }),
+        ]).start();
         setTimeout(() => setWornLogged(false), 3000);
     };
 
@@ -496,6 +531,19 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
     useEffect(() => {
         pagerRef.current?.scrollTo({ x: safeIdx * cardWidth, animated: true });
     }, [safeIdx, cardWidth]);
+
+    // #5 — Fire a subtle swipe-hint bounce once after outfits appear
+    useEffect(() => {
+        if (hintFired.current || outfits.length <= 1) return;
+        hintFired.current = true;
+        const timer = setTimeout(() => {
+            RNAnimated.sequence([
+                RNAnimated.timing(hintAnim, { toValue: 1, duration: 350, easing: RNEasing.out(RNEasing.cubic), useNativeDriver: true }),
+                RNAnimated.timing(hintAnim, { toValue: 0, duration: 450, easing: RNEasing.inOut(RNEasing.cubic), useNativeDriver: true }),
+            ]).start();
+        }, 800);
+        return () => clearTimeout(timer);
+    }, [outfits.length]);
 
     if (loading) return null;
 
@@ -580,6 +628,34 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
 
     if (!activeOutfit) return null;
 
+    // #5 — Swipe hint: translate the pager slightly left, then snap back
+    const hintTranslateX = hintAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, -28],
+    });
+
+    // #8 — Green glow interpolation for "Wore this today"
+    const glowBorderColor = glowAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['rgba(52,211,153,0)', 'rgba(52,211,153,0.65)'],
+    });
+    const glowShadowOpacity = glowAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, 0.35],
+    });
+
+    // #10 — Why this outfit explanation
+    const whyExplanation = activeOutfit ? whyThisOutfit(activeOutfit.scoreBreakdown) : null;
+
+    // #4 — Reset outfit undo
+    const handleResetOutfit = () => {
+        setRemovedByOutfit((prev) => {
+            const next = new Map(prev);
+            next.delete(safeIdx);
+            return next;
+        });
+    };
+
     return (
         <View style={styles.root}>
             {/* ── Header ── */}
@@ -591,81 +667,95 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
                 <ScoreBadge score={activeOutfit.score} />
             </View>
 
-            {/* ── Outfit pager: swipe left/right to browse options ── */}
-            <ScrollView
-                ref={pagerRef}
-                horizontal
-                pagingEnabled
-                showsHorizontalScrollIndicator={false}
-                scrollEventThrottle={16}
-                decelerationRate='fast'
-                onMomentumScrollEnd={(e) => {
-                    const page = Math.round(
-                        e.nativeEvent.contentOffset.x / cardWidth,
-                    );
-                    if (page !== activeIdx) {
-                        setActiveIdx(page);
-                        setWornLogged(false);
-                        setShowBreakdown(false);
-                    }
-                }}
-            >
-                {outfits.map((outfit, i) => {
-                    const cardRemovedIds = removedByOutfit.get(i) ?? new Set<string>();
-                    return (
-                        <View
-                            key={i}
-                            style={[styles.pagerCard, { width: cardWidth }]}
-                        >
-                            <View style={styles.pagerCardArticles}>
-                                {outfit.slots
-                                    .filter((s) => !cardRemovedIds.has(s.article._id))
-                                    .map((slot, j) => (
-                                        <ArticleThumb
-                                            key={j}
-                                            article={slot.article}
-                                            role={slot.role}
-                                            onRemove={
-                                                REMOVABLE_ROLES.includes(slot.role)
-                                                    ? () => handleRemoveSlot(i, slot.article._id)
-                                                    : undefined
-                                            }
-                                        />
-                                    ))}
-                            </View>
-                            <View style={styles.pagerCardFooter}>
-                                <Text style={styles.pagerSubtitle}>
-                                    {outfitTabSubtitle(outfit)}
-                                </Text>
-                            </View>
-                        </View>
-                    );
-                })}
-            </ScrollView>
+            {/* #2 — Headline above pager */}
+            <Text style={styles.headline}>{activeOutfit.headline}</Text>
 
-            {/* ── Page dots (also tappable) ── */}
-            {outfits.length > 1 && (
-                <View style={styles.dots}>
-                    {outfits.map((_, i) => (
-                        <Pressable
-                            key={i}
-                            hitSlop={8}
-                            style={[
-                                styles.dot,
-                                i === safeIdx && styles.dotActive,
-                            ]}
-                            onPress={() => {
-                                setActiveIdx(i);
-                                setWornLogged(false);
-                                setShowBreakdown(false);
-                            }}
-                        />
-                    ))}
-                </View>
+            {/* #10 — Why this outfit explanation */}
+            {whyExplanation && (
+                <Text style={styles.whyText}>{whyExplanation}</Text>
             )}
 
-            {/* ── Headline ── */}
-            <Text style={styles.headline}>{activeOutfit.headline}</Text>
+            {/* ── Outfit pager with #5 swipe hint bounce ── */}
+            <RNAnimated.View style={{ transform: [{ translateX: hintTranslateX }] }}>
+                <ScrollView
+                    ref={pagerRef}
+                    horizontal
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    scrollEventThrottle={16}
+                    decelerationRate='fast'
+                    onMomentumScrollEnd={(e) => {
+                        const page = Math.round(
+                            e.nativeEvent.contentOffset.x / cardWidth,
+                        );
+                        if (page !== activeIdx) {
+                            setActiveIdx(page);
+                            setWornLogged(false);
+                            setShowBreakdown(false);
+                        }
+                    }}
+                >
+                    {outfits.map((outfit, i) => {
+                        const cardRemovedIds = removedByOutfit.get(i) ?? new Set<string>();
+                        return (
+                            <View
+                                key={i}
+                                style={[styles.pagerCard, { width: cardWidth }]}
+                            >
+                                <View style={styles.pagerCardArticles}>
+                                    {outfit.slots
+                                        .filter((s) => !cardRemovedIds.has(s.article._id))
+                                        .map((slot, j) => (
+                                            <ArticleThumb
+                                                key={j}
+                                                article={slot.article}
+                                                role={slot.role}
+                                                onRemove={
+                                                    REMOVABLE_ROLES.includes(slot.role)
+                                                        ? () => handleRemoveSlot(i, slot.article._id)
+                                                        : undefined
+                                                }
+                                            />
+                                        ))}
+                                </View>
+                                <View style={styles.pagerCardFooter}>
+                                    <Text style={styles.pagerSubtitle}>
+                                        {outfitTabSubtitle(outfit)}
+                                    </Text>
+                                </View>
+                            </View>
+                        );
+                    })}
+                </ScrollView>
+            </RNAnimated.View>
+
+            {/* ── Page dots (also tappable) + #4 reset undo ── */}
+            <View style={styles.dotsRow}>
+                {outfits.length > 1 && (
+                    <View style={styles.dots}>
+                        {outfits.map((_, i) => (
+                            <Pressable
+                                key={i}
+                                hitSlop={8}
+                                style={[
+                                    styles.dot,
+                                    i === safeIdx && styles.dotActive,
+                                ]}
+                                onPress={() => {
+                                    setActiveIdx(i);
+                                    setWornLogged(false);
+                                    setShowBreakdown(false);
+                                }}
+                            />
+                        ))}
+                    </View>
+                )}
+                {removedIds.size > 0 && (
+                    <Pressable onPress={handleResetOutfit} style={styles.resetLink}>
+                        <Text style={styles.resetLinkText}>Reset outfit</Text>
+                    </Pressable>
+                )}
+            </View>
 
             {/* ── Score breakdown ── */}
             <Pressable
@@ -722,24 +812,33 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
                 <LayeringSection layering={filteredLayering} />
             )}
 
-            {/* ── Wore this today ── */}
-            <Pressable
-                style={[
-                    styles.woreThisBtn,
-                    wornLogged && styles.woreThisLogged,
-                ]}
-                onPress={handleWoreThis}
-                disabled={wornLogged}
-            >
-                <Text
+            {/* ── #8: Wore this today with haptic + green glow ── */}
+            <RNAnimated.View style={[
+                styles.woreThisGlow,
+                {
+                    borderColor: glowBorderColor,
+                    shadowColor: 'rgba(52,211,153,1)',
+                    shadowOpacity: glowShadowOpacity as any,
+                },
+            ]}>
+                <Pressable
                     style={[
-                        styles.woreThisText,
-                        wornLogged && styles.woreThisTextLogged,
+                        styles.woreThisBtn,
+                        wornLogged && styles.woreThisLogged,
                     ]}
+                    onPress={handleWoreThis}
+                    disabled={wornLogged}
                 >
-                    {wornLogged ? '✓ Logged!' : '⏱ Wore this today'}
-                </Text>
-            </Pressable>
+                    <Text
+                        style={[
+                            styles.woreThisText,
+                            wornLogged && styles.woreThisTextLogged,
+                        ]}
+                    >
+                        {wornLogged ? '✓ Logged!' : '⏱ Wore this today'}
+                    </Text>
+                </Pressable>
+            </RNAnimated.View>
         </View>
     );
 };
@@ -859,6 +958,26 @@ const styles = StyleSheet.create({
         color: colors.textSecondary,
         lineHeight: fontSizes.sm * 1.5,
     },
+    whyText: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs,
+        fontStyle: 'italic',
+        color: colors.textMuted,
+        lineHeight: fontSizes.xs * 1.5,
+    },
+    dotsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: spacing.sm,
+    },
+    resetLink: { paddingVertical: 2, paddingHorizontal: 4 },
+    resetLinkText: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs,
+        color: colors.textSecondary,
+        textDecorationLine: 'underline',
+    },
     articleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
     articleCard: {
         flexDirection: 'row',
@@ -961,11 +1080,19 @@ const styles = StyleSheet.create({
         color: colors.textSecondary,
         lineHeight: fontSizes.xs * 1.5,
     },
-    woreThisBtn: {
+    woreThisGlow: {
         marginTop: 4,
+        borderRadius: radius.sm,
+        borderWidth: 2,
+        borderColor: 'rgba(52,211,153,0)',
+        shadowOffset: { width: 0, height: 0 },
+        shadowRadius: 10,
+        elevation: 0,
+    },
+    woreThisBtn: {
         paddingVertical: 10,
         paddingHorizontal: spacing.md,
-        borderRadius: radius.sm,
+        borderRadius: radius.sm - 1,
         borderWidth: 1,
         borderColor: colors.glassBorder,
         alignItems: 'center',

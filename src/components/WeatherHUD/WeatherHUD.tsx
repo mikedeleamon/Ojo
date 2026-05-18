@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
     StyleSheet,
     ScrollView,
@@ -491,26 +491,46 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
     // Spinner rotation for the inline loading indicator
     const spinRotate = useSpinAnimation(2_000);
 
-    // ── Error state ──────────────────────────────────────────────────────────────
+    // ── Error state (#9: retry + check settings) ──────────────────────────────
     if (error && !weather)
         return (
             <View style={st.center}>
                 <Text style={st.errorText}>
                     {error ?? 'Something went wrong.'}
                 </Text>
+                <Pressable
+                    style={st.retryBtn}
+                    onPress={() => onRefresh?.()}
+                >
+                    <Text style={st.retryBtnText}>Try again</Text>
+                </Pressable>
+                <Pressable onPress={() => nav.push('Account')}>
+                    <Text style={st.settingsLink}>Check settings</Text>
+                </Pressable>
             </View>
         );
 
+    const isMetric = settings.temperatureScale === 'Metric';
     const tempVal = weather
-        ? settings.temperatureScale === 'Metric'
+        ? isMetric
             ? weather.Temperature.Metric.Value
             : weather.Temperature.Imperial.Value
         : 0;
     const feelsVal = weather
-        ? settings.temperatureScale === 'Metric'
+        ? isMetric
             ? weather.RealFeelTemperature.Metric.Value
             : weather.RealFeelTemperature.Imperial.Value
         : 0;
+
+    // #1 — High / low from hourly forecast (forecast API always returns °F)
+    const fToC = (f: number) => Math.round((f - 32) * 5 / 9);
+    const { hiTemp, loTemp } = useMemo(() => {
+        if (forecasts.length === 0) return { hiTemp: null, loTemp: null };
+        const temps = forecasts.map((f) =>
+            isMetric ? fToC(f.Temperature.Value) : f.Temperature.Value,
+        );
+        return { hiTemp: Math.round(Math.max(...temps)), loTemp: Math.round(Math.min(...temps)) };
+    }, [forecasts, isMetric]);
 
     return (
         <LinearGradient
@@ -588,6 +608,11 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
                                 temperature={tempVal}
                                 feelsLike={feelsVal}
                             />
+                            {hiTemp !== null && loTemp !== null && (
+                                <Text style={st.hiLo}>
+                                    H:{hiTemp}° L:{loTemp}°
+                                </Text>
+                            )}
                         </View>
 
                         {/* Hourly forecast strip */}
@@ -601,10 +626,11 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
                                     <MinimizedWeatherDisplay
                                         key={i}
                                         weather={f.IconPhrase}
-                                        temperature={f.Temperature.Value}
+                                        temperature={isMetric ? fToC(f.Temperature.Value) : f.Temperature.Value}
                                         time={f.DateTime}
-                                        tempUnit={f.Temperature.Unit}
+                                        tempUnit={isMetric ? 'C' : f.Temperature.Unit}
                                         isDay={f.IsDaylight}
+                                        isNow={i === 0}
                                     />
                                 ))}
                             </ScrollView>
@@ -670,7 +696,33 @@ const st = StyleSheet.create({
         color: 'rgba(255,255,255,0.35)',
         marginTop: 2,
     },
+    retryBtn: {
+        paddingVertical: 10,
+        paddingHorizontal: 28,
+        backgroundColor: colors.saveBtnBg,
+        borderRadius: 10,
+        marginTop: 4,
+    },
+    retryBtnText: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.sm,
+        fontWeight: '600' as any,
+        color: colors.saveBtnText,
+    },
+    settingsLink: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.sm,
+        color: colors.textSecondary,
+        textDecorationLine: 'underline',
+    },
     hero: { alignItems: 'center', paddingVertical: spacing.lg },
+    hiLo: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.sm,
+        color: 'rgba(255,255,255,0.55)',
+        marginTop: 4,
+        letterSpacing: 0.5,
+    },
     forecastStrip: {
         flexDirection: 'row',
         gap: 8,
