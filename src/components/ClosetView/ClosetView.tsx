@@ -15,13 +15,14 @@ import { View, Text } from '../primitives';
 import ArticleModal from '../ArticleModal/ArticleModal';
 import { Closet, ClothingArticle, ArticleFormData } from '../../types';
 import {
-    colors,
+    ColorTokens,
     fonts,
     fontSizes,
     fontWeights,
     spacing,
     radius,
 } from '../../theme/tokens';
+import { useTheme } from '../../theme/ThemeContext';
 import {
     pairHarmony,
     COLOR_NEUTRALS,
@@ -30,7 +31,7 @@ import {
     garmentWarmth,
     Season,
 } from '../../lib/outfitEngine';
-import { styles } from './ClosetView.styles';
+import { makeStyles } from './ClosetView.styles';
 
 const CATEGORIES = [
     'Casual',
@@ -196,28 +197,32 @@ interface Props {
 
 const HangerIcon = ({
     size = 20,
-    color = colors.textSecondary,
+    color,
 }: {
     size?: number;
     color?: string;
-}) => (
-    <Svg
-        width={size}
-        height={size}
-        viewBox='0 0 24 24'
-        fill='none'
-        accessibilityElementsHidden={true}
-        importantForAccessibility="no"
-    >
-        <Path
-            d='M12 4a2 2 0 0 1 2 2c0 .74-.4 1.38-1 1.73V9l8 5.5A1 1 0 0 1 20 16H4a1 1 0 0 1-.99-1.5L11 9V7.73A2 2 0 0 1 12 4Z'
-            stroke={color}
-            strokeWidth={1.5}
-            strokeLinecap='round'
-            strokeLinejoin='round'
-        />
-    </Svg>
-);
+}) => {
+    const { colors: themeColors } = useTheme();
+    const resolvedColor = color ?? themeColors.textSecondary;
+    return (
+        <Svg
+            width={size}
+            height={size}
+            viewBox='0 0 24 24'
+            fill='none'
+            accessibilityElementsHidden={true}
+            importantForAccessibility="no"
+        >
+            <Path
+                d='M12 4a2 2 0 0 1 2 2c0 .74-.4 1.38-1 1.73V9l8 5.5A1 1 0 0 1 20 16H4a1 1 0 0 1-.99-1.5L11 9V7.73A2 2 0 0 1 12 4Z'
+                stroke={resolvedColor}
+                strokeWidth={1.5}
+                strokeLinecap='round'
+                strokeLinejoin='round'
+            />
+        </Svg>
+    );
+};
 
 const WARMTH_DOT_COLOR = (w: number) =>
     w < 0.25 ? '#38bdf8' : w < 0.55 ? '#fbbf24' : '#f97316';
@@ -235,6 +240,8 @@ const ArticleCard = ({
     onEdit: () => void;
     onRemove: () => void;
 }) => {
+    const { colors } = useTheme();
+    const styles = useMemo(() => makeStyles(colors), [colors]);
     const warmth = garmentWarmth(article);
     const warmthColor = WARMTH_DOT_COLOR(warmth);
     const season = currentSeason();
@@ -390,6 +397,8 @@ const ClosetView = ({
     onRemoveArticle,
     onSetPreferred,
 }: Props) => {
+    const { colors } = useTheme();
+    const styles = useMemo(() => makeStyles(colors), [colors]);
     const [selectedId, setSelectedId] = useState<string>(
         initialSelectedId && closets.find((c) => c._id === initialSelectedId)
             ? initialSelectedId

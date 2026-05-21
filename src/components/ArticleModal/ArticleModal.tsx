@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import {
   StyleSheet, Modal, ScrollView, TextInput, Pressable,
   Image, Alert, AccessibilityInfo, findNodeHandle, View as RNView,
@@ -13,7 +13,8 @@ import { getErrorMessage } from '../../lib/auth';
 import { ClothingArticle, ArticleFormData, BodyZone } from '../../types';
 import { identifyClothing } from '../../services/clothingIdentifier';
 import type { GarmentType, FabricGuess, DetectedColor } from '../../services/clothingIdentifier.types';
-import { colors, fonts, fontSizes, fontWeights, spacing, radius } from '../../theme/tokens';
+import { ColorTokens, fonts, fontSizes, fontWeights, spacing, radius } from '../../theme/tokens';
+import { useTheme } from '../../theme/ThemeContext';
 
 // ─── Type classification ───────────────────────────────────────────────────────
 // Grouped for the visual picker — order determines display order in the form.
@@ -232,9 +233,11 @@ const MultiSwatch = () => (
   </Svg>
 );
 
-const FieldLabel = ({ children }: { children: React.ReactNode }) => (
-  <Text style={st.label}>{children}</Text>
-);
+const FieldLabel = ({ children }: { children: React.ReactNode }) => {
+  const { colors } = useTheme();
+  const st = useMemo(() => makeSt(colors), [colors]);
+  return <Text style={st.label}>{children}</Text>;
+};
 
 // Grouped visual type picker — replaces the flat 26-item ActionSheet.
 // Cross-platform (no ActionSheetIOS), always visible, one tap to select.
@@ -245,7 +248,10 @@ const TypePickerField = ({
 }: {
   value: string;
   onChange: (type: string) => void;
-}) => (
+}) => {
+  const { colors } = useTheme();
+  const st = useMemo(() => makeSt(colors), [colors]);
+  return (
   <View style={st.field}>
     <FieldLabel>Type <Text style={st.required}>*</Text></FieldLabel>
     <View style={st.typeGroups}>
@@ -270,7 +276,8 @@ const TypePickerField = ({
       ))}
     </View>
   </View>
-);
+  );
+};
 
 // Inline chip grid — all options visible, one tap to select / deselect
 const ChipField = ({
@@ -278,27 +285,31 @@ const ChipField = ({
 }: {
   label: string; value: string; items: string[];
   onValueChange: (v: string) => void; required?: boolean;
-}) => (
-  <View style={st.field}>
-    <FieldLabel>
-      {label}{required && <Text style={st.required}> *</Text>}
-    </FieldLabel>
-    <View style={st.chipGrid}>
-      {items.map(item => (
-        <Pressable
-          key={item}
-          style={[st.chip, value === item && st.chipActive]}
-          onPress={() => onValueChange(value === item ? '' : item)}
-          accessibilityRole="radio"
-          accessibilityLabel={item}
-          accessibilityState={{ selected: value === item }}
-        >
-          <Text style={[st.chipText, value === item && st.chipTextActive]}>{item}</Text>
-        </Pressable>
-      ))}
+}) => {
+  const { colors } = useTheme();
+  const st = useMemo(() => makeSt(colors), [colors]);
+  return (
+    <View style={st.field}>
+      <FieldLabel>
+        {label}{required && <Text style={st.required}> *</Text>}
+      </FieldLabel>
+      <View style={st.chipGrid}>
+        {items.map(item => (
+          <Pressable
+            key={item}
+            style={[st.chip, value === item && st.chipActive]}
+            onPress={() => onValueChange(value === item ? '' : item)}
+            accessibilityRole="radio"
+            accessibilityLabel={item}
+            accessibilityState={{ selected: value === item }}
+          >
+            <Text style={[st.chipText, value === item && st.chipTextActive]}>{item}</Text>
+          </Pressable>
+        ))}
+      </View>
     </View>
-  </View>
-);
+  );
+};
 
 // Color swatch dots — visual and compact
 const ColorField = ({
@@ -307,39 +318,43 @@ const ColorField = ({
 }: {
   value: string;
   onValueChange: (v: string) => void;
-}) => (
-  <View style={st.field}>
-    <FieldLabel>
-      Color{value ? <Text style={st.colorLabel}>  {value}</Text> : ''}
-    </FieldLabel>
-    <View style={st.swatchGrid}>
-      {COLORS.map(c => (
-        <Pressable
-          key={c}
-          onPress={() => onValueChange(value === c ? '' : c)}
-          accessibilityLabel={c}
-          accessibilityRole="radio"
-          accessibilityState={{ selected: value === c }}
-          style={[st.swatchRing, value === c && st.swatchRingActive]}
-          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-        >
-          {c === 'Multi' ? (
-            <View style={st.swatch}><MultiSwatch /></View>
-          ) : METALLIC_GRADIENTS[c] ? (
-            <LinearGradient
-              colors={METALLIC_GRADIENTS[c]}
-              start={METALLIC_START}
-              end={METALLIC_END}
-              style={st.swatch}
-            />
-          ) : (
-            <View style={[st.swatch, { backgroundColor: SWATCH[c] ?? colors.glassBg }]} />
-          )}
-        </Pressable>
-      ))}
+}) => {
+  const { colors } = useTheme();
+  const st = useMemo(() => makeSt(colors), [colors]);
+  return (
+    <View style={st.field}>
+      <FieldLabel>
+        Color{value ? <Text style={st.colorLabel}>  {value}</Text> : ''}
+      </FieldLabel>
+      <View style={st.swatchGrid}>
+        {COLORS.map(c => (
+          <Pressable
+            key={c}
+            onPress={() => onValueChange(value === c ? '' : c)}
+            accessibilityLabel={c}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: value === c }}
+            style={[st.swatchRing, value === c && st.swatchRingActive]}
+            hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+          >
+            {c === 'Multi' ? (
+              <View style={st.swatch}><MultiSwatch /></View>
+            ) : METALLIC_GRADIENTS[c] ? (
+              <LinearGradient
+                colors={METALLIC_GRADIENTS[c]}
+                start={METALLIC_START}
+                end={METALLIC_END}
+                style={st.swatch}
+              />
+            ) : (
+              <View style={[st.swatch, { backgroundColor: SWATCH[c] ?? colors.glassBg }]} />
+            )}
+          </Pressable>
+        ))}
+      </View>
     </View>
-  </View>
-);
+  );
+};
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
@@ -351,6 +366,8 @@ interface Props {
 }
 
 const ArticleModal = ({ onClose, onSubmit, initialData, onDelete }: Props) => {
+  const { colors } = useTheme();
+  const st = useMemo(() => makeSt(colors), [colors]);
   const isEditing = !!initialData;
   const [form,       setForm]      = useState<ArticleFormData>(initialData ? toForm(initialData) : EMPTY);
   const [error,      setError]     = useState<string | null>(null);
@@ -780,7 +797,7 @@ const ArticleModal = ({ onClose, onSubmit, initialData, onDelete }: Props) => {
 export { ArticleFormData };
 export default ArticleModal;
 
-const st = StyleSheet.create({
+const makeSt = (colors: ColorTokens) => StyleSheet.create({
   root:          { flex: 1, backgroundColor: colors.bgDefault },
   header:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.glassBorder },
   title:         { fontFamily: fonts.display, fontSize: 24, color: colors.textPrimary },

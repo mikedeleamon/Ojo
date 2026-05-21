@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
     StyleSheet,
     KeyboardAvoidingView,
@@ -12,20 +12,95 @@ import axios from '../../api/client';
 import { AuthState, Settings } from '../../types';
 import { getErrorMessage, saveAuth } from '../../lib/auth';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
-import {
-    colors,
-    spacing,
-    radius,
-    fonts,
-    fontSizes,
-    fontWeights,
-} from '../../theme/tokens';
+import { spacing, radius, fonts, fontSizes, fontWeights } from '../../theme/tokens';
+import { useTheme } from '../../theme/ThemeContext';
 
 interface Props {
     onLogin?: () => void;
 }
 
 export default function LoginPage({ onLogin }: Props) {
+    const { colors } = useTheme();
+    const styles = useMemo(() => StyleSheet.create({
+        root: { flex: 1, backgroundColor: colors.bgDefault },
+        content: { flexGrow: 1, justifyContent: 'center', padding: spacing.md },
+        card: {
+            backgroundColor: colors.glassBg,
+            borderRadius: radius.lg,
+            borderWidth: 1,
+            borderColor: colors.glassBorder,
+            padding: spacing.lg,
+            gap: spacing.md,
+            alignItems: 'center',
+        },
+        logo: { width: 120, height: 48, marginBottom: spacing.sm },
+        tagline: {
+            fontFamily: fonts.body,
+            fontSize: fontSizes.base,
+            color: colors.textSecondary,
+            marginBottom: spacing.sm,
+        },
+        errorBox: {
+            width: '100%',
+            padding: spacing.sm,
+            backgroundColor: colors.errorBg,
+            borderRadius: radius.sm,
+            borderWidth: 1,
+            borderColor: colors.errorBorder,
+        },
+        errorText: {
+            fontFamily: fonts.body,
+            fontSize: fontSizes.sm,
+            color: colors.errorText,
+        },
+        fields: { width: '100%', gap: spacing.sm },
+        field: { gap: 6 },
+        label: {
+            fontFamily: fonts.body,
+            fontSize: fontSizes.xs,
+            fontWeight: fontWeights.medium,
+            letterSpacing: 0.1 * fontSizes.xs,
+            textTransform: 'uppercase',
+            color: colors.textMuted,
+        },
+        input: {
+            paddingVertical: 12,
+            paddingHorizontal: spacing.md,
+            backgroundColor: colors.glassBg,
+            borderWidth: 1,
+            borderColor: colors.glassBorder,
+            borderRadius: radius.sm,
+            color: colors.textPrimary,
+            fontFamily: fonts.body,
+            fontSize: fontSizes.base,
+        },
+        btn: {
+            width: '100%',
+            paddingVertical: 14,
+            backgroundColor: colors.saveBtnBg,
+            borderRadius: radius.sm,
+            alignItems: 'center',
+        },
+        btnText: {
+            fontFamily: fonts.body,
+            fontSize: fontSizes.base,
+            fontWeight: fontWeights.semibold,
+            color: colors.saveBtnText,
+        },
+        footer: { flexDirection: 'row', alignItems: 'center' },
+        footerText: {
+            fontFamily: fonts.body,
+            fontSize: fontSizes.sm,
+            color: colors.textSecondary,
+        },
+        link: {
+            fontFamily: fonts.body,
+            fontSize: fontSizes.sm,
+            color: colors.textPrimary,
+            textDecorationLine: 'underline',
+        },
+    }), [colors]);
+
     const nav = useAppNavigation();
     const [identifier, setIdentifier] = useState('');
     const [password, setPassword] = useState('');
@@ -150,83 +225,3 @@ export default function LoginPage({ onLogin }: Props) {
         </SafeAreaView>
     );
 }
-
-const styles = StyleSheet.create({
-    root: { flex: 1, backgroundColor: colors.bgDefault },
-    content: { flexGrow: 1, justifyContent: 'center', padding: spacing.md },
-    card: {
-        backgroundColor: colors.glassBg,
-        borderRadius: radius.lg,
-        borderWidth: 1,
-        borderColor: colors.glassBorder,
-        padding: spacing.lg,
-        gap: spacing.md,
-        alignItems: 'center',
-    },
-    logo: { width: 120, height: 48, marginBottom: spacing.sm },
-    tagline: {
-        fontFamily: fonts.body,
-        fontSize: fontSizes.base,
-        color: colors.textSecondary,
-        marginBottom: spacing.sm,
-    },
-    errorBox: {
-        width: '100%',
-        padding: spacing.sm,
-        backgroundColor: colors.errorBg,
-        borderRadius: radius.sm,
-        borderWidth: 1,
-        borderColor: colors.errorBorder,
-    },
-    errorText: {
-        fontFamily: fonts.body,
-        fontSize: fontSizes.sm,
-        color: colors.errorText,
-    },
-    fields: { width: '100%', gap: spacing.sm },
-    field: { gap: 6 },
-    label: {
-        fontFamily: fonts.body,
-        fontSize: fontSizes.xs,
-        fontWeight: fontWeights.medium,
-        letterSpacing: 0.1 * fontSizes.xs,
-        textTransform: 'uppercase',
-        color: colors.textMuted,
-    },
-    input: {
-        paddingVertical: 12,
-        paddingHorizontal: spacing.md,
-        backgroundColor: colors.glassBg,
-        borderWidth: 1,
-        borderColor: colors.glassBorder,
-        borderRadius: radius.sm,
-        color: colors.textPrimary,
-        fontFamily: fonts.body,
-        fontSize: fontSizes.base,
-    },
-    btn: {
-        width: '100%',
-        paddingVertical: 14,
-        backgroundColor: colors.saveBtnBg,
-        borderRadius: radius.sm,
-        alignItems: 'center',
-    },
-    btnText: {
-        fontFamily: fonts.body,
-        fontSize: fontSizes.base,
-        fontWeight: fontWeights.semibold,
-        color: colors.saveBtnText,
-    },
-    footer: { flexDirection: 'row', alignItems: 'center' },
-    footerText: {
-        fontFamily: fonts.body,
-        fontSize: fontSizes.sm,
-        color: colors.textSecondary,
-    },
-    link: {
-        fontFamily: fonts.body,
-        fontSize: fontSizes.sm,
-        color: colors.textPrimary,
-        textDecorationLine: 'underline',
-    },
-});

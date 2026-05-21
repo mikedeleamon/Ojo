@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { StyleSheet, Modal, ScrollView, AccessibilityInfo, findNodeHandle, View as RNView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -10,20 +10,119 @@ import { useSettings } from '../../hooks/useSettings';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { clearAuth } from '../../lib/auth';
 import { PRIVACY_POLICY, TERMS_OF_SERVICE } from '../../config/legal';
-import {
-    colors,
-    spacing,
-    radius,
-    fonts,
-    fontSizes,
-    fontWeights,
-} from '../../theme/tokens';
+import { spacing, radius, fonts, fontSizes, fontWeights } from '../../theme/tokens';
+import { useTheme } from '../../theme/ThemeContext';
 
 interface Props {
     onLogout?: () => void;
 }
 
 export default function SettingsScreen({ onLogout }: Props) {
+    const { colors } = useTheme();
+    const styles = useMemo(() => StyleSheet.create({
+        root: { flex: 1, backgroundColor: colors.bgDefault },
+        header: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4,
+            padding: spacing.md,
+            paddingBottom: 12,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.glassBorder,
+        },
+        homeBtn: {
+            padding: 8,
+            paddingHorizontal: 10,
+            backgroundColor: colors.glassBg,
+            borderWidth: 1,
+            borderColor: colors.glassBorder,
+            borderRadius: radius.sm,
+        },
+        title: {
+            fontFamily: 'DMSerifDisplay',
+            fontSize: 28,
+            color: colors.textPrimary,
+        },
+        content: {
+            padding: spacing.md,
+            gap: spacing.lg,
+            paddingBottom: spacing.xl,
+        },
+        logoutBtn: {
+            paddingVertical: 14,
+            paddingHorizontal: spacing.md,
+            backgroundColor: colors.glassBg,
+            borderWidth: 1,
+            borderColor: colors.glassBorder,
+            borderRadius: radius.sm,
+            alignItems: 'center',
+        },
+        logoutText: {
+            fontFamily: fonts.body,
+            fontSize: fontSizes.base,
+            color: colors.dangerText,
+        },
+        backdrop: {
+            ...StyleSheet.absoluteFillObject,
+            backgroundColor: 'rgba(0,0,0,0.55)',
+        },
+        modalCard: {
+            position: 'absolute',
+            left: 24,
+            right: 24,
+            top: '35%',
+            backgroundColor: colors.glassBgStrong,
+            borderRadius: radius.lg,
+            padding: spacing.lg,
+            gap: 12,
+            borderWidth: 1,
+            borderColor: colors.glassBorder,
+        },
+        modalTitle: {
+            fontFamily: fonts.body,
+            fontSize: 17,
+            fontWeight: fontWeights.semibold,
+            color: colors.textPrimary,
+        },
+        modalBody: {
+            fontFamily: fonts.body,
+            fontSize: 14,
+            color: colors.textSecondary,
+            lineHeight: 14 * 1.6,
+        },
+        modalActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
+        modalCancel: {
+            flex: 1,
+            paddingVertical: 12,
+            backgroundColor: colors.glassBg,
+            borderWidth: 1,
+            borderColor: colors.glassBorder,
+            borderRadius: radius.sm,
+            alignItems: 'center',
+        },
+        modalCancelText: {
+            fontFamily: fonts.body,
+            fontSize: fontSizes.base - 1,
+            fontWeight: fontWeights.medium,
+            color: colors.textSecondary,
+        },
+        modalConfirm: {
+            flex: 1,
+            paddingVertical: 12,
+            backgroundColor: colors.glassBg,
+            borderWidth: 1,
+            borderColor: colors.glassBorder,
+            borderRadius: radius.sm,
+            alignItems: 'center',
+        },
+        modalConfirmText: {
+            fontFamily: fonts.body,
+            fontSize: fontSizes.base - 1,
+            fontWeight: fontWeights.medium,
+            color: colors.textPrimary,
+        },
+    }), [colors]);
+
     const nav = useAppNavigation();
     const { settings, refreshSettings } = useSettings();
     const [showLogout, setShowLogout] = useState(false);
@@ -145,107 +244,3 @@ export default function SettingsScreen({ onLogout }: Props) {
         </SafeAreaView>
     );
 }
-
-const styles = StyleSheet.create({
-    root: { flex: 1, backgroundColor: colors.bgDefault },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        padding: spacing.md,
-        paddingBottom: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.glassBorder,
-    },
-    homeBtn: {
-        padding: 8,
-        paddingHorizontal: 10,
-        backgroundColor: colors.glassBg,
-        borderWidth: 1,
-        borderColor: colors.glassBorder,
-        borderRadius: radius.sm,
-    },
-    title: {
-        fontFamily: 'DMSerifDisplay',
-        fontSize: 28,
-        color: colors.textPrimary,
-    },
-    content: {
-        padding: spacing.md,
-        gap: spacing.lg,
-        paddingBottom: spacing.xl,
-    },
-    logoutBtn: {
-        paddingVertical: 14,
-        paddingHorizontal: spacing.md,
-        backgroundColor: colors.glassBg,
-        borderWidth: 1,
-        borderColor: colors.glassBorder,
-        borderRadius: radius.sm,
-        alignItems: 'center',
-    },
-    logoutText: {
-        fontFamily: fonts.body,
-        fontSize: fontSizes.base,
-        color: colors.dangerText,
-    },
-    backdrop: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0,0,0,0.55)',
-    },
-    modalCard: {
-        position: 'absolute',
-        left: 24,
-        right: 24,
-        top: '35%',
-        backgroundColor: 'rgba(15,23,42,0.97)',
-        borderRadius: radius.lg,
-        padding: spacing.lg,
-        gap: 12,
-        borderWidth: 1,
-        borderColor: colors.glassBorder,
-    },
-    modalTitle: {
-        fontFamily: fonts.body,
-        fontSize: 17,
-        fontWeight: fontWeights.semibold,
-        color: colors.textPrimary,
-    },
-    modalBody: {
-        fontFamily: fonts.body,
-        fontSize: 14,
-        color: colors.textSecondary,
-        lineHeight: 14 * 1.6,
-    },
-    modalActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
-    modalCancel: {
-        flex: 1,
-        paddingVertical: 12,
-        backgroundColor: colors.glassBg,
-        borderWidth: 1,
-        borderColor: colors.glassBorder,
-        borderRadius: radius.sm,
-        alignItems: 'center',
-    },
-    modalCancelText: {
-        fontFamily: fonts.body,
-        fontSize: fontSizes.base - 1,
-        fontWeight: fontWeights.medium,
-        color: colors.textSecondary,
-    },
-    modalConfirm: {
-        flex: 1,
-        paddingVertical: 12,
-        backgroundColor: colors.glassBg,
-        borderWidth: 1,
-        borderColor: colors.glassBorder,
-        borderRadius: radius.sm,
-        alignItems: 'center',
-    },
-    modalConfirmText: {
-        fontFamily: fonts.body,
-        fontSize: fontSizes.base - 1,
-        fontWeight: fontWeights.medium,
-        color: colors.textPrimary,
-    },
-});

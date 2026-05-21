@@ -1,13 +1,18 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 import { View } from '../../components/primitives';
 import WeatherHUD from '../../components/WeatherHUD/WeatherHUD';
 import Loading from '../../components/Loading/Loading';
 import { useSettings } from '../../hooks/useSettings';
 import { getCurrentLocation, formatCoords } from '../../lib/location';
-import { colors } from '../../theme/tokens';
+import { useTheme } from '../../theme/ThemeContext';
 
 export default function MainPage() {
+  const { colors } = useTheme();
+  const st = useMemo(() => StyleSheet.create({
+    root: { flex: 1, backgroundColor: colors.bgDefault },
+  }), [colors]);
+
   const { settings, settingsReady } = useSettings();
   const [location,    setLocation]   = useState('');
   const [geoLoading,  setGeoLoading] = useState(true);
@@ -35,7 +40,3 @@ export default function MainPage() {
     </View>
   );
 }
-
-const st = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bgDefault },
-});

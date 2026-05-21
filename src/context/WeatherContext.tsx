@@ -1,5 +1,5 @@
 import { createContext, useContext, useState } from 'react';
-import { colors } from '../theme/tokens';
+import { darkColors } from '../theme/tokens';
 
 interface WeatherTheme {
   footerBg:    string;
@@ -7,12 +7,12 @@ interface WeatherTheme {
 }
 
 const WeatherContext = createContext<WeatherTheme>({
-  footerBg:    colors.bgDefault,
+  footerBg:    darkColors.bgDefault,
   setFooterBg: () => {},
 });
 
 export const WeatherProvider = ({ children }: { children: React.ReactNode }) => {
-  const [footerBg, setFooterBg] = useState(colors.bgDefault);
+  const [footerBg, setFooterBg] = useState<string>(darkColors.bgDefault);
   return (
     <WeatherContext.Provider value={{ footerBg, setFooterBg }}>
       {children}

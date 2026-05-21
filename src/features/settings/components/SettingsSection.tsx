@@ -1,8 +1,10 @@
+import { useMemo } from 'react';
 import { View, Text } from '../../../components/primitives';
-import { styles } from './SettingsSection.styles';
+import { makeStyles } from './SettingsSection.styles';
 import { SettingsSectionConfig, SettingsAction } from '../config';
 import { Settings } from '../../../types';
 import SettingsItem from './SettingsItem';
+import { useTheme } from '../../../theme/ThemeContext';
 
 interface Props {
   section:  SettingsSectionConfig;
@@ -20,20 +22,24 @@ const getSublabel = (
   return typeof v === 'string' && v.trim() ? v : '';
 };
 
-const SettingsSection = ({ section, settings, onAction }: Props) => (
-  <View style={styles.section}>
-    <Text style={styles.title}>{section.title}</Text>
-    <View style={styles.group}>
-      {section.items.map(item => (
-        <SettingsItem
-          key={item.key}
-          label={item.label}
-          sublabel={item.sublabelKey ? getSublabel(item.sublabelKey, settings) : undefined}
-          onPress={() => onAction(item.action)}
-        />
-      ))}
+const SettingsSection = ({ section, settings, onAction }: Props) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  return (
+    <View style={styles.section}>
+      <Text style={styles.title}>{section.title}</Text>
+      <View style={styles.group}>
+        {section.items.map(item => (
+          <SettingsItem
+            key={item.key}
+            label={item.label}
+            sublabel={item.sublabelKey ? getSublabel(item.sublabelKey, settings) : undefined}
+            onPress={() => onAction(item.action)}
+          />
+        ))}
+      </View>
     </View>
-  </View>
-);
+  );
+};
 
 export default SettingsSection;

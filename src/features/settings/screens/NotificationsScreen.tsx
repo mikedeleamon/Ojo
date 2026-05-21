@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   StyleSheet,
   ScrollView,
@@ -25,12 +25,11 @@ import {
 } from '../../../lib/notifications';
 import axios from '../../../api/client';
 import { authHeaders, getErrorMessage } from '../../../lib/auth';
-import { colors, spacing, radius, fonts, fontSizes, fontWeights } from '../../../theme/tokens';
-import { styles as s } from './screens.styles';
+import { spacing, radius, fonts, fontSizes, fontWeights } from '../../../theme/tokens';
+import { makeStyles } from './screens.styles';
+import { useTheme } from '../../../theme/ThemeContext';
+import { ColorTokens } from '../../../theme/tokens';
 
-const STORAGE_KEY = 'ojo_notification_settings';
-
-// ─── Hour options shown to the user (local time) ─────────────────────────────
 const HOUR_OPTIONS = [6, 7, 8, 9, 10];
 const HOUR_LABEL = (h: number) => {
   const period = h < 12 ? 'am' : 'pm';
@@ -40,13 +39,90 @@ const HOUR_LABEL = (h: number) => {
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+const makeLocalStyles = (colors: ColorTokens) => StyleSheet.create({
+  root:    { flex: 1, backgroundColor: colors.bgDefault },
+  content: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xl },
+  section: { gap: spacing.sm },
+  card: {
+    backgroundColor: colors.glassBg,
+    borderWidth:     1,
+    borderColor:     colors.glassBorder,
+    borderRadius:    radius.md,
+    paddingVertical:   14,
+    paddingHorizontal: spacing.md,
+    gap:             12,
+  },
+  row: {
+    flexDirection:  'row',
+    alignItems:     'center',
+    justifyContent: 'space-between',
+    gap:             spacing.sm,
+  },
+  rowLabel: { flex: 1, gap: 3 },
+  rowTitle: {
+    fontFamily: fonts.body,
+    fontSize:   fontSizes.base,
+    fontWeight: fontWeights.medium,
+    color:      colors.textPrimary,
+  },
+  rowSubtitle: {
+    fontFamily: fonts.body,
+    fontSize:   fontSizes.sm - 1,
+    color:      colors.textMuted,
+    lineHeight: (fontSizes.sm - 1) * 1.55,
+  },
+  subConfig: { gap: 8, paddingTop: 4 },
+  subLabel: {
+    fontFamily:    fonts.body,
+    fontSize:      fontSizes.xs,
+    fontWeight:    fontWeights.medium,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    color:         colors.textMuted,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap:      'wrap',
+    gap:           6,
+  },
+  permBanner: {
+    backgroundColor: 'rgba(250, 204, 21, 0.08)',
+    borderWidth:     1,
+    borderColor:     'rgba(250, 204, 21, 0.25)',
+    borderRadius:    radius.md,
+    padding:         spacing.md,
+    gap:             10,
+  },
+  permText: {
+    fontFamily: fonts.body,
+    fontSize:   fontSizes.sm,
+    color:      'rgba(253, 224, 71, 0.9)',
+    lineHeight: fontSizes.sm * 1.5,
+  },
+  permBtn: {
+    alignSelf:         'flex-start',
+    paddingVertical:   7,
+    paddingHorizontal: 14,
+    backgroundColor:   'rgba(250, 204, 21, 0.12)',
+    borderWidth:       1,
+    borderColor:       'rgba(250, 204, 21, 0.30)',
+    borderRadius:      radius.pill,
+  },
+  permBtnText: {
+    fontFamily: fonts.body,
+    fontSize:   fontSizes.sm,
+    fontWeight: fontWeights.medium,
+    color:      'rgba(253, 224, 71, 1)',
+  },
+});
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-const Row = ({ children }: { children: React.ReactNode }) => (
+const Row = ({ children, st }: { children: React.ReactNode; st: ReturnType<typeof makeLocalStyles> }) => (
   <View style={st.row}>{children}</View>
 );
 
-const RowLabel = ({ title, subtitle }: { title: string; subtitle: string }) => (
+const RowLabel = ({ title, subtitle, st }: { title: string; subtitle: string; st: ReturnType<typeof makeLocalStyles> }) => (
   <View style={st.rowLabel}>
     <Text style={st.rowTitle}>{title}</Text>
     <Text style={st.rowSubtitle}>{subtitle}</Text>
@@ -58,13 +134,15 @@ const ChipRow = ({
   selected,
   onSelect,
   labelFn,
+  s,
 }: {
   options: number[];
   selected: number;
   onSelect: (v: number) => void;
   labelFn: (v: number) => string;
+  s: ReturnType<typeof makeStyles>;
 }) => (
-  <View style={st.chipRow}>
+  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
     {options.map(v => (
       <Pressable
         key={v}
@@ -82,16 +160,17 @@ const ChipRow = ({
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function NotificationsScreen() {
+  const { colors } = useTheme();
+  const s  = useMemo(() => makeStyles(colors), [colors]);
+  const st = useMemo(() => makeLocalStyles(colors), [colors]);
+
   const [loading,     setLoading]     = useState(true);
   const [saving,      setSaving]      = useState(false);
   const [permission,  setPermission]  = useState<PermissionStatus>('undetermined');
   const [saved,       setSaved]       = useState(false);
   const [error,       setError]       = useState('');
-
-  // Local display hour (0–23). Converted to/from UTC when loading/saving.
-  const [localHour, setLocalHour] = useState(7);
-
-  const [ns, setNs] = useState<NotificationSettings>(NOTIF_DEFAULTS);
+  const [localHour,   setLocalHour]   = useState(7);
+  const [ns,          setNs]          = useState<NotificationSettings>(NOTIF_DEFAULTS);
   const savingRotate = useSpinAnimation(1_500);
 
   const set = useCallback(
@@ -100,15 +179,11 @@ export default function NotificationsScreen() {
     [],
   );
 
-  // ── Load ────────────────────────────────────────────────────────────────────
-
   useEffect(() => {
     let cancelled = false;
-
     const load = async () => {
       const perm = await getPermissionStatus();
       if (!cancelled) setPermission(perm);
-
       try {
         const { data } = await axios.get('/api/notifications/settings', authHeaders());
         if (!cancelled) {
@@ -117,17 +192,14 @@ export default function NotificationsScreen() {
           setLocalHour(utcHourToLocal(merged.morningBriefHourUTC));
         }
       } catch {
-        // Fall back to defaults — server may not have settings yet
+        // Fall back to defaults
       } finally {
         if (!cancelled) setLoading(false);
       }
     };
-
     load();
     return () => { cancelled = true; };
   }, []);
-
-  // ── Permission request ──────────────────────────────────────────────────────
 
   const handleRequestPermission = async () => {
     const status = await requestPermission();
@@ -142,15 +214,11 @@ export default function NotificationsScreen() {
     }
   };
 
-  // ── Save ────────────────────────────────────────────────────────────────────
-
   const handleSave = async () => {
     setSaving(true);
     setError('');
     setSaved(false);
-
     try {
-      // Ensure push token is registered if any server notification is enabled
       const needsToken =
         ns.morningBriefEnabled ||
         ns.weatherChangeEnabled ||
@@ -166,7 +234,6 @@ export default function NotificationsScreen() {
       }
       if (needsToken) await registerPushToken();
 
-      // Prepare settings with UTC hour
       const toSave: NotificationSettings = {
         ...ns,
         morningBriefHourUTC: localHourToUTC(localHour),
@@ -174,7 +241,6 @@ export default function NotificationsScreen() {
 
       await axios.put('/api/notifications/settings', toSave, authHeaders());
 
-      // Handle local weekly recap scheduling
       if (ns.weeklyRecapEnabled) {
         await scheduleWeeklyRecap(ns.weeklyRecapDay);
       } else {
@@ -190,8 +256,6 @@ export default function NotificationsScreen() {
     }
   };
 
-  // ── Render ──────────────────────────────────────────────────────────────────
-
   if (loading) return <Loading />;
 
   const anyEnabled =
@@ -205,7 +269,6 @@ export default function NotificationsScreen() {
     <SafeAreaView style={st.root} edges={['bottom']}>
       <ScrollView contentContainerStyle={st.content}>
 
-        {/* ── Permission banner ─────────────────────────────────────────── */}
         {permission !== 'granted' && (
           <View style={st.permBanner}>
             <Text style={st.permText}>
@@ -220,20 +283,19 @@ export default function NotificationsScreen() {
           </View>
         )}
 
-        {/* ── Morning Outfit Brief ──────────────────────────────────────── */}
         <View style={st.section}>
           <Text style={s.sectionLabel}>Daily</Text>
 
           <View style={st.card}>
-            <Row>
-              <RowLabel
+            <Row st={st}>
+              <RowLabel st={st}
                 title="Morning Outfit Brief"
                 subtitle="Daily weather summary and outfit tip sent each morning."
               />
               <Switch
                 value={ns.morningBriefEnabled}
                 onValueChange={v => set('morningBriefEnabled', v)}
-                trackColor={{ false: 'rgba(255,255,255,0.12)', true: 'rgba(135,222,90,0.6)' }}
+                trackColor={{ false: colors.glassBorder, true: 'rgba(135,222,90,0.6)' }}
                 thumbColor={ns.morningBriefEnabled ? '#87DE5A' : colors.textMuted}
               />
             </Row>
@@ -241,7 +303,7 @@ export default function NotificationsScreen() {
             {ns.morningBriefEnabled && (
               <View style={st.subConfig}>
                 <Text style={st.subLabel}>Send at</Text>
-                <ChipRow
+                <ChipRow s={s}
                   options={HOUR_OPTIONS}
                   selected={localHour}
                   onSelect={setLocalHour}
@@ -251,17 +313,16 @@ export default function NotificationsScreen() {
             )}
           </View>
 
-          {/* Temperature Swing Warning */}
           <View style={st.card}>
-            <Row>
-              <RowLabel
+            <Row st={st}>
+              <RowLabel st={st}
                 title="Temperature Swing Warning"
                 subtitle="Alerts you to dress in layers when the daily swing is large."
               />
               <Switch
                 value={ns.tempSwingEnabled}
                 onValueChange={v => set('tempSwingEnabled', v)}
-                trackColor={{ false: 'rgba(255,255,255,0.12)', true: 'rgba(135,222,90,0.6)' }}
+                trackColor={{ false: colors.glassBorder, true: 'rgba(135,222,90,0.6)' }}
                 thumbColor={ns.tempSwingEnabled ? '#87DE5A' : colors.textMuted}
               />
             </Row>
@@ -280,7 +341,7 @@ export default function NotificationsScreen() {
                   value={ns.tempSwingThresholdF}
                   onValueChange={v => set('tempSwingThresholdF', v)}
                   minimumTrackTintColor="#87DE5A"
-                  maximumTrackTintColor="rgba(255,255,255,0.15)"
+                  maximumTrackTintColor={colors.glassBorder}
                   thumbTintColor="#87DE5A"
                 />
               </View>
@@ -288,57 +349,53 @@ export default function NotificationsScreen() {
           </View>
         </View>
 
-        {/* ── Real-time Alerts ──────────────────────────────────────────── */}
         <View style={st.section}>
           <Text style={s.sectionLabel}>Alerts</Text>
 
-          {/* Weather Change Alert */}
           <View style={st.card}>
-            <Row>
-              <RowLabel
+            <Row st={st}>
+              <RowLabel st={st}
                 title="Weather Change Alert"
                 subtitle="Notifies you in the afternoon if rain or a cold front moves in unexpectedly."
               />
               <Switch
                 value={ns.weatherChangeEnabled}
                 onValueChange={v => set('weatherChangeEnabled', v)}
-                trackColor={{ false: 'rgba(255,255,255,0.12)', true: 'rgba(135,222,90,0.6)' }}
+                trackColor={{ false: colors.glassBorder, true: 'rgba(135,222,90,0.6)' }}
                 thumbColor={ns.weatherChangeEnabled ? '#87DE5A' : colors.textMuted}
               />
             </Row>
           </View>
 
-          {/* Closet Gap Nudge */}
           <View style={st.card}>
-            <Row>
-              <RowLabel
+            <Row st={st}>
+              <RowLabel st={st}
                 title="Closet Gap Nudge"
                 subtitle="Suggests adding missing items when your closet lacks gear for the forecast."
               />
               <Switch
                 value={ns.closetGapEnabled}
                 onValueChange={v => set('closetGapEnabled', v)}
-                trackColor={{ false: 'rgba(255,255,255,0.12)', true: 'rgba(135,222,90,0.6)' }}
+                trackColor={{ false: colors.glassBorder, true: 'rgba(135,222,90,0.6)' }}
                 thumbColor={ns.closetGapEnabled ? '#87DE5A' : colors.textMuted}
               />
             </Row>
           </View>
         </View>
 
-        {/* ── Weekly ────────────────────────────────────────────────────── */}
         <View style={st.section}>
           <Text style={s.sectionLabel}>Weekly</Text>
 
           <View style={st.card}>
-            <Row>
-              <RowLabel
+            <Row st={st}>
+              <RowLabel st={st}
                 title="Weekly Wardrobe Recap"
                 subtitle="A weekly prompt to review your outfit history and discover new combinations."
               />
               <Switch
                 value={ns.weeklyRecapEnabled}
                 onValueChange={v => set('weeklyRecapEnabled', v)}
-                trackColor={{ false: 'rgba(255,255,255,0.12)', true: 'rgba(135,222,90,0.6)' }}
+                trackColor={{ false: colors.glassBorder, true: 'rgba(135,222,90,0.6)' }}
                 thumbColor={ns.weeklyRecapEnabled ? '#87DE5A' : colors.textMuted}
               />
             </Row>
@@ -346,7 +403,7 @@ export default function NotificationsScreen() {
             {ns.weeklyRecapEnabled && (
               <View style={st.subConfig}>
                 <Text style={st.subLabel}>Send on</Text>
-                <ChipRow
+                <ChipRow s={s}
                   options={[0, 1, 2, 3, 4, 5, 6]}
                   selected={ns.weeklyRecapDay}
                   onSelect={v => set('weeklyRecapDay', v)}
@@ -357,7 +414,6 @@ export default function NotificationsScreen() {
           </View>
         </View>
 
-        {/* ── Status + Save ─────────────────────────────────────────────── */}
         {error !== '' && (
           <View style={[s.statusMsg, s.error]}>
             <Text style={{ color: colors.errorText, fontFamily: fonts.body, fontSize: 13 }}>
@@ -397,96 +453,3 @@ export default function NotificationsScreen() {
     </SafeAreaView>
   );
 }
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
-const st = StyleSheet.create({
-  root:    { flex: 1, backgroundColor: colors.bgDefault },
-  content: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xl },
-  center:  { flex: 1, alignItems: 'center', justifyContent: 'center' },
-
-  section: { gap: spacing.sm },
-
-  card: {
-    backgroundColor: colors.glassBg,
-    borderWidth:     1,
-    borderColor:     colors.glassBorder,
-    borderRadius:    radius.md,
-    paddingVertical:   14,
-    paddingHorizontal: spacing.md,
-    gap:             12,
-  },
-
-  row: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    justifyContent: 'space-between',
-    gap:             spacing.sm,
-  },
-
-  rowLabel: { flex: 1, gap: 3 },
-
-  rowTitle: {
-    fontFamily: fonts.body,
-    fontSize:   fontSizes.base,
-    fontWeight: fontWeights.medium,
-    color:      colors.textPrimary,
-  },
-
-  rowSubtitle: {
-    fontFamily: fonts.body,
-    fontSize:   fontSizes.sm - 1,
-    color:      colors.textMuted,
-    lineHeight: (fontSizes.sm - 1) * 1.55,
-  },
-
-  subConfig: { gap: 8, paddingTop: 4 },
-
-  subLabel: {
-    fontFamily:    fonts.body,
-    fontSize:      fontSizes.xs,
-    fontWeight:    fontWeights.medium,
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-    color:         colors.textMuted,
-  },
-
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap:      'wrap',
-    gap:           6,
-  },
-
-  permBanner: {
-    backgroundColor: 'rgba(250, 204, 21, 0.08)',
-    borderWidth:     1,
-    borderColor:     'rgba(250, 204, 21, 0.25)',
-    borderRadius:    radius.md,
-    padding:         spacing.md,
-    gap:             10,
-  },
-
-  permText: {
-    fontFamily: fonts.body,
-    fontSize:   fontSizes.sm,
-    color:      'rgba(253, 224, 71, 0.9)',
-    lineHeight: fontSizes.sm * 1.5,
-  },
-
-  permBtn: {
-    alignSelf:         'flex-start',
-    paddingVertical:   7,
-    paddingHorizontal: 14,
-    backgroundColor:   'rgba(250, 204, 21, 0.12)',
-    borderWidth:       1,
-    borderColor:       'rgba(250, 204, 21, 0.30)',
-    borderRadius:      radius.pill,
-  },
-
-  permBtnText: {
-    fontFamily: fonts.body,
-    fontSize:   fontSizes.sm,
-    fontWeight: fontWeights.medium,
-    color:      'rgba(253, 224, 71, 1)',
-  },
-});

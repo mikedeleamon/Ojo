@@ -1,23 +1,41 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { StyleSheet, Pressable } from 'react-native';
 import { Svg, Path } from 'react-native-svg';
 import { View, Text } from '../primitives';
 import OutfitSuggestion from '../OutfitSuggestion/OutfitSuggestion';
 import { CurrentWeather, Forecast, Settings } from '../../types';
-import { colors, fonts, fontSizes, fontWeights, spacing, radius } from '../../theme/tokens';
+import { ColorTokens, fonts, fontSizes, fontWeights, spacing, radius } from '../../theme/tokens';
+import { useTheme } from '../../theme/ThemeContext';
 
 interface Props { weather: CurrentWeather; settings: Settings; forecasts: Forecast[]; }
 
-const Stat = ({ label, value }: { label: string; value: string }) => (
-  <View style={st.stat}>
-    <Text style={st.statLabel}>{label}</Text>
-    <Text style={st.statValue}>{value}</Text>
-  </View>
-);
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
+  root:       { gap: spacing.md },
+  toggle:     { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingVertical: 6 },
+  toggleText: { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.textSecondary },
+  grid:       { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  stat: {
+    flex: 1, minWidth: 120,
+    backgroundColor: colors.glassBg,
+    borderRadius: radius.sm, borderWidth: 1, borderColor: colors.glassBorder,
+    padding: spacing.sm, gap: 4,
+  },
+  statLabel: { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  statValue: { fontFamily: fonts.body, fontSize: fontSizes.base, color: colors.textPrimary, fontWeight: fontWeights.medium },
+});
 
 const WeatherDetails = ({ weather, settings, forecasts }: Props) => {
+  const { colors } = useTheme();
+  const st = useMemo(() => makeStyles(colors), [colors]);
   const [expanded, setExpanded] = useState(false);
   const isMetric = settings.temperatureScale === 'Metric';
+
+  const Stat = ({ label, value }: { label: string; value: string }) => (
+    <View style={st.stat}>
+      <Text style={st.statLabel}>{label}</Text>
+      <Text style={st.statValue}>{value}</Text>
+    </View>
+  );
 
   return (
     <View style={st.root}>
@@ -50,18 +68,3 @@ const WeatherDetails = ({ weather, settings, forecasts }: Props) => {
 };
 
 export default WeatherDetails;
-
-const st = StyleSheet.create({
-  root:       { gap: spacing.md },
-  toggle:     { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingVertical: 6 },
-  toggleText: { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.textSecondary },
-  grid:       { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  stat: {
-    flex: 1, minWidth: 120,
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderRadius: radius.sm, borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)',
-    padding: spacing.sm, gap: 4,
-  },
-  statLabel: { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
-  statValue: { fontFamily: fonts.body, fontSize: fontSizes.base, color: colors.textPrimary, fontWeight: fontWeights.medium },
-});

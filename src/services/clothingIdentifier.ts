@@ -250,46 +250,50 @@ function guessShapeFromAspect(aspectRatio: number): ShapeCategory {
   return 'ambiguous';
 }
 
-/** If model prediction contradicts strong geometric signal, pick a better candidate */
+/**
+ * Shape heuristic — ONLY override when the geometric signal is extreme
+ * AND the model is very unsure. Previous version was too aggressive and
+ * was overriding correct footwear/accessory predictions.
+ */
 function applyShapeHeuristic(
   garmentType: GarmentType,
   confidence: number,
   logits: Float32Array,
   aspectRatio: number,
 ): { corrected: GarmentType; confidence: number } {
-  const modelCategory = GARMENT_SHAPE_CATEGORY[garmentType];
-  const shapeGuess = guessShapeFromAspect(aspectRatio);
-
-  // If model is highly confident or shape is ambiguous, trust the model
-  if (confidence > 0.75 || shapeGuess === 'ambiguous') {
+  // Trust the model in almost all cases. Only intervene when:
+  // 1. Model confidence is very low (< 0.55)
+  // 2. Aspect ratio is extreme (very wide = likely footwear)
+  // This prevents the heuristic from overriding correct but low-confidence predictions.
+  if (confidence > 0.55) {
     return { corrected: garmentType, confidence };
   }
 
-  // If model agrees with shape, keep it
-  if (modelCategory === shapeGuess) {
-    return { corrected: garmentType, confidence };
-  }
-
-  // CONFLICT: model says one category but image shape strongly disagrees.
-  // Find the best-scoring label that matches the shape hint.
-  let bestIdx = -1;
-  let bestScore = -Infinity;
-  for (let i = 0; i < logits.length; i++) {
-    const label = GARMENT_LABELS[i];
-    if (GARMENT_SHAPE_CATEGORY[label] === shapeGuess && logits[i] > bestScore) {
-      bestScore = logits[i];
-      bestIdx = i;
+  // Only apply for the one strong geometric signal: very wide images are almost
+  // always footwear. All other aspect ratios are too ambiguous to override.
+  if (aspectRatio > 2.0) {
+    const modelCategory = GARMENT_SHAPE_CATEGORY[garmentType];
+    if (modelCategory !== 'footwear') {
+      // Find the best footwear label
+      let bestIdx = -1;
+      let bestScore = -Infinity;
+      for (let i = 0; i < logits.length; i++) {
+        const label = GARMENT_LABELS[i];
+        if (GARMENT_SHAPE_CATEGORY[label] === 'footwear' && logits[i] > bestScore) {
+          bestScore = logits[i];
+          bestIdx = i;
+        }
+      }
+      if (bestIdx >= 0) {
+        const corrected = GARMENT_LABELS[bestIdx];
+        const newConf = logitToConfidence(bestScore);
+        console.log(
+          `[Ojo] Shape heuristic override: ${garmentType} → ${corrected} `
+          + `(aspect=${aspectRatio.toFixed(2)}, very wide → footwear)`
+        );
+        return { corrected, confidence: newConf };
+      }
     }
-  }
-
-  if (bestIdx >= 0) {
-    const corrected = GARMENT_LABELS[bestIdx];
-    const newConf = logitToConfidence(bestScore);
-    console.log(
-      `[Ojo] Shape heuristic override: ${garmentType} → ${corrected} `
-      + `(aspect=${aspectRatio.toFixed(2)}, shape=${shapeGuess})`
-    );
-    return { corrected, confidence: newConf };
   }
 
   return { corrected: garmentType, confidence };

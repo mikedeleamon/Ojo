@@ -13,9 +13,9 @@
  */
 
 import { StyleSheet } from 'react-native';
-import { colors, spacing, fonts, fontSizes, fontWeights } from '../../../theme/tokens';
+import { ColorTokens, spacing, fonts, fontSizes, fontWeights } from '../../../theme/tokens';
 
-export const styles = StyleSheet.create({
+export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   row: {
     flexDirection:   'row'    as const,
     alignItems:      'center' as const,

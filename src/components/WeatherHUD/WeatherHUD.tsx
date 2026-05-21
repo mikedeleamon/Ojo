@@ -24,12 +24,13 @@ import { useWeatherTheme } from '../../context/WeatherContext';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { CityData, CurrentWeather, Forecast, Settings } from '../../types';
 import {
-    colors,
+    ColorTokens,
     fonts,
     fontSizes,
     weatherGradients,
     spacing,
 } from '../../theme/tokens';
+import { useTheme } from '../../theme/ThemeContext';
 
 // ─── Color interpolation utilities ───────────────────────────────────────────
 
@@ -157,7 +158,7 @@ const easeInOut = (t: number): number =>
  * Each stop's animation is offset by a small delay so the gradient appears to
  * "wave" through colors rather than every pixel moving in lockstep.
  */
-const lerpGradient = (from: string[], to: string[], t: number): string[] => {
+const lerpGradient = (from: readonly string[], to: readonly string[], t: number): string[] => {
     const stagger = 0.15; // each stop is delayed by 15% of total duration
     return to.map((_, i) => {
         const offset = (i / Math.max(1, to.length - 1)) * stagger;
@@ -168,7 +169,7 @@ const lerpGradient = (from: string[], to: string[], t: number): string[] => {
 
 // ─── Gradient + footer colour maps ────────────────────────────────────────────
 
-const gradientFor = (condition: string, isDay: boolean): string[] => {
+const gradientFor = (condition: string, isDay: boolean): readonly string[] => {
     const c = condition.toLowerCase();
 
     // ── Night clear must be checked first ────────────────────────────────────
@@ -281,7 +282,96 @@ interface Props {
     onRefresh?: () => void;
 }
 
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
+    root: { flex: 1 },
+    contentLayer: { flex: 1 },
+    loadingOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        zIndex: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    loadingIcon: { width: 80, height: 80 },
+    scroll: { flexGrow: 1, paddingBottom: spacing.xl },
+    center: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 12,
+        padding: spacing.lg,
+    },
+    errorText: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.base,
+        color: colors.textSecondary,
+        textAlign: 'center',
+        lineHeight: fontSizes.base * 1.5,
+    },
+    header: { alignItems: 'center', paddingTop: spacing.lg, gap: 4 },
+    gearBtn: { position: 'absolute', right: spacing.md, padding: 6 },
+    city: {
+        fontFamily: fonts.display,
+        fontSize: 36,
+        color: colors.textPrimary,
+    },
+    condition: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.base,
+        color: 'rgba(255,255,255,0.75)',
+    },
+    lastUpdated: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs,
+        color: 'rgba(255,255,255,0.35)',
+        marginTop: 2,
+    },
+    retryBtn: {
+        paddingVertical: 10,
+        paddingHorizontal: 28,
+        backgroundColor: colors.saveBtnBg,
+        borderRadius: 10,
+        marginTop: 4,
+    },
+    retryBtnText: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.sm,
+        fontWeight: '600' as any,
+        color: colors.saveBtnText,
+    },
+    settingsLink: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.sm,
+        color: colors.textSecondary,
+        textDecorationLine: 'underline',
+    },
+    hero: { alignItems: 'center', paddingVertical: spacing.lg },
+    hiLo: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.sm,
+        color: 'rgba(255,255,255,0.55)',
+        marginTop: 4,
+        letterSpacing: 0.5,
+    },
+    forecastStrip: {
+        flexDirection: 'row',
+        gap: 8,
+        paddingHorizontal: spacing.md,
+        paddingBottom: spacing.md,
+    },
+    details: {
+        marginHorizontal: spacing.md,
+        backgroundColor: colors.glassBg,
+        borderRadius: 18,
+        borderWidth: 1,
+        borderColor: colors.glassBorder,
+        padding: spacing.md,
+        gap: spacing.md,
+    },
+});
+
 const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
+    const { colors } = useTheme();
+    const st = useMemo(() => makeStyles(colors), [colors]);
     const { setFooterBg } = useWeatherTheme();
     const { top: topInset } = useSafeAreaInsets();
     const nav = useAppNavigation();
@@ -401,15 +491,15 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
     // displayed gradient to the target weather gradient. On first load this goes
     // from solid dark (loading bg) to the weather colors. On refresh/reload it
     // transitions from whatever's currently shown to the new weather gradient.
-    const DEFAULT_GRADIENT = [
+    const DEFAULT_GRADIENT: readonly string[] = useMemo(() => [
         colors.bgDefault,
         colors.bgDefault,
         colors.bgDefault,
-    ];
+    ], [colors.bgDefault]);
 
     const [displayGradient, setDisplayGradient] =
-        useState<string[]>(DEFAULT_GRADIENT);
-    const fromColorsRef = useRef<string[]>(DEFAULT_GRADIENT);
+        useState<readonly string[]>(DEFAULT_GRADIENT);
+    const fromColorsRef = useRef<readonly string[]>(DEFAULT_GRADIENT);
     const animProgress = useRef(new RNAnimated.Value(1)).current;
     const loadingOpacity = useRef(new RNAnimated.Value(1)).current;
     // Content fades in from 0 after spinner fades out — cross-dissolve handoff
@@ -570,7 +660,7 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
                                     setRefreshing(true);
                                     onRefresh?.();
                                 }}
-                                tintColor={colors.textPrimary}
+                                tintColor={colors.textPrimary as string}
                             />
                         }
                     >
@@ -652,90 +742,3 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
 };
 
 export default WeatherHUD;
-
-const st = StyleSheet.create({
-    root: { flex: 1 },
-    contentLayer: { flex: 1 },
-    loadingOverlay: {
-        ...StyleSheet.absoluteFillObject,
-        zIndex: 10,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    loadingIcon: { width: 80, height: 80 },
-    scroll: { flexGrow: 1, paddingBottom: spacing.xl },
-    center: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 12,
-        padding: spacing.lg,
-    },
-    errorText: {
-        fontFamily: fonts.body,
-        fontSize: fontSizes.base,
-        color: colors.textSecondary,
-        textAlign: 'center',
-        lineHeight: fontSizes.base * 1.5,
-    },
-    header: { alignItems: 'center', paddingTop: spacing.lg, gap: 4 },
-    gearBtn: { position: 'absolute', right: spacing.md, padding: 6 },
-    city: {
-        fontFamily: fonts.display,
-        fontSize: 36,
-        color: colors.textPrimary,
-    },
-    condition: {
-        fontFamily: fonts.body,
-        fontSize: fontSizes.base,
-        color: 'rgba(255,255,255,0.75)',
-    },
-    lastUpdated: {
-        fontFamily: fonts.body,
-        fontSize: fontSizes.xs,
-        color: 'rgba(255,255,255,0.35)',
-        marginTop: 2,
-    },
-    retryBtn: {
-        paddingVertical: 10,
-        paddingHorizontal: 28,
-        backgroundColor: colors.saveBtnBg,
-        borderRadius: 10,
-        marginTop: 4,
-    },
-    retryBtnText: {
-        fontFamily: fonts.body,
-        fontSize: fontSizes.sm,
-        fontWeight: '600' as any,
-        color: colors.saveBtnText,
-    },
-    settingsLink: {
-        fontFamily: fonts.body,
-        fontSize: fontSizes.sm,
-        color: colors.textSecondary,
-        textDecorationLine: 'underline',
-    },
-    hero: { alignItems: 'center', paddingVertical: spacing.lg },
-    hiLo: {
-        fontFamily: fonts.body,
-        fontSize: fontSizes.sm,
-        color: 'rgba(255,255,255,0.55)',
-        marginTop: 4,
-        letterSpacing: 0.5,
-    },
-    forecastStrip: {
-        flexDirection: 'row',
-        gap: 8,
-        paddingHorizontal: spacing.md,
-        paddingBottom: spacing.md,
-    },
-    details: {
-        marginHorizontal: spacing.md,
-        backgroundColor: 'rgba(15,23,42,0.55)',
-        borderRadius: 18,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.12)',
-        padding: spacing.md,
-        gap: spacing.md,
-    },
-});

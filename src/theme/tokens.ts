@@ -14,7 +14,7 @@
 
 // ─── Colours ──────────────────────────────────────────────────────────────────
 
-export const colors = {
+export const darkColors = {
   // Backgrounds
   bgDefault: '#0F172A',          // var(--bg-default) base stop
 
@@ -49,6 +49,34 @@ export const colors = {
   saveBtnBg:    'rgba(255, 255, 255, 0.92)',
   saveBtnText:  '#0D1B2A',
 } as const;
+
+export const lightColors = {
+  bgDefault:      '#F1F5F9',
+  glassBg:        'rgba(0, 0, 0, 0.04)',
+  glassBgStrong:  'rgba(0, 0, 0, 0.08)',
+  glassBorder:    'rgba(0, 0, 0, 0.10)',
+  textPrimary:    'rgba(15, 23, 42, 0.92)',
+  textSecondary:  'rgba(15, 23, 42, 0.58)',
+  textMuted:      'rgba(15, 23, 42, 0.40)',
+  dangerBg:       'rgba(239, 68, 68, 0.08)',
+  dangerBorder:   'rgba(239, 68, 68, 0.22)',
+  dangerText:     'rgba(185, 28, 28, 0.90)',
+  dangerTextHi:   'rgba(185, 28, 28, 1.00)',
+  successBg:      'rgba(16, 185, 129, 0.10)',
+  successBorder:  'rgba(16, 185, 129, 0.28)',
+  successText:    'rgba(6, 95, 70, 1.00)',
+  errorBg:        'rgba(239, 68, 68, 0.08)',
+  errorBorder:    'rgba(239, 68, 68, 0.22)',
+  errorText:      'rgba(185, 28, 28, 1.00)',
+  white:          '#FFFFFF',
+  saveBtnBg:      'rgba(15, 23, 42, 0.88)',
+  saveBtnText:    '#F8FAFC',
+} as const;
+
+// Backward-compat alias — files not yet updated still compile fine
+export const colors = darkColors;
+
+export type ColorTokens = { readonly [K in keyof typeof darkColors]: string };
 
 // ─── Weather background gradients ─────────────────────────────────────────────
 // RN migration: use expo-linear-gradient with these stop arrays
@@ -155,5 +183,5 @@ export const animation = {
 
 // ─── Convenience re-exports ───────────────────────────────────────────────────
 
-const theme = { colors, weatherGradients, spacing, radius, fonts, fontSizes, fontWeights, shadows, animation };
+const theme = { colors, darkColors, lightColors, weatherGradients, spacing, radius, fonts, fontSizes, fontWeights, shadows, animation };
 export default theme;

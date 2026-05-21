@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Image, StyleSheet, useColorScheme, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Font from 'expo-font';
 import { WeatherProvider } from './src/context/WeatherContext';
 import { SettingsProvider } from './src/context/SettingsContext';
+import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
+import { darkColors, lightColors } from './src/theme/tokens';
 import RootNavigator from './src/navigation/RootNavigator';
 import {
     initAuthCache,
@@ -91,16 +93,49 @@ export default function App() {
 
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
+            <ThemeProvider>
             <SafeAreaProvider>
                 <SettingsProvider>
                     <WeatherProvider>
-                        <NavigationContainer>
-                            <StatusBar style='light' />
-                            <RootNavigator />
-                        </NavigationContainer>
+                        <ThemedNavigationShell />
                     </WeatherProvider>
                 </SettingsProvider>
             </SafeAreaProvider>
+            </ThemeProvider>
         </GestureHandlerRootView>
+    );
+}
+
+/** Renders NavigationContainer + StatusBar inside ThemeProvider so useTheme() works. */
+function ThemedNavigationShell() {
+    const { colors, isDark } = useTheme();
+
+    const navTheme = isDark
+        ? {
+              ...DarkTheme,
+              colors: {
+                  ...DarkTheme.colors,
+                  background: colors.bgDefault,
+                  card: colors.bgDefault,
+                  border: colors.glassBorder,
+                  text: colors.textPrimary,
+              },
+          }
+        : {
+              ...DefaultTheme,
+              colors: {
+                  ...DefaultTheme.colors,
+                  background: colors.bgDefault,
+                  card: colors.bgDefault,
+                  border: colors.glassBorder,
+                  text: colors.textPrimary,
+              },
+          };
+
+    return (
+        <NavigationContainer theme={navTheme}>
+            <StatusBar style={isDark ? 'light' : 'dark'} />
+            <RootNavigator />
+        </NavigationContainer>
     );
 }

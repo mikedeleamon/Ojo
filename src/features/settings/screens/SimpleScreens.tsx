@@ -1,24 +1,46 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { StyleSheet, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { View, Text, Pressable } from '../../../components/primitives';
 import { loadHistory, deleteHistoryEntry, clearHistory } from '../../../lib/outfitHistory';
 import { OutfitHistoryEntry } from '../../../types';
-import { styles as s } from './screens.styles';
-import { colors, spacing, radius, fonts, fontSizes } from '../../../theme/tokens';
+import { makeStyles } from './screens.styles';
+import { spacing, radius, fonts, fontSizes } from '../../../theme/tokens';
+import { useTheme } from '../../../theme/ThemeContext';
+import { ColorTokens } from '../../../theme/tokens';
 
-const Root = ({ children }: { children: React.ReactNode }) => (
-  <SafeAreaView style={st.root} edges={['bottom']}>
-    <ScrollView contentContainerStyle={st.content}>{children}</ScrollView>
-  </SafeAreaView>
-);
+const makeLocalStyles = (colors: ColorTokens) => StyleSheet.create({
+  root:    { flex: 1, backgroundColor: colors.bgDefault },
+  content: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xl },
+  clearBtn: {
+    alignSelf: 'flex-end',
+    paddingVertical: 6, paddingHorizontal: 14,
+    borderRadius: radius.pill, borderWidth: 1,
+    borderColor: 'rgba(252,165,165,0.3)',
+  },
+  clearBtnText: { fontFamily: fonts.body, fontSize: 12, color: 'rgba(252,165,165,0.75)' },
+});
 
-const InfoCard = ({ title, body }: { title: string; body: string }) => (
-  <View style={s.infoCard}>
-    <Text style={s.infoTitle}>{title}</Text>
-    <Text style={s.infoBody}>{body}</Text>
-  </View>
-);
+const Root = ({ children }: { children: React.ReactNode }) => {
+  const { colors } = useTheme();
+  const st = useMemo(() => makeLocalStyles(colors), [colors]);
+  return (
+    <SafeAreaView style={st.root} edges={['bottom']}>
+      <ScrollView contentContainerStyle={st.content}>{children}</ScrollView>
+    </SafeAreaView>
+  );
+};
+
+const InfoCard = ({ title, body }: { title: string; body: string }) => {
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
+  return (
+    <View style={s.infoCard}>
+      <Text style={s.infoTitle}>{title}</Text>
+      <Text style={s.infoBody}>{body}</Text>
+    </View>
+  );
+};
 
 // ─── Permissions ──────────────────────────────────────────────────────────────
 
@@ -49,6 +71,9 @@ export const DataUsageScreen = () => (
 // ─── History ──────────────────────────────────────────────────────────────────
 
 export const HistoryScreen = () => {
+  const { colors } = useTheme();
+  const s  = useMemo(() => makeStyles(colors), [colors]);
+  const st = useMemo(() => makeLocalStyles(colors), [colors]);
   const [entries, setEntries] = useState<OutfitHistoryEntry[]>([]);
 
   useEffect(() => { loadHistory().then(setEntries); }, []);
@@ -108,15 +133,3 @@ export const HistoryScreen = () => {
     </Root>
   );
 };
-
-const st = StyleSheet.create({
-  root:        { flex: 1, backgroundColor: colors.bgDefault },
-  content:     { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xl },
-  clearBtn: {
-    alignSelf: 'flex-end',
-    paddingVertical: 6, paddingHorizontal: 14,
-    borderRadius: radius.pill, borderWidth: 1,
-    borderColor: 'rgba(252,165,165,0.3)',
-  },
-  clearBtnText: { fontFamily: fonts.body, fontSize: 12, color: 'rgba(252,165,165,0.75)' },
-});

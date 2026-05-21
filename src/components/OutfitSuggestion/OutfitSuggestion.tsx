@@ -32,13 +32,14 @@ import {
     Settings,
 } from '../../types';
 import {
-    colors,
+    ColorTokens,
     fonts,
     fontSizes,
     fontWeights,
     spacing,
     radius,
 } from '../../theme/tokens';
+import { useTheme } from '../../theme/ThemeContext';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -114,26 +115,30 @@ const BREAKDOWN_LABELS: { key: keyof ScoreBreakdown; label: string }[] = [
 
 const HangerIcon = ({
     size = 24,
-    color = colors.textSecondary,
+    color,
 }: {
     size?: number;
     color?: string;
-}) => (
-    <Svg
-        width={size}
-        height={size}
-        viewBox='0 0 24 24'
-        fill='none'
-    >
-        <Path
-            d='M12 4a2 2 0 0 1 2 2c0 .74-.4 1.38-1 1.73V9l8 5.5A1 1 0 0 1 20 16H4a1 1 0 0 1-.99-1.5L11 9V7.73A2 2 0 0 1 12 4Z'
-            stroke={color}
-            strokeWidth={1.5}
-            strokeLinecap='round'
-            strokeLinejoin='round'
-        />
-    </Svg>
-);
+}) => {
+    const { colors: themeColors } = useTheme();
+    const resolvedColor = color ?? themeColors.textSecondary;
+    return (
+        <Svg
+            width={size}
+            height={size}
+            viewBox='0 0 24 24'
+            fill='none'
+        >
+            <Path
+                d='M12 4a2 2 0 0 1 2 2c0 .74-.4 1.38-1 1.73V9l8 5.5A1 1 0 0 1 20 16H4a1 1 0 0 1-.99-1.5L11 9V7.73A2 2 0 0 1 12 4Z'
+                stroke={resolvedColor}
+                strokeWidth={1.5}
+                strokeLinecap='round'
+                strokeLinejoin='round'
+            />
+        </Svg>
+    );
+};
 
 const REMOVABLE_ROLES: OutfitRole[] = ['midLayer', 'outerwear'];
 
@@ -145,60 +150,66 @@ const ArticleThumb = ({
     article: ClothingArticle;
     role: OutfitRole;
     onRemove?: () => void;
-}) => (
-    <View style={styles.articleCard}>
-        <View style={styles.articleImg}>
-            {article.imageUrl ? (
-                <Image
-                    source={{ uri: article.imageUrl }}
-                    style={styles.articleImgFill}
-                    resizeMode='cover'
-                />
-            ) : (
-                <HangerIcon
-                    size={20}
-                    color={colors.textMuted}
-                />
-            )}
-            {article.color && CSS_COLORS[article.color] && (
-                <View
-                    style={[
-                        styles.colorDot,
-                        { backgroundColor: CSS_COLORS[article.color] },
-                    ]}
-                />
+}) => {
+    const { colors } = useTheme();
+    const styles = useMemo(() => makeStyles(colors), [colors]);
+    return (
+        <View style={styles.articleCard}>
+            <View style={styles.articleImg}>
+                {article.imageUrl ? (
+                    <Image
+                        source={{ uri: article.imageUrl }}
+                        style={styles.articleImgFill}
+                        resizeMode='cover'
+                    />
+                ) : (
+                    <HangerIcon
+                        size={20}
+                        color={colors.textMuted}
+                    />
+                )}
+                {article.color && CSS_COLORS[article.color] && (
+                    <View
+                        style={[
+                            styles.colorDot,
+                            { backgroundColor: CSS_COLORS[article.color] },
+                        ]}
+                    />
+                )}
+            </View>
+            <View style={styles.articleLabel}>
+                <Text style={styles.roleLabel}>
+                    {role === 'accessory'
+                        ? articleZoneLabel(article)
+                        : ROLE_LABELS[role]}
+                </Text>
+                <Text
+                    style={styles.articleName}
+                    numberOfLines={1}
+                >
+                    {article.name || article.clothingType}
+                </Text>
+                {article.fabricType ? (
+                    <Text style={styles.articleMeta}>{article.fabricType}</Text>
+                ) : null}
+            </View>
+            {onRemove && (
+                <Pressable
+                    style={styles.articleRemoveBtn}
+                    onPress={onRemove}
+                    hitSlop={8}
+                    accessibilityLabel='Remove from outfit'
+                >
+                    <Text style={styles.articleRemoveText}>✕</Text>
+                </Pressable>
             )}
         </View>
-        <View style={styles.articleLabel}>
-            <Text style={styles.roleLabel}>
-                {role === 'accessory'
-                    ? articleZoneLabel(article)
-                    : ROLE_LABELS[role]}
-            </Text>
-            <Text
-                style={styles.articleName}
-                numberOfLines={1}
-            >
-                {article.name || article.clothingType}
-            </Text>
-            {article.fabricType ? (
-                <Text style={styles.articleMeta}>{article.fabricType}</Text>
-            ) : null}
-        </View>
-        {onRemove && (
-            <Pressable
-                style={styles.articleRemoveBtn}
-                onPress={onRemove}
-                hitSlop={8}
-                accessibilityLabel='Remove from outfit'
-            >
-                <Text style={styles.articleRemoveText}>✕</Text>
-            </Pressable>
-        )}
-    </View>
-);
+    );
+};
 
 const ScoreBadge = ({ score }: { score: number }) => {
+    const { colors } = useTheme();
+    const styles = useMemo(() => makeStyles(colors), [colors]);
     const color =
         score >= 80
             ? 'rgba(52,211,153,0.9)'
@@ -217,6 +228,8 @@ const ScoreBadge = ({ score }: { score: number }) => {
 // ─── Layering section ─────────────────────────────────────────────────────────
 
 const ConfidencePip = ({ value }: { value: number }) => {
+    const { colors } = useTheme();
+    const layerStyles = useMemo(() => makeLayerStyles(colors), [colors]);
     const pct = Math.round(value * 100);
     const col =
         pct >= 80
@@ -246,6 +259,8 @@ const LayerRow = ({
     label: string;
     slot: OutfitSlot | null;
 }) => {
+    const { colors } = useTheme();
+    const layerStyles = useMemo(() => makeLayerStyles(colors), [colors]);
     if (!slot) return null;
     const name = slot.article.name || slot.article.clothingType;
     const dotColor = slot.article.color ? CSS_COLORS[slot.article.color] : null;
@@ -277,6 +292,8 @@ const LayerRow = ({
 };
 
 const LayeringSection = ({ layering }: { layering: LayeringResult }) => {
+    const { colors } = useTheme();
+    const layerStyles = useMemo(() => makeLayerStyles(colors), [colors]);
     const hasLayers =
         layering.layers.base || layering.layers.mid || layering.layers.outer;
     return (
@@ -405,6 +422,8 @@ interface Props {
 }
 
 const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
+    const { colors } = useTheme();
+    const styles = useMemo(() => makeStyles(colors), [colors]);
     const { closets, loading, preferred, setPreferred, setClosets } =
         useClosets();
     const [settingPref, setSettingPref] = useState(false);
@@ -849,22 +868,26 @@ const PreferredBadge = ({
 }: {
     name: string;
     onPress: () => void;
-}) => (
-    <Pressable
-        style={styles.preferredBadge}
-        onPress={onPress}
-    >
-        <HangerIcon
-            size={11}
-            color={colors.textSecondary}
-        />
-        <Text style={styles.preferredBadgeText}>{name}</Text>
-    </Pressable>
-);
+}) => {
+    const { colors } = useTheme();
+    const styles = useMemo(() => makeStyles(colors), [colors]);
+    return (
+        <Pressable
+            style={styles.preferredBadge}
+            onPress={onPress}
+        >
+            <HangerIcon
+                size={11}
+                color={colors.textSecondary}
+            />
+            <Text style={styles.preferredBadgeText}>{name}</Text>
+        </Pressable>
+    );
+};
 
 export default OutfitSuggestion;
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     root: { gap: spacing.sm },
     sectionLabel: {
         fontFamily: fonts.body,
@@ -885,7 +908,7 @@ const styles = StyleSheet.create({
         gap: 6,
         paddingVertical: 5,
         paddingHorizontal: 10,
-        backgroundColor: 'rgba(255,255,255,0.08)',
+        backgroundColor: colors.glassBg,
         borderRadius: radius.pill,
         borderWidth: 1,
         borderColor: colors.glassBorder,
@@ -916,7 +939,7 @@ const styles = StyleSheet.create({
         flexWrap: 'wrap',
         gap: spacing.sm,
         padding: spacing.sm,
-        backgroundColor: 'rgba(255,255,255,0.04)',
+        backgroundColor: colors.glassBg,
         borderRadius: radius.md,
         borderWidth: 1,
         borderColor: colors.glassBorder,
@@ -944,7 +967,7 @@ const styles = StyleSheet.create({
         width: 6,
         height: 6,
         borderRadius: 3,
-        backgroundColor: 'rgba(255,255,255,0.22)',
+        backgroundColor: colors.glassBorder,
     },
     dotActive: {
         width: 18,
@@ -983,7 +1006,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 10,
-        backgroundColor: 'rgba(255,255,255,0.06)',
+        backgroundColor: colors.glassBg,
         borderRadius: radius.sm,
         borderWidth: 1,
         borderColor: colors.glassBorder,
@@ -995,7 +1018,7 @@ const styles = StyleSheet.create({
         width: 44,
         height: 44,
         borderRadius: 8,
-        backgroundColor: 'rgba(255,255,255,0.05)',
+        backgroundColor: colors.glassBg,
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'hidden',
@@ -1057,7 +1080,7 @@ const styles = StyleSheet.create({
     breakdownBarBg: {
         flex: 1,
         height: 4,
-        backgroundColor: 'rgba(255,255,255,0.08)',
+        backgroundColor: colors.glassBg,
         borderRadius: 2,
         overflow: 'hidden',
     },
@@ -1096,7 +1119,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: colors.glassBorder,
         alignItems: 'center',
-        backgroundColor: 'rgba(255,255,255,0.05)',
+        backgroundColor: colors.glassBg,
     },
     woreThisLogged: {
         borderColor: 'rgba(52,211,153,0.4)',
@@ -1148,7 +1171,7 @@ const styles = StyleSheet.create({
 
 // ─── Layering section styles ──────────────────────────────────────────────────
 
-const layerStyles = StyleSheet.create({
+const makeLayerStyles = (colors: ColorTokens) => StyleSheet.create({
     root: {
         gap: 8,
         paddingTop: 4,
@@ -1183,7 +1206,7 @@ const layerStyles = StyleSheet.create({
         gap: 4,
         paddingVertical: 4,
         paddingHorizontal: 10,
-        backgroundColor: 'rgba(255,255,255,0.04)',
+        backgroundColor: colors.glassBg,
         borderRadius: radius.sm,
         borderWidth: 1,
         borderColor: colors.glassBorder,

@@ -1,6 +1,8 @@
+import { useMemo } from 'react';
 import { StyleSheet, Image, Animated } from 'react-native';
 import { View, Text } from '../primitives';
-import { colors, fonts, fontSizes } from '../../theme/tokens';
+import { ColorTokens, fonts, fontSizes } from '../../theme/tokens';
+import { useTheme } from '../../theme/ThemeContext';
 import { useSpinAnimation } from '../../hooks/useSpinAnimation';
 
 // ─── Icon map ─────────────────────────────────────────────────────────────────
@@ -46,6 +48,31 @@ interface Props {
     feelsLike?: number | string;
 }
 
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
+    root: { alignItems: 'center' },
+    large: { gap: 8 },
+    small: { gap: 4 },
+    iconLarge: { width: 180, height: 180 },
+    iconSmall: { width: 36, height: 36 },
+    temps: { alignItems: 'center', gap: 2 },
+    temp: {
+        fontFamily: fonts.display,
+        fontSize: 64,
+        color: colors.textPrimary,
+        lineHeight: 68,
+    },
+    feelsLike: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.sm,
+        color: colors.textSecondary,
+    },
+    miniTemp: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.sm,
+        color: colors.textSecondary,
+    },
+});
+
 const WeatherIconDisplay = ({
     condition,
     isDay,
@@ -53,6 +80,8 @@ const WeatherIconDisplay = ({
     temperature,
     feelsLike,
 }: Props) => {
+    const { colors } = useTheme();
+    const styles = useMemo(() => makeStyles(colors), [colors]);
     const icon = iconFor(condition, isDay);
     const isLarge = size === 'large';
     const isSunny = icon === ICONS.Sunny;
@@ -93,28 +122,3 @@ const WeatherIconDisplay = ({
 };
 
 export default WeatherIconDisplay;
-
-const styles = StyleSheet.create({
-    root: { alignItems: 'center' },
-    large: { gap: 8 },
-    small: { gap: 4 },
-    iconLarge: { width: 180, height: 180 },
-    iconSmall: { width: 36, height: 36 },
-    temps: { alignItems: 'center', gap: 2 },
-    temp: {
-        fontFamily: fonts.display,
-        fontSize: 64,
-        color: colors.textPrimary,
-        lineHeight: 68,
-    },
-    feelsLike: {
-        fontFamily: fonts.body,
-        fontSize: fontSizes.sm,
-        color: colors.textSecondary,
-    },
-    miniTemp: {
-        fontFamily: fonts.body,
-        fontSize: fontSizes.sm,
-        color: colors.textSecondary,
-    },
-});

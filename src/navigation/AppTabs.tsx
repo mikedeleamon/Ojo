@@ -3,7 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Svg, Path } from 'react-native-svg';
 import { useWeatherTheme } from '../context/WeatherContext';
-import { colors } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 import MainPage from '../views/MainPage/MainPage';
 import ClosetPage from '../views/ClosetPage/ClosetPage';
 import PreferencesScreen from '../features/settings/screens/PreferencesScreen';
@@ -54,18 +54,21 @@ const SparklesIcon = ({ color }: { color: string }) => (
 
 export default function AppTabs() {
     const { footerBg } = useWeatherTheme();
+    const { colors } = useTheme();
+
+    const { isDark } = useTheme();
 
     return (
         <Tab.Navigator
             screenOptions={{
                 headerShown: false,
                 tabBarStyle: {
-                    backgroundColor: footerBg,
+                    backgroundColor: isDark ? footerBg : colors.bgDefault,
                     borderTopColor: colors.glassBorder,
                     borderTopWidth: 1,
                 },
                 tabBarActiveTintColor: colors.textPrimary,
-                tabBarInactiveTintColor: 'rgba(255,255,255,0.45)',
+                tabBarInactiveTintColor: colors.textMuted,
                 tabBarLabelStyle: {
                     fontFamily: 'Outfit',
                     fontSize: 10,
@@ -109,7 +112,7 @@ export default function AppTabs() {
             >
                 {() => (
                     <SafeAreaView
-                        style={styles.tabRoot}
+                        style={{ flex: 1, backgroundColor: colors.bgDefault }}
                         edges={['top']}
                     >
                         <PreferencesScreen />
@@ -119,7 +122,3 @@ export default function AppTabs() {
         </Tab.Navigator>
     );
 }
-
-const styles = StyleSheet.create({
-    tabRoot: { flex: 1, backgroundColor: colors.bgDefault },
-});

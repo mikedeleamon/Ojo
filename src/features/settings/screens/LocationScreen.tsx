@@ -1,13 +1,26 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { StyleSheet, KeyboardAvoidingView, Platform, ScrollView, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { View, Text, Pressable } from '../../../components/primitives';
 import { StatusMessage } from '../../../components/shared';
 import { useSettings } from '../../../hooks/useSettings';
 import { useFormSubmit } from '../../../hooks/useFormSubmit';
-import { colors, spacing, radius, fonts, fontSizes, fontWeights } from '../../../theme/tokens';
+import { spacing, radius, fonts, fontSizes, fontWeights } from '../../../theme/tokens';
+import { useTheme } from '../../../theme/ThemeContext';
 
 export default function LocationScreen() {
+  const { colors } = useTheme();
+  const st = useMemo(() => StyleSheet.create({
+    root:        { flex: 1, backgroundColor: colors.bgDefault },
+    content:     { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xl },
+    section:     { gap: spacing.sm },
+    sectionLabel:{ fontFamily: fonts.body, fontSize: fontSizes.xs, fontWeight: fontWeights.medium, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+    hint:        { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.textMuted, lineHeight: fontSizes.sm * 1.6 },
+    input:       { fontFamily: fonts.body, fontSize: fontSizes.base, color: colors.textPrimary, backgroundColor: colors.glassBg, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radius.sm, paddingVertical: 12, paddingHorizontal: spacing.md },
+    saveBtn:     { paddingVertical: 14, backgroundColor: colors.saveBtnBg, borderRadius: radius.sm, alignItems: 'center' },
+    saveBtnText: { fontFamily: fonts.body, fontSize: fontSizes.base, fontWeight: fontWeights.semibold, color: colors.saveBtnText },
+  }), [colors]);
+
   const { settings, saveSettings }  = useSettings();
   const [city, setCity]             = useState(settings.location);
   const { status, loading, submit } = useFormSubmit('Location saved.', 2000);
@@ -40,14 +53,3 @@ export default function LocationScreen() {
     </SafeAreaView>
   );
 }
-
-const st = StyleSheet.create({
-  root:        { flex: 1, backgroundColor: colors.bgDefault },
-  content:     { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xl },
-  section:     { gap: spacing.sm },
-  sectionLabel:{ fontFamily: fonts.body, fontSize: fontSizes.xs, fontWeight: fontWeights.medium, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
-  hint:        { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.textMuted, lineHeight: fontSizes.sm * 1.6 },
-  input:       { fontFamily: fonts.body, fontSize: fontSizes.base, color: colors.textPrimary, backgroundColor: colors.glassBg, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radius.sm, paddingVertical: 12, paddingHorizontal: spacing.md },
-  saveBtn:     { paddingVertical: 14, backgroundColor: colors.saveBtnBg, borderRadius: radius.sm, alignItems: 'center' },
-  saveBtnText: { fontFamily: fonts.body, fontSize: fontSizes.base, fontWeight: fontWeights.semibold, color: colors.saveBtnText },
-});

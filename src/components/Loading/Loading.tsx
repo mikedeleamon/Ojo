@@ -1,9 +1,23 @@
+import { useMemo } from 'react';
 import { StyleSheet, Animated } from 'react-native';
 import { View } from '../primitives';
-import { colors } from '../../theme/tokens';
+import { ColorTokens } from '../../theme/tokens';
+import { useTheme } from '../../theme/ThemeContext';
 import { useSpinAnimation } from '../../hooks/useSpinAnimation';
 
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
+    root: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.bgDefault,
+    },
+    icon: { width: 80, height: 80 },
+});
+
 const Loading = () => {
+    const { colors } = useTheme();
+    const styles = useMemo(() => makeStyles(colors), [colors]);
     const rotate = useSpinAnimation(2_000);
 
     return (
@@ -18,13 +32,3 @@ const Loading = () => {
 };
 
 export default Loading;
-
-const styles = StyleSheet.create({
-    root: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: colors.bgDefault,
-    },
-    icon: { width: 80, height: 80 },
-});

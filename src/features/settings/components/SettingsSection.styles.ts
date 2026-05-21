@@ -11,9 +11,9 @@
  */
 
 import { StyleSheet } from 'react-native';
-import { colors, spacing, radius, fonts, fontSizes, fontWeights } from '../../../theme/tokens';
+import { ColorTokens, spacing, radius, fonts, fontSizes, fontWeights } from '../../../theme/tokens';
 
-export const styles = StyleSheet.create({
+export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   section: {
     flexDirection: 'column' as const,
     gap:           6,

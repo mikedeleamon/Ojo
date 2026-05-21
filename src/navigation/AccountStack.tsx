@@ -1,7 +1,7 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Pressable } from '../components/primitives';
 import { Svg, Path } from 'react-native-svg';
-import { colors } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 
 import SettingsScreen from '../features/settings/SettingsScreen';
 import ProfileScreen from '../features/settings/screens/ProfileScreen';
@@ -23,7 +23,7 @@ interface Props {
     onLogout?: () => void;
 }
 
-const BackButton = ({ onPress }: { onPress: () => void }) => (
+const BackButton = ({ onPress, color }: { onPress: () => void; color: string }) => (
     <Pressable
         onPress={onPress}
         style={{ padding: 8, marginLeft: -8 }}
@@ -41,7 +41,7 @@ const BackButton = ({ onPress }: { onPress: () => void }) => (
         >
             <Path
                 d='M11 14l-5-5 5-5'
-                stroke={colors.textPrimary}
+                stroke={color}
                 strokeWidth={1.5}
                 strokeLinecap='round'
                 strokeLinejoin='round'
@@ -50,16 +50,18 @@ const BackButton = ({ onPress }: { onPress: () => void }) => (
     </Pressable>
 );
 
-const subScreen = ({ navigation }: any) => ({
-    headerShown: true,
-    headerStyle: { backgroundColor: colors.bgDefault },
-    headerTintColor: colors.textPrimary,
-    headerShadowVisible: false,
-    headerBackVisible: false,
-    headerLeft: () => <BackButton onPress={() => navigation.goBack()} />,
-});
-
 export default function AccountStack({ onLogout }: Props) {
+    const { colors } = useTheme();
+
+    const subScreen = ({ navigation }: any) => ({
+        headerShown: true,
+        headerStyle: { backgroundColor: colors.bgDefault },
+        headerTintColor: colors.textPrimary,
+        headerShadowVisible: false,
+        headerBackVisible: false,
+        headerLeft: () => <BackButton onPress={() => navigation.goBack()} color={colors.textPrimary} />,
+    });
+
     return (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name='Settings'>

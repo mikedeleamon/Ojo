@@ -7,7 +7,6 @@ import AccountStack from './AccountStack';
 import LoginPage from '../views/LoginPage/LoginPage';
 import SignupPage from '../views/SignupPage/Signup';
 import OnboardingPage from '../views/OnboardingPage/OnboardingPage';
-import { colors } from '../theme/tokens';
 import Loading from '../components/Loading/Loading';
 
 const Stack = createNativeStackNavigator();

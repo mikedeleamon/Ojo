@@ -1,46 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { colors, spacing, radius, fonts, fontSizes } from '../../theme/tokens';
+import { ColorTokens, spacing, radius, fonts, fontSizes } from '../../theme/tokens';
+import { useTheme } from '../../theme/ThemeContext';
 
-// ─── StatusMessage ─────────────────────────────────────────────────────────────
-
-interface StatusMessageProps {
-  status: { type: 'success' | 'error'; msg: string } | null;
-}
-
-export const StatusMessage = ({ status }: StatusMessageProps) => {
-  if (!status) return null;
-  const isSuccess = status.type === 'success';
-  return (
-    <View style={[styles.base, isSuccess ? styles.success : styles.error]}>
-      <Text style={[styles.text, isSuccess ? styles.successText : styles.errorText]}>
-        {status.msg}
-      </Text>
-    </View>
-  );
-};
-
-// ─── EmptyState ────────────────────────────────────────────────────────────────
-
-interface EmptyStateProps {
-  icon:    React.ReactNode;
-  title:   string;
-  body:    string;
-  action?: React.ReactNode;
-}
-
-export const EmptyState = ({ icon, title, body, action }: EmptyStateProps) => (
-  <View style={styles.emptyContainer}>
-    <View style={styles.emptyIcon}>{icon}</View>
-    <Text style={styles.emptyTitle}>{title}</Text>
-    <Text style={styles.emptyBody}>{body}</Text>
-    {action}
-  </View>
-);
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
-const styles = StyleSheet.create({
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   // StatusMessage
   base: {
     paddingVertical:   10,
@@ -93,3 +56,45 @@ const styles = StyleSheet.create({
     lineHeight: fontSizes.base * 1.6,
   },
 });
+
+// ─── StatusMessage ─────────────────────────────────────────────────────────────
+
+interface StatusMessageProps {
+  status: { type: 'success' | 'error'; msg: string } | null;
+}
+
+export const StatusMessage = ({ status }: StatusMessageProps) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  if (!status) return null;
+  const isSuccess = status.type === 'success';
+  return (
+    <View style={[styles.base, isSuccess ? styles.success : styles.error]}>
+      <Text style={[styles.text, isSuccess ? styles.successText : styles.errorText]}>
+        {status.msg}
+      </Text>
+    </View>
+  );
+};
+
+// ─── EmptyState ────────────────────────────────────────────────────────────────
+
+interface EmptyStateProps {
+  icon:    React.ReactNode;
+  title:   string;
+  body:    string;
+  action?: React.ReactNode;
+}
+
+export const EmptyState = ({ icon, title, body, action }: EmptyStateProps) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  return (
+    <View style={styles.emptyContainer}>
+      <View style={styles.emptyIcon}>{icon}</View>
+      <Text style={styles.emptyTitle}>{title}</Text>
+      <Text style={styles.emptyBody}>{body}</Text>
+      {action}
+    </View>
+  );
+};

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
     StyleSheet,
     ScrollView,
@@ -14,14 +14,8 @@ import {
     AppSlider,
 } from '../../../components/primitives';
 import { useSettings } from '../../../hooks/useSettings';
-import {
-    colors,
-    spacing,
-    radius,
-    fonts,
-    fontSizes,
-    fontWeights,
-} from '../../../theme/tokens';
+import { spacing, radius, fonts, fontSizes, fontWeights } from '../../../theme/tokens';
+import { useTheme, ThemeMode } from '../../../theme/ThemeContext';
 
 const fToC = (f: number) => Math.round((f - 32) * 5 / 9);
 const cToF = (c: number) => Math.round(c * 9 / 5 + 32);
@@ -38,6 +32,12 @@ const STYLES = [
     'Preppy',
 ];
 
+const APPEARANCE_MODES: { label: string; value: ThemeMode }[] = [
+    { label: 'Auto', value: 'auto' },
+    { label: 'Light', value: 'light' },
+    { label: 'Dark', value: 'dark' },
+];
+
 interface SliderFieldProps {
     label: string;
     value: number;
@@ -46,269 +46,11 @@ interface SliderFieldProps {
     max: number;
     onChange: (v: number) => void;
     onSave: (v: number) => void;
+    styles: ReturnType<typeof makeStyles>;
+    colors: ReturnType<typeof useTheme>['colors'];
 }
 
-const SliderField = ({
-    label,
-    value,
-    unit,
-    min,
-    max,
-    onChange,
-    onSave,
-}: SliderFieldProps) => (
-    <View style={styles.sliderRow}>
-        <View style={styles.sliderMeta}>
-            <Text style={styles.sliderLabel}>{label}</Text>
-            <Text style={styles.sliderValue}>
-                {value}
-                {unit}
-            </Text>
-        </View>
-        <AppSlider
-            minimumValue={min}
-            maximumValue={max}
-            value={value}
-            step={1}
-            onValueChange={onChange}
-            onSlidingComplete={onSave}
-            minimumTrackTintColor={colors.textPrimary}
-            maximumTrackTintColor={colors.glassBorder}
-            thumbTintColor={colors.saveBtnBg}
-            style={{ width: '100%' }}
-            accessibilityLabel={label}
-        />
-    </View>
-);
-
-export default function PreferencesScreen() {
-    const { settings, saveSettings, settingsReady } = useSettings();
-    const [clothingStyle, setClothingStyle] = useState(settings.clothingStyle);
-    const [location, setLocation] = useState(settings.location);
-    const [tempScale, setTempScale] = useState<'Imperial' | 'Metric'>(
-        settings.temperatureScale as 'Imperial' | 'Metric',
-    );
-    // Always stored in °F — source of truth for persistence
-    const [hiTemp, setHiTemp] = useState(settings.hiTempThreshold);
-    const [lowTemp, setLowTemp] = useState(settings.lowTempThreshold);
-    // Display state in the current unit — avoids round-trip F→C→F rounding on every tick
-    const [hiTempDisp, setHiTempDisp] = useState(
-        settings.temperatureScale === 'Metric'
-            ? fToC(settings.hiTempThreshold)
-            : settings.hiTempThreshold,
-    );
-    const [lowTempDisp, setLowTempDisp] = useState(
-        settings.temperatureScale === 'Metric'
-            ? fToC(settings.lowTempThreshold)
-            : settings.lowTempThreshold,
-    );
-    const [humidity, setHumidity] = useState(settings.humidityPreference);
-
-    const locationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    useEffect(() => {
-        if (!settingsReady) return;
-        const isCelsius = settings.temperatureScale === 'Metric';
-        setClothingStyle(settings.clothingStyle);
-        setLocation(settings.location);
-        setTempScale(settings.temperatureScale as 'Imperial' | 'Metric');
-        setHiTemp(settings.hiTempThreshold);
-        setLowTemp(settings.lowTempThreshold);
-        setHiTempDisp(isCelsius ? fToC(settings.hiTempThreshold) : settings.hiTempThreshold);
-        setLowTempDisp(isCelsius ? fToC(settings.lowTempThreshold) : settings.lowTempThreshold);
-        setHumidity(settings.humidityPreference);
-    }, [settings, settingsReady]);
-
-    const currentSettings = (overrides: Partial<typeof settings>) => ({
-        clothingStyle,
-        location,
-        temperatureScale: tempScale,
-        hiTempThreshold: hiTemp,
-        lowTempThreshold: lowTemp,
-        humidityPreference: humidity,
-        ...overrides,
-    });
-
-    const handleStyleChange = (s: string) => {
-        setClothingStyle(s);
-        saveSettings(currentSettings({ clothingStyle: s })).catch(() => {});
-    };
-
-    const handleScaleChange = (scale: 'Imperial' | 'Metric') => {
-        const toC = scale === 'Metric';
-        setHiTempDisp(toC ? fToC(hiTemp) : hiTemp);
-        setLowTempDisp(toC ? fToC(lowTemp) : lowTemp);
-        setTempScale(scale);
-        saveSettings(currentSettings({ temperatureScale: scale })).catch(() => {});
-    };
-
-    const handleLocationChange = (text: string) => {
-        setLocation(text);
-        if (locationTimer.current) clearTimeout(locationTimer.current);
-        locationTimer.current = setTimeout(() => {
-            saveSettings(currentSettings({ location: text })).catch(() => {});
-        }, 800);
-    };
-
-    return (
-        <SafeAreaView
-            style={styles.root}
-            edges={['bottom']}
-        >
-            <KeyboardAvoidingView
-                style={{ flex: 1 }}
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            >
-                <ScrollView
-                    contentContainerStyle={styles.content}
-                    keyboardShouldPersistTaps='handled'
-                >
-                    {/* Style preference */}
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>
-                            Style preference
-                        </Text>
-                        <View style={styles.chipGrid}>
-                            {STYLES.map((s) => (
-                                <Pressable
-                                    key={s}
-                                    style={[
-                                        styles.chip,
-                                        clothingStyle === s &&
-                                            styles.chipActive,
-                                    ]}
-                                    onPress={() => handleStyleChange(s)}
-                                    accessibilityRole="radio"
-                                    accessibilityLabel={s}
-                                    accessibilityState={{ selected: clothingStyle === s }}
-                                >
-                                    <Text
-                                        style={[
-                                            styles.chipText,
-                                            clothingStyle === s &&
-                                                styles.chipTextActive,
-                                        ]}
-                                    >
-                                        {s}
-                                    </Text>
-                                </Pressable>
-                            ))}
-                        </View>
-                    </View>
-
-                    {/* Location */}
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>
-                            Default location
-                        </Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder='City name'
-                            placeholderTextColor={colors.textMuted}
-                            value={location}
-                            onChangeText={handleLocationChange}
-                            returnKeyType='done'
-                            accessibilityLabel="Default location"
-                        />
-                    </View>
-
-                    {/* Temperature unit */}
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>
-                            Temperature unit
-                        </Text>
-                        <View style={styles.segmented}>
-                            {(['Imperial', 'Metric'] as const).map((scale) => (
-                                <Pressable
-                                    key={scale}
-                                    style={[
-                                        styles.seg,
-                                        tempScale === scale && styles.segActive,
-                                    ]}
-                                    onPress={() => handleScaleChange(scale)}
-                                    accessibilityRole="radio"
-                                    accessibilityLabel={scale === 'Imperial' ? 'Fahrenheit' : 'Celsius'}
-                                    accessibilityState={{ selected: tempScale === scale }}
-                                >
-                                    <Text
-                                        style={[
-                                            styles.segText,
-                                            tempScale === scale &&
-                                                styles.segTextActive,
-                                        ]}
-                                    >
-                                        {scale === 'Imperial' ? '°F' : '°C'}
-                                    </Text>
-                                </Pressable>
-                            ))}
-                        </View>
-                    </View>
-
-                    {/* Temperature feel */}
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>
-                            Temperature feel
-                        </Text>
-                        <SliderField
-                            label='Hot above'
-                            value={hiTempDisp}
-                            unit='°'
-                            min={tempScale === 'Metric' ? 10 : 50}
-                            max={tempScale === 'Metric' ? 49 : 120}
-                            onChange={(v) => {
-                                setHiTempDisp(v);
-                                setHiTemp(tempScale === 'Metric' ? cToF(v) : v);
-                            }}
-                            onSave={(v) =>
-                                saveSettings(
-                                    currentSettings({ hiTempThreshold: tempScale === 'Metric' ? cToF(v) : v }),
-                                ).catch(() => {})
-                            }
-                        />
-                        <SliderField
-                            label='Cold below'
-                            value={lowTempDisp}
-                            unit='°'
-                            min={tempScale === 'Metric' ? -18 : 0}
-                            max={tempScale === 'Metric' ? 21 : 70}
-                            onChange={(v) => {
-                                setLowTempDisp(v);
-                                setLowTemp(tempScale === 'Metric' ? cToF(v) : v);
-                            }}
-                            onSave={(v) =>
-                                saveSettings(
-                                    currentSettings({ lowTempThreshold: tempScale === 'Metric' ? cToF(v) : v }),
-                                ).catch(() => {})
-                            }
-                        />
-                    </View>
-
-                    {/* Humidity */}
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>
-                            Humidity sensitivity
-                        </Text>
-                        <SliderField
-                            label='Threshold'
-                            value={humidity}
-                            unit='%'
-                            min={0}
-                            max={100}
-                            onChange={setHumidity}
-                            onSave={(v) =>
-                                saveSettings(
-                                    currentSettings({ humidityPreference: v }),
-                                ).catch(() => {})
-                            }
-                        />
-                    </View>
-                </ScrollView>
-            </KeyboardAvoidingView>
-        </SafeAreaView>
-    );
-}
-
-const styles = StyleSheet.create({
+const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.bgDefault },
     content: {
         padding: spacing.md,
@@ -373,7 +115,7 @@ const styles = StyleSheet.create({
         borderRadius: 6,
         alignItems: 'center',
     },
-    segActive: { backgroundColor: 'rgba(255,255,255,0.14)' },
+    segActive: { backgroundColor: colors.glassBgStrong },
     segText: {
         fontFamily: fonts.body,
         fontSize: fontSizes.base,
@@ -394,4 +136,296 @@ const styles = StyleSheet.create({
         fontWeight: fontWeights.medium,
         color: colors.textPrimary,
     },
+    // Appearance segmented — full-width
+    appearanceSegmented: {
+        flexDirection: 'row',
+        gap: 4,
+        backgroundColor: colors.glassBg,
+        borderWidth: 1,
+        borderColor: colors.glassBorder,
+        borderRadius: radius.sm,
+        padding: 4,
+    },
+    appearanceSeg: {
+        flex: 1,
+        paddingVertical: 8,
+        borderRadius: 6,
+        alignItems: 'center',
+    },
 });
+
+const SliderField = ({
+    label,
+    value,
+    unit,
+    min,
+    max,
+    onChange,
+    onSave,
+    styles,
+    colors,
+}: SliderFieldProps) => (
+    <View style={styles.sliderRow}>
+        <View style={styles.sliderMeta}>
+            <Text style={styles.sliderLabel}>{label}</Text>
+            <Text style={styles.sliderValue}>
+                {value}
+                {unit}
+            </Text>
+        </View>
+        <AppSlider
+            minimumValue={min}
+            maximumValue={max}
+            value={value}
+            step={1}
+            onValueChange={onChange}
+            onSlidingComplete={onSave}
+            minimumTrackTintColor={colors.textPrimary}
+            maximumTrackTintColor={colors.glassBorder}
+            thumbTintColor={colors.saveBtnBg}
+            style={{ width: '100%' }}
+            accessibilityLabel={label}
+        />
+    </View>
+);
+
+export default function PreferencesScreen() {
+    const { colors, mode, setMode } = useTheme();
+    const styles = useMemo(() => makeStyles(colors), [colors]);
+
+    const { settings, saveSettings, settingsReady } = useSettings();
+    const [clothingStyle, setClothingStyle] = useState(settings.clothingStyle);
+    const [location, setLocation] = useState(settings.location);
+    const [tempScale, setTempScale] = useState<'Imperial' | 'Metric'>(
+        settings.temperatureScale as 'Imperial' | 'Metric',
+    );
+    const [hiTemp, setHiTemp] = useState(settings.hiTempThreshold);
+    const [lowTemp, setLowTemp] = useState(settings.lowTempThreshold);
+    const [hiTempDisp, setHiTempDisp] = useState(
+        settings.temperatureScale === 'Metric'
+            ? fToC(settings.hiTempThreshold)
+            : settings.hiTempThreshold,
+    );
+    const [lowTempDisp, setLowTempDisp] = useState(
+        settings.temperatureScale === 'Metric'
+            ? fToC(settings.lowTempThreshold)
+            : settings.lowTempThreshold,
+    );
+    const [humidity, setHumidity] = useState(settings.humidityPreference);
+
+    const locationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+        if (!settingsReady) return;
+        const isCelsius = settings.temperatureScale === 'Metric';
+        setClothingStyle(settings.clothingStyle);
+        setLocation(settings.location);
+        setTempScale(settings.temperatureScale as 'Imperial' | 'Metric');
+        setHiTemp(settings.hiTempThreshold);
+        setLowTemp(settings.lowTempThreshold);
+        setHiTempDisp(isCelsius ? fToC(settings.hiTempThreshold) : settings.hiTempThreshold);
+        setLowTempDisp(isCelsius ? fToC(settings.lowTempThreshold) : settings.lowTempThreshold);
+        setHumidity(settings.humidityPreference);
+    }, [settings, settingsReady]);
+
+    const currentSettings = (overrides: Partial<typeof settings>) => ({
+        clothingStyle,
+        location,
+        temperatureScale: tempScale,
+        hiTempThreshold: hiTemp,
+        lowTempThreshold: lowTemp,
+        humidityPreference: humidity,
+        ...overrides,
+    });
+
+    const handleStyleChange = (s: string) => {
+        setClothingStyle(s);
+        saveSettings(currentSettings({ clothingStyle: s })).catch(() => {});
+    };
+
+    const handleScaleChange = (scale: 'Imperial' | 'Metric') => {
+        const toC = scale === 'Metric';
+        setHiTempDisp(toC ? fToC(hiTemp) : hiTemp);
+        setLowTempDisp(toC ? fToC(lowTemp) : lowTemp);
+        setTempScale(scale);
+        saveSettings(currentSettings({ temperatureScale: scale })).catch(() => {});
+    };
+
+    const handleLocationChange = (text: string) => {
+        setLocation(text);
+        if (locationTimer.current) clearTimeout(locationTimer.current);
+        locationTimer.current = setTimeout(() => {
+            saveSettings(currentSettings({ location: text })).catch(() => {});
+        }, 800);
+    };
+
+    return (
+        <SafeAreaView style={styles.root} edges={['bottom']}>
+            <KeyboardAvoidingView
+                style={{ flex: 1 }}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            >
+                <ScrollView
+                    contentContainerStyle={styles.content}
+                    keyboardShouldPersistTaps='handled'
+                >
+                    {/* Appearance */}
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Appearance</Text>
+                        <View style={styles.appearanceSegmented}>
+                            {APPEARANCE_MODES.map(({ label, value }) => (
+                                <Pressable
+                                    key={value}
+                                    style={[
+                                        styles.appearanceSeg,
+                                        mode === value && styles.segActive,
+                                    ]}
+                                    onPress={() => setMode(value)}
+                                    accessibilityRole="radio"
+                                    accessibilityLabel={label}
+                                    accessibilityState={{ selected: mode === value }}
+                                >
+                                    <Text style={[
+                                        styles.segText,
+                                        mode === value && styles.segTextActive,
+                                    ]}>
+                                        {label}
+                                    </Text>
+                                </Pressable>
+                            ))}
+                        </View>
+                    </View>
+
+                    {/* Style preference */}
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Style preference</Text>
+                        <View style={styles.chipGrid}>
+                            {STYLES.map((s) => (
+                                <Pressable
+                                    key={s}
+                                    style={[
+                                        styles.chip,
+                                        clothingStyle === s && styles.chipActive,
+                                    ]}
+                                    onPress={() => handleStyleChange(s)}
+                                    accessibilityRole="radio"
+                                    accessibilityLabel={s}
+                                    accessibilityState={{ selected: clothingStyle === s }}
+                                >
+                                    <Text style={[
+                                        styles.chipText,
+                                        clothingStyle === s && styles.chipTextActive,
+                                    ]}>
+                                        {s}
+                                    </Text>
+                                </Pressable>
+                            ))}
+                        </View>
+                    </View>
+
+                    {/* Location */}
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Default location</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder='City name'
+                            placeholderTextColor={colors.textMuted}
+                            value={location}
+                            onChangeText={handleLocationChange}
+                            returnKeyType='done'
+                            accessibilityLabel="Default location"
+                        />
+                    </View>
+
+                    {/* Temperature unit */}
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Temperature unit</Text>
+                        <View style={styles.segmented}>
+                            {(['Imperial', 'Metric'] as const).map((scale) => (
+                                <Pressable
+                                    key={scale}
+                                    style={[
+                                        styles.seg,
+                                        tempScale === scale && styles.segActive,
+                                    ]}
+                                    onPress={() => handleScaleChange(scale)}
+                                    accessibilityRole="radio"
+                                    accessibilityLabel={scale === 'Imperial' ? 'Fahrenheit' : 'Celsius'}
+                                    accessibilityState={{ selected: tempScale === scale }}
+                                >
+                                    <Text style={[
+                                        styles.segText,
+                                        tempScale === scale && styles.segTextActive,
+                                    ]}>
+                                        {scale === 'Imperial' ? '°F' : '°C'}
+                                    </Text>
+                                </Pressable>
+                            ))}
+                        </View>
+                    </View>
+
+                    {/* Temperature feel */}
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Temperature feel</Text>
+                        <SliderField
+                            label='Hot above'
+                            value={hiTempDisp}
+                            unit='°'
+                            min={tempScale === 'Metric' ? 10 : 50}
+                            max={tempScale === 'Metric' ? 49 : 120}
+                            onChange={(v) => {
+                                setHiTempDisp(v);
+                                setHiTemp(tempScale === 'Metric' ? cToF(v) : v);
+                            }}
+                            onSave={(v) =>
+                                saveSettings(
+                                    currentSettings({ hiTempThreshold: tempScale === 'Metric' ? cToF(v) : v }),
+                                ).catch(() => {})
+                            }
+                            styles={styles}
+                            colors={colors}
+                        />
+                        <SliderField
+                            label='Cold below'
+                            value={lowTempDisp}
+                            unit='°'
+                            min={tempScale === 'Metric' ? -18 : 0}
+                            max={tempScale === 'Metric' ? 21 : 70}
+                            onChange={(v) => {
+                                setLowTempDisp(v);
+                                setLowTemp(tempScale === 'Metric' ? cToF(v) : v);
+                            }}
+                            onSave={(v) =>
+                                saveSettings(
+                                    currentSettings({ lowTempThreshold: tempScale === 'Metric' ? cToF(v) : v }),
+                                ).catch(() => {})
+                            }
+                            styles={styles}
+                            colors={colors}
+                        />
+                    </View>
+
+                    {/* Humidity */}
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Humidity sensitivity</Text>
+                        <SliderField
+                            label='Threshold'
+                            value={humidity}
+                            unit='%'
+                            min={0}
+                            max={100}
+                            onChange={setHumidity}
+                            onSave={(v) =>
+                                saveSettings(
+                                    currentSettings({ humidityPreference: v }),
+                                ).catch(() => {})
+                            }
+                            styles={styles}
+                            colors={colors}
+                        />
+                    </View>
+                </ScrollView>
+            </KeyboardAvoidingView>
+        </SafeAreaView>
+    );
+}

@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 import {
-    colors,
+    ColorTokens,
     fonts,
     fontSizes,
     fontWeights,
@@ -8,7 +8,7 @@ import {
     radius,
 } from '../../theme/tokens';
 
-export const styles = StyleSheet.create({
+export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.bgDefault },
     closetBar: {
         flexDirection: 'row',
@@ -275,7 +275,7 @@ export const styles = StyleSheet.create({
         width: 48,
         height: 48,
         borderRadius: 8,
-        backgroundColor: 'rgba(255,255,255,0.05)',
+        backgroundColor: colors.glassBg,
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'hidden',
@@ -316,7 +316,7 @@ export const styles = StyleSheet.create({
         fontFamily: fonts.body,
         fontSize: 10,
         color: colors.textMuted,
-        backgroundColor: 'rgba(255,255,255,0.05)',
+        backgroundColor: colors.glassBg,
         borderRadius: 4,
         paddingHorizontal: 6,
         paddingVertical: 2,

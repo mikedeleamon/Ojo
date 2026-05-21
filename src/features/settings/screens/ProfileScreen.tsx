@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { StyleSheet, Modal, Alert, AccessibilityInfo, findNodeHandle, View as RNView } from 'react-native';
 import { ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,12 +8,34 @@ import { auth, getToken, getErrorMessage, updateAuthUser, clearAuth } from '../.
 import { storage } from '../../../lib/storage';
 import { useFormSubmit } from '../../../hooks/useFormSubmit';
 import { StatusMessage } from '../../../components/shared';
-import { styles as s } from '../screens/screens.styles';
-import { colors, spacing, radius, fonts, fontSizes } from '../../../theme/tokens';
+import { makeStyles } from '../screens/screens.styles';
+import { spacing, radius, fonts, fontSizes } from '../../../theme/tokens';
+import { useTheme } from '../../../theme/ThemeContext';
 
 interface Props { onLogout?: () => void; }
 
 export default function ProfileScreen({ onLogout }: Props) {
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
+  const styles = useMemo(() => StyleSheet.create({
+    root:        { flex: 1, backgroundColor: colors.bgDefault },
+    content:     { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xl },
+    saveBtnText: { fontFamily: fonts.body, fontSize: fontSizes.base, fontWeight: '600', color: colors.saveBtnText },
+    backdrop:    { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.55)' },
+    modalCard: {
+      position: 'absolute', left: 24, right: 24,
+      top: '30%',
+      backgroundColor: colors.glassBgStrong,
+      borderRadius: radius.lg, padding: spacing.lg,
+      borderWidth: 1, borderColor: colors.glassBorder, gap: 12,
+    },
+    modalIcon: {
+      width: 44, height: 44, borderRadius: 22,
+      backgroundColor: 'rgba(239,68,68,0.10)',
+      alignItems: 'center', justifyContent: 'center',
+    },
+  }), [colors]);
+
   const [username,     setUsername]     = useState('');
   const [email,        setEmail]        = useState('');
   const [deleteStep,   setDeleteStep]   = useState(false);
@@ -110,7 +132,6 @@ export default function ProfileScreen({ onLogout }: Props) {
           onPress={() => { if (!deleteLoading) { setDeleteStep(false); setDeleteError(null); } }} />
         <View style={styles.modalCard}>
           <View style={styles.modalIcon}>
-            {/* warning icon placeholder */}
             <Text style={{ fontSize: 20 }}>⚠️</Text>
           </View>
           <RNView ref={deleteModalTitleRef} accessible={true} accessibilityLabel="Are you sure? This will permanently delete your account.">
@@ -144,22 +165,3 @@ export default function ProfileScreen({ onLogout }: Props) {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  root:        { flex: 1, backgroundColor: colors.bgDefault },
-  content:     { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xl },
-  saveBtnText: { fontFamily: fonts.body, fontSize: fontSizes.base, fontWeight: '600', color: '#0D1B2A' },
-  backdrop:    { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.55)' },
-  modalCard: {
-    position: 'absolute', left: 24, right: 24,
-    top: '30%',
-    backgroundColor: 'rgba(15,23,42,0.96)',
-    borderRadius: radius.lg, padding: spacing.lg,
-    borderWidth: 1, borderColor: colors.glassBorder, gap: 12,
-  },
-  modalIcon: {
-    width: 44, height: 44, borderRadius: 22,
-    backgroundColor: 'rgba(239,68,68,0.10)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-});

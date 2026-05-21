@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   StyleSheet, Animated, TextInput as RNTextInput,
   Image, ScrollView, KeyboardAvoidingView, Platform,
@@ -10,7 +10,9 @@ import { useSettings } from '../../hooks/useSettings';
 import { storage } from '../../lib/storage';
 import { auth } from '../../lib/auth';
 import axios from '../../api/client';
-import { colors, spacing, radius, fonts, fontSizes, fontWeights, shadows } from '../../theme/tokens';
+import { spacing, radius, fonts, fontSizes, fontWeights, shadows } from '../../theme/tokens';
+import { useTheme } from '../../theme/ThemeContext';
+import { ColorTokens } from '../../theme/tokens';
 
 const ONBOARD_KEY = 'ojo_onboarding_done';
 const STYLES_LIST = ['Casual', 'Business Casual', 'Formal', 'Athletic', 'Streetwear', 'Minimalist'];
@@ -20,15 +22,15 @@ const TOTAL_STEPS = 4;
 interface Props { onComplete?: () => void; }
 
 // ── Step progress dots ────────────────────────────────────────────────────────
-const Dots = ({ step }: { step: number }) => (
-  <View style={st.dots}>
+const Dots = ({ step, colors }: { step: number; colors: ColorTokens }) => (
+  <View style={{ flexDirection: 'row', gap: 6, marginBottom: spacing.xs }}>
     {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
       <View
         key={i}
         style={[
-          st.dot,
-          i === step - 1 && st.dotActive,
-          i < step - 1  && st.dotDone,
+          { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.glassBorder },
+          i === step - 1 && { width: 18, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.7)' },
+          i < step - 1  && { backgroundColor: 'rgba(52,211,153,0.65)' },
         ]}
       />
     ))}
@@ -36,16 +38,20 @@ const Dots = ({ step }: { step: number }) => (
 );
 
 // ── Circular icon container ───────────────────────────────────────────────────
-const StepIcon = ({ children }: { children: React.ReactNode }) => (
-  <View style={st.stepIcon}>{children}</View>
+const StepIcon = ({ children, colors }: { children: React.ReactNode; colors: ColorTokens }) => (
+  <View style={{
+    width: 64, height: 64, borderRadius: 32,
+    backgroundColor: colors.glassBg, borderWidth: 1, borderColor: colors.glassBorder,
+    alignItems: 'center', justifyContent: 'center',
+  }}>{children}</View>
 );
 
 // ── Arrow icon used inside primary buttons ────────────────────────────────────
-const ArrowRight = () => (
+const ArrowRight = ({ color }: { color: string }) => (
   <Svg width={16} height={16} viewBox="0 0 16 16" fill="none">
     <Path
       d="M3 8h10M9 4l4 4-4 4"
-      stroke={colors.saveBtnText}
+      stroke={color}
       strokeWidth={1.5}
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -54,7 +60,7 @@ const ArrowRight = () => (
 );
 
 // ── Animated loading dots (step 4) ────────────────────────────────────────────
-const LoadingDots = () => {
+const LoadingDots = ({ colors }: { colors: ColorTokens }) => {
   const anims = useRef([
     new Animated.Value(0.4),
     new Animated.Value(0.4),
@@ -76,34 +82,259 @@ const LoadingDots = () => {
   }, []);
 
   return (
-    <View style={st.loadingDots}>
+    <View style={{ flexDirection: 'row', gap: 6, marginTop: spacing.sm }}>
       {anims.map((a, i) => (
-        <Animated.View key={i} style={[st.loadingDot, { opacity: a }]} />
+        <Animated.View key={i} style={[{
+          width: 7, height: 7, borderRadius: 3.5,
+          backgroundColor: colors.glassBorder,
+        }, { opacity: a }]} />
       ))}
     </View>
   );
 };
 
+const makeStyles = (colors: ColorTokens) => StyleSheet.create({
+  root:   { flex: 1, backgroundColor: colors.bgDefault },
+  scroll: { flexGrow: 1, justifyContent: 'center', padding: spacing.md },
+
+  card: {
+    backgroundColor: colors.glassBg,
+    borderWidth:     1,
+    borderColor:     colors.glassBorder,
+    borderRadius:    radius.lg,
+    paddingTop:      spacing.xl,
+    paddingBottom:   spacing.lg,
+    paddingHorizontal: spacing.lg,
+    ...shadows.glass,
+  },
+
+  stepShell: {
+    alignItems: 'center',
+    gap:        spacing.md,
+  },
+
+  heading: {
+    fontFamily:    fonts.display,
+    fontSize:      34,
+    color:         colors.textPrimary,
+    letterSpacing: -0.02 * 34,
+    textAlign:     'center',
+    lineHeight:    34 * 1.1,
+  },
+  sub: {
+    fontFamily: fonts.body,
+    fontSize:   fontSizes.base,
+    color:      colors.textSecondary,
+    textAlign:  'center',
+    lineHeight: fontSizes.base * 1.65,
+  },
+  illustrationRow: {
+    flexDirection: 'row',
+    gap:           spacing.md,
+    marginVertical: spacing.sm,
+  },
+  iconPill: {
+    width:           56,
+    height:          56,
+    borderRadius:    28,
+    backgroundColor: colors.glassBg,
+    borderWidth:     1,
+    borderColor:     colors.glassBorder,
+    alignItems:      'center',
+    justifyContent:  'center',
+  },
+
+  stepHeading: {
+    fontFamily:    fonts.display,
+    fontSize:      27,
+    color:         colors.textPrimary,
+    letterSpacing: -0.02 * 27,
+    textAlign:     'center',
+  },
+  stepDesc: {
+    fontFamily: fonts.body,
+    fontSize:   fontSizes.sm,
+    color:      colors.textSecondary,
+    textAlign:  'center',
+    lineHeight: fontSizes.sm * 1.6,
+  },
+
+  primaryBtn: {
+    flexDirection:   'row',
+    alignItems:      'center',
+    gap:             8,
+    paddingVertical: 13,
+    paddingHorizontal: 28,
+    backgroundColor: colors.saveBtnBg,
+    borderRadius:    radius.pill,
+  },
+  primaryBtnDisabled: {
+    opacity: 0.45,
+  },
+  primaryBtnText: {
+    fontFamily:  fonts.body,
+    fontSize:    fontSizes.base,
+    fontWeight:  fontWeights.semibold,
+    color:       colors.saveBtnText,
+  },
+  ghostBtn: {
+    paddingVertical:   12,
+    paddingHorizontal: 20,
+    backgroundColor:   'transparent',
+    borderWidth:       1,
+    borderColor:       colors.glassBorder,
+    borderRadius:      radius.pill,
+  },
+  ghostBtnText: {
+    fontFamily: fonts.body,
+    fontSize:   fontSizes.sm,
+    color:      colors.textSecondary,
+  },
+  navRow: {
+    flexDirection: 'row',
+    gap:           spacing.sm,
+    alignItems:    'center',
+    justifyContent:'center',
+    width:         '100%',
+    marginTop:     spacing.xs,
+  },
+  skipLink: {
+    fontFamily:         fonts.body,
+    fontSize:           12,
+    color:              colors.textMuted,
+    textDecorationLine: 'underline',
+  },
+
+  inputRow: { width: '100%' },
+  textInput: {
+    width:             '100%',
+    paddingVertical:   14,
+    paddingHorizontal: spacing.md,
+    backgroundColor:   colors.glassBg,
+    borderWidth:       1,
+    borderColor:       'rgba(255,255,255,0.28)',
+    borderRadius:      radius.sm,
+    color:             colors.textPrimary,
+    fontFamily:        fonts.body,
+    fontSize:          fontSizes.base,
+    textAlign:         'center',
+  },
+  successBadge: {
+    flexDirection:   'row',
+    alignItems:      'center',
+    gap:             8,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    backgroundColor: 'rgba(52,211,153,0.10)',
+    borderWidth:     1,
+    borderColor:     'rgba(52,211,153,0.30)',
+    borderRadius:    radius.pill,
+  },
+  successText: {
+    fontFamily: fonts.body,
+    fontSize:   fontSizes.sm,
+    color:      'rgba(52,211,153,0.9)',
+  },
+  errText: {
+    fontFamily: fonts.body,
+    fontSize:   12,
+    color:      'rgba(252,165,165,0.9)',
+    textAlign:  'center',
+  },
+
+  prefSection: {
+    width: '100%',
+    gap:   spacing.sm,
+  },
+  prefLabel: {
+    fontFamily:      fonts.body,
+    fontSize:        fontSizes.xs,
+    fontWeight:      fontWeights.semibold,
+    letterSpacing:   0.1 * fontSizes.xs,
+    textTransform:   'uppercase',
+    color:           colors.textMuted,
+  },
+  chipGrid: {
+    flexDirection: 'row',
+    flexWrap:      'wrap',
+    gap:           8,
+  },
+  chip: {
+    paddingVertical:   7,
+    paddingHorizontal: 16,
+    backgroundColor:   colors.glassBg,
+    borderWidth:       1,
+    borderColor:       colors.glassBorder,
+    borderRadius:      radius.pill,
+  },
+  chipActive: {
+    backgroundColor: colors.saveBtnBg,
+    borderWidth:     0,
+  },
+  chipText: {
+    fontFamily: fonts.body,
+    fontSize:   fontSizes.sm,
+    color:      colors.textSecondary,
+  },
+  chipTextActive: {
+    color:      colors.saveBtnText,
+    fontWeight: fontWeights.semibold,
+  },
+  segmented: {
+    flexDirection: 'row',
+    borderWidth:   1,
+    borderColor:   colors.glassBorder,
+    borderRadius:  radius.sm,
+    overflow:      'hidden',
+  },
+  seg: {
+    flex:            1,
+    paddingVertical: 10,
+    alignItems:      'center',
+    justifyContent:  'center',
+  },
+  segDivider: {
+    borderRightWidth: 1,
+    borderRightColor: colors.glassBorder,
+  },
+  segActive: {
+    backgroundColor: 'rgba(255,255,255,0.9)',
+  },
+  segText: {
+    fontFamily: fonts.body,
+    fontSize:   fontSizes.sm,
+    color:      colors.textSecondary,
+  },
+  segTextActive: {
+    color:      colors.saveBtnText,
+    fontWeight: fontWeights.semibold,
+  },
+
+  logo: {
+    height: 36,
+    width:  160,
+  },
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function OnboardingPage({ onComplete }: Props) {
+  const { colors } = useTheme();
+  const st = useMemo(() => makeStyles(colors), [colors]);
   const { settings, saveSettings } = useSettings();
 
   const [step, setStep] = useState(1);
 
-  // Step 2 — closet creation
   const [closetName,    setClosetName]    = useState('My Wardrobe');
   const [closetDone,    setClosetDone]    = useState(false);
   const [closetErr,     setClosetErr]     = useState<string | null>(null);
   const [closetLoading, setClosetLoading] = useState(false);
 
-  // Step 3 — preferences
   const [styleChoice, setStyleChoice] = useState(settings.clothingStyle || 'Casual');
   const [tempUnit,    setTempUnit]    = useState<'Imperial' | 'Metric'>(
     (settings.temperatureScale as 'Imperial' | 'Metric') || 'Imperial',
   );
 
-  // Card slide + fade animation
   const slideAnim   = useRef(new Animated.Value(0)).current;
   const opacityAnim = useRef(new Animated.Value(1)).current;
 
@@ -178,7 +409,7 @@ export default function OnboardingPage({ onComplete }: Props) {
               {/* ── Step 1: Welcome ─────────────────────────────────────────── */}
               {step === 1 && (
                 <View style={st.stepShell}>
-                  <Dots step={1} />
+                  <Dots step={1} colors={colors} />
                   <Image
                     source={require('../../assets/images/logos/ojoLogo.png')}
                     style={st.logo}
@@ -217,7 +448,7 @@ export default function OnboardingPage({ onComplete }: Props) {
                   </View>
                   <Pressable style={st.primaryBtn} onPress={() => advance(2)}>
                     <Text style={st.primaryBtnText}>Let's go</Text>
-                    <ArrowRight />
+                    <ArrowRight color={colors.saveBtnText} />
                   </Pressable>
                   <Pressable onPress={handleSkip}>
                     <Text style={st.skipLink}>Skip setup</Text>
@@ -228,8 +459,8 @@ export default function OnboardingPage({ onComplete }: Props) {
               {/* ── Step 2: Create Closet ────────────────────────────────────── */}
               {step === 2 && (
                 <View style={st.stepShell}>
-                  <Dots step={2} />
-                  <StepIcon>
+                  <Dots step={2} colors={colors} />
+                  <StepIcon colors={colors}>
                     <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
                       <Path
                         d="M12 4a2 2 0 0 1 2 2c0 .74-.4 1.38-1 1.73V9l8 5.5A1 1 0 0 1 20 16H4a1 1 0 0 1-.99-1.5L11 9V7.73A2 2 0 0 1 12 4Z"
@@ -286,7 +517,7 @@ export default function OnboardingPage({ onComplete }: Props) {
                       disabled={!closetDone && !closetErr}
                     >
                       <Text style={st.primaryBtnText}>{closetErr ? 'Skip this step' : 'Next'}</Text>
-                      <ArrowRight />
+                      <ArrowRight color={colors.saveBtnText} />
                     </Pressable>
                   </View>
                 </View>
@@ -295,8 +526,8 @@ export default function OnboardingPage({ onComplete }: Props) {
               {/* ── Step 3: Preferences ──────────────────────────────────────── */}
               {step === 3 && (
                 <View style={st.stepShell}>
-                  <Dots step={3} />
-                  <StepIcon>
+                  <Dots step={3} colors={colors} />
+                  <StepIcon colors={colors}>
                     <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
                       <Path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"
                         stroke={colors.textSecondary} strokeWidth={1.5} />
@@ -351,7 +582,7 @@ export default function OnboardingPage({ onComplete }: Props) {
                     </Pressable>
                     <Pressable style={st.primaryBtn} onPress={handleFinish}>
                       <Text style={st.primaryBtnText}>Finish setup</Text>
-                      <ArrowRight />
+                      <ArrowRight color={colors.saveBtnText} />
                     </Pressable>
                   </View>
                 </View>
@@ -360,7 +591,7 @@ export default function OnboardingPage({ onComplete }: Props) {
               {/* ── Step 4: Done ─────────────────────────────────────────────── */}
               {step === 4 && (
                 <View style={st.stepShell}>
-                  <Dots step={4} />
+                  <Dots step={4} colors={colors} />
                   <Svg width={56} height={56} viewBox="0 0 24 24" fill="none">
                     <Circle cx={12} cy={12} r={10} stroke="rgba(52,211,153,0.8)" strokeWidth={1.5} />
                     <Path
@@ -373,7 +604,7 @@ export default function OnboardingPage({ onComplete }: Props) {
                   </Svg>
                   <Text style={st.stepHeading}>You're all set!</Text>
                   <Text style={st.stepDesc}>Taking you to your dashboard…</Text>
-                  <LoadingDots />
+                  <LoadingDots colors={colors} />
                 </View>
               )}
 
@@ -384,280 +615,3 @@ export default function OnboardingPage({ onComplete }: Props) {
     </SafeAreaView>
   );
 }
-
-const st = StyleSheet.create({
-  root:   { flex: 1, backgroundColor: colors.bgDefault },
-  scroll: { flexGrow: 1, justifyContent: 'center', padding: spacing.md },
-
-  // ── Card ──────────────────────────────────────────────────────────────────
-  card: {
-    backgroundColor: colors.glassBg,
-    borderWidth:     1,
-    borderColor:     colors.glassBorder,
-    borderRadius:    radius.lg,
-    paddingTop:      spacing.xl,
-    paddingBottom:   spacing.lg,
-    paddingHorizontal: spacing.lg,
-    ...shadows.glass,
-  },
-
-  // ── Step shell ────────────────────────────────────────────────────────────
-  stepShell: {
-    alignItems: 'center',
-    gap:        spacing.md,
-  },
-
-  // ── Dots ──────────────────────────────────────────────────────────────────
-  dots: {
-    flexDirection: 'row',
-    gap:           6,
-    marginBottom:  spacing.xs,
-  },
-  dot: {
-    width:           6,
-    height:          6,
-    borderRadius:    3,
-    backgroundColor: colors.glassBorder,
-  },
-  dotActive: {
-    width:           18,
-    borderRadius:    radius.pill,
-    backgroundColor: 'rgba(255,255,255,0.7)',
-  },
-  dotDone: {
-    backgroundColor: 'rgba(52,211,153,0.65)',
-  },
-
-  // ── Step 1 ────────────────────────────────────────────────────────────────
-  logo: {
-    height: 36,
-    width:  160,
-  },
-  heading: {
-    fontFamily:    fonts.display,
-    fontSize:      34,
-    color:         colors.textPrimary,
-    letterSpacing: -0.02 * 34,
-    textAlign:     'center',
-    lineHeight:    34 * 1.1,
-  },
-  sub: {
-    fontFamily: fonts.body,
-    fontSize:   fontSizes.base,
-    color:      colors.textSecondary,
-    textAlign:  'center',
-    lineHeight: fontSizes.base * 1.65,
-  },
-  illustrationRow: {
-    flexDirection: 'row',
-    gap:           spacing.md,
-    marginVertical: spacing.sm,
-  },
-  iconPill: {
-    width:           56,
-    height:          56,
-    borderRadius:    28,
-    backgroundColor: colors.glassBg,
-    borderWidth:     1,
-    borderColor:     colors.glassBorder,
-    alignItems:      'center',
-    justifyContent:  'center',
-  },
-
-  // ── Step icon circle (steps 2 & 3) ────────────────────────────────────────
-  stepIcon: {
-    width:           64,
-    height:          64,
-    borderRadius:    32,
-    backgroundColor: colors.glassBg,
-    borderWidth:     1,
-    borderColor:     colors.glassBorder,
-    alignItems:      'center',
-    justifyContent:  'center',
-  },
-
-  // ── Step typography ───────────────────────────────────────────────────────
-  stepHeading: {
-    fontFamily:    fonts.display,
-    fontSize:      27,
-    color:         colors.textPrimary,
-    letterSpacing: -0.02 * 27,
-    textAlign:     'center',
-  },
-  stepDesc: {
-    fontFamily: fonts.body,
-    fontSize:   fontSizes.sm,
-    color:      colors.textSecondary,
-    textAlign:  'center',
-    lineHeight: fontSizes.sm * 1.6,
-  },
-
-  // ── Buttons ───────────────────────────────────────────────────────────────
-  primaryBtn: {
-    flexDirection:   'row',
-    alignItems:      'center',
-    gap:             8,
-    paddingVertical: 13,
-    paddingHorizontal: 28,
-    backgroundColor: colors.saveBtnBg,
-    borderRadius:    radius.pill,
-  },
-  primaryBtnDisabled: {
-    opacity: 0.45,
-  },
-  primaryBtnText: {
-    fontFamily:  fonts.body,
-    fontSize:    fontSizes.base,
-    fontWeight:  fontWeights.semibold,
-    color:       colors.saveBtnText,
-  },
-  ghostBtn: {
-    paddingVertical:   12,
-    paddingHorizontal: 20,
-    backgroundColor:   'transparent',
-    borderWidth:       1,
-    borderColor:       colors.glassBorder,
-    borderRadius:      radius.pill,
-  },
-  ghostBtnText: {
-    fontFamily: fonts.body,
-    fontSize:   fontSizes.sm,
-    color:      colors.textSecondary,
-  },
-  navRow: {
-    flexDirection: 'row',
-    gap:           spacing.sm,
-    alignItems:    'center',
-    justifyContent:'center',
-    width:         '100%',
-    marginTop:     spacing.xs,
-  },
-  skipLink: {
-    fontFamily:         fonts.body,
-    fontSize:           12,
-    color:              colors.textMuted,
-    textDecorationLine: 'underline',
-  },
-
-  // ── Step 2: closet input ──────────────────────────────────────────────────
-  inputRow: {
-    width: '100%',
-  },
-  textInput: {
-    width:             '100%',
-    paddingVertical:   14,
-    paddingHorizontal: spacing.md,
-    backgroundColor:   colors.glassBg,
-    borderWidth:       1,
-    borderColor:       'rgba(255,255,255,0.28)',
-    borderRadius:      radius.sm,
-    color:             colors.textPrimary,
-    fontFamily:        fonts.body,
-    fontSize:          fontSizes.base,
-    textAlign:         'center',
-  },
-  successBadge: {
-    flexDirection:   'row',
-    alignItems:      'center',
-    gap:             8,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    backgroundColor: 'rgba(52,211,153,0.10)',
-    borderWidth:     1,
-    borderColor:     'rgba(52,211,153,0.30)',
-    borderRadius:    radius.pill,
-  },
-  successText: {
-    fontFamily: fonts.body,
-    fontSize:   fontSizes.sm,
-    color:      'rgba(52,211,153,0.9)',
-  },
-  errText: {
-    fontFamily: fonts.body,
-    fontSize:   12,
-    color:      'rgba(252,165,165,0.9)',
-    textAlign:  'center',
-  },
-
-  // ── Step 3: preferences ───────────────────────────────────────────────────
-  prefSection: {
-    width: '100%',
-    gap:   spacing.sm,
-  },
-  prefLabel: {
-    fontFamily:      fonts.body,
-    fontSize:        fontSizes.xs,
-    fontWeight:      fontWeights.semibold,
-    letterSpacing:   0.1 * fontSizes.xs,
-    textTransform:   'uppercase',
-    color:           colors.textMuted,
-  },
-  chipGrid: {
-    flexDirection: 'row',
-    flexWrap:      'wrap',
-    gap:           8,
-  },
-  chip: {
-    paddingVertical:   7,
-    paddingHorizontal: 16,
-    backgroundColor:   colors.glassBg,
-    borderWidth:       1,
-    borderColor:       colors.glassBorder,
-    borderRadius:      radius.pill,
-  },
-  chipActive: {
-    backgroundColor: colors.saveBtnBg,
-    borderWidth:     0,
-  },
-  chipText: {
-    fontFamily: fonts.body,
-    fontSize:   fontSizes.sm,
-    color:      colors.textSecondary,
-  },
-  chipTextActive: {
-    color:      colors.saveBtnText,
-    fontWeight: fontWeights.semibold,
-  },
-  segmented: {
-    flexDirection: 'row',
-    borderWidth:   1,
-    borderColor:   colors.glassBorder,
-    borderRadius:  radius.sm,
-    overflow:      'hidden',
-  },
-  seg: {
-    flex:            1,
-    paddingVertical: 10,
-    alignItems:      'center',
-    justifyContent:  'center',
-  },
-  segDivider: {
-    borderRightWidth: 1,
-    borderRightColor: colors.glassBorder,
-  },
-  segActive: {
-    backgroundColor: 'rgba(255,255,255,0.9)',
-  },
-  segText: {
-    fontFamily: fonts.body,
-    fontSize:   fontSizes.sm,
-    color:      colors.textSecondary,
-  },
-  segTextActive: {
-    color:      colors.saveBtnText,
-    fontWeight: fontWeights.semibold,
-  },
-
-  // ── Step 4: done ──────────────────────────────────────────────────────────
-  loadingDots: {
-    flexDirection: 'row',
-    gap:           6,
-    marginTop:     spacing.sm,
-  },
-  loadingDot: {
-    width:           7,
-    height:          7,
-    borderRadius:    3.5,
-    backgroundColor: colors.glassBorder,
-  },
-});

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { View, Text, TextInput, Pressable } from '../../../components/primitives';
@@ -6,10 +6,19 @@ import axios from '../../../api/client';
 import { auth } from '../../../lib/auth';
 import { useFormSubmit } from '../../../hooks/useFormSubmit';
 import { StatusMessage } from '../../../components/shared';
-import { styles as s } from './screens.styles';
-import { colors, spacing, fonts, fontSizes } from '../../../theme/tokens';
+import { makeStyles } from './screens.styles';
+import { spacing, fonts, fontSizes } from '../../../theme/tokens';
+import { useTheme } from '../../../theme/ThemeContext';
 
 export default function PasswordScreen() {
+  const { colors } = useTheme();
+  const s = useMemo(() => makeStyles(colors), [colors]);
+  const styles = useMemo(() => StyleSheet.create({
+    root:    { flex: 1, backgroundColor: colors.bgDefault },
+    content: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xl },
+    btnText: { fontFamily: fonts.body, fontSize: fontSizes.base, fontWeight: '600', color: colors.saveBtnText },
+  }), [colors]);
+
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword,     setNewPassword]     = useState('');
   const [confirm,         setConfirm]         = useState('');
@@ -67,9 +76,3 @@ export default function PasswordScreen() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  root:    { flex: 1, backgroundColor: colors.bgDefault },
-  content: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xl },
-  btnText: { fontFamily: fonts.body, fontSize: fontSizes.base, fontWeight: '600', color: '#0D1B2A' },
-});
