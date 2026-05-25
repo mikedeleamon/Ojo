@@ -20,7 +20,12 @@ import { spacing, radius, fonts, fontSizes, fontWeights } from '../../../theme/t
 import { useTheme, ThemeMode } from '../../../theme/ThemeContext';
 import { fToC, cToF } from '../../../lib/units';
 import { loadHistory } from '../../../lib/outfitHistory';
-import { loadPreferences, UserPreferenceProfile } from '../../../lib/userPreferences';
+import {
+    loadPreferences,
+    UserPreferenceProfile,
+    computeStyleDNA,
+    StyleDNA,
+} from '../../../lib/userPreferences';
 import { OutfitHistoryEntry } from '../../../types';
 import { CSS_COLORS } from '../../../lib/colors/cssColors';
 
@@ -234,6 +239,39 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
         color: colors.textMuted,
         marginTop: 1,
     },
+    // Style DNA card
+    dnaCard: {
+        borderWidth: 1,
+        borderRadius: radius.md,
+        padding: spacing.sm,
+        gap: 8,
+    },
+    dnaHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    dnaTitle: {
+        fontFamily: fonts.bodySemiBold,
+        fontSize: fontSizes.sm,
+    },
+    dnaLevel: {
+        fontFamily: fonts.bodySemiBold,
+        fontSize: fontSizes.xs,
+    },
+    dnaBarBg: {
+        height: 4,
+        borderRadius: radius.pill,
+        overflow: 'hidden',
+    },
+    dnaBarFill: {
+        height: '100%' as any,
+        borderRadius: radius.pill,
+    },
+    dnaSub: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs,
+    },
     // Appearance segmented — full-width
     appearanceSegmented: {
         flexDirection: 'row',
@@ -334,6 +372,57 @@ const HistorySection = ({
                 </View>
             ))}
         </>
+    );
+};
+
+// ─── Style DNA card ──────────────────────────────────────────────────────────
+
+const LEVEL_LABELS: Record<StyleDNA['level'], string> = {
+    none:     'Building profile…',
+    learning: 'Learning your style',
+    active:   'Personalized ★',
+};
+const LEVEL_COLORS: Record<StyleDNA['level'], string> = {
+    none:     'rgba(148,163,184,0.8)',
+    learning: 'rgba(251,191,36,0.9)',
+    active:   'rgba(99,102,241,0.9)',
+};
+const LEVEL_PROGRESS: Record<StyleDNA['level'], number> = { none: 0.15, learning: 0.5, active: 1.0 };
+
+const StyleDNACard = ({
+    prefs,
+    styles,
+}: {
+    prefs: UserPreferenceProfile;
+    styles: ReturnType<typeof makeStyles>;
+}) => {
+    const { colors } = useTheme();
+    const dna = computeStyleDNA(prefs);
+    const levelColor = LEVEL_COLORS[dna.level];
+    const progress   = LEVEL_PROGRESS[dna.level];
+
+    return (
+        <View style={[styles.dnaCard, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}>
+            <View style={styles.dnaHeaderRow}>
+                <Text style={[styles.dnaTitle, { color: colors.textPrimary }]}>Style Ranker</Text>
+                <Text style={[styles.dnaLevel, { color: levelColor }]}>
+                    {LEVEL_LABELS[dna.level]}
+                </Text>
+            </View>
+            {/* Progress bar */}
+            <View style={[styles.dnaBarBg, { backgroundColor: colors.glassBorder }]}>
+                <View style={[styles.dnaBarFill, { width: `${Math.round(progress * 100)}%` as any, backgroundColor: levelColor }]} />
+            </View>
+            <Text style={[styles.dnaSub, { color: colors.textMuted }]}>
+                {dna.totalOutfits} outfits logged · {dna.level === 'active' ? 'Score badge now shows "Your Score"' : dna.level === 'learning' ? `${30 - dna.totalOutfits} more to fully personalize` : `${10 - dna.totalOutfits} outfits until the ranker starts learning`}
+            </Text>
+            {dna.topColors.length > 0 && (
+                <Text style={[styles.dnaSub, { color: colors.textSecondary, marginTop: 2 }]}>
+                    Signature colors: {dna.topColors.join(', ')}
+                    {dna.topFabric ? ` · Fabric: ${dna.topFabric}` : ''}
+                </Text>
+            )}
+        </View>
     );
 };
 
@@ -516,6 +605,12 @@ export default function PreferencesScreen() {
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Outfit history</Text>
                         <HistorySection history={history} styles={styles} />
+                    </View>
+
+                    {/* Style Ranker DNA card */}
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Personal Style Ranker</Text>
+                        <StyleDNACard prefs={prefs} styles={styles} />
                     </View>
 
                     {/* Wear patterns */}

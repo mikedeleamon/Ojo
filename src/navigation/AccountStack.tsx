@@ -17,6 +17,7 @@ import {
     HistoryScreen,
 } from '../features/settings/screens/SimpleScreens';
 import TripFitScreen from '../views/TripFit/TripFitScreen';
+import ScanOutfitScreen from '../views/ScanOutfit/ScanOutfitScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -137,6 +138,12 @@ export default function AccountStack({ onLogout }: Props) {
                 name='TripFit'
                 options={(p) => ({ ...subScreen(p), title: 'TripFit', headerShown: false })}
                 component={TripFitScreen}
+            />
+
+            <Stack.Screen
+                name='ScanOutfit'
+                options={(p) => ({ ...subScreen(p), title: 'Scan Outfit', headerShown: false })}
+                component={ScanOutfitScreen}
             />
         </Stack.Navigator>
     );

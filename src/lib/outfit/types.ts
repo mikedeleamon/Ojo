@@ -30,13 +30,15 @@ export interface ScoreBreakdown {
 }
 
 export interface OutfitResult {
-  status: OutfitStatus;
-  headline: string;
-  slots: OutfitSlot[];
-  notes: string[];
-  score: number;
-  scoreBreakdown: ScoreBreakdown;
-  layering?: LayeringResult;
+  status:          OutfitStatus;
+  headline:        string;
+  slots:           OutfitSlot[];
+  notes:           string[];
+  score:           number;
+  scoreBreakdown:  ScoreBreakdown;
+  layering?:       LayeringResult;
+  /** True when ≥30 logged outfits — preference weight is meaningfully elevated. */
+  isPersonalized?: boolean;
 }
 
 /** Accepts either legacy Set<string> or Map<string, number> (id→daysSinceWorn). */

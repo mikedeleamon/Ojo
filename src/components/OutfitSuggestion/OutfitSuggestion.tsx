@@ -4,6 +4,7 @@ import {
     Image,
     Pressable,
     Linking,
+    Share,
     useWindowDimensions,
     Animated as RNAnimated,
     Easing as RNEasing,
@@ -16,6 +17,7 @@ import { useClosets } from '../../hooks/useClosets';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import {
     generateOutfits,
+    personalizedScoreLevel,
     OutfitRole,
     OutfitSlot,
     OutfitResult,
@@ -23,7 +25,11 @@ import {
     articleZoneLabel,
 } from '../../lib/outfitEngine';
 import { addHistoryEntry, recentlyWornWithAge } from '../../lib/outfitHistory';
-import { updatePreferences } from '../../lib/userPreferences';
+import {
+    updatePreferences,
+    loadPreferences,
+    UserPreferenceProfile,
+} from '../../lib/userPreferences';
 import { recordGapsFromNotes, getGapSuggestions, GapSuggestion, GapType } from '../../lib/wardrobeGaps';
 import {
     ClothingArticle,
@@ -112,7 +118,15 @@ const ArticleThumb = ({
     );
 };
 
-const ScoreBadge = ({ score }: { score: number }) => {
+const ScoreBadge = ({
+    score,
+    isPersonalized,
+    isLearning,
+}: {
+    score: number;
+    isPersonalized?: boolean;
+    isLearning?: boolean;
+}) => {
     const { colors } = useTheme();
     const styles = useMemo(() => makeStyles(colors), [colors]);
     const color =
@@ -121,11 +135,18 @@ const ScoreBadge = ({ score }: { score: number }) => {
             : score >= 60
               ? 'rgba(251,191,36,0.9)'
               : 'rgba(148,163,184,0.9)';
+    const label = isPersonalized ? 'Your Score' : 'Outfit Score';
     return (
         <View style={[styles.scoreBadge, { borderColor: color }]}>
             <Text style={[styles.scoreBadgeText, { color }]}>
-                Outfit Score: {score}
+                {label}: {score}
+                {isPersonalized ? ' ★' : ''}
             </Text>
+            {isLearning && !isPersonalized && (
+                <Text style={[styles.scoreBadgeText, { color, fontSize: 10, opacity: 0.7 }]}>
+                    personalizing…
+                </Text>
+            )}
         </View>
     );
 };
@@ -245,6 +266,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
     );
     const [gapSuggestion, setGapSuggestion] = useState<GapSuggestion | null>(null);
     const [gapDismissed, setGapDismissed] = useState(false);
+    const [profile, setProfile] = useState<UserPreferenceProfile>({ colors: {}, fabrics: {}, categories: {}, colorPairs: {}, totalOutfits: 0 });
     const nav = useAppNavigation();
 
     // ─── #5: Swipe hint bounce (first render only) ──────────────────────────
@@ -261,6 +283,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
 
     useEffect(() => {
         recentlyWornWithAge(7).then(setWorn);
+        loadPreferences().then(setProfile).catch(() => {});
     }, []);
 
     useEffect(() => {
@@ -292,11 +315,11 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
             effectiveSettings,
             worn,
             3,
-            undefined,
+            profile,
             forecasts,
         );
         return { outfits: results, status };
-    }, [preferred, weather, effectiveSettings, worn, forecasts]);
+    }, [preferred, weather, effectiveSettings, worn, forecasts, profile]);
 
     const safeIdx = Math.min(activeIdx, Math.max(0, outfits.length - 1));
     const activeOutfit: OutfitResult | null = outfits[safeIdx] ?? null;
@@ -364,6 +387,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
             articleSummary: articles.map((a) => a.name || a.clothingType).join(', '),
         });
         await updatePreferences(articles);
+        loadPreferences().then(setProfile).catch(() => {});
         setWornLogged(true);
         // #8 — green glow animation
         glowAnim.setValue(0);
@@ -475,6 +499,18 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
 
     if (!activeOutfit) return null;
 
+    // ── Personalization level for badge ───────────────────────────────────────
+    const scoreLevel = personalizedScoreLevel(profile.totalOutfits);
+
+    // ── Share handler (Feature 10) ────────────────────────────────────────────
+    const handleShare = async () => {
+        const articles = activeSlots.map((s) => s.article);
+        const lines = articles.map(a => `• ${a.name || a.clothingType}${a.color ? ` (${a.color})` : ''}`).join('\n');
+        const tempF = Math.round(weather.Temperature.Imperial.Value);
+        const msg = `👔 My Ojo Outfit — Score: ${activeOutfit.score}${activeOutfit.isPersonalized ? ' ★' : ''}\n${'─'.repeat(22)}\n${lines}\n\n🌤️ ${tempF}°F · ${weather.WeatherText}\n\nStyled with Ojo`;
+        Share.share({ message: msg }).catch(() => {});
+    };
+
     // #5 — Swipe hint: translate the pager slightly left, then snap back
     const hintTranslateX = hintAnim.interpolate({
         inputRange: [0, 1],
@@ -511,7 +547,31 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
                     name={preferred.name}
                     onPress={() => nav.push('Closet')}
                 />
-                <ScoreBadge score={activeOutfit.score} />
+                <View style={styles.scoreBadgeRow}>
+                    <ScoreBadge
+                        score={activeOutfit.score}
+                        isPersonalized={scoreLevel === 'active'}
+                        isLearning={scoreLevel === 'learning'}
+                    />
+                    <Pressable
+                        onPress={handleShare}
+                        style={styles.shareBtn}
+                        accessibilityLabel="Share outfit"
+                        accessibilityRole="button"
+                        hitSlop={8}
+                    >
+                        <Text style={[styles.shareBtnText, { color: colors.textMuted }]}>↑ Share</Text>
+                    </Pressable>
+                    <Pressable
+                        onPress={() => nav.push('Account', { screen: 'ScanOutfit' })}
+                        style={styles.shareBtn}
+                        accessibilityLabel="Scan what you're wearing"
+                        accessibilityRole="button"
+                        hitSlop={8}
+                    >
+                        <Text style={[styles.shareBtnText, { color: colors.textMuted }]}>📷 Scan</Text>
+                    </Pressable>
+                </View>
             </View>
 
             {/* ── Occasion quick-switch ── */}

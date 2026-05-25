@@ -91,6 +91,42 @@ export const articlePreferenceScore = (
   return 1 / (1 + Math.exp(-10 * (raw - 0.1)));
 };
 
+// ─── Style DNA ────────────────────────────────────────────────────────────────
+
+/** How much the ranker has learned from the user's outfit history. */
+export type PersonalizationLevel = 'none' | 'learning' | 'active';
+
+export interface StyleDNA {
+  topColors:    string[];
+  topFabric:    string | null;
+  topCategory:  string | null;
+  level:        PersonalizationLevel;
+  totalOutfits: number;
+}
+
+export const PERSONALIZATION_THRESHOLD = 30;
+export const LEARNING_THRESHOLD        = 10;
+
+/** Compute the user's style fingerprint from their preference history. */
+export const computeStyleDNA = (profile: UserPreferenceProfile): StyleDNA => {
+  const level: PersonalizationLevel =
+    profile.totalOutfits >= PERSONALIZATION_THRESHOLD ? 'active' :
+    profile.totalOutfits >= LEARNING_THRESHOLD        ? 'learning' : 'none';
+
+  const topColors = Object.entries(profile.colors)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([c]) => c);
+
+  const topFabric = Object.entries(profile.fabrics)
+    .sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+
+  const topCategory = Object.entries(profile.categories)
+    .sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+
+  return { topColors, topFabric, topCategory, level, totalOutfits: profile.totalOutfits };
+};
+
 /**
  * Returns a 0–0.10 bonus for an outfit based on how often its color pairings
  * have appeared in the user's history. Frequently-chosen combos get boosted

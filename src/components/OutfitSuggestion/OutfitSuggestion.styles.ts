@@ -39,6 +39,11 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         fontSize: fontSizes.xs,
         color: colors.textSecondary,
     },
+    scoreBadgeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
     scoreBadge: {
         paddingHorizontal: 8,
         paddingVertical: 3,
@@ -49,6 +54,18 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         fontFamily: fonts.body,
         fontSize: fontSizes.sm,
         fontWeight: fontWeights.semibold,
+    },
+    shareBtn: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: radius.pill,
+        borderWidth: 1,
+        borderColor: 'transparent',
+    },
+    shareBtnText: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs,
+        fontWeight: fontWeights.medium,
     },
     pagerCard: {
         gap: spacing.sm,

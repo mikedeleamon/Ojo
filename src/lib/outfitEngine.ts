@@ -15,7 +15,10 @@
  */
 
 import { ClothingArticle, CurrentWeather, Forecast, Settings, OutfitOccasion } from '../types';
-import { articlePreferenceScore, colorPairingBonus, UserPreferenceProfile } from './userPreferences';
+import {
+  articlePreferenceScore, colorPairingBonus, UserPreferenceProfile,
+  PERSONALIZATION_THRESHOLD, LEARNING_THRESHOLD,
+} from './userPreferences';
 import { buildLayeringContext, generateLayeringRecommendation } from './layeringEngine';
 import type {
   OutfitRole,
@@ -412,12 +415,42 @@ const outfitPreferenceScore = (slots: OutfitSlot[], profile: UserPreferenceProfi
 
 // ─── 4. Outfit composite scorer ───────────────────────────────────────────────
 
+/**
+ * Personalization level for external callers (e.g. the UI score badge).
+ * Mirrors the thresholds in userPreferences.ts without a circular import.
+ */
+export const personalizedScoreLevel = (totalOutfits: number): 'none' | 'learning' | 'active' =>
+  totalOutfits >= PERSONALIZATION_THRESHOLD ? 'active' :
+  totalOutfits >= LEARNING_THRESHOLD        ? 'learning' : 'none';
+
 // Scoring weights vary by weather extremity — fabric matters more when comfort is critical.
-const getWeights = (bucket: WeatherBucket) => {
-  if (bucket === 'freezing' || bucket === 'hot') {
-    return { fabric: 0.40, color: 0.22, style: 0.22, simplicity: 0.08, preference: 0.08 };
-  }
-  return { fabric: 0.30, color: 0.25, style: 0.25, simplicity: 0.10, preference: 0.10 };
+// Preference weight scales up as the user logs more outfits (personal style ranker).
+const getWeights = (bucket: WeatherBucket, totalOutfits: number) => {
+  const extreme = bucket === 'freezing' || bucket === 'hot';
+  const base = extreme
+    ? { fabric: 0.40, color: 0.22, style: 0.22, simplicity: 0.08, preference: 0.08 }
+    : { fabric: 0.30, color: 0.25, style: 0.25, simplicity: 0.10, preference: 0.10 };
+
+  // Graduated personalization: preference weight grows as data accumulates.
+  // Surplus is taken proportionally from fabric/color/style/simplicity so weights sum to 1.
+  const boost =
+    totalOutfits >= PERSONALIZATION_THRESHOLD ? 2.5 :
+    totalOutfits >= LEARNING_THRESHOLD        ? 1.5 : 1.0;
+
+  if (boost === 1.0) return base;
+
+  const newPref   = Math.min(0.25, base.preference * boost);
+  const delta     = newPref - base.preference;
+  const nonPrefSum = 1 - base.preference;
+  const scale     = (nonPrefSum - delta) / nonPrefSum;
+
+  return {
+    fabric:     base.fabric     * scale,
+    color:      base.color      * scale,
+    style:      base.style      * scale,
+    simplicity: base.simplicity * scale,
+    preference: newPref,
+  };
 };
 
 // ─── Recency decay ─────────────��───────────────────────────���─────────────────
@@ -463,7 +496,7 @@ const scoreCombo = (
   const preference = outfitPreferenceScore(slots, profile);
   const occasion   = occasionScore(slots, settings.occasion ?? 'everyday');
 
-  const weights = getWeights(bucket);
+  const weights = getWeights(bucket, profile.totalOutfits);
 
   const recencyPenalty = Math.min(
     slots.reduce((sum, s) => sum + recencyPenaltyForArticle(s.article._id, recentlyWorn), 0),
@@ -901,6 +934,8 @@ export const generateOutfits = (
   // scoring should not be repeated inside the per-outfit map below.
   const layeringCtx = buildLayeringContext({ weather, forecasts, settings });
 
+  const isPersonalized = profile.totalOutfits >= PERSONALIZATION_THRESHOLD;
+
   const results: OutfitResult[] = topList.map(combo => {
     const layering = generateLayeringRecommendation({ context: layeringCtx, slots: combo.slots });
 
@@ -911,13 +946,14 @@ export const generateOutfits = (
     const adjustedScore = Math.max(0, Math.min(100, combo.score + confidenceBoost));
 
     return {
-      status:         'ok' as OutfitStatus,
-      headline:       headline(bucket),
-      slots:          combo.slots,
-      notes:          buildNotes(combo.slots, combo.breakdown, notesCtx),
-      score:          adjustedScore,
-      scoreBreakdown: combo.breakdown,
+      status:          'ok' as OutfitStatus,
+      headline:        headline(bucket),
+      slots:           combo.slots,
+      notes:           buildNotes(combo.slots, combo.breakdown, notesCtx),
+      score:           adjustedScore,
+      scoreBreakdown:  combo.breakdown,
       layering,
+      isPersonalized,
     };
   });
 
