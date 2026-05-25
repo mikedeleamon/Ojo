@@ -7,6 +7,7 @@ import {
     Image,
     Alert,
     Animated,
+    useWindowDimensions,
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -39,7 +40,7 @@ import {
     METALLIC_END,
 } from '../../lib/colors/metallicGradients';
 import { CATEGORIES, COLORS, FABRICS } from '../../lib/colors/palettes';
-import { SwipeableArticleCard } from './ArticleCard';
+import { SwipeableArticleCard, TileArticleCard } from './ArticleCard';
 
 interface Props {
     closets: Closet[];
@@ -70,6 +71,12 @@ const ClosetView = ({
 }: Props) => {
     const { colors } = useTheme();
     const styles = useMemo(() => makeStyles(colors), [colors]);
+    const { width: windowWidth } = useWindowDimensions();
+    const [viewMode, setViewMode] = useState<'list' | 'tile'>('list');
+    // Two columns with outer padding (md each side) and one inter-tile gap (sm)
+    const tileWidth = Math.floor(
+        (windowWidth - spacing.md * 2 - spacing.sm) / 2,
+    );
     const [selectedId, setSelectedId] = useState<string>(
         initialSelectedId && closets.find((c) => c._id === initialSelectedId)
             ? initialSelectedId
@@ -424,6 +431,44 @@ const ClosetView = ({
             {/* ── Main panel ── */}
             <View style={styles.mainHead}>
                 <Text style={styles.mainTitle}>{selected?.name}</Text>
+                <View style={styles.viewToggleWrap}>
+                    <Pressable
+                        style={[
+                            styles.viewToggleBtn,
+                            viewMode === 'list' && styles.viewToggleBtnActive,
+                        ]}
+                        onPress={() => setViewMode('list')}
+                        accessibilityLabel='List view'
+                        accessibilityRole='button'
+                    >
+                        <Text
+                            style={[
+                                styles.viewToggleIcon,
+                                viewMode === 'list' && styles.viewToggleIconActive,
+                            ]}
+                        >
+                            ≡
+                        </Text>
+                    </Pressable>
+                    <Pressable
+                        style={[
+                            styles.viewToggleBtn,
+                            viewMode === 'tile' && styles.viewToggleBtnActive,
+                        ]}
+                        onPress={() => setViewMode('tile')}
+                        accessibilityLabel='Tile view'
+                        accessibilityRole='button'
+                    >
+                        <Text
+                            style={[
+                                styles.viewToggleIcon,
+                                viewMode === 'tile' && styles.viewToggleIconActive,
+                            ]}
+                        >
+                            ⊞
+                        </Text>
+                    </Pressable>
+                </View>
                 <Pressable
                     style={styles.addBtn}
                     onPress={() => setShowModal(true)}
@@ -556,14 +601,15 @@ const ClosetView = ({
                 </View>
             )}
 
-            {/* ── Article list ── */}
-            <ScrollView contentContainerStyle={styles.articleList}>
+            {/* ── Article list / tile grid ── */}
+            <ScrollView
+                contentContainerStyle={
+                    viewMode === 'tile' ? styles.tileGrid : styles.articleList
+                }
+            >
                 {!selected || selected.articles.length === 0 ? (
                     <View style={styles.emptyState}>
-                        <HangerIcon
-                            size={36}
-                            color={colors.textMuted}
-                        />
+                        <HangerIcon size={36} color={colors.textMuted} />
                         <Text style={styles.emptyTitle}>No articles yet</Text>
                         <Pressable
                             style={styles.addBtn}
@@ -583,6 +629,19 @@ const ClosetView = ({
                             </Text>
                         </Pressable>
                     </View>
+                ) : viewMode === 'tile' ? (
+                    filteredArticles.map((a) => (
+                        <TileArticleCard
+                            key={a._id}
+                            article={a}
+                            harmonyScore={harmonyMap.get(a._id)}
+                            tileWidth={tileWidth}
+                            onEdit={() => setEditingArticle(a)}
+                            onRemove={() =>
+                                onRemoveArticle(selected._id, a._id)
+                            }
+                        />
+                    ))
                 ) : (
                     filteredArticles.map((a) => (
                         <SwipeableArticleCard

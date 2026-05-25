@@ -341,4 +341,98 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         fontSize: fontSizes.base,
         color: colors.textSecondary,
     },
+
+    // ── View toggle ────────────────────────────────────────────────────────────
+    viewToggleWrap: {
+        flexDirection: 'row',
+        gap: 4,
+    },
+    viewToggleBtn: {
+        width: 34,
+        height: 34,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: radius.sm,
+        borderWidth: 1,
+        borderColor: colors.glassBorder,
+        backgroundColor: colors.glassBg,
+    },
+    viewToggleBtnActive: {
+        backgroundColor: colors.saveBtnBg,
+        borderColor: colors.saveBtnBg,
+    },
+    viewToggleIcon: {
+        fontSize: 15,
+        color: colors.textSecondary,
+    },
+    viewToggleIconActive: {
+        color: colors.saveBtnText,
+    },
+
+    // ── Tile grid ──────────────────────────────────────────────────────────────
+    tileGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        padding: spacing.md,
+        gap: spacing.sm,
+        paddingBottom: spacing.xl,
+    },
+    tileCard: {
+        borderRadius: radius.md,
+        backgroundColor: colors.glassBg,
+        borderWidth: 1,
+        borderColor: colors.glassBorder,
+        overflow: 'hidden',
+    },
+    tileCardOOS: { opacity: 0.42 },
+    tileImg: {
+        width: '100%',
+        aspectRatio: 1,
+        backgroundColor: colors.glassBg,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    tileImgFill: { width: '100%', height: '100%' },
+    tileWarmthDot: {
+        position: 'absolute',
+        bottom: 6,
+        right: 6,
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.25)',
+    },
+    tileInfo: {
+        padding: 8,
+        gap: 3,
+    },
+    tileNameRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    tileName: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs,
+        fontWeight: fontWeights.medium,
+        color: colors.textPrimary,
+        flexShrink: 1,
+    },
+    tileMeta: {
+        fontFamily: fonts.body,
+        fontSize: 10,
+        color: colors.textMuted,
+    },
+    tileMetaClash: {
+        color: '#f59e0b',
+    },
+    tileColorDot: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.2)',
+        marginTop: 2,
+    },
 });
