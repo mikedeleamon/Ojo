@@ -136,8 +136,29 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
             api.get(`${weatherConstants.GET_CURRENT_FORECAST}/${city.Key}`),
         ])
             .then(([wRes, fRes]) => {
-                const w = wRes.data?.[0];
-                if (!w) throw new Error('Empty response');
+                const raw = wRes.data?.[0];
+                if (!raw) throw new Error('Empty response');
+
+                // Parse AirAndPollen (present when details: true)
+                const airPollen: { Name: string; Value: number; Category: string }[] =
+                    raw.AirAndPollen ?? [];
+                const airQuality = airPollen.find((e: any) => e.Name === 'AirQuality');
+                const POLLEN_NAMES = new Set(['Tree', 'Grass', 'Ragweed', 'Weed']);
+                const POLLEN_ORDER = ['Low', 'Moderate', 'High', 'Very High'];
+                const pollenEntries = airPollen.filter((e: any) => POLLEN_NAMES.has(e.Name));
+                const worstPollen = pollenEntries.reduce(
+                    (worst: any, e: any) =>
+                        POLLEN_ORDER.indexOf(e.Category) > POLLEN_ORDER.indexOf(worst?.Category ?? 'Low')
+                            ? e : worst,
+                    null,
+                );
+                const w = {
+                    ...raw,
+                    AirQualityText:  airQuality?.Category ?? undefined,
+                    AirQualityIndex: airQuality?.Value    ?? undefined,
+                    PollenCategory:  worstPollen?.Category ?? undefined,
+                };
+
                 if (isRefreshRef.current) {
                     // Pull-to-refresh in flight — buffer until finally() flushes atomically
                     pendingRef.current = {

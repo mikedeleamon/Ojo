@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { StyleSheet, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { View, Text, Pressable } from '../../../components/primitives';
 import { loadHistory, deleteHistoryEntry, clearHistory } from '../../../lib/outfitHistory';
+import { useFocusEffect } from '@react-navigation/native';
 import { OutfitHistoryEntry } from '../../../types';
 import { makeStyles } from './screens.styles';
 import { spacing, radius, fonts, fontSizes } from '../../../theme/tokens';
@@ -76,7 +77,9 @@ export const HistoryScreen = () => {
   const st = useMemo(() => makeLocalStyles(colors), [colors]);
   const [entries, setEntries] = useState<OutfitHistoryEntry[]>([]);
 
-  useEffect(() => { loadHistory().then(setEntries); }, []);
+  useFocusEffect(
+    useCallback(() => { loadHistory().then(setEntries).catch(() => {}); }, []),
+  );
 
   const handleDelete = async (id: string) => {
     await deleteHistoryEntry(id);

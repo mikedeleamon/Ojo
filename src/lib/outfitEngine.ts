@@ -33,6 +33,8 @@ import {
   classifyPrecipitation,
   precipMultiplier,
   UV_HIGH_LABELS,
+  AQI_HIGH_LABELS,
+  POLLEN_HIGH_LABELS,
 } from './outfit/weatherBuckets';
 import { roleOf, articleZoneLabel, buildAccCombos } from './outfit/roles';
 import { COLOR_NEUTRALS, NEUTRAL_BASE_COLORS, pairHarmony } from './outfit/colorHarmony';
@@ -542,6 +544,8 @@ interface NotesContext {
   uvIndexText:      string;
   isSnowing:        boolean;
   settings:         Settings;
+  aqiHigh?:         boolean;
+  pollenHigh?:      boolean;
 }
 
 const buildNotes = (
@@ -582,6 +586,35 @@ const buildNotes = (
 
   if (ctx.uvHigh && !slots.some(s => s.article.clothingType === 'Hat' || s.article.clothingType === 'Cap')) {
     notes.push(`UV is ${ctx.uvIndexText} today — a hat would help protect you.`);
+  }
+
+  if (ctx.aqiHigh) {
+    const hasAsthma = ctx.settings.sensitivities?.asthma;
+    const syntheticSlots = slots.filter(s =>
+      s.article.fabricType === 'Polyester' || s.article.fabricType === 'Synthetic',
+    );
+    if (hasAsthma) {
+      notes.push('Air quality is poor today — choose breathable natural fabrics (Cotton, Linen) and consider a mask outdoors.');
+    } else if (syntheticSlots.length > 0) {
+      notes.push('Air quality is reduced today — breathable fabrics like Cotton or Linen are more comfortable.');
+    } else {
+      notes.push('Air quality is reduced today — limit outdoor exposure during peak hours.');
+    }
+  }
+
+  if (ctx.pollenHigh) {
+    const hasAllergies = ctx.settings.sensitivities?.allergies;
+    const naturalFabricSlots = slots.filter(s =>
+      s.article.fabricType === 'Cotton' || s.article.fabricType === 'Linen' || s.article.fabricType === 'Wool',
+    );
+    if (hasAllergies && naturalFabricSlots.length > 0) {
+      const names = naturalFabricSlots.map(s => s.article.name || s.article.clothingType).join(' & ');
+      notes.push(`High pollen today — natural fabrics like ${names.split(' & ')[0]}'s fabric can trap allergens. Machine-washable synthetics are easier to clean after outdoor exposure.`);
+    } else if (hasAllergies) {
+      notes.push('High pollen today — shower and change clothes after spending time outdoors.');
+    } else {
+      notes.push('Pollen levels are high today — allergy sufferers should take precautions.');
+    }
   }
 
   // ── Fabric care warnings (rain-sensitive items) ────────────────────────
@@ -859,6 +892,8 @@ export const generateOutfits = (
 
   const notesCtx: NotesContext = {
     bucket, precipIntensity, windMph, uvHigh, uvIndexText, isSnowing, settings,
+    aqiHigh:    weather.AirQualityText  ? AQI_HIGH_LABELS.has(weather.AirQualityText)  : undefined,
+    pollenHigh: weather.PollenCategory  ? POLLEN_HIGH_LABELS.has(weather.PollenCategory) : undefined,
   };
 
   // Build layering context once — weather/forecast/settings inputs are constant

@@ -286,6 +286,72 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         fontSize: fontSizes.xs,
         color: colors.textMuted,
     },
+    occasionRow: {
+        flexDirection: 'row',
+        gap: 8,
+        paddingVertical: 2,
+    },
+    occasionChip: {
+        paddingVertical: 5,
+        paddingHorizontal: 12,
+        borderRadius: radius.pill,
+        borderWidth: 1,
+        borderColor: colors.glassBorder,
+        backgroundColor: colors.glassBg,
+    },
+    occasionChipActive: {
+        backgroundColor: colors.saveBtnBg,
+        borderColor: colors.saveBtnBg,
+    },
+    occasionChipText: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs,
+        color: colors.textSecondary,
+        fontWeight: fontWeights.medium,
+    },
+    occasionChipTextActive: {
+        color: colors.saveBtnText,
+        fontWeight: fontWeights.semibold,
+    },
+    gapCard: {
+        backgroundColor: 'rgba(250,204,21,0.08)',
+        borderRadius: radius.sm,
+        borderWidth: 1,
+        borderColor: 'rgba(250,204,21,0.28)',
+        padding: 12,
+        gap: 8,
+    },
+    gapDismiss: {
+        position: 'absolute',
+        top: 8,
+        right: 10,
+    },
+    gapDismissText: {
+        fontSize: 11,
+        color: 'rgba(250,204,21,0.55)',
+    },
+    gapMessage: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs,
+        color: 'rgba(250,204,21,0.85)',
+        lineHeight: fontSizes.xs * 1.5,
+        paddingRight: 16,
+    },
+    gapCTA: {
+        alignSelf: 'flex-start',
+        paddingVertical: 5,
+        paddingHorizontal: 10,
+        borderRadius: radius.pill,
+        borderWidth: 1,
+        borderColor: 'rgba(250,204,21,0.35)',
+        backgroundColor: 'rgba(250,204,21,0.08)',
+    },
+    gapCTAText: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs,
+        color: 'rgba(250,204,21,0.90)',
+        fontWeight: fontWeights.medium,
+    },
 });
 
 export const makeLayerStyles = (colors: ColorTokens) => StyleSheet.create({

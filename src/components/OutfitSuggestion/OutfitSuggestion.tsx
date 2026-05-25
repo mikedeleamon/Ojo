@@ -3,6 +3,7 @@ import {
     ScrollView,
     Image,
     Pressable,
+    Linking,
     useWindowDimensions,
     Animated as RNAnimated,
     Easing as RNEasing,
@@ -23,11 +24,13 @@ import {
 } from '../../lib/outfitEngine';
 import { addHistoryEntry, recentlyWornWithAge } from '../../lib/outfitHistory';
 import { updatePreferences } from '../../lib/userPreferences';
+import { recordGapsFromNotes, getGapSuggestions, GapSuggestion, GapType } from '../../lib/wardrobeGaps';
 import {
     ClothingArticle,
     CurrentWeather,
     Forecast,
     Settings,
+    OutfitOccasion,
 } from '../../types';
 import { spacing } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
@@ -127,6 +130,97 @@ const ScoreBadge = ({ score }: { score: number }) => {
     );
 };
 
+// ─── Gap card ────────────────────────────────────────────────────────────────
+
+const GAP_SEARCH_TERMS: Record<GapType, string> = {
+    missing_coat:       'winter coat',
+    missing_jacket:     'light jacket',
+    missing_boots:      'boots',
+    missing_mid_layer:  'hoodie sweater',
+    missing_rain_layer: 'waterproof jacket',
+    missing_footwear:   'shoes',
+};
+
+const GapCard = ({
+    suggestion,
+    onDismiss,
+}: {
+    suggestion: GapSuggestion;
+    onDismiss: () => void;
+}) => {
+    const { colors } = useTheme();
+    const styles = useMemo(() => makeStyles(colors), [colors]);
+    const searchTerm = GAP_SEARCH_TERMS[suggestion.type] ?? 'clothing';
+    return (
+        <View style={styles.gapCard}>
+            <Pressable style={styles.gapDismiss} onPress={onDismiss} hitSlop={8}>
+                <Text style={styles.gapDismissText}>✕</Text>
+            </Pressable>
+            <Text style={styles.gapMessage}>{suggestion.message}</Text>
+            <Pressable
+                style={styles.gapCTA}
+                onPress={() =>
+                    Linking.openURL(
+                        `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(searchTerm)}`,
+                    )
+                }
+            >
+                <Text style={styles.gapCTAText}>Browse {searchTerm} →</Text>
+            </Pressable>
+        </View>
+    );
+};
+
+// ─── Occasion chips ───────────────────────────────────────────────────────────
+
+const OCCASION_CHIPS: { value: OutfitOccasion; label: string }[] = [
+    { value: 'everyday', label: 'Everyday' },
+    { value: 'work',     label: 'Work' },
+    { value: 'weekend',  label: 'Weekend' },
+    { value: 'date',     label: 'Date' },
+    { value: 'outdoor',  label: 'Outdoor' },
+    { value: 'athletic', label: 'Athletic' },
+];
+
+const OccasionChips = ({
+    active,
+    onChange,
+}: {
+    active: OutfitOccasion;
+    onChange: (o: OutfitOccasion) => void;
+}) => {
+    const { colors } = useTheme();
+    const styles = useMemo(() => makeStyles(colors), [colors]);
+    return (
+        <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.occasionRow}
+        >
+            {OCCASION_CHIPS.map(({ value, label }) => (
+                <Pressable
+                    key={value}
+                    style={[
+                        styles.occasionChip,
+                        active === value && styles.occasionChipActive,
+                    ]}
+                    onPress={() => onChange(value)}
+                    hitSlop={4}
+                >
+                    <Text
+                        style={[
+                            styles.occasionChipText,
+                            active === value && styles.occasionChipTextActive,
+                        ]}
+                    >
+                        {label}
+                    </Text>
+                </Pressable>
+            ))}
+        </ScrollView>
+    );
+};
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 interface Props {
@@ -146,6 +240,11 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
     const [wornLogged, setWornLogged] = useState(false);
     const [worn, setWorn] = useState<Map<string, number>>(new Map());
     const [removedByOutfit, setRemovedByOutfit] = useState<Map<number, Set<string>>>(new Map());
+    const [occasionOverride, setOccasionOverride] = useState<OutfitOccasion>(
+        settings.occasion ?? 'everyday',
+    );
+    const [gapSuggestion, setGapSuggestion] = useState<GapSuggestion | null>(null);
+    const [gapDismissed, setGapDismissed] = useState(false);
     const nav = useAppNavigation();
 
     // ─── #5: Swipe hint bounce (first render only) ──────────────────────────
@@ -169,7 +268,13 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
         setShowBreakdown(false);
         setWornLogged(false);
         setRemovedByOutfit(new Map());
+        setOccasionOverride(settings.occasion ?? 'everyday');
     }, [settings]);
+
+    const effectiveSettings = useMemo(
+        () => ({ ...settings, occasion: occasionOverride }),
+        [settings, occasionOverride],
+    );
 
     const setPreferredCloset = async (id: string) => {
         setSettingPref(true);
@@ -184,17 +289,26 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
         const { results, status } = generateOutfits(
             preferred.articles,
             weather,
-            settings,
+            effectiveSettings,
             worn,
             3,
             undefined,
             forecasts,
         );
         return { outfits: results, status };
-    }, [preferred, weather, settings, worn, forecasts]);
+    }, [preferred, weather, effectiveSettings, worn, forecasts]);
 
     const safeIdx = Math.min(activeIdx, Math.max(0, outfits.length - 1));
     const activeOutfit: OutfitResult | null = outfits[safeIdx] ?? null;
+
+    useEffect(() => {
+        if (!activeOutfit || activeOutfit.notes.length === 0) return;
+        recordGapsFromNotes(activeOutfit.notes)
+            .then(() => getGapSuggestions())
+            .then((suggestions) => setGapSuggestion(suggestions[0] ?? null))
+            .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [safeIdx, outfits]);
 
     const handleRemoveSlot = (outfitIdx: number, articleId: string) => {
         setRemovedByOutfit((prev) => {
@@ -400,6 +514,18 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
                 <ScoreBadge score={activeOutfit.score} />
             </View>
 
+            {/* ── Occasion quick-switch ── */}
+            <OccasionChips
+                active={occasionOverride}
+                onChange={(o) => {
+                    setOccasionOverride(o);
+                    setActiveIdx(0);
+                    setShowBreakdown(false);
+                    setWornLogged(false);
+                    setRemovedByOutfit(new Map());
+                }}
+            />
+
             {/* #2 — Headline above pager */}
             <Text style={styles.headline}>{activeOutfit.headline}</Text>
 
@@ -489,6 +615,14 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
                     </Pressable>
                 )}
             </View>
+
+            {/* ── Gap card ── */}
+            {gapSuggestion && !gapDismissed && (
+                <GapCard
+                    suggestion={gapSuggestion}
+                    onDismiss={() => setGapDismissed(true)}
+                />
+            )}
 
             {/* ── Score breakdown ── */}
             <Pressable

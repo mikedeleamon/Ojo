@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import {
     StyleSheet,
     ScrollView,
@@ -34,6 +34,8 @@ import {
 } from '../../lib/outfitEngine';
 import { makeStyles } from './ClosetView.styles';
 import { CSS_COLORS } from '../../lib/colors/cssColors';
+import { recentlyWornWithAge } from '../../lib/outfitHistory';
+import { useFocusEffect } from '@react-navigation/native';
 import {
     METALLIC_GRADIENTS,
     METALLIC_START,
@@ -94,6 +96,13 @@ const ClosetView = ({
     const [activeColors, setActiveColors] = useState<string[]>([]);
     const [activeFabrics, setActiveFabrics] = useState<string[]>([]);
     const [showFilters, setShowFilters] = useState(false);
+    const [wornAgeMap, setWornAgeMap] = useState<Map<string, number>>(new Map());
+
+    useFocusEffect(
+        useCallback(() => {
+            recentlyWornWithAge(30).then(setWornAgeMap).catch(() => {});
+        }, []),
+    );
 
     const selected = closets.find((c) => c._id === selectedId) ?? closets[0];
     const filterCount =
@@ -635,6 +644,7 @@ const ClosetView = ({
                             key={a._id}
                             article={a}
                             harmonyScore={harmonyMap.get(a._id)}
+                            wornAge={wornAgeMap.get(a._id)}
                             tileWidth={tileWidth}
                             onEdit={() => setEditingArticle(a)}
                             onRemove={() =>

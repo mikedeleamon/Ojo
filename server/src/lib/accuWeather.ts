@@ -6,9 +6,10 @@ const accu = axios.create({
 });
 const key = () => process.env.ACCUWEATHER_API_KEY!;
 
-const TTL_CITY = 60 * 60 * 1_000;
-const TTL_CURRENT = 30 * 60 * 1_000;
+const TTL_CITY     = 60 * 60 * 1_000;
+const TTL_CURRENT  = 30 * 60 * 1_000;
 const TTL_FORECAST = 60 * 60 * 1_000;
+const TTL_DAILY    =  3 * 60 * 60 * 1_000; // daily forecast: 3-hour cache
 
 /** Look up an AccuWeather city by free-form query. Cached for 1 hour. */
 export async function lookupCity(query: string): Promise<unknown | null> {
@@ -37,6 +38,19 @@ export async function getCurrent(
     params: { apikey: key(), details },
   });
   if (data) ttlSet(cacheKey, data, TTL_CURRENT);
+  return data;
+}
+
+/** Fetch 5-day daily forecast. Cached 3 hours. */
+export async function get5DayForecast(cityKey: string): Promise<unknown> {
+  const cacheKey = `daily5:${cityKey}`;
+  const cached = ttlGet<unknown>(cacheKey);
+  if (cached) return cached;
+
+  const { data } = await accu.get(`/forecasts/v1/daily/5day/${cityKey}`, {
+    params: { apikey: key(), details: false, metric: false },
+  });
+  if (data) ttlSet(cacheKey, data, TTL_DAILY);
   return data;
 }
 

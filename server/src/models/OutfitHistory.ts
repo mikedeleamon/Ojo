@@ -1,0 +1,27 @@
+import mongoose, { Document, Schema, Types } from 'mongoose';
+
+export interface IOutfitHistory extends Document {
+  userId:         Types.ObjectId;
+  clientId:       string;   // client-generated id — used for deduplication
+  wornAt:         Date;
+  closetId:       string;
+  closetName:     string;
+  articleIds:     string[];
+  articleSummary: string;
+}
+
+const outfitHistorySchema = new Schema<IOutfitHistory>({
+  userId:         { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  clientId:       { type: String, required: true },
+  wornAt:         { type: Date, required: true },
+  closetId:       { type: String, required: true },
+  closetName:     { type: String, required: true },
+  articleIds:     { type: [String], default: [] },
+  articleSummary: { type: String, default: '' },
+});
+
+// Fast timeline queries and uniqueness guard
+outfitHistorySchema.index({ userId: 1, wornAt: -1 });
+outfitHistorySchema.index({ userId: 1, clientId: 1 }, { unique: true });
+
+export default mongoose.model<IOutfitHistory>('OutfitHistory', outfitHistorySchema);

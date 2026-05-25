@@ -1,14 +1,79 @@
 import { OutfitHistoryEntry } from '../types';
 import { storage, storageGetJSON } from './storage';
+import api from '../api/client';
+import { authHeaders } from './auth';
 
-const HISTORY_KEY  = 'ojo_outfit_history';
-const MAX_ENTRIES  = 60;
+const HISTORY_KEY    = 'ojo_outfit_history';
+const MIGRATED_KEY   = 'ojo_history_migrated_v1';
+const MAX_ENTRIES    = 60;
 
-export const loadHistory = async (): Promise<OutfitHistoryEntry[]> =>
+// ─── Local storage helpers ────────────────────────────────────────────────────
+
+export const loadLocalHistory = async (): Promise<OutfitHistoryEntry[]> =>
   storageGetJSON<OutfitHistoryEntry[]>(storage, HISTORY_KEY, []);
 
 export const saveHistory = async (entries: OutfitHistoryEntry[]): Promise<void> =>
   storage.setItem(HISTORY_KEY, JSON.stringify(entries.slice(0, MAX_ENTRIES)));
+
+// ─── Server sync helpers (fire-and-forget, swallow errors) ───────────────────
+
+const syncPost = (entry: OutfitHistoryEntry) =>
+  api.post('/api/history', {
+    id:             entry.id,
+    wornAt:         entry.wornAt,
+    closetId:       entry.closetId,
+    closetName:     entry.closetName,
+    articleIds:     entry.articleIds,
+    articleSummary: entry.articleSummary,
+  }, authHeaders()).catch(() => {});
+
+const syncDelete = (id: string) =>
+  api.delete(`/api/history/${id}`, authHeaders()).catch(() => {});
+
+const syncClear = () =>
+  api.delete('/api/history', authHeaders()).catch(() => {});
+
+// ─── One-time migration: push local entries that server doesn't have ──────────
+
+const migrateLocalToServer = async (serverIds: Set<string>, local: OutfitHistoryEntry[]) => {
+  const alreadyMigrated = await storage.getItem(MIGRATED_KEY);
+  if (alreadyMigrated) return;
+  const unsynced = local.filter(e => !serverIds.has(e.id));
+  await Promise.all(unsynced.map(syncPost));
+  await storage.setItem(MIGRATED_KEY, '1');
+};
+
+// ─── Public API ───────────────────────────────────────────────────────────────
+
+/**
+ * Load history: tries server first, merges with local, falls back to local-only.
+ * Deduplication is by entry `id` (client-generated).
+ */
+export const loadHistory = async (): Promise<OutfitHistoryEntry[]> => {
+  const local = await loadLocalHistory();
+
+  try {
+    const res = await api.get<OutfitHistoryEntry[]>('/api/history', authHeaders());
+    const serverEntries: OutfitHistoryEntry[] = res.data ?? [];
+    const serverIds = new Set(serverEntries.map(e => e.id));
+
+    // One-time migration of local-only entries
+    migrateLocalToServer(serverIds, local).catch(() => {});
+
+    // Merge: server wins for entries with matching id; local-only entries appended
+    const localOnly = local.filter(e => !serverIds.has(e.id));
+    const merged = [...serverEntries, ...localOnly]
+      .sort((a, b) => new Date(b.wornAt).getTime() - new Date(a.wornAt).getTime())
+      .slice(0, MAX_ENTRIES);
+
+    // Keep local cache in sync with merged result
+    await saveHistory(merged);
+    return merged;
+  } catch {
+    // Network unavailable — return local entries
+    return local;
+  }
+};
 
 export const addHistoryEntry = async (
   entry: Omit<OutfitHistoryEntry, 'id' | 'wornAt'>
@@ -18,25 +83,32 @@ export const addHistoryEntry = async (
     id:     `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     wornAt: new Date().toISOString(),
   };
-  const existing = await loadHistory();
+  // Write locally first (instant)
+  const existing = await loadLocalHistory();
   await saveHistory([newEntry, ...existing]);
+  // Fire-and-forget sync to server
+  syncPost(newEntry);
   return newEntry;
 };
 
 export const deleteHistoryEntry = async (id: string): Promise<void> => {
-  const entries = (await loadHistory()).filter(e => e.id !== id);
+  const entries = (await loadLocalHistory()).filter(e => e.id !== id);
   await saveHistory(entries);
+  syncDelete(id);
 };
 
 export const clearHistory = async (): Promise<void> => {
   await storage.removeItem(HISTORY_KEY);
+  syncClear();
 };
+
+// ─── Query helpers (unchanged, operate on local for speed) ───────────────────
 
 /** Returns article IDs worn within the last `withinDays` days (default 3). */
 export const recentlyWornIds = async (withinDays = 3): Promise<Set<string>> => {
   const cutoff = Date.now() - withinDays * 24 * 60 * 60 * 1000;
   const ids = new Set<string>();
-  (await loadHistory()).forEach(entry => {
+  (await loadLocalHistory()).forEach(entry => {
     if (new Date(entry.wornAt).getTime() >= cutoff) {
       entry.articleIds.forEach(id => ids.add(id));
     }
@@ -54,7 +126,7 @@ export const recentlyWornWithAge = async (withinDays = 7): Promise<Map<string, n
   const map = new Map<string, number>();
   const now = Date.now();
 
-  (await loadHistory()).forEach(entry => {
+  (await loadLocalHistory()).forEach(entry => {
     const wornTime = new Date(entry.wornAt).getTime();
     if (wornTime >= cutoff) {
       const daysSince = (now - wornTime) / (24 * 60 * 60 * 1000);

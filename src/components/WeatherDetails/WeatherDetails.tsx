@@ -22,6 +22,14 @@ const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   },
   statLabel: { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
   statValue: { fontFamily: fonts.body, fontSize: fontSizes.base, color: colors.textPrimary, fontWeight: fontWeights.medium },
+  pillRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  pill: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingVertical: 4, paddingHorizontal: 10,
+    borderRadius: radius.pill, borderWidth: 1,
+  },
+  pillLabel: { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  pillValue: { fontFamily: fonts.body, fontSize: fontSizes.xs, fontWeight: fontWeights.semibold },
 });
 
 const WeatherDetails = ({ weather, settings, forecasts }: Props) => {
@@ -36,6 +44,30 @@ const WeatherDetails = ({ weather, settings, forecasts }: Props) => {
       <Text style={st.statValue}>{value}</Text>
     </View>
   );
+
+  // ── Pill badge helper ────────────────────────────────────────────────────
+  const BAD_LABELS = new Set(['High', 'Very High', 'Extreme', 'Unhealthy for Sensitive Groups', 'Unhealthy', 'Very Unhealthy', 'Hazardous']);
+  const MID_LABELS = new Set(['Moderate', 'Medium']);
+
+  const pillColor = (value?: string) => {
+    if (!value) return { border: colors.glassBorder, text: colors.textMuted };
+    if (BAD_LABELS.has(value)) return { border: 'rgba(239,68,68,0.40)', text: 'rgba(252,165,165,0.9)' };
+    if (MID_LABELS.has(value)) return { border: 'rgba(251,191,36,0.40)', text: 'rgba(251,191,36,0.9)' };
+    return { border: 'rgba(52,211,153,0.35)', text: 'rgba(52,211,153,0.9)' };
+  };
+
+  const ConditionPill = ({ label, value }: { label: string; value?: string }) => {
+    if (!value) return null;
+    const c = pillColor(value);
+    return (
+      <View style={[st.pill, { borderColor: c.border, backgroundColor: 'rgba(255,255,255,0.04)' }]}>
+        <Text style={st.pillLabel}>{label}</Text>
+        <Text style={[st.pillValue, { color: c.text }]}>{value}</Text>
+      </View>
+    );
+  };
+
+  const hasConditionData = weather.AirQualityText || weather.PollenCategory;
 
   return (
     <View style={st.root}>
@@ -56,12 +88,21 @@ const WeatherDetails = ({ weather, settings, forecasts }: Props) => {
       </Pressable>
 
       {expanded && (
-        <View style={st.grid}>
-          <Stat label="UV Index"   value={weather.UVIndexText} />
-          <Stat label="Feels like" value={`${isMetric
-            ? weather.RealFeelTemperature.Metric.Value
-            : weather.RealFeelTemperature.Imperial.Value}°`} />
-        </View>
+        <>
+          <View style={st.grid}>
+            <Stat label="UV Index"   value={weather.UVIndexText} />
+            <Stat label="Feels like" value={`${isMetric
+              ? weather.RealFeelTemperature.Metric.Value
+              : weather.RealFeelTemperature.Imperial.Value}°`} />
+          </View>
+
+          {hasConditionData && (
+            <View style={st.pillRow}>
+              <ConditionPill label="Air Quality" value={weather.AirQualityText} />
+              <ConditionPill label="Pollen"      value={weather.PollenCategory} />
+            </View>
+          )}
+        </>
       )}
     </View>
   );

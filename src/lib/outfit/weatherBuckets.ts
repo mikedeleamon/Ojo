@@ -64,3 +64,11 @@ export const precipMultiplier = (intensity: PrecipIntensity): number => {
 
 /** AccuWeather UVIndexText values considered high enough to warrant a hat note. */
 export const UV_HIGH_LABELS = new Set(['High', 'Very High', 'Extreme']);
+
+/** AccuWeather AirQuality Category values that warrant an air quality note. */
+export const AQI_HIGH_LABELS = new Set([
+  'Unhealthy for Sensitive Groups', 'Unhealthy', 'Very Unhealthy', 'Hazardous',
+]);
+
+/** Pollen Category values that warrant an allergy note. */
+export const POLLEN_HIGH_LABELS = new Set(['High', 'Very High']);

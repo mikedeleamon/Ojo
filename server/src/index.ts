@@ -11,6 +11,7 @@ import userRoutes from './routes/user';
 import closetRoutes from './routes/closets';
 import weatherRoutes from './routes/weather';
 import notificationRoutes from './routes/notifications';
+import historyRoutes from './routes/history';
 import { startNotificationService } from './services/notificationService';
 
 const app = express();
@@ -69,6 +70,7 @@ app.use('/api/weather',       weatherLimiter, weatherRoutes);
 app.use('/api/user',          generalLimiter, userRoutes);
 app.use('/api/closets',       generalLimiter, closetRoutes);
 app.use('/api/notifications', generalLimiter, notificationRoutes);
+app.use('/api/history',       generalLimiter, historyRoutes);
 
 // ─── Global error handler ─────────────────────────────────────────────────────
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {

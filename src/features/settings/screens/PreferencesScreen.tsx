@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
     StyleSheet,
     ScrollView,
     KeyboardAvoidingView,
+    Switch,
     Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,9 +15,14 @@ import {
     AppSlider,
 } from '../../../components/primitives';
 import { useSettings } from '../../../hooks/useSettings';
+import { useFocusEffect } from '@react-navigation/native';
 import { spacing, radius, fonts, fontSizes, fontWeights } from '../../../theme/tokens';
 import { useTheme, ThemeMode } from '../../../theme/ThemeContext';
 import { fToC, cToF } from '../../../lib/units';
+import { loadHistory } from '../../../lib/outfitHistory';
+import { loadPreferences, UserPreferenceProfile } from '../../../lib/userPreferences';
+import { OutfitHistoryEntry } from '../../../types';
+import { CSS_COLORS } from '../../../lib/colors/cssColors';
 
 const STYLES = [
     'Casual',
@@ -134,6 +140,100 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
         fontWeight: fontWeights.medium,
         color: colors.textPrimary,
     },
+    historyEmpty: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs,
+        color: colors.textMuted,
+        fontStyle: 'italic',
+        paddingVertical: 4,
+    },
+    historyCard: {
+        backgroundColor: colors.glassBg,
+        borderRadius: radius.sm,
+        borderWidth: 1,
+        borderColor: colors.glassBorder,
+        padding: 10,
+        gap: 4,
+    },
+    historyCardRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    historyDate: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs,
+        color: colors.textMuted,
+    },
+    historyCloset: {
+        fontFamily: fonts.body,
+        fontSize: 10,
+        color: colors.textMuted,
+    },
+    historySummary: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs,
+        color: colors.textSecondary,
+        lineHeight: fontSizes.xs * 1.4,
+    },
+    patternRow: {
+        gap: 6,
+    },
+    patternItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    patternLabel: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs,
+        color: colors.textSecondary,
+        width: 72,
+    },
+    patternBarBg: {
+        flex: 1,
+        height: 5,
+        backgroundColor: colors.glassBg,
+        borderRadius: 3,
+        overflow: 'hidden',
+    },
+    patternBarFill: {
+        height: 5,
+        borderRadius: 3,
+        backgroundColor: colors.textSecondary,
+    },
+    patternCount: {
+        fontFamily: fonts.body,
+        fontSize: 10,
+        color: colors.textMuted,
+        width: 18,
+        textAlign: 'right',
+    },
+    colorSwatch: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.12)',
+    },
+    sensitivityRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 6,
+        paddingHorizontal: 2,
+    },
+    sensitivityLabel: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.base,
+        color: colors.textSecondary,
+    },
+    sensitivitySub: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs,
+        color: colors.textMuted,
+        marginTop: 1,
+    },
     // Appearance segmented — full-width
     appearanceSegmented: {
         flexDirection: 'row',
@@ -187,9 +287,140 @@ const SliderField = ({
     </View>
 );
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+const formatWornAt = (iso: string): string => {
+    const d = new Date(iso);
+    const now = new Date();
+    const diff = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+    if (diff === 0) return 'Today';
+    if (diff === 1) return 'Yesterday';
+    if (diff < 7) return `${diff} days ago`;
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+};
+
+const topEntries = (map: Record<string, number>, n = 5) =>
+    Object.entries(map)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, n);
+
+// ─── Sub-sections ─────────────────────────────────────────────────────────────
+
+const HistorySection = ({
+    history,
+    styles,
+}: {
+    history: OutfitHistoryEntry[];
+    styles: ReturnType<typeof makeStyles>;
+}) => {
+    if (history.length === 0) {
+        return (
+            <Text style={styles.historyEmpty}>
+                Log outfits with "Wore this today" to see your history here.
+            </Text>
+        );
+    }
+    return (
+        <>
+            {history.slice(0, 8).map((entry) => (
+                <View key={entry.id} style={styles.historyCard}>
+                    <View style={styles.historyCardRow}>
+                        <Text style={styles.historyDate}>{formatWornAt(entry.wornAt)}</Text>
+                        <Text style={styles.historyCloset}>{entry.closetName}</Text>
+                    </View>
+                    <Text style={styles.historySummary} numberOfLines={2}>
+                        {entry.articleSummary}
+                    </Text>
+                </View>
+            ))}
+        </>
+    );
+};
+
+const PatternsSection = ({
+    prefs,
+    styles,
+}: {
+    prefs: UserPreferenceProfile;
+    styles: ReturnType<typeof makeStyles>;
+}) => {
+    const colorEntries = topEntries(prefs.colors, 5);
+    const fabricEntries = topEntries(prefs.fabrics, 4);
+    if (prefs.totalOutfits === 0) return null;
+
+    const maxColor = colorEntries[0]?.[1] ?? 1;
+    const maxFabric = fabricEntries[0]?.[1] ?? 1;
+
+    return (
+        <>
+            {colorEntries.length > 0 && (
+                <View style={styles.patternRow}>
+                    {colorEntries.map(([color, count]) => (
+                        <View key={color} style={styles.patternItem}>
+                            <View
+                                style={[
+                                    styles.colorSwatch,
+                                    { backgroundColor: CSS_COLORS[color] ?? '#888' },
+                                ]}
+                            />
+                            <Text style={[styles.patternLabel, { width: 62 }]} numberOfLines={1}>
+                                {color}
+                            </Text>
+                            <View style={styles.patternBarBg}>
+                                <View
+                                    style={[
+                                        styles.patternBarFill,
+                                        { width: `${Math.round((count / maxColor) * 100)}%` as any },
+                                    ]}
+                                />
+                            </View>
+                            <Text style={styles.patternCount}>{count}</Text>
+                        </View>
+                    ))}
+                </View>
+            )}
+            {fabricEntries.length > 0 && (
+                <View style={[styles.patternRow, { marginTop: 6 }]}>
+                    {fabricEntries.map(([fabric, count]) => (
+                        <View key={fabric} style={styles.patternItem}>
+                            <Text style={styles.patternLabel} numberOfLines={1}>{fabric}</Text>
+                            <View style={styles.patternBarBg}>
+                                <View
+                                    style={[
+                                        styles.patternBarFill,
+                                        {
+                                            width: `${Math.round((count / maxFabric) * 100)}%` as any,
+                                            backgroundColor: 'rgba(134,211,214,0.7)',
+                                        },
+                                    ]}
+                                />
+                            </View>
+                            <Text style={styles.patternCount}>{count}</Text>
+                        </View>
+                    ))}
+                </View>
+            )}
+        </>
+    );
+};
+
+// ─── Main screen ──────────────────────────────────────────────────────────────
+
 export default function PreferencesScreen() {
     const { colors, mode, setMode } = useTheme();
     const styles = useMemo(() => makeStyles(colors), [colors]);
+
+    const [history, setHistory] = useState<OutfitHistoryEntry[]>([]);
+    const [prefs, setPrefs] = useState<UserPreferenceProfile>({
+        colors: {}, fabrics: {}, categories: {}, colorPairs: {}, totalOutfits: 0,
+    });
+
+    useFocusEffect(
+        useCallback(() => {
+            loadHistory().then(setHistory).catch(() => {});
+            loadPreferences().then(setPrefs).catch(() => {});
+        }, []),
+    );
 
     const { settings, saveSettings, settingsReady } = useSettings();
     const [clothingStyle, setClothingStyle] = useState(settings.clothingStyle);
@@ -210,6 +441,8 @@ export default function PreferencesScreen() {
             : settings.lowTempThreshold,
     );
     const [humidity, setHumidity] = useState(settings.humidityPreference);
+    const [allergies, setAllergies] = useState(settings.sensitivities?.allergies ?? false);
+    const [asthma,    setAsthma]    = useState(settings.sensitivities?.asthma    ?? false);
 
     const locationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -224,6 +457,8 @@ export default function PreferencesScreen() {
         setHiTempDisp(isCelsius ? fToC(settings.hiTempThreshold) : settings.hiTempThreshold);
         setLowTempDisp(isCelsius ? fToC(settings.lowTempThreshold) : settings.lowTempThreshold);
         setHumidity(settings.humidityPreference);
+        setAllergies(settings.sensitivities?.allergies ?? false);
+        setAsthma(settings.sensitivities?.asthma ?? false);
     }, [settings, settingsReady]);
 
     const currentSettings = (overrides: Partial<typeof settings>) => ({
@@ -233,8 +468,18 @@ export default function PreferencesScreen() {
         hiTempThreshold: hiTemp,
         lowTempThreshold: lowTemp,
         humidityPreference: humidity,
+        sensitivities: { allergies, asthma },
         ...overrides,
     });
+
+    const handleSensitivityChange = (key: 'allergies' | 'asthma', value: boolean) => {
+        if (key === 'allergies') setAllergies(value);
+        else setAsthma(value);
+        const newSens = key === 'allergies'
+            ? { allergies: value, asthma }
+            : { allergies, asthma: value };
+        saveSettings(currentSettings({ sensitivities: newSens })).catch(() => {});
+    };
 
     const handleStyleChange = (s: string) => {
         setClothingStyle(s);
@@ -267,6 +512,22 @@ export default function PreferencesScreen() {
                     contentContainerStyle={styles.content}
                     keyboardShouldPersistTaps='handled'
                 >
+                    {/* Outfit history */}
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Outfit history</Text>
+                        <HistorySection history={history} styles={styles} />
+                    </View>
+
+                    {/* Wear patterns */}
+                    {prefs.totalOutfits > 0 && (
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>
+                                Your patterns · {prefs.totalOutfits} outfits logged
+                            </Text>
+                            <PatternsSection prefs={prefs} styles={styles} />
+                        </View>
+                    )}
+
                     {/* Appearance */}
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Appearance</Text>
@@ -421,6 +682,35 @@ export default function PreferencesScreen() {
                             styles={styles}
                             colors={colors}
                         />
+                    </View>
+
+                    {/* Sensitivities */}
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Sensitivities</Text>
+                        <View style={styles.sensitivityRow}>
+                            <View>
+                                <Text style={styles.sensitivityLabel}>Allergies</Text>
+                                <Text style={styles.sensitivitySub}>Get pollen warnings & fabric tips</Text>
+                            </View>
+                            <Switch
+                                value={allergies}
+                                onValueChange={(v) => handleSensitivityChange('allergies', v)}
+                                trackColor={{ true: colors.toggleThumbActive }}
+                                thumbColor={colors.white}
+                            />
+                        </View>
+                        <View style={styles.sensitivityRow}>
+                            <View>
+                                <Text style={styles.sensitivityLabel}>Asthma</Text>
+                                <Text style={styles.sensitivitySub}>Get air quality fabric guidance</Text>
+                            </View>
+                            <Switch
+                                value={asthma}
+                                onValueChange={(v) => handleSensitivityChange('asthma', v)}
+                                trackColor={{ true: colors.toggleThumbActive }}
+                                thumbColor={colors.white}
+                            />
+                        </View>
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>

@@ -116,14 +116,24 @@ export const ArticleCard = ({
 interface TileArticleCardProps {
     article: ClothingArticle;
     harmonyScore?: number;
+    wornAge?: number;       // days since last worn (from recentlyWornWithAge); undefined = never logged
     tileWidth: number;
     onEdit: () => void;
     onRemove: () => void;
 }
 
+/** Returns the heat-map tint color and opacity for the wear-age overlay. */
+const wornAgeOverlay = (wornAge: number | undefined): string | null => {
+    if (wornAge === undefined)  return 'rgba(99,102,241,0.13)';  // never logged — indigo
+    if (wornAge > 14)           return 'rgba(99,102,241,0.22)';  // stale — stronger indigo
+    if (wornAge <= 3)           return 'rgba(251,191,36,0.13)';  // recently worn — amber
+    return null;                                                   // 3–14 days — neutral
+};
+
 export const TileArticleCard = ({
     article,
     harmonyScore,
+    wornAge,
     tileWidth,
     onEdit,
     onRemove,
@@ -147,6 +157,8 @@ export const TileArticleCard = ({
             { text: 'Remove', style: 'destructive', onPress: onRemove },
         ]);
 
+    const ageOverlayColor = wornAgeOverlay(wornAge);
+
     return (
         <Pressable
             style={[styles.tileCard, { width: tileWidth }]}
@@ -164,6 +176,20 @@ export const TileArticleCard = ({
                     />
                 ) : (
                     <HangerIcon size={24} color={colors.textMuted} decorative />
+                )}
+                {/* Wear-age heat map overlay */}
+                {ageOverlayColor && (
+                    <View
+                        style={[
+                            styles.tileImgFill,
+                            {
+                                position: 'absolute',
+                                top: 0, left: 0,
+                                backgroundColor: ageOverlayColor,
+                                borderRadius: 4,
+                            },
+                        ]}
+                    />
                 )}
                 <View style={[styles.tileWarmthDot, { backgroundColor: warmthColor }]} />
             </View>

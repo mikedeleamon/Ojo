@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { AxiosError } from 'axios';
-import { lookupCity, getCurrent, getHourlyForecast } from '../lib/accuWeather';
+import { lookupCity, getCurrent, getHourlyForecast, get5DayForecast } from '../lib/accuWeather';
 
 const router = Router();
 
@@ -42,6 +42,14 @@ router.get('/forecast/:cityKey', async (req: Request, res: Response): Promise<vo
     res.json(await getHourlyForecast(req.params.cityKey));
   } catch (err) {
     handleAccuError(err, res, 'forecast');
+  }
+});
+
+router.get('/forecast/daily/:cityKey', async (req: Request, res: Response): Promise<void> => {
+  try {
+    res.json(await get5DayForecast(req.params.cityKey));
+  } catch (err) {
+    handleAccuError(err, res, 'daily forecast');
   }
 });
 

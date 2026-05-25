@@ -16,6 +16,7 @@ import {
     DataUsageScreen,
     HistoryScreen,
 } from '../features/settings/screens/SimpleScreens';
+import TripFitScreen from '../views/TripFit/TripFitScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -131,6 +132,12 @@ export default function AccountStack({ onLogout }: Props) {
                     <LegalWebViewScreen doc={(route.params as any)?.doc} />
                 )}
             </Stack.Screen>
+
+            <Stack.Screen
+                name='TripFit'
+                options={(p) => ({ ...subScreen(p), title: 'TripFit', headerShown: false })}
+                component={TripFitScreen}
+            />
         </Stack.Navigator>
     );
 }

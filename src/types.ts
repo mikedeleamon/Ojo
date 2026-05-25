@@ -54,6 +54,10 @@ export interface CurrentWeather {
   Wind: { Speed: { Imperial: { Value: number }; Metric: { Value: number } } };
   RelativeHumidity: number;
   UVIndexText: string;
+  // Parsed from AccuWeather AirAndPollen (details: true)
+  AirQualityText?:  string;   // e.g. "Good", "Moderate", "Unhealthy"
+  AirQualityIndex?: number;   // 0–500 AQI numeric value
+  PollenCategory?:  string;   // worst of Tree/Grass/Ragweed e.g. "Low", "High", "Very High"
 }
 
 export interface Forecast {
@@ -61,6 +65,15 @@ export interface Forecast {
   Temperature: { Value: number; Unit: string };
   DateTime: string;
   IsDaylight: boolean;
+}
+
+/** One day from the AccuWeather 5-day daily forecast, normalised for Ojo. */
+export interface DailyForecast {
+  date:             string;   // ISO date string e.g. "2026-05-26"
+  minTempF:         number;
+  maxTempF:         number;
+  dayPhrase:        string;   // e.g. "Partly cloudy"
+  hasPrecipitation: boolean;
 }
 
 export type OutfitOccasion = 'everyday' | 'work' | 'weekend' | 'date' | 'outdoor' | 'athletic';
@@ -72,7 +85,8 @@ export interface Settings {
   hiTempThreshold: number;
   lowTempThreshold: number;
   humidityPreference: number;
-  occasion?: OutfitOccasion;  // optional — defaults to 'everyday' if not set
+  occasion?:       OutfitOccasion;  // optional — defaults to 'everyday' if not set
+  sensitivities?:  { allergies?: boolean; asthma?: boolean };
 }
 
 export interface ClothingArticle {
