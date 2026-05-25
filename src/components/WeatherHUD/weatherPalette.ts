@@ -4,7 +4,7 @@ import { weatherGradients } from '../../theme/tokens';
 export const gradientFor = (condition: string, isDay: boolean): readonly string[] => {
     const c = condition.toLowerCase();
 
-    if (!isDay && (c.includes('clear') || c.includes('mostly clear')))
+    if (!isDay && (c.includes('clear') || c.includes('mostly clear')||c.includes('partly cloudy')))
         return weatherGradients.clearNight;
 
     if (c.includes('fog') || c.includes('mist')) return weatherGradients.foggy;
@@ -17,9 +17,9 @@ export const gradientFor = (condition: string, isDay: boolean): readonly string[
     if (c.includes('clear'))
         return isDay ? weatherGradients.clearDay : weatherGradients.clearNight;
 
-    if (c.includes('partly') || c.includes('intermittent'))
-        return weatherGradients.partlyCloudy;
-    if (c.includes('cloud') || c.includes('overcast'))
+    // if (c.includes('partly') || c.includes('intermittent'))
+    //     return weatherGradients.partlyCloudy;
+    if (c.includes('mostly cloudy') || c.includes('overcast'))
         return weatherGradients.cloudy;
 
     if (c.includes('snow') || c.includes('flurr') || c.includes('blizzard'))
