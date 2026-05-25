@@ -1,5 +1,10 @@
+// All helpers below are marked 'worklet' so Reanimated can invoke them from the
+// UI thread inside useAnimatedProps. They remain ordinary functions when called
+// from JS — the directive is additive, not exclusive.
+
 /** Parse hex (#RRGGBB or #RGB) to [r, g, b] (0–255). */
 export const hexToRgb = (hex: string): [number, number, number] => {
+    'worklet';
     const h = hex.replace('#', '');
     if (h.length === 3) {
         return [
@@ -17,8 +22,11 @@ export const hexToRgb = (hex: string): [number, number, number] => {
 
 /** Convert [r, g, b] back to #RRGGBB. */
 export const rgbToHex = (r: number, g: number, b: number): string => {
-    const toHex = (n: number) =>
-        Math.round(Math.max(0, Math.min(255, n))).toString(16).padStart(2, '0');
+    'worklet';
+    const toHex = (n: number) => {
+        'worklet';
+        return Math.round(Math.max(0, Math.min(255, n))).toString(16).padStart(2, '0');
+    };
     return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 };
 
@@ -28,6 +36,7 @@ export const rgbToHsl = (
     g: number,
     b: number,
 ): [number, number, number] => {
+    'worklet';
     r /= 255;
     g /= 255;
     b /= 255;
@@ -52,6 +61,7 @@ export const hslToRgb = (
     s: number,
     l: number,
 ): [number, number, number] => {
+    'worklet';
     h = ((h % 360) + 360) % 360;
     if (s === 0) {
         const v = l * 255;
@@ -61,6 +71,7 @@ export const hslToRgb = (
     const p = 2 * l - q;
     const hk = h / 360;
     const hue2rgb = (t: number) => {
+        'worklet';
         if (t < 0) t += 1;
         if (t > 1) t -= 1;
         if (t < 1 / 6) return p + (q - p) * 6 * t;
@@ -81,6 +92,7 @@ export const hslToRgb = (
  * which is what RGB interpolation does for distant hues.
  */
 export const lerpColor = (from: string, to: string, t: number): string => {
+    'worklet';
     const [r1, g1, b1] = hexToRgb(from);
     const [r2, g2, b2] = hexToRgb(to);
     const [h1, s1, l1] = rgbToHsl(r1, g1, b1);
@@ -101,8 +113,10 @@ export const lerpColor = (from: string, to: string, t: number): string => {
 };
 
 /** Smooth easing (ease-in-out) for staggered per-stop progress. */
-export const easeInOut = (t: number): number =>
-    t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+export const easeInOut = (t: number): number => {
+    'worklet';
+    return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+};
 
 /**
  * Interpolate an array of color stops with per-stop staggering.
@@ -114,6 +128,7 @@ export const lerpGradient = (
     to: readonly string[],
     t: number,
 ): string[] => {
+    'worklet';
     const stagger = 0.15;
     return to.map((_, i) => {
         const offset = (i / Math.max(1, to.length - 1)) * stagger;

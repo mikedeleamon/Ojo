@@ -7,6 +7,12 @@ import {
     Easing as RNEasing,
     Image,
 } from 'react-native';
+import Animated, {
+    useSharedValue,
+    useAnimatedProps,
+    withTiming,
+    Easing as REasing,
+} from 'react-native-reanimated';
 import { useSpinAnimation } from '../../hooks/useSpinAnimation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -24,7 +30,12 @@ import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { CityData, CurrentWeather, Forecast, Settings } from '../../types';
 import { spacing } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
-import { lerpGradient } from './colorMath';
+import { lerpGradient, lerpColor, easeInOut } from './colorMath';
+
+// LinearGradient driven by a UI-thread worklet via useAnimatedProps. The
+// gradient's colors prop is updated directly on the native view each frame,
+// bypassing the JS thread (and React reconciliation) entirely.
+const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 import { gradientFor, footerBgFor, formatLastUpdated } from './weatherPalette';
 import { fToC } from '../../lib/units';
 import { makeStyles } from './WeatherHUD.styles';
@@ -157,20 +168,21 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
     }, [city]);
 
     // ── Animated gradient color interpolation ───────────────────────────────────
-    // Each gradient stop transitions through intermediate colors from the current
-    // displayed gradient to the target weather gradient. On first load this goes
-    // from solid dark (loading bg) to the weather colors. On refresh/reload it
-    // transitions from whatever's currently shown to the new weather gradient.
+    // The "from" and "to" gradients live in shared values; a single progress
+    // shared value drives the transition with withTiming on the UI thread. The
+    // useAnimatedProps worklet recomputes interpolated colors per frame natively,
+    // so the gradient stays smooth even while the JS thread is busy (image
+    // decoding, fetch parsing, scroll handlers).
     const DEFAULT_GRADIENT: readonly string[] = useMemo(() => [
         colors.bgDefault,
         colors.bgDefault,
         colors.bgDefault,
     ], [colors.bgDefault]);
 
-    const [displayGradient, setDisplayGradient] =
-        useState<readonly string[]>(DEFAULT_GRADIENT);
-    const fromColorsRef = useRef<readonly string[]>(DEFAULT_GRADIENT);
-    const animProgress = useRef(new RNAnimated.Value(1)).current;
+    const fromColors = useSharedValue<string[]>([...DEFAULT_GRADIENT]);
+    const toColors = useSharedValue<string[]>([...DEFAULT_GRADIENT]);
+    const progress = useSharedValue(1);
+
     const loadingOpacity = useRef(new RNAnimated.Value(1)).current;
     // Content fades in from 0 after spinner fades out — cross-dissolve handoff
     const contentOpacity = useRef(new RNAnimated.Value(0)).current;
@@ -180,8 +192,27 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
         ? gradientFor(weather.WeatherText, weather.IsDayTime)
         : DEFAULT_GRADIENT;
 
-    // Trigger color interpolation animation when target gradient changes
     const prevTargetRef = useRef<string>(DEFAULT_GRADIENT.join(','));
+
+    const animatedGradientProps = useAnimatedProps(() => {
+        'worklet';
+        const from = fromColors.value;
+        const to = toColors.value;
+        const t = progress.value;
+        const stagger = 0.15;
+        const n = to.length;
+        const result: string[] = [];
+        for (let i = 0; i < n; i++) {
+            const offset = (i / Math.max(1, n - 1)) * stagger;
+            let stopT = (t - offset) / (1 - stagger);
+            if (stopT < 0) stopT = 0;
+            else if (stopT > 1) stopT = 1;
+            result.push(
+                lerpColor(from[i] ?? from[0], to[i] ?? to[0], easeInOut(stopT)),
+            );
+        }
+        return { colors: result as unknown as [string, string, ...string[]] };
+    });
 
     useEffect(() => {
         const targetKey = targetGradient.join(',');
@@ -193,30 +224,20 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
             prevTargetRef.current === DEFAULT_GRADIENT.join(',');
         prevTargetRef.current = targetKey;
 
-        // Snapshot current display as the "from" state
-        fromColorsRef.current = [...displayGradient];
-        animProgress.setValue(0);
-
-        const listener = animProgress.addListener(({ value }) => {
-            setDisplayGradient(
-                lerpGradient(fromColorsRef.current, targetGradient, value),
-            );
-        });
-
-        RNAnimated.timing(animProgress, {
-            toValue: 1,
+        // Snapshot whatever's currently on screen as the new "from", so an
+        // interruption mid-transition reads as a continuous shift, not a jump.
+        const snapshot = lerpGradient(
+            fromColors.value,
+            toColors.value,
+            progress.value,
+        );
+        fromColors.value = snapshot;
+        toColors.value = [...targetGradient];
+        progress.value = 0;
+        progress.value = withTiming(1, {
             duration: isFirstPaint ? 2500 : 2000,
-            easing: RNEasing.inOut(RNEasing.cubic),
-            useNativeDriver: false,
-        }).start(() => {
-            animProgress.removeListener(listener);
-            // Ensure final state is exactly the target (no floating point drift)
-            setDisplayGradient([...targetGradient]);
+            easing: REasing.inOut(REasing.cubic),
         });
-
-        return () => {
-            animProgress.removeListener(listener);
-        };
     }, [targetGradient.join(',')]);
 
     // Cross-dissolve: spinner fades out while content fades in simultaneously.
@@ -292,8 +313,9 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
     }, [forecasts, isMetric]);
 
     return (
-        <LinearGradient
-            colors={displayGradient as [string, string, ...string[]]}
+        <AnimatedLinearGradient
+            colors={toColors.value as [string, string, ...string[]]}
+            animatedProps={animatedGradientProps}
             style={st.root}
         >
             {/* Transparent loading spinner — sits over the animating gradient */}
@@ -406,7 +428,7 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
                     </ScrollView>
                 </RNAnimated.View>
             )}
-        </LinearGradient>
+        </AnimatedLinearGradient>
     );
 };
 
