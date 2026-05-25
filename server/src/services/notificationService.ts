@@ -207,9 +207,6 @@ async function sendPush(token: string, msg: { title: string; body: string }): Pr
 }
 
 // ─── Morning check (every hour) ───────────────────────────────────────────────
-// In-memory snapshot of what was seen at morning notification time.
-// Used by afternoon weather change check to detect meaningful shifts.
-const morningSnapshot = new Map<string, { hasPrecipitation: boolean; tempF: number }>();
 
 async function runMorningCheck(): Promise<void> {
   const currentUTCHour = new Date().getUTCHours();
@@ -235,9 +232,8 @@ async function runMorningCheck(): Promise<void> {
     ]);
     if (!weather) continue;
 
-    morningSnapshot.set(String(user._id), {
-      hasPrecipitation: weather.hasPrecipitation,
-      tempF:            weather.tempF,
+    await User.findByIdAndUpdate(user._id, {
+      lastMorningSnapshot: { hasPrecipitation: weather.hasPrecipitation, tempF: weather.tempF, recordedAt: new Date() },
     });
 
     const ns = user.notificationSettings;
@@ -265,6 +261,8 @@ async function runMorningCheck(): Promise<void> {
 
 // ─── Afternoon weather change check (14:00 UTC daily) ─────────────────────────
 
+const MS_24H = 24 * 60 * 60 * 1_000;
+
 async function runAfternoonCheck(): Promise<void> {
   const users = await User.find({
     pushToken:                                  { $exists: true, $ne: null },
@@ -283,8 +281,13 @@ async function runAfternoonCheck(): Promise<void> {
     const weather = await getCurrentWeather(cityKey);
     if (!weather) continue;
 
-    const morning = morningSnapshot.get(String(user._id));
-    const scale   = user.settings?.temperatureScale ?? 'Imperial';
+    const snap  = user.lastMorningSnapshot;
+    const scale = user.settings?.temperatureScale ?? 'Imperial';
+
+    // Only use morning snapshot if it was recorded today (within 24 h)
+    const morning = snap && (Date.now() - new Date(snap.recordedAt).getTime() < MS_24H)
+      ? snap
+      : null;
 
     const precipChanged = morning
       ? !morning.hasPrecipitation && weather.hasPrecipitation
@@ -299,9 +302,6 @@ async function runAfternoonCheck(): Promise<void> {
       await sendPush(user.pushToken!, msg);
     }
   }
-
-  // Reset snapshots each afternoon cycle
-  morningSnapshot.clear();
 }
 
 // ─── Service entry point ──────────────────────────────────────────────────────

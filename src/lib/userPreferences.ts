@@ -32,10 +32,45 @@ export const loadPreferences = async (): Promise<UserPreferenceProfile> => {
 
 export const savePreferences = async (profile: UserPreferenceProfile): Promise<void> => {
   await storage.setItem(PREFS_KEY, JSON.stringify(profile));
+  pushPreferencesToServer(profile);
 };
 
 export const clearPreferences = async (): Promise<void> => {
   await storage.removeItem(PREFS_KEY);
+};
+
+// ─── Server sync ──────────────────────────────────────────────────────────────
+
+async function pushPreferencesToServer(profile: UserPreferenceProfile): Promise<void> {
+  try {
+    const { default: client } = await import('../api/client');
+    const { authHeaders } = await import('./auth');
+    const config = authHeaders();
+    if (!config.headers) return;
+    await client.put('/api/preferences', profile, config);
+  } catch {
+    // fire-and-forget — local copy is the source of truth until server responds
+  }
+}
+
+/**
+ * Pull the server's preference profile and hydrate local storage.
+ * Call once at app startup after the user is confirmed logged in.
+ * Server wins on conflict — it holds the aggregate across all devices.
+ */
+export const syncPreferencesFromServer = async (): Promise<void> => {
+  try {
+    const { default: client } = await import('../api/client');
+    const { authHeaders } = await import('./auth');
+    const config = authHeaders();
+    if (!config.headers) return;
+    const { data } = await client.get<UserPreferenceProfile>('/api/preferences', config);
+    if (data && typeof data.totalOutfits === 'number') {
+      await storage.setItem(PREFS_KEY, JSON.stringify({ ...empty(), ...data }));
+    }
+  } catch {
+    // Network failure — keep local data
+  }
 };
 
 // ─── Mutation ─────────────────────────────────────────────────────────────────

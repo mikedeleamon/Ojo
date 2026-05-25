@@ -2,6 +2,9 @@ import { Router, Response } from 'express';
 import bcrypt from 'bcrypt';
 import User from '../models/User';
 import Closet from '../models/Closet';
+import OutfitHistory from '../models/OutfitHistory';
+import UserPreferences from '../models/UserPreferences';
+import { signToken } from '../lib/jwt';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 
 const router = Router();
@@ -51,8 +54,10 @@ router.put('/password', async (req: AuthRequest, res: Response): Promise<void> =
       res.status(401).json({ error: 'Current password is incorrect' }); return;
     }
     user.password = await bcrypt.hash(newPassword, 12);
+    user.tokenVersion = (user.tokenVersion ?? 0) + 1;
     await user.save();
-    res.sendStatus(204);
+    // Return a fresh token so the client stays logged in with the new version
+    res.json({ token: signToken(user.id, user.tokenVersion) });
   } catch (err) {
     console.error('[user] password update error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -64,6 +69,8 @@ router.delete('/me', async (req: AuthRequest, res: Response): Promise<void> => {
     await Promise.all([
       User.findByIdAndDelete(req.userId),
       Closet.deleteMany({ userId: req.userId }),
+      OutfitHistory.deleteMany({ userId: req.userId }),
+      UserPreferences.deleteOne({ userId: req.userId }),
     ]);
     res.sendStatus(204);
   } catch (err) {
@@ -85,7 +92,12 @@ router.get('/settings', async (req: AuthRequest, res: Response): Promise<void> =
 
 router.put('/settings', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    await User.findByIdAndUpdate(req.userId, { settings: req.body });
+    // Merge individual fields rather than replacing the whole sub-document
+    const updateFields: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(req.body)) {
+      updateFields[`settings.${key}`] = value;
+    }
+    await User.findByIdAndUpdate(req.userId, { $set: updateFields });
     res.sendStatus(204);
   } catch (err) {
     console.error('[user] settings update error:', err);

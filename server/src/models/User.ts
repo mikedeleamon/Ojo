@@ -20,6 +20,12 @@ export interface INotificationSettings {
   weeklyRecapDay:         number;
 }
 
+export interface IMorningSnapshot {
+  hasPrecipitation: boolean;
+  tempF: number;
+  recordedAt: Date;
+}
+
 export interface IUser extends Document {
   firstName: string;
   lastName: string;
@@ -30,6 +36,8 @@ export interface IUser extends Document {
   settings: ISettings;
   pushToken?: string;
   notificationSettings: INotificationSettings;
+  tokenVersion: number;
+  lastMorningSnapshot?: IMorningSnapshot;
 }
 
 const settingsSchema = new Schema<ISettings>({
@@ -52,6 +60,12 @@ const notificationSettingsSchema = new Schema<INotificationSettings>({
   weeklyRecapDay:       { type: Number,  default: 0 },
 }, { _id: false });
 
+const morningSnapshotSchema = new Schema<IMorningSnapshot>({
+  hasPrecipitation: { type: Boolean, required: true },
+  tempF:            { type: Number,  required: true },
+  recordedAt:       { type: Date,    required: true },
+}, { _id: false });
+
 const userSchema = new Schema<IUser>({
   firstName:            { type: String, required: true },
   lastName:             { type: String, required: true },
@@ -62,6 +76,8 @@ const userSchema = new Schema<IUser>({
   settings:             { type: settingsSchema, default: () => ({}) },
   pushToken:            { type: String },
   notificationSettings: { type: notificationSettingsSchema, default: () => ({}) },
+  tokenVersion:         { type: Number, default: 0 },
+  lastMorningSnapshot:  { type: morningSnapshotSchema },
 }, { timestamps: true });
 
 export default mongoose.model<IUser>('User', userSchema);

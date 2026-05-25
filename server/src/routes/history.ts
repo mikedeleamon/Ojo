@@ -35,8 +35,8 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
 router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id, wornAt, closetId, closetName, articleIds, articleSummary } = req.body;
-    if (!id || !wornAt || !closetId) {
-      res.status(400).json({ error: 'id, wornAt, and closetId are required' });
+    if (!id || !wornAt || !closetId || !closetName) {
+      res.status(400).json({ error: 'id, wornAt, closetId, and closetName are required' });
       return;
     }
 
@@ -63,8 +63,12 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
   }
 });
 
-/** DELETE /api/history — clear all entries for the authenticated user */
+/** DELETE /api/history?confirm=true — clear all entries for the authenticated user */
 router.delete('/', async (req: AuthRequest, res: Response): Promise<void> => {
+  if (req.query.confirm !== 'true') {
+    res.status(400).json({ error: 'Pass ?confirm=true to clear all history' });
+    return;
+  }
   try {
     await OutfitHistory.deleteMany({ userId: req.userId });
     res.sendStatus(204);

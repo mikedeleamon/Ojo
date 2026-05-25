@@ -669,6 +669,7 @@ const ClosetView = ({
 
             {showModal && (
                 <ArticleModal
+                    closetId={selected._id}
                     onClose={() => setShowModal(false)}
                     onSubmit={async (data) => {
                         await onAddArticle(selected._id, data);
@@ -678,6 +679,7 @@ const ClosetView = ({
             )}
             {editingArticle && (
                 <ArticleModal
+                    closetId={selected._id}
                     onClose={() => setEditingArticle(null)}
                     initialData={editingArticle}
                     onDelete={async () => {

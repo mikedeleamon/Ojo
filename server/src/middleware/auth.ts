@@ -1,11 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
+import { verifyToken } from '../lib/jwt';
+import User from '../models/User';
 
 export interface AuthRequest extends Request {
   userId?: string;
 }
 
-export const requireAuth = (req: AuthRequest, res: Response, next: NextFunction): void => {
+export const requireAuth = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   const header = req.headers.authorization;
   if (!header?.startsWith('Bearer ')) {
     res.status(401).json({ error: 'Unauthorized' });
@@ -13,7 +14,12 @@ export const requireAuth = (req: AuthRequest, res: Response, next: NextFunction)
   }
   const token = header.slice(7);
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET!) as { sub: string };
+    const payload = verifyToken(token);
+    const user = await User.findById(payload.sub).select('tokenVersion').lean();
+    if (!user || (payload.ver ?? 0) !== user.tokenVersion) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
     req.userId = payload.sub;
     next();
   } catch {

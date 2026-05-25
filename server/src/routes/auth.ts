@@ -1,13 +1,10 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
 import User from '../models/User';
+import { signToken } from '../lib/jwt';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 
 const router = Router();
-
-const signToken = (userId: string): string =>
-  jwt.sign({ sub: userId }, process.env.JWT_SECRET!, { expiresIn: '30d' });
 
 router.post('/login', async (req: Request, res: Response): Promise<void> => {
   try {
@@ -24,7 +21,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       return;
     }
     res.json({
-      token: signToken(user.id),
+      token: signToken(user.id, user.tokenVersion),
       user: { id: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email },
       settings: user.settings,
     });
@@ -60,7 +57,7 @@ router.post('/signup', async (req: Request, res: Response): Promise<void> => {
       birthday: birthday ?? '',
     });
     res.status(201).json({
-      token: signToken(user.id),
+      token: signToken(user.id, user.tokenVersion),
       user: { id: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email },
       settings: user.settings,
     });
@@ -72,12 +69,12 @@ router.post('/signup', async (req: Request, res: Response): Promise<void> => {
 
 router.post('/refresh', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const user = await User.findById(req.userId);
+    const user = await User.findById(req.userId).select('tokenVersion').lean();
     if (!user) {
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
-    res.json({ token: signToken(user.id) });
+    res.json({ token: signToken(String(user._id), user.tokenVersion) });
   } catch (err) {
     console.error('[auth] refresh error:', err);
     res.status(500).json({ error: 'Internal server error' });

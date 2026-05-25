@@ -45,4 +45,6 @@ const closetSchema = new Schema<ICloset>({
   isPreferred: { type: Boolean, default: false },
 }, { timestamps: true });
 
+closetSchema.index({ userId: 1 });
+
 export default mongoose.model<ICloset>('Closet', closetSchema);

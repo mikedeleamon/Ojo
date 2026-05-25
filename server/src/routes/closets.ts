@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import Closet from '../models/Closet';
 import { requireAuth, AuthRequest } from '../middleware/auth';
+import { uploadToR2, deleteFromR2 } from '../lib/r2';
 
 const router = Router();
 router.use(requireAuth);
@@ -68,6 +69,21 @@ router.put('/:id/preferred', async (req: AuthRequest, res: Response): Promise<vo
   }
 });
 
+router.post('/:closetId/upload-image', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { base64 } = req.body;
+    if (!base64 || !base64.startsWith('data:')) {
+      res.status(400).json({ error: 'Valid base64 data URI is required' });
+      return;
+    }
+    const imageUrl = await uploadToR2(base64);
+    res.json({ imageUrl });
+  } catch (err) {
+    console.error('[closets] upload-image error:', err);
+    res.status(500).json({ error: 'Image upload failed' });
+  }
+});
+
 router.post('/:closetId/articles', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const closet = await Closet.findOne({ _id: req.params.closetId, userId: req.userId });
@@ -104,11 +120,21 @@ router.put('/:closetId/articles/:articleId', async (req: AuthRequest, res: Respo
     if (!closet) { res.status(404).json({ error: 'Closet not found' }); return; }
     const article = closet.articles.id(req.params.articleId);
     if (!article) { res.status(404).json({ error: 'Article not found' }); return; }
+
+    // If imageUrl is being changed, delete old R2 image
+    const oldImageUrl = article.imageUrl;
+
     for (const field of ARTICLE_EDITABLE_FIELDS) {
       if (Object.prototype.hasOwnProperty.call(req.body, field)) {
         (article as unknown as Record<string, unknown>)[field] = req.body[field];
       }
     }
+
+    // Clean up old R2 image if it changed
+    if (req.body.imageUrl && oldImageUrl && oldImageUrl !== req.body.imageUrl && !oldImageUrl.startsWith('data:')) {
+      deleteFromR2(oldImageUrl).catch(err => console.error('[closets] R2 cleanup error:', err));
+    }
+
     await closet.save();
     res.json(closet);
   } catch (err) {
@@ -121,6 +147,11 @@ router.delete('/:closetId/articles/:articleId', async (req: AuthRequest, res: Re
   try {
     const closet = await Closet.findOne({ _id: req.params.closetId, userId: req.userId });
     if (!closet) { res.status(404).json({ error: 'Closet not found' }); return; }
+    const article = closet.articles.id(req.params.articleId);
+    if (article?.imageUrl && !article.imageUrl.startsWith('data:')) {
+      // Clean up R2 image (fire-and-forget, don't block deletion)
+      deleteFromR2(article.imageUrl).catch(err => console.error('[closets] R2 cleanup error:', err));
+    }
     closet.articles.pull({ _id: req.params.articleId });
     await closet.save();
     res.json(closet);

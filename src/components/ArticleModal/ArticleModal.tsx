@@ -8,7 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Svg, Path } from 'react-native-svg';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { View, Text } from '../primitives';
-import { pickImage, captureImage } from '../../lib/imageService';
+import { pickImage, captureImage, uploadImageToR2 } from '../../lib/imageService';
 import { getErrorMessage } from '../../lib/auth';
 import { ClothingArticle, ArticleFormData, BodyZone } from '../../types';
 import { identifyClothing } from '../../services/clothingIdentifier';
@@ -218,13 +218,14 @@ const ColorField = ({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 interface Props {
+  closetId:     string;
   onClose:      () => void;
   onSubmit:     (data: ArticleFormData) => Promise<void>;
   initialData?: ClothingArticle;
   onDelete?:    () => Promise<void>;
 }
 
-const ArticleModal = ({ onClose, onSubmit, initialData, onDelete }: Props) => {
+const ArticleModal = ({ closetId, onClose, onSubmit, initialData, onDelete }: Props) => {
   const { colors } = useTheme();
   const st = useMemo(() => makeSt(colors), [colors]);
   const isEditing = !!initialData;
@@ -356,9 +357,15 @@ const ArticleModal = ({ onClose, onSubmit, initialData, onDelete }: Props) => {
     const result = await pickImage();
     if (result.error) { Alert.alert('Error', result.error); return; }
     if (result.uri) {
-      set('imageUrl', result.uri);
       if (result.localUri && result.width && result.height) {
         runIdentification(result.localUri, result.width, result.height);
+      }
+      // Upload to R2 and set the public URL
+      const r2Url = await uploadImageToR2(result.uri, closetId);
+      if (r2Url) {
+        set('imageUrl', r2Url);
+      } else {
+        Alert.alert('Error', 'Failed to upload image. Please try again.');
       }
     }
   };
@@ -367,9 +374,15 @@ const ArticleModal = ({ onClose, onSubmit, initialData, onDelete }: Props) => {
     const result = await captureImage();
     if (result.error) { Alert.alert('Error', result.error); return; }
     if (result.uri) {
-      set('imageUrl', result.uri);
       if (result.localUri && result.width && result.height) {
         runIdentification(result.localUri, result.width, result.height);
+      }
+      // Upload to R2 and set the public URL
+      const r2Url = await uploadImageToR2(result.uri, closetId);
+      if (r2Url) {
+        set('imageUrl', r2Url);
+      } else {
+        Alert.alert('Error', 'Failed to upload image. Please try again.');
       }
     }
   };

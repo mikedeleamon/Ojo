@@ -1,8 +1,10 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import { AxiosError } from 'axios';
 import { lookupCity, getCurrent, getHourlyForecast, get5DayForecast } from '../lib/accuWeather';
+import { requireAuth, AuthRequest } from '../middleware/auth';
 
 const router = Router();
+router.use(requireAuth);
 
 // Surface AccuWeather's status (especially 429) rather than swallowing it as 500.
 function handleAccuError(err: unknown, res: Response, label: string) {
@@ -15,7 +17,7 @@ function handleAccuError(err: unknown, res: Response, label: string) {
   }
 }
 
-router.get('/city', async (req: Request, res: Response): Promise<void> => {
+router.get('/city', async (req: AuthRequest, res: Response): Promise<void> => {
   const { q } = req.query;
   if (!q) {
     res.status(400).json({ error: 'q is required' });
@@ -28,7 +30,7 @@ router.get('/city', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-router.get('/current/:cityKey', async (req: Request, res: Response): Promise<void> => {
+router.get('/current/:cityKey', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const details = req.query.details === undefined ? true : Boolean(req.query.details);
     res.json(await getCurrent(req.params.cityKey, details));
@@ -37,7 +39,7 @@ router.get('/current/:cityKey', async (req: Request, res: Response): Promise<voi
   }
 });
 
-router.get('/forecast/:cityKey', async (req: Request, res: Response): Promise<void> => {
+router.get('/forecast/:cityKey', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     res.json(await getHourlyForecast(req.params.cityKey));
   } catch (err) {
@@ -45,7 +47,7 @@ router.get('/forecast/:cityKey', async (req: Request, res: Response): Promise<vo
   }
 });
 
-router.get('/forecast/daily/:cityKey', async (req: Request, res: Response): Promise<void> => {
+router.get('/forecast/daily/:cityKey', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     res.json(await get5DayForecast(req.params.cityKey));
   } catch (err) {

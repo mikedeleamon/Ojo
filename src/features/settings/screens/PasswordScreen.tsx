@@ -3,7 +3,7 @@ import { StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-na
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { View, Text, TextInput, Pressable } from '../../../components/primitives';
 import axios from '../../../api/client';
-import { auth } from '../../../lib/auth';
+import { auth, updateToken } from '../../../lib/auth';
 import { useFormSubmit } from '../../../hooks/useFormSubmit';
 import { StatusMessage } from '../../../components/shared';
 import { makeStyles } from './screens.styles';
@@ -32,7 +32,8 @@ export default function PasswordScreen() {
     clearStatus();
     if (!currentPassword || newPassword.length < 8 || newPassword !== confirm) return;
     submit(async () => {
-      await axios.put('/api/user/password', { currentPassword, newPassword }, auth());
+      const { data } = await axios.put<{ token: string }>('/api/user/password', { currentPassword, newPassword }, auth());
+      if (data?.token) await updateToken(data.token);
       setCurrentPassword(''); setNewPassword(''); setConfirm('');
     });
   };

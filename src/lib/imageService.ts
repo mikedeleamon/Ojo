@@ -1,13 +1,11 @@
 /**
  * imageService.ts — React Native implementation using expo-image-picker.
- * File picking is re-enabled (was URL-only on web pending image hosting).
- * Interface identical to web version — ArticleModal unchanged.
- *
- * Note: Images are still stored as base64 in MongoDB.
- * Add Cloudinary/S3 before launch to avoid the 16MB document limit.
+ * Images are uploaded to Cloudflare R2 via the server.
  */
 
 import * as ImagePicker from 'expo-image-picker';
+import client from '../api/client';
+import { authHeaders } from './auth';
 
 export const MAX_FILE_MB    = 5;
 export const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
@@ -105,5 +103,28 @@ export const captureImage = async (): Promise<ImageResult> => {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Failed to capture image.';
     return { uri: null, localUri: null, width: null, height: null, error: msg };
+  }
+};
+
+/**
+ * Upload base64 image to Cloudflare R2 via the server.
+ * Returns the public R2 URL or null on failure.
+ */
+export const uploadImageToR2 = async (base64: string, closetId: string): Promise<string | null> => {
+  try {
+    if (!base64.startsWith('data:')) return null;
+    const config = authHeaders();
+    if (!config.headers) return null;
+
+    const { data } = await client.post<{ imageUrl: string }>(
+      `/api/closets/${closetId}/upload-image`,
+      { base64 },
+      config,
+    );
+    return data?.imageUrl ?? null;
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Image upload failed';
+    console.error('[imageService] R2 upload error:', msg);
+    return null;
   }
 };

@@ -3,6 +3,7 @@ interface CacheEntry<T> {
   expiresAt: number;
 }
 
+const MAX_ENTRIES = 2_000;
 const store = new Map<string, CacheEntry<unknown>>();
 
 export function ttlGet<T>(key: string): T | null {
@@ -15,6 +16,11 @@ export function ttlGet<T>(key: string): T | null {
 }
 
 export function ttlSet<T>(key: string, data: T, ttlMs: number): void {
+  if (store.size >= MAX_ENTRIES && !store.has(key)) {
+    // Evict the oldest insertion (Map preserves insertion order)
+    const oldest = store.keys().next().value;
+    if (oldest !== undefined) store.delete(oldest);
+  }
   store.set(key, { data, expiresAt: Date.now() + ttlMs });
 }
 

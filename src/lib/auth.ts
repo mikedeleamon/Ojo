@@ -56,6 +56,13 @@ export const clearAuth = async (): Promise<void> => {
   await secureStorage.removeItem(AUTH_KEY);
 };
 
+/** Swap in a new token without changing the stored user object. */
+export const updateToken = async (token: string): Promise<void> => {
+  _cachedToken = token;
+  const payload = await storageGetJSON<AuthPayload>(secureStorage, AUTH_KEY, {});
+  await secureStorage.setItem(AUTH_KEY, JSON.stringify({ ...payload, token }));
+};
+
 /**
  * Returns true if the stored token will expire within the next `withinSeconds`.
  * Uses Buffer instead of atob() which is unavailable in the RN JS engine.
