@@ -82,8 +82,6 @@ export default function App() {
             } finally {
                 await new Promise((r) => setTimeout(r, 2500));
                 setReady(true);
-                //TODO:add this line back (maybe?)
-                //await SplashScreen.hideAsync();
             }
         };
         init();

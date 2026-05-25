@@ -81,13 +81,34 @@ router.post('/:closetId/articles', async (req: AuthRequest, res: Response): Prom
   }
 });
 
+const ARTICLE_EDITABLE_FIELDS = [
+  'name',
+  'clothingType',
+  'topOrBottom',
+  'clothingCategory',
+  'fabricType',
+  'color',
+  'isAccessory',
+  'bodyZone',
+  'merchant',
+  'imageUrl',
+  'detectedGarmentType',
+  'detectedColors',
+  'detectedFabric',
+  'identificationConfidence',
+] as const;
+
 router.put('/:closetId/articles/:articleId', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const closet = await Closet.findOne({ _id: req.params.closetId, userId: req.userId });
     if (!closet) { res.status(404).json({ error: 'Closet not found' }); return; }
     const article = closet.articles.id(req.params.articleId);
     if (!article) { res.status(404).json({ error: 'Article not found' }); return; }
-    Object.assign(article, req.body);
+    for (const field of ARTICLE_EDITABLE_FIELDS) {
+      if (Object.prototype.hasOwnProperty.call(req.body, field)) {
+        (article as unknown as Record<string, unknown>)[field] = req.body[field];
+      }
+    }
     await closet.save();
     res.json(closet);
   } catch (err) {

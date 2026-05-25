@@ -19,74 +19,12 @@
  */
 
 import { ClothingArticle, CurrentWeather, Forecast, Settings } from '../types';
-import { OutfitSlot } from './outfitEngine';
+import type { OutfitSlot } from './outfit/types';
+import { extractLayers } from './layering/extractLayers';
+import { deriveDayRange } from './layering/dayRange';
+import type { LayeringResult, LayeringContext } from './layering/types';
 
-// ─── Public output type ───────────────────────────────────────────────────────
-
-export interface LayeringResult {
-  layers: {
-    base:  OutfitSlot | null;
-    mid:   OutfitSlot | null;
-    outer: OutfitSlot | null;
-  };
-  recommendation: string;
-  timeline?: { time: string; action: string }[];
-  confidence: number; // 0–1
-}
-
-// ─── 1. Layer extraction ──────────────────────────────────────────────────────
-// Reads the role already assigned by outfitEngine — no separate clothingType
-// lookup needed. This keeps the two engines in sync: any new type that
-// outfitEngine classifies as 'midLayer' or 'outerwear' is automatically
-// recognised here without needing a parallel LAYER_OF table update.
-
-/**
- * Pulls the first base, mid, and outer slot from an outfit using the role
- * already assigned by outfitEngine. Bottoms, footwear, and accessories are
- * layer-neutral and ignored here.
- */
-const extractLayers = (
-  slots: OutfitSlot[],
-): { base: OutfitSlot | null; mid: OutfitSlot | null; outer: OutfitSlot | null } => {
-  let base:  OutfitSlot | null = null;
-  let mid:   OutfitSlot | null = null;
-  let outer: OutfitSlot | null = null;
-
-  for (const slot of slots) {
-    if ((slot.role === 'top' || slot.role === 'fullBody') && !base) base  = slot;
-    if (slot.role === 'midLayer'  && !mid)                          mid   = slot;
-    if (slot.role === 'outerwear' && !outer)                        outer = slot;
-  }
-
-  return { base, mid, outer };
-};
-
-// ─── 2. Day temperature range ─────────────────────────────────────────────────
-// Derive a feels-like high/low from the hourly forecast array.
-//
-// The Forecast type only carries raw Temperature, but every layering decision
-// downstream is made on a feels-like basis (currentTemp = RealFeel). To keep
-// units consistent we apply the current feels-like offset (RealFeel - airTemp)
-// to each forecast value. This is a coarse approximation — real RealFeel varies
-// with humidity and solar load throughout the day — but it's far better than
-// mixing raw forecast temps with feels-like current temps when computing the
-// day delta.
-//
-// Falls back to currentFeelsLike when no forecasts are available, producing a
-// zero delta and suppressing timeline output gracefully.
-
-const deriveDayRange = (
-  forecasts:        Forecast[],
-  currentAirTemp:   number,
-  currentFeelsLike: number,
-): { high: number; low: number; offset: number } => {
-  const offset = currentFeelsLike - currentAirTemp;
-  if (forecasts.length === 0) {
-    return { high: currentFeelsLike, low: currentFeelsLike, offset };
-  }
-  const feelsTemps = forecasts.map(f => f.Temperature.Value + offset);
-  return { high: Math.max(...feelsTemps), low: Math.min(...feelsTemps), offset };
-};
+export type { LayeringResult, LayeringContext };
 
 // ─── 3. Layer necessity scoring ───────────────────────────────────────────────
 // Flexible signal-based decisions — avoids hardcoded "cold = 3 layers" rules.
@@ -525,27 +463,6 @@ const computeConfidence = (
 };
 
 // ─── Public API ───────────────────────────────────────────────────────────────
-
-/**
- * Weather-derived context computed once per weather snapshot.
- * Hoist this outside any per-outfit loop — deriveDayRange, rainForecast, and
- * necessity scoring all depend only on weather + forecasts + settings, not
- * on the specific slots in each outfit candidate.
- */
-export interface LayeringContext {
-  forecasts:    Forecast[];  // passed through so buildTimeline can scan them per-outfit
-  currentTemp:  number;
-  windSpeed:    number;
-  raining:      boolean;
-  rainForecast: boolean;
-  snowing:      boolean;     // currently snowing or snow in forecast
-  high:         number;
-  low:          number;
-  offset:       number;     // feels-like correction applied to forecast temps
-  tempDelta:    number;
-  needsMid:     boolean;
-  needsOuter:   boolean;
-}
 
 /**
  * Computes all weather-dependent values that are constant across outfit candidates.

@@ -14,169 +14,57 @@
  * by replacing scoreOutfit() with a model inference call.
  */
 
-import { ClothingArticle, CurrentWeather, Forecast, Settings, OutfitOccasion, BodyZone } from '../types';
+import { ClothingArticle, CurrentWeather, Forecast, Settings, OutfitOccasion } from '../types';
 import { articlePreferenceScore, colorPairingBonus, UserPreferenceProfile } from './userPreferences';
-import { buildLayeringContext, generateLayeringRecommendation, LayeringResult } from './layeringEngine';
+import { buildLayeringContext, generateLayeringRecommendation } from './layeringEngine';
+import type {
+  OutfitRole,
+  WeatherBucket,
+  OutfitSlot,
+  OutfitStatus,
+  ScoreBreakdown,
+  OutfitResult,
+  PrecipIntensity,
+  RecentlyWorn,
+} from './outfit/types';
+import {
+  getWeatherBucket,
+  isWeatherAppropriate,
+  classifyPrecipitation,
+  precipMultiplier,
+  UV_HIGH_LABELS,
+} from './outfit/weatherBuckets';
+import { roleOf, articleZoneLabel, buildAccCombos } from './outfit/roles';
+import { COLOR_NEUTRALS, NEUTRAL_BASE_COLORS, pairHarmony } from './outfit/colorHarmony';
+import { currentSeason, SEASONAL_COLORS, seasonalBonus, type Season } from './outfit/seasons';
 
-// ─── Core types ───────────────────────────────────────────────────────────────
-
-export type OutfitRole = 'top' | 'bottom' | 'fullBody' | 'midLayer' | 'outerwear' | 'footwear' | 'accessory';
-export type WeatherBucket = 'hot' | 'warm' | 'cool' | 'cold' | 'freezing';
-
-export interface OutfitSlot {
-  role:    OutfitRole;
-  article: ClothingArticle;
-}
-
-export type OutfitStatus = 'ok' | 'empty_closet' | 'insufficient';
-
-export interface ScoreBreakdown {
-  fabric:     number;  // 0–100
-  color:      number;  // 0–100
-  style:      number;  // 0–100
-  simplicity: number;  // 0–100
-  preference: number;  // 0–100
-}
-
-export interface OutfitResult {
-  status:         OutfitStatus;
-  headline:       string;
-  slots:          OutfitSlot[];
-  notes:          string[];
-  score:          number;        // 0–100 composite
-  scoreBreakdown: ScoreBreakdown;
-  layering?:      LayeringResult;
-}
-
-// ─── Weather bucketing ────────────────────────────────────────────────────────
-
-export const getWeatherBucket = (
-  feelsLikeF: number,
-  hiThreshold: number,
-  loThreshold: number,
-): WeatherBucket => {
-  if (feelsLikeF >= hiThreshold)       return 'hot';
-  if (feelsLikeF >= loThreshold)       return 'warm';
-  if (feelsLikeF >= loThreshold - 15)  return 'cool';
-  if (feelsLikeF >= 32)                return 'cold';
-  return 'freezing';
+// Re-export public surface for backwards compatibility with existing callers.
+export type {
+  OutfitRole,
+  WeatherBucket,
+  OutfitSlot,
+  OutfitStatus,
+  ScoreBreakdown,
+  OutfitResult,
+  PrecipIntensity,
+  RecentlyWorn,
+  Season,
 };
-
-// ─── 1. Hard weather filter ───────────────────────────────────────────────────
-// Eliminates items that are clearly climatically impossible — these never enter
-// the combination space, so the scorer never has to penalise them.
-
-const HARD_EXCLUDE_HOT      = new Set(['Coat', 'Gloves', 'Scarf', 'Sweater', 'Hoodie']);
-const HARD_EXCLUDE_COLD     = new Set(['Sandals', 'Shorts']);
-const HARD_EXCLUDE_FREEZING = new Set(['Sandals', 'Shorts', 'Skirt']);
-
-const isWeatherAppropriate = (
-  a: ClothingArticle,
-  bucket: WeatherBucket,
-): boolean => {
-  if (bucket === 'hot'                         && HARD_EXCLUDE_HOT.has(a.clothingType))      return false;
-  if (bucket === 'freezing'                    && HARD_EXCLUDE_FREEZING.has(a.clothingType)) return false;
-  if (bucket === 'cold'                        && HARD_EXCLUDE_COLD.has(a.clothingType))     return false;
-  return true;
-};
-
-// ─── 2. Role classification ───────────────────────────────────────────────────
-
-const ROLE_MAP: Record<string, OutfitRole> = {
-  Shirt: 'top', 'T-Shirt': 'top', Blouse: 'top',
-  Hoodie: 'midLayer', Sweater: 'midLayer',   // insulating mid layer, not a base top
-  Jacket: 'outerwear', Coat: 'outerwear',
-  Pants: 'bottom', Jeans: 'bottom', Shorts: 'bottom', Skirt: 'bottom',
-  Dress: 'fullBody',
-  Shoes: 'footwear', Sneakers: 'footwear', Boots: 'footwear', Sandals: 'footwear',
-  Hat: 'accessory', Cap: 'accessory', Scarf: 'accessory', Gloves: 'accessory',
-  Belt: 'accessory', Bag: 'accessory', Watch: 'accessory', Jewelry: 'accessory', Socks: 'accessory',
-};
-
-const roleOf = (a: ClothingArticle): OutfitRole =>
-  ROLE_MAP[a.clothingType] ?? (a.isAccessory ? 'accessory' : 'top');
-
-// ─── 2b. Accessory body-zone classification ───────────────────────────────────
-// Derives which body zone an accessory occupies, used to build non-competing
-// accessory pairs (a watch and a hat can coexist; two necklaces cannot).
-// Falls back to clothingType heuristics when bodyZone is not explicitly set.
-
-const ZONE_FROM_TYPE: Record<string, BodyZone> = {
-  Hat: 'Head', Cap: 'Head',
-  Scarf: 'Neck', Jewelry: 'Neck',
-  Gloves: 'Hand',
-  Belt: 'Waist',
-  Watch: 'Wrist',
-  Socks: 'Ankle',
-  Bag: 'Carried',
-};
-
-const zoneOf = (a: ClothingArticle): BodyZone =>
-  a.bodyZone ?? ZONE_FROM_TYPE[a.clothingType] ?? 'Carried';
-
-/** Human-readable zone label for an accessory article. */
-export const articleZoneLabel = (a: ClothingArticle): string =>
-  a.bodyZone ?? ZONE_FROM_TYPE[a.clothingType] ?? 'Extra';
-
-/**
- * Generates all valid accessory combinations:
- *   - empty (no accessories)
- *   - single items
- *   - pairs from different body zones (non-competing)
- * Capped at 4 input articles to keep the combination space manageable.
- */
-const buildAccCombos = (accessories: ClothingArticle[]): ClothingArticle[][] => {
-  const items = accessories.slice(0, 4);
-  const combos: ClothingArticle[][] = [[]]; // no accessories
-  for (const a of items) combos.push([a]);
-  for (let i = 0; i < items.length; i++) {
-    for (let j = i + 1; j < items.length; j++) {
-      if (zoneOf(items[i]) !== zoneOf(items[j])) {
-        combos.push([items[i], items[j]]);
-      }
-    }
-  }
-  return combos;
+export {
+  getWeatherBucket,
+  articleZoneLabel,
+  COLOR_NEUTRALS,
+  pairHarmony,
+  currentSeason,
+  SEASONAL_COLORS,
 };
 
 // ─── 3a. Fabric × weather scoring ────────────────────────────────────────────
 // 0–1 score for how appropriate a fabric is in each weather bucket.
 // Built as a lookup table so new fabrics can be added without changing logic.
 
-// ─── Precipitation intensity grading ─────────────────────────────────────────
-// Replaces the binary "raining" flag with a 0–1 intensity scale.
-// Light drizzle barely affects fabric scoring; heavy downpours aggressively
-// penalize absorbent fabrics and reward water-resistant ones.
-export type PrecipIntensity = 'none' | 'light' | 'moderate' | 'heavy';
-
-const classifyPrecipitation = (weather: CurrentWeather): PrecipIntensity => {
-  if (!weather.HasPrecipitation) return 'none';
-  const amountInch = weather.Precip1hr?.Imperial?.Value ?? 0;
-  // AccuWeather precipitation rates (inches/hr): light < 0.1, moderate 0.1–0.3, heavy > 0.3
-  if (amountInch >= 0.30) return 'heavy';
-  if (amountInch >= 0.10) return 'moderate';
-  // If HasPrecipitation but no amount data, infer from WeatherText
-  const text = (weather.WeatherText ?? '').toLowerCase();
-  if (text.includes('heavy') || text.includes('downpour')) return 'heavy';
-  if (text.includes('shower') || text.includes('storm'))   return 'moderate';
-  return 'light';
-};
-
-/** Multiplier for rain-related fabric adjustments based on intensity. */
-const precipMultiplier = (intensity: PrecipIntensity): number => {
-  switch (intensity) {
-    case 'none':     return 0;
-    case 'light':    return 0.4;
-    case 'moderate': return 0.7;
-    case 'heavy':    return 1.0;
-  }
-};
-
 // Fabrics that typically require dry-cleaning (used in care notes).
 const DRY_CLEAN_FABRICS = new Set(['Silk', 'Wool']);
-
-// AccuWeather UVIndexText values considered high enough to warrant a hat note.
-const UV_HIGH_LABELS = new Set(['High', 'Very High', 'Extreme']);
 
 const FABRIC_WEATHER: Record<string, Record<WeatherBucket, number>> = {
   Cotton:    { hot: 0.90, warm: 0.80, cool: 0.60, cold: 0.30, freezing: 0.10 },
@@ -362,106 +250,7 @@ const outfitFabricScore = (
 };
 
 // ─── 3b. Color harmony scoring ────────────────────────────────────────────────
-// 12-position RYB color wheel. Wheel position is 0–11 (30° per step).
-// Harmony score is based on the angular distance between two colors.
-
-const COLOR_WHEEL_POSITION: Record<string, number> = {
-  // Position 0 — Red family
-  Red: 0, Scarlet: 0, Crimson: 0, Maroon: 0, Burgundy: 0,
-  // Position 2 — Orange family
-  Orange: 2, Coral: 2, Peach: 2, Salmon: 2, Rust: 2,
-  // Position 3 — Gold/yellow-orange
-  Gold: 3,
-  // Position 4 — Yellow family
-  Yellow: 4, Lime: 4,
-  // Position 5 — Yellow-green
-  Olive: 5, Khaki: 5, Sage: 5,
-  // Position 6 — Green family
-  Green: 6, Mint: 6,
-  // Position 7 — Blue-green
-  Teal: 7, Cyan: 7,
-  // Position 8 — Blue family
-  Blue: 8, 'Sky Blue': 8, 'Baby Blue': 8, Cobalt: 8, 'Electric Blue': 8,
-  // Position 9 — Blue-purple / dark blue
-  Navy: 9, Indigo: 9, Periwinkle: 9,
-  // Position 10 — Purple family
-  Purple: 10, Violet: 10, Plum: 10, Lilac: 10,
-  // Position 11 — Red-purple / pink
-  Pink: 11, 'Hot Pink': 11, Fuchsia: 11, Magenta: 11,
-  Lavender: 11, Rose: 11, 'Dusty Rose': 11, Blush: 11,
-};
-
-// Neutrals harmonise with everything — they don't interact with the wheel.
-// Metallics are treated as fashion neutrals — a gold watch or silver earring
-// pairs with virtually any outfit, so they receive the 0.90 neutral bonus.
-export const COLOR_NEUTRALS = new Set([
-  'Black', 'White', 'Grey', 'Gray', 'Beige', 'Brown',
-  'Ivory', 'Cream', 'Tan', 'Multi',
-  // Metallics — pair with everything
-  'Silver', 'Gold', 'Bronze', 'Rose Gold', 'Champagne',
-]);
-
-/**
- * Returns 0–1 harmony score for two colors.
- * Based on standard color theory interval relationships.
- */
-export const pairHarmony = (colorA: string, colorB: string): number => {
-  // Neutrals pair perfectly with anything
-  if (COLOR_NEUTRALS.has(colorA) || COLOR_NEUTRALS.has(colorB)) return 0.90;
-
-  const posA = COLOR_WHEEL_POSITION[colorA];
-  const posB = COLOR_WHEEL_POSITION[colorB];
-
-  // Unknown color → treat as neutral
-  if (posA === undefined || posB === undefined) return 0.70;
-
-  // Angular distance on the wheel (0–6)
-  const d = Math.min(Math.abs(posA - posB), 12 - Math.abs(posA - posB));
-
-  // Harmony scoring by interval:
-  if (d === 0) return 0.70;   // Monochromatic — clean but not dynamic
-  if (d === 1) return 0.80;   // Analogous — pleasing, low contrast
-  if (d === 2) return 0.65;   // Near-analogous — subtle
-  if (d === 3) return 0.35;   // Quarter-wheel — can clash (e.g. red + yellow-green)
-  if (d === 4) return 0.75;   // Tetradic — bold, structured
-  if (d === 5) return 0.85;   // Split-complementary — visually exciting
-  if (d === 6) return 1.00;   // Complementary — highest contrast harmony
-  return 0.50;
-};
-
-// ─── Seasonal color palette ──────────────────────────────────────────────────
-// Subtle boost for colors that feel season-appropriate. Nothing is penalized —
-// only in-season colors get a small bonus, keeping the scoring additive.
-export type Season = 'spring' | 'summer' | 'autumn' | 'winter';
-
-export const currentSeason = (): Season => {
-  const month = new Date().getMonth(); // 0-indexed
-  if (month >= 2 && month <= 4) return 'spring';
-  if (month >= 5 && month <= 7) return 'summer';
-  if (month >= 8 && month <= 10) return 'autumn';
-  return 'winter';
-};
-
-export const SEASONAL_COLORS: Record<Season, Set<string>> = {
-  spring: new Set(['Pink', 'Lavender', 'Mint', 'Coral', 'Sky Blue', 'Yellow', 'Rose', 'Cream',
-    'Blush', 'Peach', 'Lilac', 'Sage', 'Periwinkle', 'Baby Blue', 'Dusty Rose']),
-  summer: new Set(['White', 'Cyan', 'Coral', 'Yellow', 'Orange', 'Sky Blue', 'Teal', 'Mint',
-    'Lime', 'Hot Pink', 'Fuchsia', 'Peach', 'Baby Blue', 'Electric Blue']),
-  autumn: new Set(['Rust', 'Burgundy', 'Olive', 'Brown', 'Gold', 'Maroon', 'Orange', 'Khaki', 'Tan',
-    'Scarlet', 'Sage', 'Champagne']),
-  winter: new Set(['Navy', 'Black', 'Burgundy', 'Plum', 'Indigo', 'Grey', 'Silver', 'Cobalt',
-    'Champagne', 'Rose Gold', 'Lilac', 'Periwinkle']),
-};
-
-/** Returns a 0–0.08 seasonal bonus based on how many outfit colors match the season. */
-const seasonalBonus = (outfitColors: string[]): number => {
-  const season = currentSeason();
-  const palette = SEASONAL_COLORS[season];
-  const matchCount = outfitColors.filter(c => palette.has(c)).length;
-  if (outfitColors.length === 0) return 0;
-  // Scale: 1 match = 0.03, 2+ = 0.05–0.08
-  return Math.min(0.08, matchCount * 0.03);
-};
+// Pure helpers live in ./outfit/colorHarmony and ./outfit/seasons.
 
 const outfitColorScore = (slots: OutfitSlot[], profile?: UserPreferenceProfile): number => {
   const outfitColors = slots.map(s => s.article.color).filter(Boolean) as string[];
@@ -595,8 +384,6 @@ const occasionScore = (slots: OutfitSlot[], occasion: OutfitOccasion): number =>
 // ─── 3d. Simplicity / neutrality scoring ─────────────────────────────────────
 // Classic styling principle: neutral base + at most one accent color.
 
-const NEUTRAL_BASE_COLORS = new Set(['Black', 'White', 'Grey', 'Beige', 'Brown', 'Navy']);
-
 const simplicityScore = (slots: OutfitSlot[]): number => {
   const colors = slots.map(s => s.article.color).filter(Boolean) as string[];
   if (colors.length === 0) return 0.60;
@@ -637,9 +424,6 @@ const getWeights = (bucket: WeatherBucket) => {
 // This naturally rotates the wardrobe without hard-blocking repeated items.
 const RECENCY_PENALTY_BASE     = 0.15;   // penalty for item worn today/yesterday
 const RECENCY_PENALTY_MAX      = 0.25;   // cap for entire outfit
-
-/** Accepts either legacy Set<string> or Map<string, number> (id→daysSinceWorn). */
-export type RecentlyWorn = Set<string> | Map<string, number>;
 
 const recencyPenaltyForArticle = (id: string, worn: RecentlyWorn): number => {
   if (worn instanceof Map) {

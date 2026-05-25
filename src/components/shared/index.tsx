@@ -3,6 +3,8 @@ import { View, Text, StyleSheet } from 'react-native';
 import { ColorTokens, spacing, radius, fonts, fontSizes } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 
+export { HangerIcon } from './HangerIcon';
+
 const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   // StatusMessage
   base: {

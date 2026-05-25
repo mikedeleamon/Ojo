@@ -296,7 +296,7 @@ export default function NotificationsScreen() {
                 value={ns.morningBriefEnabled}
                 onValueChange={v => set('morningBriefEnabled', v)}
                 trackColor={{ false: colors.glassBorder, true: 'rgba(135,222,90,0.6)' }}
-                thumbColor={ns.morningBriefEnabled ? '#87DE5A' : colors.textMuted}
+                thumbColor={ns.morningBriefEnabled ? colors.toggleThumbActive : colors.textMuted}
               />
             </Row>
 
@@ -323,7 +323,7 @@ export default function NotificationsScreen() {
                 value={ns.tempSwingEnabled}
                 onValueChange={v => set('tempSwingEnabled', v)}
                 trackColor={{ false: colors.glassBorder, true: 'rgba(135,222,90,0.6)' }}
-                thumbColor={ns.tempSwingEnabled ? '#87DE5A' : colors.textMuted}
+                thumbColor={ns.tempSwingEnabled ? colors.toggleThumbActive : colors.textMuted}
               />
             </Row>
 
@@ -340,9 +340,9 @@ export default function NotificationsScreen() {
                   step={5}
                   value={ns.tempSwingThresholdF}
                   onValueChange={v => set('tempSwingThresholdF', v)}
-                  minimumTrackTintColor="#87DE5A"
+                  minimumTrackTintColor={colors.toggleThumbActive}
                   maximumTrackTintColor={colors.glassBorder}
-                  thumbTintColor="#87DE5A"
+                  thumbTintColor={colors.toggleThumbActive}
                 />
               </View>
             )}
@@ -362,7 +362,7 @@ export default function NotificationsScreen() {
                 value={ns.weatherChangeEnabled}
                 onValueChange={v => set('weatherChangeEnabled', v)}
                 trackColor={{ false: colors.glassBorder, true: 'rgba(135,222,90,0.6)' }}
-                thumbColor={ns.weatherChangeEnabled ? '#87DE5A' : colors.textMuted}
+                thumbColor={ns.weatherChangeEnabled ? colors.toggleThumbActive : colors.textMuted}
               />
             </Row>
           </View>
@@ -377,7 +377,7 @@ export default function NotificationsScreen() {
                 value={ns.closetGapEnabled}
                 onValueChange={v => set('closetGapEnabled', v)}
                 trackColor={{ false: colors.glassBorder, true: 'rgba(135,222,90,0.6)' }}
-                thumbColor={ns.closetGapEnabled ? '#87DE5A' : colors.textMuted}
+                thumbColor={ns.closetGapEnabled ? colors.toggleThumbActive : colors.textMuted}
               />
             </Row>
           </View>
@@ -396,7 +396,7 @@ export default function NotificationsScreen() {
                 value={ns.weeklyRecapEnabled}
                 onValueChange={v => set('weeklyRecapEnabled', v)}
                 trackColor={{ false: colors.glassBorder, true: 'rgba(135,222,90,0.6)' }}
-                thumbColor={ns.weeklyRecapEnabled ? '#87DE5A' : colors.textMuted}
+                thumbColor={ns.weeklyRecapEnabled ? colors.toggleThumbActive : colors.textMuted}
               />
             </Row>
 

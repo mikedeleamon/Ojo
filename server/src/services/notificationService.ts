@@ -20,32 +20,21 @@
 
 import cron from 'node-cron';
 import { Expo, ExpoPushMessage } from 'expo-server-sdk';
-import axios from 'axios';
 import User from '../models/User';
 import Closet from '../models/Closet';
+import {
+  lookupCity,
+  getCurrent as accuGetCurrent,
+  getHourlyForecast as accuGetForecast,
+} from '../lib/accuWeather';
 
 const expo = new Expo();
 
-const accu = axios.create({
-  baseURL: process.env.ACCUWEATHER_BASE_URL ?? 'https://dataservice.accuweather.com',
-});
-const accuKey = () => process.env.ACCUWEATHER_API_KEY!;
-
-// ─── City key cache ───────────────────────────────────────────────────────────
-// Avoids repeated location lookups for the same city string.
-const cityKeyCache = new Map<string, string>();
-
 async function getCityKey(city: string): Promise<string | null> {
   if (!city) return null;
-  const cached = cityKeyCache.get(city.toLowerCase());
-  if (cached) return cached;
   try {
-    const { data } = await accu.get('/locations/v1/cities/search', {
-      params: { apikey: accuKey(), q: city },
-    });
-    const key: string | undefined = data?.[0]?.Key;
-    if (key) cityKeyCache.set(city.toLowerCase(), key);
-    return key ?? null;
+    const result = (await lookupCity(city)) as { Key?: string } | null;
+    return result?.Key ?? null;
   } catch {
     return null;
   }
@@ -65,9 +54,7 @@ interface ForecastHour {
 
 async function getCurrentWeather(cityKey: string): Promise<WeatherSnapshot | null> {
   try {
-    const { data } = await accu.get(`/currentconditions/v1/${cityKey}`, {
-      params: { apikey: accuKey(), details: true },
-    });
+    const data = (await accuGetCurrent(cityKey, true)) as any[];
     const w = data?.[0];
     if (!w) return null;
     return {
@@ -83,9 +70,7 @@ async function getCurrentWeather(cityKey: string): Promise<WeatherSnapshot | nul
 
 async function getHourlyForecast(cityKey: string): Promise<ForecastHour[]> {
   try {
-    const { data } = await accu.get(`/forecasts/v1/hourly/12hour/${cityKey}`, {
-      params: { apikey: accuKey(), details: false },
-    });
+    const data = (await accuGetForecast(cityKey)) as any[];
     return (data ?? []).map((h: any) => ({
       tempF:            h.Temperature?.Value ?? 0,
       hasPrecipitation: Boolean(h.HasPrecipitation),

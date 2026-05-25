@@ -16,9 +16,7 @@ import {
 import { useSettings } from '../../../hooks/useSettings';
 import { spacing, radius, fonts, fontSizes, fontWeights } from '../../../theme/tokens';
 import { useTheme, ThemeMode } from '../../../theme/ThemeContext';
-
-const fToC = (f: number) => Math.round((f - 32) * 5 / 9);
-const cToF = (c: number) => Math.round(c * 9 / 5 + 32);
+import { fToC, cToF } from '../../../lib/units';
 
 const STYLES = [
     'Casual',

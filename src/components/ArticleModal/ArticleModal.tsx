@@ -16,155 +16,18 @@ import type { GarmentType, FabricGuess, DetectedColor } from '../../services/clo
 import { ColorTokens, fonts, fontSizes, fontWeights, spacing, radius } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 
-// ─── Type classification ───────────────────────────────────────────────────────
-// Grouped for the visual picker — order determines display order in the form.
+import { CATEGORIES, COLORS, FABRICS } from '../../lib/colors/palettes';
+import {
+  TYPE_GROUPS,
+  TYPE_DEFAULTS,
+  KNOWN_TYPES,
+  GARMENT_TO_FORM_TYPE,
+  DETECTED_COLOR_TO_FORM,
+  detectedFabricToForm,
+} from './detection';
 
-const TYPE_GROUPS: { label: string; types: string[] }[] = [
-  { label: 'Tops',        types: ['T-Shirt', 'Shirt', 'Blouse'] },
-  { label: 'Layers',      types: ['Sweater', 'Hoodie'] },
-  { label: 'Bottoms',     types: ['Pants', 'Jeans', 'Shorts', 'Skirt'] },
-  { label: 'Outerwear',   types: ['Jacket', 'Coat'] },
-  { label: 'Full Body',   types: ['Dress'] },
-  { label: 'Footwear',    types: ['Shoes', 'Sneakers', 'Boots', 'Sandals'] },
-  { label: 'Accessories', types: ['Hat', 'Cap', 'Scarf', 'Gloves', 'Belt', 'Bag', 'Watch', 'Jewelry', 'Socks'] },
-  { label: 'Other',       types: ['Other'] },
-];
-
-// Defaults inferred the moment a type is selected.
-//  - topOrBottom  → always derived from type
-//  - fabricType   → suggested only when the field is still empty (non-destructive)
-//  - isAccessory  → fully driven by type for all known accessories
-//  - bodyZone     → set for known accessories; cleared when switching to non-accessory
-const TYPE_DEFAULTS: Record<string, Partial<ArticleFormData>> = {
-  Shirt:    { topOrBottom: 'Top' },
-  'T-Shirt':{ topOrBottom: 'Top',      fabricType: 'Cotton' },
-  Blouse:   { topOrBottom: 'Top' },
-  Sweater:  { topOrBottom: 'N/A',      fabricType: 'Wool'   },
-  Hoodie:   { topOrBottom: 'N/A',      fabricType: 'Cotton' },
-  Jacket:   { topOrBottom: 'Top' },
-  Coat:     { topOrBottom: 'Top' },
-  Pants:    { topOrBottom: 'Bottom' },
-  Jeans:    { topOrBottom: 'Bottom',   fabricType: 'Denim'  },
-  Shorts:   { topOrBottom: 'Bottom' },
-  Skirt:    { topOrBottom: 'Bottom' },
-  Dress:    { topOrBottom: 'Full body' },
-  Shoes:    { topOrBottom: 'Footwear' },
-  Sneakers: { topOrBottom: 'Footwear' },
-  Boots:    { topOrBottom: 'Footwear' },
-  Sandals:  { topOrBottom: 'Footwear' },
-  Hat:      { topOrBottom: 'N/A', isAccessory: true, bodyZone: 'Head'    },
-  Cap:      { topOrBottom: 'N/A', isAccessory: true, bodyZone: 'Head'    },
-  Scarf:    { topOrBottom: 'N/A', isAccessory: true, bodyZone: 'Neck'    },
-  Gloves:   { topOrBottom: 'N/A', isAccessory: true, bodyZone: 'Hand'    },
-  Belt:     { topOrBottom: 'N/A', isAccessory: true, bodyZone: 'Waist'   },
-  Bag:      { topOrBottom: 'N/A', isAccessory: true, bodyZone: 'Carried' },
-  Watch:    { topOrBottom: 'N/A', isAccessory: true, bodyZone: 'Wrist'   },
-  Jewelry:  { topOrBottom: 'N/A', isAccessory: true, bodyZone: 'Neck'    },
-  Socks:    { topOrBottom: 'N/A', isAccessory: true, bodyZone: 'Ankle'   },
-};
-
-// Known types whose classification is unambiguous. For these, the manual
-// Accessory toggle and Top/Bottom chip field are hidden — auto-derived from
-// the type selection. Only 'Other' (and an unset type) need manual controls.
-const KNOWN_TYPES = new Set(
-  TYPE_GROUPS.flatMap(g => g.types).filter(t => t !== 'Other'),
-);
-
-// ─── Detection → Form mappings ────────────────────────────────────────────────
-// Maps ML pipeline GarmentType to the form's clothingType values (TYPE_GROUPS).
-
-const GARMENT_TO_FORM_TYPE: Partial<Record<GarmentType, string>> = {
-  't-shirt':           'T-Shirt',
-  'long-sleeve-shirt': 'Shirt',
-  'dress-shirt':       'Shirt',
-  'polo':              'Shirt',
-  'tank-top':          'T-Shirt',
-  'hoodie':            'Hoodie',
-  'sweatshirt':        'Sweater',
-  'sweater':           'Sweater',
-  'cardigan':          'Sweater',
-  'jacket':            'Jacket',
-  'blazer':            'Jacket',
-  'coat':              'Coat',
-  'puffer':            'Jacket',
-  'vest':              'Jacket',
-  'jeans':             'Jeans',
-  'pants':             'Pants',
-  'shorts':            'Shorts',
-  'leggings':          'Pants',
-  'skirt':             'Skirt',
-  'dress':             'Dress',
-  'jumpsuit':          'Dress',
-  'hat':               'Hat',
-  'cap':               'Cap',
-  'scarf':             'Scarf',
-  'gloves':            'Gloves',
-  'belt':              'Belt',
-  'bag':               'Bag',
-  'shoes':             'Shoes',
-  'boots':             'Boots',
-  'sneakers':          'Sneakers',
-  'sandals':           'Sandals',
-  'socks':             'Socks',
-  'watch':             'Watch',
-};
-
-// Maps detected color names (from colorUtils) → the form's COLORS list.
-const DETECTED_COLOR_TO_FORM: Record<string, string> = {
-  'white': 'White', 'off-white': 'Cream', 'cream': 'Cream',
-  'light gray': 'Grey', 'gray': 'Grey', 'charcoal': 'Grey', 'dark gray': 'Grey',
-  'black': 'Black',
-  'navy': 'Navy', 'dark blue': 'Navy', 'blue': 'Blue', 'light blue': 'Sky Blue',
-  'sky blue': 'Sky Blue', 'cobalt': 'Cobalt', 'denim blue': 'Blue',
-  'teal': 'Teal', 'turquoise': 'Teal',
-  'forest green': 'Green', 'olive': 'Olive', 'green': 'Green', 'mint': 'Mint', 'sage': 'Sage',
-  'red': 'Red', 'crimson': 'Crimson', 'burgundy': 'Burgundy', 'wine': 'Burgundy',
-  'coral': 'Coral', 'orange': 'Orange', 'rust': 'Rust',
-  'tan': 'Beige', 'camel': 'Beige', 'khaki': 'Khaki', 'beige': 'Beige',
-  'brown': 'Brown', 'chocolate': 'Brown',
-  'yellow': 'Yellow', 'mustard': 'Yellow',
-  'pink': 'Pink', 'hot pink': 'Hot Pink', 'blush': 'Blush', 'mauve': 'Pink',
-  'purple': 'Purple', 'lavender': 'Lavender', 'plum': 'Plum',
-  'gold': 'Gold', 'silver': 'Silver',
-};
-
-// Extracts the best-matching form fabric from a detected fabric string.
-function detectedFabricToForm(fabric: FabricGuess): string {
-  const t = fabric.type.toLowerCase();
-  if (t.includes('denim'))     return 'Denim';
-  if (t.includes('leather'))   return 'Leather';
-  if (t.includes('silk'))      return 'Silk';
-  if (t.includes('linen'))     return 'Linen';
-  if (t.includes('wool'))      return 'Wool';
-  if (t.includes('cotton'))    return 'Cotton';
-  if (t.includes('polyester')) return 'Polyester';
-  if (t.includes('nylon') || t.includes('spandex') || t.includes('synthetic')) return 'Synthetic';
-  return '';
-}
-
-// ─── Option lists ──────────────────────────────────────────────────────────────
-
-const CATEGORIES: string[]  = ['Casual', 'Formal', 'Business Casual', 'Athletic', 'Lounge', 'Outdoor'];
 const BODY_ZONES: BodyZone[] = ['Head', 'Neck', 'Wrist', 'Hand', 'Waist', 'Ankle', 'Carried'];
-const FABRICS:    string[]   = ['Cotton', 'Wool', 'Linen', 'Silk', 'Polyester', 'Denim', 'Leather', 'Synthetic', 'Other'];
 const TOP_BOTTOM: string[]   = ['Top', 'Bottom', 'Full body', 'Footwear', 'N/A'];
-
-const COLORS: string[] = [
-  // Neutrals
-  'Black', 'White', 'Grey', 'Brown', 'Beige', 'Cream',
-  // Metallics
-  'Silver', 'Gold', 'Bronze', 'Rose Gold', 'Champagne',
-  // Blues
-  'Navy', 'Indigo', 'Cobalt', 'Blue', 'Electric Blue', 'Sky Blue', 'Periwinkle', 'Teal', 'Cyan', 'Baby Blue',
-  // Greens
-  'Green', 'Mint', 'Lime', 'Sage', 'Olive', 'Khaki',
-  // Reds & warm
-  'Red', 'Scarlet', 'Crimson', 'Burgundy', 'Orange', 'Coral', 'Peach', 'Rust', 'Yellow',
-  // Purples & pinks
-  'Purple', 'Plum', 'Lilac', 'Lavender', 'Pink', 'Rose', 'Dusty Rose', 'Blush', 'Magenta', 'Hot Pink', 'Fuchsia',
-  // Other
-  'Multi',
-];
 
 const SWATCH: Record<string, string> = {
   Black: '#1a1a1a', White: '#f0f0f0', Grey: '#9ca3af', Brown: '#92400e',
@@ -183,16 +46,12 @@ const SWATCH: Record<string, string> = {
   Magenta: '#e879f9', 'Hot Pink': '#ec4899', Fuchsia: '#d946ef',
 };
 
-// Diagonal highlight → midtone → shadow stops for each metallic finish.
-const METALLIC_GRADIENTS: Record<string, readonly [string, string, ...string[]]> = {
-  Silver:      ['#f2f2f2', '#c0c0c0', '#f5f5f5', '#8a8a8a'],
-  Gold:        ['#fde68a', '#d4af37', '#f5e27a', '#b8860b'],
-  Bronze:      ['#d4a271', '#8b5c2a', '#cd853f', '#7b3f15'],
-  'Rose Gold': ['#f4c2b8', '#c9776a', '#eda99a', '#a0504a'],
-  Champagne:   ['#f8f0d8', '#e4c96e', '#f5e8c0', '#c8a84b'],
-};
-const METALLIC_START = { x: 0.15, y: 0 } as const;
-const METALLIC_END   = { x: 0.85, y: 1 } as const;
+import {
+  METALLIC_GRADIENTS,
+  METALLIC_START,
+  METALLIC_END,
+} from '../../lib/colors/metallicGradients';
+import { makeSt } from './ArticleModal.styles';
 
 // ─── Default state + edit hydration ───────────────────────────────────────────
 
@@ -797,78 +656,3 @@ const ArticleModal = ({ onClose, onSubmit, initialData, onDelete }: Props) => {
 export { ArticleFormData };
 export default ArticleModal;
 
-const makeSt = (colors: ColorTokens) => StyleSheet.create({
-  root:          { flex: 1, backgroundColor: colors.bgDefault },
-  header:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.glassBorder },
-  title:         { fontFamily: fonts.display, fontSize: 24, color: colors.textPrimary },
-  closeBtn:      { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.glassBg, borderWidth: 1, borderColor: colors.glassBorder, alignItems: 'center', justifyContent: 'center' },
-  closeBtnText:  { color: colors.textSecondary, fontSize: 14 },
-  body:          { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xl },
-  errorBox:      { padding: spacing.sm, backgroundColor: colors.errorBg, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.errorBorder },
-  errorText:     { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.errorText },
-
-  // Image
-  imageSection:         { gap: spacing.sm, alignItems: 'center' },
-  previewWrap:          { alignItems: 'center', gap: 8 },
-  preview:              { width: 100, height: 100, borderRadius: radius.sm },
-  clearImg:             { paddingVertical: 4, paddingHorizontal: 12, backgroundColor: colors.dangerBg, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.dangerBorder },
-  clearImgText:         { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.dangerText },
-  imagePlaceholder:     { width: 100, height: 100, borderRadius: radius.sm, backgroundColor: colors.glassBg, borderWidth: 1, borderColor: colors.glassBorder, alignItems: 'center', justifyContent: 'center' },
-  imagePlaceholderText: { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textMuted },
-  imageButtons:         { flexDirection: 'row', gap: spacing.sm },
-  imageBtn:             { flex: 1, paddingVertical: 7, paddingHorizontal: spacing.md, backgroundColor: colors.glassBg, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.glassBorder, alignItems: 'center' },
-  imageBtnText:         { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.textSecondary },
-
-  // Detection card
-  detectionCard:        { width: '100%', backgroundColor: colors.glassBg, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radius.sm, padding: spacing.sm, gap: 6 },
-  detectionLabel:       { fontFamily: fonts.body, fontSize: fontSizes.xs, fontWeight: fontWeights.semibold, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
-  detectionHeadline:    { fontFamily: fonts.display, fontSize: fontSizes.base, color: colors.textPrimary, fontWeight: fontWeights.semibold },
-  detectionRow:         { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  detectionChip:        { paddingVertical: 3, paddingHorizontal: 8, backgroundColor: colors.saveBtnBg, borderRadius: radius.pill },
-  detectionChipText:    { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.saveBtnText, fontWeight: fontWeights.medium },
-  detectionChipMuted:   { backgroundColor: colors.glassBg, borderWidth: 1, borderColor: colors.glassBorder },
-  detectionChipTextMuted: { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textMuted, fontWeight: fontWeights.medium },
-  detectionColors:      { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 2 },
-  detectionSwatchWrap:  { alignItems: 'center', gap: 3 },
-  detectionSwatch:      { width: 22, height: 22, borderRadius: 11, borderWidth: 1, borderColor: colors.glassBorder },
-  detectionSwatchLabel: { fontFamily: fonts.body, fontSize: 9, color: colors.textMuted },
-  detectionConfidence:  { fontFamily: fonts.body, fontSize: 10, color: colors.textMuted, marginTop: 2 },
-
-  // Fields
-  field:         { gap: 6 },
-  label:         { fontFamily: fonts.body, fontSize: fontSizes.xs, fontWeight: fontWeights.medium, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
-  required:      { color: colors.errorText, textTransform: 'none' },
-  optional:      { color: colors.textMuted, fontWeight: fontWeights.regular, textTransform: 'none' },
-  colorLabel:    { color: colors.textSecondary, fontWeight: fontWeights.regular, textTransform: 'none', letterSpacing: 0 },
-  input:         { fontFamily: fonts.body, fontSize: fontSizes.base, color: colors.textPrimary, backgroundColor: colors.glassBg, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radius.sm, paddingVertical: 12, paddingHorizontal: spacing.md },
-
-  // Chips
-  chipGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  chip:          { paddingVertical: 6, paddingHorizontal: 12, backgroundColor: colors.glassBg, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radius.pill },
-  chipActive:    { backgroundColor: colors.saveBtnBg, borderColor: colors.saveBtnBg },
-  chipText:      { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.textSecondary },
-  chipTextActive:{ color: colors.saveBtnText, fontWeight: fontWeights.semibold },
-
-  // Type picker groups
-  typeGroups:     { gap: 12 },
-  typeGroup:      { gap: 5 },
-  typeGroupLabel: { fontFamily: fonts.body, fontSize: 10, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: fontWeights.medium },
-
-  // Color swatches
-  swatchGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  swatchRing:      { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'transparent' },
-  swatchRingActive:{ borderColor: colors.textPrimary },
-  swatch:          { width: 26, height: 26, borderRadius: 13, overflow: 'hidden' },
-
-  // Danger zone
-  dangerSection: { borderTopWidth: 1, borderTopColor: colors.glassBorder, paddingTop: spacing.md },
-  deleteBtn:     { paddingVertical: 12, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.dangerBorder, backgroundColor: colors.dangerBg, alignItems: 'center' },
-  deleteBtnText: { fontFamily: fonts.body, fontSize: fontSizes.base, color: colors.dangerText, fontWeight: fontWeights.medium },
-
-  // Footer
-  footer:        { flexDirection: 'row', gap: spacing.sm, padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.glassBorder },
-  cancelBtn:     { flex: 1, paddingVertical: 14, backgroundColor: colors.glassBg, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.glassBorder, alignItems: 'center' },
-  cancelBtnText: { fontFamily: fonts.body, fontSize: fontSizes.base, color: colors.textSecondary },
-  submitBtn:     { flex: 2, paddingVertical: 14, backgroundColor: colors.saveBtnBg, borderRadius: radius.sm, alignItems: 'center' },
-  submitBtnText: { fontFamily: fonts.body, fontSize: fontSizes.base, fontWeight: fontWeights.semibold, color: colors.saveBtnText },
-});

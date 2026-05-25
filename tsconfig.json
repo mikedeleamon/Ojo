@@ -38,7 +38,13 @@
   "exclude": [
     "node_modules",
     "dist",
-    "build"
+    "build",
+    "web-server",
+    "server",
+    "**/__tests__/**",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "jest.setup.ts"
   ],
   "extends": "expo/tsconfig.base"
 }

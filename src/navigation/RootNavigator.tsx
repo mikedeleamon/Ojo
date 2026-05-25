@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { getToken } from '../lib/auth';
 import AppTabs from './AppTabs';
@@ -44,5 +43,3 @@ export default function RootNavigator() {
     </Stack.Navigator>
   );
 }
-
-const st = StyleSheet.create({});
