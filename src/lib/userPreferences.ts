@@ -107,24 +107,36 @@ export const updatePreferences = async (articles: ClothingArticle[]): Promise<vo
 
 // ─── Query helpers ────────────────────────────────────────────────────────────
 
+/**
+ * Scores how well an article matches the user's learned preferences.
+ *
+ * Each dimension (color, fabric, category) is scored as a relative preference:
+ *   (count + 1) / (maxCount + 1)
+ *
+ * This keeps the score in [0, 1] and stays discriminative regardless of how
+ * much history exists. The previous sigmoid approach saturated once the
+ * smoothed frequency exceeded the 0.1 threshold, making "worn 5 times" and
+ * "worn 50 times" indistinguishable.
+ *
+ * Cold start: with no history, maxCount = 0 for all dimensions, so every
+ * article scores 1/1 = 1.0 — equal preference until data accumulates.
+ * Unseen attributes score 1/(maxCount+1), the natural floor.
+ */
 export const articlePreferenceScore = (
   article: ClothingArticle,
   profile: UserPreferenceProfile,
 ): number => {
-  const totalC   = Math.max(1, Object.values(profile.colors).reduce((a, b) => a + b, 0));
-  const totalF   = Math.max(1, Object.values(profile.fabrics).reduce((a, b) => a + b, 0));
-  const totalCat = Math.max(1, Object.values(profile.categories).reduce((a, b) => a + b, 0));
+  const relScore = (countMap: Record<string, number>, key: string | undefined): number => {
+    const maxCount = Object.values(countMap).reduce((m, v) => (v > m ? v : m), 0);
+    const count    = key ? (countMap[key] ?? 0) : 0;
+    return (count + 1) / (maxCount + 1);
+  };
 
-  const vocabC   = Object.keys(profile.colors).length   + 1;
-  const vocabF   = Object.keys(profile.fabrics).length  + 1;
-  const vocabCat = Object.keys(profile.categories).length + 1;
+  const colorScore  = relScore(profile.colors,      article.color);
+  const fabricScore = relScore(profile.fabrics,      article.fabricType);
+  const catScore    = relScore(profile.categories,   article.clothingCategory);
 
-  const colorFreq  = article.color            ? ((profile.colors[article.color]               ?? 0) + 1) / (totalC   + vocabC)   : 0.5 / vocabC;
-  const fabricFreq = article.fabricType       ? ((profile.fabrics[article.fabricType]         ?? 0) + 1) / (totalF   + vocabF)   : 0.5 / vocabF;
-  const catFreq    = article.clothingCategory ? ((profile.categories[article.clothingCategory]?? 0) + 1) / (totalCat + vocabCat) : 0.5 / vocabCat;
-
-  const raw = colorFreq * 0.5 + fabricFreq * 0.3 + catFreq * 0.2;
-  return 1 / (1 + Math.exp(-10 * (raw - 0.1)));
+  return colorScore * 0.5 + fabricScore * 0.3 + catScore * 0.2;
 };
 
 // ─── Style DNA ────────────────────────────────────────────────────────────────

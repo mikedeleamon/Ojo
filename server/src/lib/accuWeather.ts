@@ -54,6 +54,19 @@ export async function get5DayForecast(cityKey: string): Promise<unknown> {
   return data;
 }
 
+/** Fetch 10-day daily forecast. Cached 3 hours. Requires AccuWeather paid plan. */
+export async function get10DayForecast(cityKey: string): Promise<unknown> {
+  const cacheKey = `daily10:${cityKey}`;
+  const cached = ttlGet<unknown>(cacheKey);
+  if (cached) return cached;
+
+  const { data } = await accu.get(`/forecasts/v1/daily/10day/${cityKey}`, {
+    params: { apikey: key(), details: false, metric: false },
+  });
+  if (data) ttlSet(cacheKey, data, TTL_DAILY);
+  return data;
+}
+
 /** Fetch 12-hour hourly forecast. Cached 1 hour. */
 export async function getHourlyForecast(cityKey: string): Promise<unknown> {
   const cacheKey = `forecast:${cityKey}`;

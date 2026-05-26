@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { AxiosError } from 'axios';
-import { lookupCity, getCurrent, getHourlyForecast, get5DayForecast } from '../lib/accuWeather';
+import { lookupCity, getCurrent, getHourlyForecast, get5DayForecast, get10DayForecast } from '../lib/accuWeather';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 
 const router = Router();
@@ -52,6 +52,14 @@ router.get('/forecast/daily/:cityKey', async (req: AuthRequest, res: Response): 
     res.json(await get5DayForecast(req.params.cityKey));
   } catch (err) {
     handleAccuError(err, res, 'daily forecast');
+  }
+});
+
+router.get('/forecast/daily10/:cityKey', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    res.json(await get10DayForecast(req.params.cityKey));
+  } catch (err) {
+    handleAccuError(err, res, 'daily10 forecast');
   }
 });
 
