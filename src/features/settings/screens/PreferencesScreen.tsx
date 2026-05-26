@@ -13,6 +13,7 @@ import {
     TextInput,
     Pressable,
     AppSlider,
+    GlassCard,
 } from '../../../components/primitives';
 import { useSettings } from '../../../hooks/useSettings';
 import { useFocusEffect } from '@react-navigation/native';
@@ -361,7 +362,7 @@ const HistorySection = ({
     return (
         <>
             {history.slice(0, 8).map((entry) => (
-                <View key={entry.id} style={styles.historyCard}>
+                <GlassCard key={entry.id} style={styles.historyCard}>
                     <View style={styles.historyCardRow}>
                         <Text style={styles.historyDate}>{formatWornAt(entry.wornAt)}</Text>
                         <Text style={styles.historyCloset}>{entry.closetName}</Text>
@@ -369,7 +370,7 @@ const HistorySection = ({
                     <Text style={styles.historySummary} numberOfLines={2}>
                         {entry.articleSummary}
                     </Text>
-                </View>
+                </GlassCard>
             ))}
         </>
     );
@@ -402,7 +403,7 @@ const StyleDNACard = ({
     const progress   = LEVEL_PROGRESS[dna.level];
 
     return (
-        <View style={[styles.dnaCard, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}>
+        <GlassCard style={styles.dnaCard}>
             <View style={styles.dnaHeaderRow}>
                 <Text style={[styles.dnaTitle, { color: colors.textPrimary }]}>Style Ranker</Text>
                 <Text style={[styles.dnaLevel, { color: levelColor }]}>
@@ -422,7 +423,7 @@ const StyleDNACard = ({
                     {dna.topFabric ? ` · Fabric: ${dna.topFabric}` : ''}
                 </Text>
             )}
-        </View>
+        </GlassCard>
     );
 };
 

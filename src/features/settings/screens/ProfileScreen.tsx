@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { StyleSheet, Modal, Alert, AccessibilityInfo, findNodeHandle, View as RNView } from 'react-native';
 import { ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { View, Text, TextInput, Pressable } from '../../../components/primitives';
+import { View, Text, TextInput, Pressable, GlassCard } from '../../../components/primitives';
 import axios from '../../../api/client';
 import { auth, getToken, getErrorMessage, updateAuthUser, clearAuth } from '../../../lib/auth';
 import { storage } from '../../../lib/storage';
@@ -130,7 +130,7 @@ export default function ProfileScreen({ onLogout }: Props) {
       <Modal visible={deleteStep} transparent animationType="fade">
         <Pressable style={styles.backdrop}
           onPress={() => { if (!deleteLoading) { setDeleteStep(false); setDeleteError(null); } }} />
-        <View style={styles.modalCard}>
+        <GlassCard style={styles.modalCard}>
           <View style={styles.modalIcon}>
             <Text style={{ fontSize: 20 }}>⚠️</Text>
           </View>
@@ -160,7 +160,7 @@ export default function ProfileScreen({ onLogout }: Props) {
               <Text style={s.modalConfirmText}>{deleteLoading ? 'Deleting…' : 'Yes, delete'}</Text>
             </Pressable>
           </View>
-        </View>
+        </GlassCard>
       </Modal>
     </SafeAreaView>
   );

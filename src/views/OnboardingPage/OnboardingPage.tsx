@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Svg, Path, Circle } from 'react-native-svg';
-import { View, Text, Pressable } from '../../components/primitives';
+import { View, Text, Pressable, GlassCard } from '../../components/primitives';
 import { useSettings } from '../../hooks/useSettings';
 import { storage } from '../../lib/storage';
 import { auth } from '../../lib/auth';
@@ -180,7 +180,7 @@ export default function OnboardingPage({ onComplete }: Props) {
           contentContainerStyle={st.scroll}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={st.card}>
+          <GlassCard style={st.card}>
             <Animated.View
               style={{ opacity: opacityAnim, transform: [{ translateX: slideAnim }] }}
             >
@@ -200,30 +200,30 @@ export default function OnboardingPage({ onComplete }: Props) {
                     perfect outfits every day.
                   </Text>
                   <View style={st.illustrationRow}>
-                    <View style={st.iconPill}>
+                    <GlassCard style={st.iconPill}>
                       <Svg width={26} height={26} viewBox="0 0 24 24" fill="none">
                         <Path d="M12 2a3 3 0 0 1 3 3v1l4 2v14H5V8l4-2V5a3 3 0 0 1 3-3z"
                           stroke={colors.textSecondary} strokeWidth={1.4} strokeLinejoin="round" />
                       </Svg>
-                    </View>
-                    <View style={st.iconPill}>
+                    </GlassCard>
+                    <GlassCard style={st.iconPill}>
                       <Svg width={26} height={26} viewBox="0 0 24 24" fill="none">
                         <Path d="M3 6l4-3h10l4 3-4 4v11H7V10L3 6z"
                           stroke={colors.textSecondary} strokeWidth={1.4} strokeLinejoin="round" />
                       </Svg>
-                    </View>
-                    <View style={st.iconPill}>
+                    </GlassCard>
+                    <GlassCard style={st.iconPill}>
                       <Svg width={26} height={26} viewBox="0 0 24 24" fill="none">
                         <Path d="M3 16l4-8h4l1 4h9v4H3z"
                           stroke={colors.textSecondary} strokeWidth={1.4} strokeLinejoin="round" />
                       </Svg>
-                    </View>
-                    <View style={st.iconPill}>
+                    </GlassCard>
+                    <GlassCard style={st.iconPill}>
                       <Svg width={26} height={26} viewBox="0 0 24 24" fill="none">
                         <Path d="M4 6l3-3 5 3 5-3 3 3v14H4V6z"
                           stroke={colors.textSecondary} strokeWidth={1.4} strokeLinejoin="round" />
                       </Svg>
-                    </View>
+                    </GlassCard>
                   </View>
                   <Pressable style={st.primaryBtn} onPress={() => advance(2)}>
                     <Text style={st.primaryBtnText}>Let's go</Text>
@@ -388,7 +388,7 @@ export default function OnboardingPage({ onComplete }: Props) {
               )}
 
             </Animated.View>
-          </View>
+          </GlassCard>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

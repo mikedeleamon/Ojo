@@ -3,7 +3,7 @@ import { StyleSheet, Modal, ScrollView, AccessibilityInfo, findNodeHandle, View 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Svg, Path } from 'react-native-svg';
-import { View, Text, Pressable } from '../../components/primitives';
+import { View, Text, Pressable, GlassCard } from '../../components/primitives';
 import { SETTINGS_CONFIG, SettingsAction } from './config';
 import SettingsSection from './components/SettingsSection';
 import { useSettings } from '../../hooks/useSettings';
@@ -216,7 +216,7 @@ export default function SettingsScreen({ onLogout }: Props) {
                     accessibilityLabel="Dismiss"
                     accessibilityRole="button"
                 />
-                <View style={styles.modalCard}>
+                <GlassCard style={styles.modalCard}>
                     <RNView ref={logoutModalTitleRef} accessible={true} accessibilityLabel="Log out?">
                         <Text style={styles.modalTitle}>Log out?</Text>
                     </RNView>
@@ -239,7 +239,7 @@ export default function SettingsScreen({ onLogout }: Props) {
                             <Text style={styles.modalConfirmText}>Log out</Text>
                         </Pressable>
                     </View>
-                </View>
+                </GlassCard>
             </Modal>
         </SafeAreaView>
     );

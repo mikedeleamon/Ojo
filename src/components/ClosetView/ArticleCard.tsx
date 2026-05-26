@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, Image, Animated, StyleSheet, Alert } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -50,6 +50,7 @@ export const ArticleCard = ({
         harmonyScore < 0.55 &&
         !!article.color &&
         !COLOR_NEUTRALS.has(article.color);
+    const [imgError, setImgError] = useState(false);
 
     return (
         <Pressable
@@ -59,11 +60,12 @@ export const ArticleCard = ({
             accessibilityRole='button'
         >
             <View style={styles.articleImg}>
-                {article.imageUrl ? (
+                {article.imageUrl && !imgError ? (
                     <Image
                         source={{ uri: article.imageUrl }}
                         style={styles.articleImgFill}
                         resizeMode='cover'
+                        onError={() => setImgError(true)}
                     />
                 ) : (
                     <HangerIcon size={18} color={colors.textMuted} decorative />
@@ -150,6 +152,7 @@ export const TileArticleCard = ({
         harmonyScore < 0.55 &&
         !!article.color &&
         !COLOR_NEUTRALS.has(article.color);
+    const [imgError, setImgError] = useState(false);
 
     const confirmDelete = () =>
         Alert.alert('Remove article?', article.name || article.clothingType, [
@@ -168,11 +171,12 @@ export const TileArticleCard = ({
             accessibilityRole='button'
         >
             <View style={styles.tileImg}>
-                {article.imageUrl ? (
+                {article.imageUrl && !imgError ? (
                     <Image
                         source={{ uri: article.imageUrl }}
                         style={styles.tileImgFill}
                         resizeMode='cover'
+                        onError={() => setImgError(true)}
                     />
                 ) : (
                     <HangerIcon size={24} color={colors.textMuted} decorative />

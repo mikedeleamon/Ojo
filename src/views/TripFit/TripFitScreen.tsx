@@ -18,7 +18,7 @@ import {
     Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { View, Text } from '../../components/primitives';
+import { View, Text, GlassCard } from '../../components/primitives';
 import { useTheme } from '../../theme/ThemeContext';
 import { fonts, fontSizes, fontWeights, radius, spacing } from '../../theme/tokens';
 import { useClosets } from '../../hooks/useClosets';
@@ -119,7 +119,7 @@ const DayCard = ({
 }) => {
     const articles = plan.outfit.slots.map((s: { article: ClothingArticle }) => s.article);
     return (
-        <View style={[dayCardStyles.card, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}>
+        <GlassCard style={dayCardStyles.card}>
             <Text style={[dayCardStyles.dateLabel, { color: colors.textSecondary }]}>
                 {phraseEmoji(plan.day.dayPhrase)} {fmtDate(plan.day.date)}
             </Text>
@@ -138,7 +138,7 @@ const DayCard = ({
                     {plan.outfit.notes[0]}
                 </Text>
             )}
-        </View>
+        </GlassCard>
     );
 };
 
@@ -410,11 +410,11 @@ export default function TripFitScreen() {
                         <Text style={st.sectionSub}>
                             {packingList.length} unique {packingList.length === 1 ? 'item' : 'items'} across {plans.length} {plans.length === 1 ? 'day' : 'days'}
                         </Text>
-                        <View style={[st.packCard, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}>
+                        <GlassCard style={st.packCard}>
                             {packingList.map(a => (
                                 <PackingRow key={a._id} article={a} colors={colors} />
                             ))}
-                        </View>
+                        </GlassCard>
                     </>
                 )}
             </ScrollView>

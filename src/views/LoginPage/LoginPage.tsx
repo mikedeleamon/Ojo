@@ -7,7 +7,7 @@ import {
     Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { View, Text, TextInput, Pressable } from '../../components/primitives';
+import { View, Text, TextInput, Pressable, GlassCard } from '../../components/primitives';
 import axios from '../../api/client';
 import { AuthState, Settings } from '../../types';
 import { getErrorMessage, saveAuth } from '../../lib/auth';
@@ -137,7 +137,7 @@ export default function LoginPage({ onLogin }: Props) {
                     contentContainerStyle={styles.content}
                     keyboardShouldPersistTaps='handled'
                 >
-                    <View style={styles.card}>
+                    <GlassCard style={styles.card}>
                         <Image
                             source={require('../../assets/images/logos/ojoLogo.png')}
                             style={styles.logo}
@@ -219,7 +219,7 @@ export default function LoginPage({ onLogin }: Props) {
                                 <Text style={styles.link}>Sign up</Text>
                             </Pressable>
                         </View>
-                    </View>
+                    </GlassCard>
                 </ScrollView>
             </KeyboardAvoidingView>
         </SafeAreaView>

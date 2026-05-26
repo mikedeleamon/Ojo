@@ -17,7 +17,7 @@ import { useSpinAnimation } from '../../hooks/useSpinAnimation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Svg, Circle, Path } from 'react-native-svg';
-import { View, Text } from '../primitives';
+import { View, Text, GlassCard } from '../primitives';
 import GearIcon from '../icons/GearIcon';
 import api from '../../api/client';
 import weatherConstants from '../../constants/weatherConstants';
@@ -205,8 +205,6 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
     const progress = useSharedValue(1);
 
     const loadingOpacity = useRef(new RNAnimated.Value(1)).current;
-    // Content fades in from 0 after spinner fades out — cross-dissolve handoff
-    const contentOpacity = useRef(new RNAnimated.Value(0)).current;
 
     // Compute target gradient from weather data
     const targetGradient = weather
@@ -261,32 +259,19 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
         });
     }, [targetGradient.join(',')]);
 
-    // Cross-dissolve: spinner fades out while content fades in simultaneously.
-    // A slight delay on contentOpacity means the spinner has started leaving
-    // before the content arrives, which reads as a clean handoff rather than
-    // two things fighting for the same space.
+    // Spinner fades out once weather data arrives; the content layer renders at
+    // full opacity from the start so GlassView can sample the background
+    // immediately — mounting inside opacity:0 prevents native blur initialisation.
     useEffect(() => {
         if (!loading && weather) {
-            RNAnimated.parallel([
-                RNAnimated.timing(loadingOpacity, {
-                    toValue: 0,
-                    duration: 380,
-                    easing: RNEasing.out(RNEasing.cubic),
-                    useNativeDriver: true,
-                }),
-                RNAnimated.sequence([
-                    RNAnimated.delay(120),
-                    RNAnimated.timing(contentOpacity, {
-                        toValue: 1,
-                        duration: 420,
-                        easing: RNEasing.out(RNEasing.cubic),
-                        useNativeDriver: true,
-                    }),
-                ]),
-            ]).start();
+            RNAnimated.timing(loadingOpacity, {
+                toValue: 0,
+                duration: 400,
+                easing: RNEasing.out(RNEasing.cubic),
+                useNativeDriver: true,
+            }).start();
         } else if (loading) {
             loadingOpacity.setValue(1);
-            contentOpacity.setValue(0);
         }
     }, [loading, weather]);
 
@@ -354,11 +339,12 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
                 />
             </RNAnimated.View>
 
-            {/* Content fades in via contentOpacity — rendered once weather exists,
-                opacity-0 while loading so it's invisible but mounted and ready. */}
+            {/* Content renders at full opacity so GlassView can initialise its
+                native material correctly. The loading overlay sits on top and
+                fades out, revealing the content beneath. */}
             {weather && (
-                <RNAnimated.View
-                    style={[st.contentLayer, { opacity: contentOpacity }]}
+                <View
+                    style={st.contentLayer}
                     pointerEvents={loading ? 'none' : 'auto'}
                 >
                     <ScrollView
@@ -439,15 +425,15 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
                         )}
 
                         {/* Details + outfit */}
-                        <View style={st.details}>
+                        <GlassCard style={st.details}>
                             <WeatherDetails
                                 weather={weather}
                                 settings={settings}
                                 forecasts={forecasts}
                             />
-                        </View>
+                        </GlassCard>
                     </ScrollView>
-                </RNAnimated.View>
+                </View>
             )}
         </AnimatedLinearGradient>
     );

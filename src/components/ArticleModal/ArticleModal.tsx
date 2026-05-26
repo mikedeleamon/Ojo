@@ -234,6 +234,7 @@ const ArticleModal = ({ closetId, onClose, onSubmit, initialData, onDelete }: Pr
   const [saving,     setSaving]    = useState(false);
   const [deleting,   setDeleting]  = useState(false);
   const [identifying,    setIdentifying]   = useState(false);
+  const [previewError,   setPreviewError]  = useState(false);
   const [topLabelText,   setTopLabelText]  = useState<string>('');
 
   const headerRef = useRef<RNView>(null);
@@ -247,8 +248,10 @@ const ArticleModal = ({ closetId, onClose, onSubmit, initialData, onDelete }: Pr
     return () => clearTimeout(id);
   }, []);
 
-  const set = <K extends keyof ArticleFormData>(key: K, val: ArticleFormData[K]) =>
+  const set = <K extends keyof ArticleFormData>(key: K, val: ArticleFormData[K]) => {
+    if (key === 'imageUrl') setPreviewError(false);
     setForm(f => ({ ...f, [key]: val }));
+  };
 
   const runIdentification = async (localUri: string, width: number, height: number) => {
     setIdentifying(true);
@@ -447,16 +450,23 @@ const ArticleModal = ({ closetId, onClose, onSubmit, initialData, onDelete }: Pr
 
           {/* Image */}
           <View style={st.imageSection}>
-            {form.imageUrl ? (
+            {form.imageUrl && !previewError ? (
               <View style={st.previewWrap}>
-                <Image source={{ uri: form.imageUrl }} style={st.preview} resizeMode='cover' />
+                <Image
+                  source={{ uri: form.imageUrl }}
+                  style={st.preview}
+                  resizeMode='cover'
+                  onError={() => setPreviewError(true)}
+                />
                 <Pressable style={st.clearImg} onPress={() => set('imageUrl', '')} accessibilityRole="button">
                   <Text style={st.clearImgText}>Remove</Text>
                 </Pressable>
               </View>
             ) : (
               <View style={st.imagePlaceholder}>
-                <Text style={st.imagePlaceholderText}>No image</Text>
+                <Text style={st.imagePlaceholderText}>
+                  {previewError ? 'Image unavailable' : 'No image'}
+                </Text>
               </View>
             )}
 

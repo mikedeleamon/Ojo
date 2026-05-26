@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { StyleSheet, Pressable } from 'react-native';
 import { Svg, Path } from 'react-native-svg';
-import { View, Text } from '../primitives';
+import { View, Text, GlassCard } from '../primitives';
 import OutfitSuggestion from '../OutfitSuggestion/OutfitSuggestion';
 import { CurrentWeather, Forecast, Settings } from '../../types';
 import { ColorTokens, fonts, fontSizes, fontWeights, spacing, radius } from '../../theme/tokens';
@@ -39,10 +39,10 @@ const WeatherDetails = ({ weather, settings, forecasts }: Props) => {
   const isMetric = settings.temperatureScale === 'Metric';
 
   const Stat = ({ label, value }: { label: string; value: string }) => (
-    <View style={st.stat}>
+    <GlassCard style={st.stat}>
       <Text style={st.statLabel}>{label}</Text>
       <Text style={st.statValue}>{value}</Text>
-    </View>
+    </GlassCard>
   );
 
   // ── Pill badge helper ────────────────────────────────────────────────────

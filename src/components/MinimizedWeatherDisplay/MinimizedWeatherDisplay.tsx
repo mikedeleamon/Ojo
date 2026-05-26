@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { StyleSheet } from 'react-native';
-import { View, Text } from '../primitives';
+import { View, Text, GlassCard } from '../primitives';
 import WeatherIconDisplay from '../WeatherIconDisplay/WeatherIconDisplay';
 import { ColorTokens, fonts, fontSizes, radius, spacing } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
@@ -42,11 +42,11 @@ const MinimizedWeatherDisplay = ({ weather, temperature, time, tempUnit, isDay, 
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
-    <View style={[styles.card, isNow && styles.cardNow]}>
+    <GlassCard glassStyle={isNow ? 'regular' : 'clear'} style={[styles.card, isNow && styles.cardNow]}>
       <Text style={[styles.time, isNow && styles.timeNow]}>{isNow ? 'Now' : formatTime(time)}</Text>
       <WeatherIconDisplay condition={weather} isDay={isDay} size="small" />
       <Text style={styles.temp}>{temperature}° {tempUnit}</Text>
-    </View>
+    </GlassCard>
   );
 };
 

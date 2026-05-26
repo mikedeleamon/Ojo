@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
     ScrollView,
     Image,
@@ -11,7 +12,7 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Svg, Circle } from 'react-native-svg';
-import { View, Text } from '../primitives';
+import { View, Text, GlassCard } from '../primitives';
 import { EmptyState } from '../shared';
 import { useClosets } from '../../hooks/useClosets';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
@@ -65,7 +66,7 @@ const ArticleThumb = ({
     const { colors } = useTheme();
     const styles = useMemo(() => makeStyles(colors), [colors]);
     return (
-        <View style={styles.articleCard}>
+        <GlassCard style={styles.articleCard}>
             <View style={styles.articleImg}>
                 {article.imageUrl ? (
                     <Image
@@ -114,7 +115,7 @@ const ArticleThumb = ({
                     <Text style={styles.articleRemoveText}>✕</Text>
                 </Pressable>
             )}
-        </View>
+        </GlassCard>
     );
 };
 
@@ -253,8 +254,13 @@ interface Props {
 const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
     const { colors } = useTheme();
     const styles = useMemo(() => makeStyles(colors), [colors]);
-    const { closets, loading, preferred, setPreferred, setClosets } =
+    const { closets, loading, preferred, setPreferred, setClosets, refresh } =
         useClosets();
+
+    // Re-fetch closets each time this screen gains focus so outfit suggestions
+    // stay current after the user adds clothes or sets a preferred closet in
+    // the Closet tab without needing to fully restart the app.
+    useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
     const [settingPref, setSettingPref] = useState(false);
     const [activeIdx, setActiveIdx] = useState(0);
     const [showBreakdown, setShowBreakdown] = useState(false);

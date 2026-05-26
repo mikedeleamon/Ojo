@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { View, Text } from '../primitives';
+import { View, Text, GlassCard } from '../primitives';
 import type { OutfitSlot } from '../../lib/outfit/types';
 import type { LayeringResult } from '../../lib/layering/types';
 import { useTheme } from '../../theme/ThemeContext';
@@ -67,7 +67,7 @@ export const LayeringSection = ({ layering }: { layering: LayeringResult }) => {
             </View>
 
             {hasLayers && (
-                <View style={layerStyles.layerStack}>
+                <GlassCard style={layerStyles.layerStack}>
                     {LAYER_TIERS.map(({ key, label }) => (
                         <LayerRow
                             key={key}
@@ -75,7 +75,7 @@ export const LayeringSection = ({ layering }: { layering: LayeringResult }) => {
                             slot={layering.layers[key]}
                         />
                     ))}
-                </View>
+                </GlassCard>
             )}
 
             <Text style={layerStyles.recommendation}>{layering.recommendation}</Text>

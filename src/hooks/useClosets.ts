@@ -10,6 +10,7 @@ interface UseClosetsResult {
   error:        string | null;
   preferred:    Closet | null;
   setClosets:   React.Dispatch<React.SetStateAction<Closet[]>>;
+  refresh:      () => void;
   createCloset: (name: string) => Promise<void>;
   renameCloset: (id: string, name: string) => Promise<void>;
   deleteCloset: (id: string) => Promise<void>;
@@ -27,15 +28,19 @@ export const useClosets = (): UseClosetsResult => {
   const [closets, setClosets] = useState<Closet[]>([]);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState<string | null>(null);
+  const [fetchKey, setFetchKey] = useState(0);
+
+  const refresh = useCallback(() => setFetchKey(k => k + 1), []);
 
   useEffect(() => {
+    setLoading(true);
     const token = getToken();
     if (!token) { setLoading(false); return; }
     axios.get<Closet[]>('/api/closets', auth())
       .then(({ data }) => setClosets(data))
       .catch(() => setError('Could not load closets. Is the server running?'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [fetchKey]);
 
   const preferred = closets.find(c => c.isPreferred) ?? null;
 
@@ -77,6 +82,6 @@ export const useClosets = (): UseClosetsResult => {
     setClosets(prev => prev.map(c => ({ ...c, isPreferred: c._id === data._id })));
   }, []);
 
-  return { closets, loading, error, preferred, setClosets, createCloset, renameCloset,
+  return { closets, loading, error, preferred, setClosets, refresh, createCloset, renameCloset,
            deleteCloset, addArticle, editArticle, removeArticle, setPreferred };
 };

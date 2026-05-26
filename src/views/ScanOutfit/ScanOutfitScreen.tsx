@@ -23,7 +23,7 @@ import {
     Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { View, Text } from '../../components/primitives';
+import { View, Text, GlassCard } from '../../components/primitives';
 import { useTheme } from '../../theme/ThemeContext';
 import { fonts, fontSizes, fontWeights, radius, spacing } from '../../theme/tokens';
 import { useClosets } from '../../hooks/useClosets';
@@ -121,7 +121,7 @@ const ScannedItemCard = ({
     onRemove: (i: number) => void;
     colors: ReturnType<typeof useTheme>['colors'];
 }) => (
-    <View style={[scanStyles.itemCard, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}>
+    <GlassCard style={scanStyles.itemCard}>
         <Image source={{ uri: item.localUri }} style={scanStyles.itemThumb} resizeMode="cover" />
         <View style={{ flex: 1, gap: 3 }}>
             <Text style={[scanStyles.itemType, { color: colors.textPrimary }]}>
@@ -145,7 +145,7 @@ const ScannedItemCard = ({
         >
             <Text style={{ color: colors.textMuted, fontSize: 16 }}>✕</Text>
         </Pressable>
-    </View>
+    </GlassCard>
 );
 
 const scanStyles = StyleSheet.create({
@@ -329,7 +329,7 @@ export default function ScanOutfitScreen() {
 
                 {/* Result */}
                 {result && result.status === 'ok' && (
-                    <View style={[st.resultCard, { backgroundColor: colors.glassBg, borderColor: colors.glassBorder }]}>
+                    <GlassCard style={st.resultCard}>
                         {/* Score badge */}
                         <View style={[st.scoreBadge, { borderColor: scoreColor(result.score) }]}>
                             <Text style={[st.scoreBadgeText, { color: scoreColor(result.score) }]}>
@@ -361,7 +361,7 @@ export default function ScanOutfitScreen() {
                                 ))}
                             </View>
                         )}
-                    </View>
+                    </GlassCard>
                 )}
             </ScrollView>
         </SafeAreaView>
