@@ -63,6 +63,20 @@ export const updateToken = async (token: string): Promise<void> => {
   await secureStorage.setItem(AUTH_KEY, JSON.stringify({ ...payload, token }));
 };
 
+/** Returns the current user's ID decoded from the JWT sub claim, or null if not authenticated. */
+export const getUserId = (): string | null => {
+  try {
+    const token = getToken();
+    if (!token) return null;
+    const payload = JSON.parse(
+      Buffer.from(token.split('.')[1], 'base64').toString('utf8'),
+    );
+    return payload?.sub ?? null;
+  } catch {
+    return null;
+  }
+};
+
 /**
  * Returns true if the stored token will expire within the next `withinSeconds`.
  * Uses Buffer instead of atob() which is unavailable in the RN JS engine.

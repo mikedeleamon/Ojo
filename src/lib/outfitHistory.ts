@@ -1,19 +1,21 @@
 import { OutfitHistoryEntry } from '../types';
 import { storage, storageGetJSON } from './storage';
 import api from '../api/client';
-import { authHeaders } from './auth';
+import { authHeaders, getUserId } from './auth';
 
-const HISTORY_KEY    = 'ojo_outfit_history';
-const MIGRATED_KEY   = 'ojo_history_migrated_v1';
-const MAX_ENTRIES    = 60;
+const MAX_ENTRIES = 60;
+
+// Storage keys scoped to the authenticated user to prevent history bleed between accounts.
+const historyKey  = () => `ojo_outfit_history_${getUserId() ?? 'anon'}`;
+const migratedKey = () => `ojo_history_migrated_v1_${getUserId() ?? 'anon'}`;
 
 // ─── Local storage helpers ────────────────────────────────────────────────────
 
 export const loadLocalHistory = async (): Promise<OutfitHistoryEntry[]> =>
-  storageGetJSON<OutfitHistoryEntry[]>(storage, HISTORY_KEY, []);
+  storageGetJSON<OutfitHistoryEntry[]>(storage, historyKey(), []);
 
 export const saveHistory = async (entries: OutfitHistoryEntry[]): Promise<void> =>
-  storage.setItem(HISTORY_KEY, JSON.stringify(entries.slice(0, MAX_ENTRIES)));
+  storage.setItem(historyKey(), JSON.stringify(entries.slice(0, MAX_ENTRIES)));
 
 // ─── Server sync helpers (fire-and-forget, swallow errors) ───────────────────
 
@@ -36,11 +38,11 @@ const syncClear = () =>
 // ─── One-time migration: push local entries that server doesn't have ──────────
 
 const migrateLocalToServer = async (serverIds: Set<string>, local: OutfitHistoryEntry[]) => {
-  const alreadyMigrated = await storage.getItem(MIGRATED_KEY);
+  const alreadyMigrated = await storage.getItem(migratedKey());
   if (alreadyMigrated) return;
   const unsynced = local.filter(e => !serverIds.has(e.id));
   await Promise.all(unsynced.map(syncPost));
-  await storage.setItem(MIGRATED_KEY, '1');
+  await storage.setItem(migratedKey(), '1');
 };
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -98,7 +100,7 @@ export const deleteHistoryEntry = async (id: string): Promise<void> => {
 };
 
 export const clearHistory = async (): Promise<void> => {
-  await storage.removeItem(HISTORY_KEY);
+  await storage.removeItem(historyKey());
   syncClear();
 };
 

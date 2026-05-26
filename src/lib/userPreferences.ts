@@ -8,8 +8,9 @@
 
 import { ClothingArticle } from '../types';
 import { storage, storageGetJSON } from './storage';
+import { getUserId } from './auth';
 
-const PREFS_KEY = 'ojo_user_prefs';
+const prefsKey = () => `ojo_user_prefs_${getUserId() ?? 'anon'}`;
 
 export interface UserPreferenceProfile {
   colors:       Record<string, number>;
@@ -26,17 +27,17 @@ const empty = (): UserPreferenceProfile => ({
 // ─── Persistence ──────────────────────────────────────────────────────────────
 
 export const loadPreferences = async (): Promise<UserPreferenceProfile> => {
-  const data = await storageGetJSON<Partial<UserPreferenceProfile>>(storage, PREFS_KEY, {});
+  const data = await storageGetJSON<Partial<UserPreferenceProfile>>(storage, prefsKey(), {});
   return { ...empty(), ...data };
 };
 
 export const savePreferences = async (profile: UserPreferenceProfile): Promise<void> => {
-  await storage.setItem(PREFS_KEY, JSON.stringify(profile));
+  await storage.setItem(prefsKey(), JSON.stringify(profile));
   pushPreferencesToServer(profile);
 };
 
 export const clearPreferences = async (): Promise<void> => {
-  await storage.removeItem(PREFS_KEY);
+  await storage.removeItem(prefsKey());
 };
 
 // ─── Server sync ──────────────────────────────────────────────────────────────
@@ -66,7 +67,7 @@ export const syncPreferencesFromServer = async (): Promise<void> => {
     if (!config.headers) return;
     const { data } = await client.get<UserPreferenceProfile>('/api/preferences', config);
     if (data && typeof data.totalOutfits === 'number') {
-      await storage.setItem(PREFS_KEY, JSON.stringify({ ...empty(), ...data }));
+      await storage.setItem(prefsKey(), JSON.stringify({ ...empty(), ...data }));
     }
   } catch {
     // Network failure — keep local data
