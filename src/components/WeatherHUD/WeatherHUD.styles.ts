@@ -27,7 +27,8 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         lineHeight: fontSizes.base * 1.5,
     },
     header: { alignItems: 'center', paddingTop: spacing.lg, gap: 4 },
-    gearBtn: { position: 'absolute', right: spacing.md, padding: 6 },
+    gearBtn: { position: 'absolute', right: spacing.md, borderRadius: 999, overflow: 'hidden' },
+    gearBtnInner: { padding: 8 },
     city: {
         fontFamily: fonts.display,
         fontSize: 36,

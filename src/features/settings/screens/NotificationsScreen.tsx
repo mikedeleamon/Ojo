@@ -19,10 +19,13 @@ import {
   registerPushToken,
   scheduleWeeklyRecap,
   cancelWeeklyRecap,
+  cancelTripPackingReminder,
+  TRIP_PACKING_PREF_KEY,
   localHourToUTC,
   utcHourToLocal,
   PermissionStatus,
 } from '../../../lib/notifications';
+import { storage } from '../../../lib/storage';
 import axios from '../../../api/client';
 import { authHeaders, getErrorMessage } from '../../../lib/auth';
 import { spacing, radius, fonts, fontSizes, fontWeights } from '../../../theme/tokens';
@@ -247,6 +250,11 @@ export default function NotificationsScreen() {
         await cancelWeeklyRecap();
       }
 
+      await storage.setItem(TRIP_PACKING_PREF_KEY, ns.tripPackingEnabled ? 'true' : 'false');
+      if (!ns.tripPackingEnabled) {
+        await cancelTripPackingReminder();
+      }
+
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {
@@ -263,7 +271,8 @@ export default function NotificationsScreen() {
     ns.weatherChangeEnabled ||
     ns.tempSwingEnabled ||
     ns.closetGapEnabled ||
-    ns.weeklyRecapEnabled;
+    ns.weeklyRecapEnabled ||
+    ns.tripPackingEnabled;
 
   return (
     <SafeAreaView style={st.root} edges={['bottom']}>
@@ -378,6 +387,25 @@ export default function NotificationsScreen() {
                 onValueChange={v => set('closetGapEnabled', v)}
                 trackColor={{ false: colors.glassBorder, true: 'rgba(135,222,90,0.6)' }}
                 thumbColor={ns.closetGapEnabled ? colors.toggleThumbActive : colors.textMuted}
+              />
+            </Row>
+          </View>
+        </View>
+
+        <View style={st.section}>
+          <Text style={s.sectionLabel}>Trips</Text>
+
+          <View style={st.card}>
+            <Row st={st}>
+              <RowLabel st={st}
+                title="Trip Packing Reminder"
+                subtitle="Reminds you to check your TripFit packing list 2 days before your trip starts."
+              />
+              <Switch
+                value={ns.tripPackingEnabled}
+                onValueChange={v => set('tripPackingEnabled', v)}
+                trackColor={{ false: colors.glassBorder, true: 'rgba(135,222,90,0.6)' }}
+                thumbColor={ns.tripPackingEnabled ? colors.toggleThumbActive : colors.textMuted}
               />
             </Row>
           </View>

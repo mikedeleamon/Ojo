@@ -2,6 +2,7 @@ import { Image, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Svg, Path } from 'react-native-svg';
+import { BlurView } from 'expo-blur';
 import { useWeatherTheme } from '../context/WeatherContext';
 import { useTheme } from '../theme/ThemeContext';
 import MainPage from '../views/MainPage/MainPage';
@@ -9,6 +10,10 @@ import ClosetPage from '../views/ClosetPage/ClosetPage';
 import PreferencesScreen from '../features/settings/screens/PreferencesScreen';
 
 const Tab = createBottomTabNavigator();
+
+/** Replace the alpha channel of an rgba(...) string */
+const withAlpha = (rgba: string, alpha: number) =>
+    rgba.replace(/[\d.]+\)$/, `${alpha})`);
 
 const HangerIcon = ({ color }: { color: string }) => (
     <Svg
@@ -21,7 +26,7 @@ const HangerIcon = ({ color }: { color: string }) => (
         strokeLinecap='round'
         strokeLinejoin='round'
         accessibilityElementsHidden={true}
-        importantForAccessibility="no"
+        importantForAccessibility='no'
     >
         <Path
             d='M12 4a2 2 0 0 1 2 2c0 .74-.4 1.38-1 1.73V9l8 5.5A1 1 0 0 1 20 16H4a1 1 0 0 1-.99-1.5L11 9V7.73A2 2 0 0 1 12 4Z'
@@ -44,7 +49,7 @@ const SparklesIcon = ({ color }: { color: string }) => (
         strokeLinecap='round'
         strokeLinejoin='round'
         accessibilityElementsHidden={true}
-        importantForAccessibility="no"
+        importantForAccessibility='no'
     >
         <Path d='M15 4l1.5 3L20 8.5 16.5 10 15 13l-1.5-3L10 8.5 13.5 7z' />
         <Path d='M6 14l1 2 2 1-2 1-1 2-1-2-2-1 2-1z' />
@@ -54,16 +59,32 @@ const SparklesIcon = ({ color }: { color: string }) => (
 
 export default function AppTabs() {
     const { footerBg } = useWeatherTheme();
-    const { colors } = useTheme();
-
-    const { isDark } = useTheme();
+    const { colors, isDark } = useTheme();
 
     return (
         <Tab.Navigator
             screenOptions={{
                 headerShown: false,
+                tabBarBackground: () => (
+                    <BlurView
+                        tint={isDark ? 'dark' : 'light'}
+                        intensity={55}
+                        style={StyleSheet.absoluteFill}
+                    >
+                        <View
+                            style={[
+                                StyleSheet.absoluteFill,
+                                {
+                                    backgroundColor: isDark
+                                        ? withAlpha(footerBg, 0.45)
+                                        : colors.glassBg,
+                                },
+                            ]}
+                        />
+                    </BlurView>
+                ),
                 tabBarStyle: {
-                    backgroundColor: isDark ? footerBg : colors.bgDefault,
+                    backgroundColor: 'transparent',
                     borderTopColor: colors.glassBorder,
                     borderTopWidth: 1,
                 },
@@ -90,7 +111,7 @@ export default function AppTabs() {
                                 opacity: focused ? 1 : 0.45,
                             }}
                             accessibilityElementsHidden={true}
-                            importantForAccessibility="no"
+                            importantForAccessibility='no'
                         />
                     ),
                 }}

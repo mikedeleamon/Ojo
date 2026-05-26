@@ -17,6 +17,7 @@
       "bundleIdentifier": "com.placeholder.ojo",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Ojo uses your location to fetch local weather for outfit suggestions.",
+        "NSCameraUsageDescription": "Ojo uses your camera so you can photograph clothing items to add to your closet.",
         "NSPhotoLibraryUsageDescription": "Ojo uses your photo library so you can add images of your clothing items.",
         "NSUserNotificationsUsageDescription": "Ojo sends daily outfit suggestions and weather alerts to help you dress for the day."
       }
@@ -39,7 +40,8 @@
         "locationWhenInUsePermission": "Ojo uses your location for local weather."
       }],
       ["expo-image-picker", {
-        "photosPermission": "Ojo uses your photo library to add clothing images."
+        "photosPermission": "Ojo uses your photo library to add clothing images.",
+        "cameraPermission": "Ojo uses your camera so you can photograph clothing items to add to your closet."
       }],
       ["expo-notifications", {
         "icon": "./assets/ojo_app_icon@1x.png",

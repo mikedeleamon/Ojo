@@ -247,33 +247,52 @@ On the first successful server sync after an app update, `migrateLocalToServer()
 ### 8. TripFit — Trip Planner
 
 **What it does**  
-Given a destination city and a trip length (1–5 days), TripFit fetches a 5-day daily forecast, runs the outfit engine once per day using that day's projected temperature and conditions, and presents a horizontally scrollable day-by-day outfit plan plus a deduplicated packing list.
+Given a destination city and a date range (up to 10 days), TripFit fetches up to a 10-day daily forecast, runs the outfit engine once per day for the selected occasion, and presents a full-width paginated day-by-day outfit plan with clothing photo thumbnails, weather-gradient-tinted cards, and a grouped interactive packing list.
+
+**UI summary**
+- Inline calendar range picker (up to 10 days, month navigation, today ring)
+- Occasion chips — Everyday · Work · Weekend · Date · Outdoor · Athletic — feed directly into outfit scoring
+- Skeleton loading cards while the forecast fetches
+- Hero banner: destination name, date range, overall temp range, dominant weather emoji
+- Full-width paginated outfit pager with dot indicators and tap-to-jump
+- Each day card: weather gradient tint, 4-up clothing photo thumbnail grid, "↺ Replan" button per card
+- Grouped packing list (Tops · Bottoms · Outerwear · Footwear · Accessories) with tap-to-check items
+- "↑ Share" button exports the grouped list as plain text via the native share sheet
+
+All surfaces use liquid glass (`GlassCard regular` for primary cards, `GlassCard clear` for chips, checkboxes, thumbnails, and pill controls).
 
 **How it works**
 
 **Step 1 — City lookup**  
-The user types a city name. TripFit calls `GET /api/weather/city?q={query}` (existing AccuWeather location endpoint) to get the AccuWeather city key.
+The user types a city name. TripFit calls `GET /api/weather/city?q={query}` to get the AccuWeather city key.
 
-**Step 2 — 5-day daily forecast**  
-A new server endpoint `GET /api/weather/forecast/daily/:cityKey` calls AccuWeather's `/forecasts/v1/daily/5day/{cityKey}` API. The result is cached server-side for 3 hours. The raw response is parsed into `DailyForecast` objects: `{ date, minTempF, maxTempF, dayPhrase, hasPrecipitation }`.
+**Step 2 — 10-day daily forecast (with 5-day fallback)**  
+`GET /api/weather/forecast/daily10/:cityKey` calls AccuWeather's `/forecasts/v1/daily/10day/{cityKey}`. The result is cached server-side for 3 hours. If the 10-day endpoint fails (e.g., free-tier API key), the client silently retries `GET /api/weather/forecast/daily/:cityKey` (5-day) and surfaces a "Forecast limited to 5 days" notice. The raw response is parsed into `DailyForecast[]` objects: `{ date, minTempF, maxTempF, dayPhrase, hasPrecipitation }`. Days are filtered to the user's selected start date and sliced to the trip length.
 
 **Step 3 — Per-day outfit generation**  
-For each day in the forecast (up to the selected count), `buildTripWeather(day)` synthesizes a `CurrentWeather` object using the midpoint of the day's min/max temperature and the day phrase as `WeatherText`. This synthetic weather object is fed to `generateOutfits()` with the user's preferred closet articles and settings.
+For each day, `buildTripWeather(day)` synthesizes a `CurrentWeather` object from the midpoint temperature and day phrase. `generateOutfits()` is called with the user's preferred closet and `{ ...settings, occasion: selectedOccasion }` — the selected occasion chip is merged in at call time, not stored.
 
 **Step 4 — Packing list**  
-All outfit slots across all days are flattened and deduplicated by `article._id`. The resulting packing list shows every unique article needed for the trip.
+All outfit slots across all days are flattened, deduplicated by `article._id`, and grouped by category. Each item is individually checkable; checked items migrate to a "✓ Packed" sub-section.
 
 **Step 5 — Gap notes**  
-If any day's outfit generates notes (e.g., "consider a waterproof layer"), those notes are recorded via `recordGapsFromNotes()` so the gap detector accumulates signal from the trip plan.
+Outfit notes are recorded via `recordGapsFromNotes()` to accumulate wardrobe gap signal from the trip plan.
+
+**Step 6 — Replan single day**  
+The "↺" button on each day card re-runs `generateOutfits()` for that day only using the already-fetched `DailyForecast` (stored in `forecastDaysRef`) — no API call needed.
+
+**Stagger entrance animation**  
+Day cards slide in from below on `translateY` (no opacity animation, which would prevent `GlassView` from initialising its native blur on iOS 26). `useReduceMotion()` skips the animation entirely for users with Reduce Motion enabled.
 
 **Entry point**  
-An "✈️ TripFit" button is pinned below the closet list on the Closet tab. It navigates to the `TripFit` screen in the Account stack.
+"✈️ TripFit" button pinned below the closet list on the Closet tab → `TripFit` screen in the Account stack.
 
 **Key files**
-- `src/views/TripFit/TripFitScreen.tsx` — full UI: city input, day picker, results, packing list
-- `server/src/lib/accuWeather.ts` — `get5DayForecast(cityKey)` with 3-hour TTL cache
-- `server/src/routes/weather.ts` — `GET /forecast/daily/:cityKey`
-- `src/types.ts` — `DailyForecast` interface
+- `src/views/TripFit/TripFitScreen.tsx` — full UI: calendar, occasion chips, pager, skeleton, hero banner, packing list
+- `src/views/TripFit/TripCalendar.tsx` — inline calendar range picker component
+- `server/src/lib/accuWeather.ts` — `get10DayForecast()` and `get5DayForecast()`, both with 3-hour TTL cache
+- `server/src/routes/weather.ts` — `GET /forecast/daily10/:cityKey` and `GET /forecast/daily/:cityKey`
+- `src/types.ts` — `DailyForecast` interface, `OutfitOccasion` type
 
 ---
 
@@ -411,6 +430,7 @@ Some features are more powerful in combination:
 | **Heat Map** + **History** | A visual answer to "what am I actually wearing vs what I think I wear" |
 | **Scan Outfit** + **Style Ranker** | Your real-world outfit scored against your own learned preferences, not generic rules |
 | **TripFit** + **Gap Card** | A packing plan that also surfaces what you'd need to buy for the trip |
+| **TripFit** + **Occasion Quick-Switch** | Per-trip occasion selection (e.g. "Work" for a conference trip, "Athletic" for a ski trip) shapes every day's outfit independently |
 | **AQI/Pollen** + **Sensitivities** | Outfit notes that are personalized to your health context, not generic weather advice |
 
 ---

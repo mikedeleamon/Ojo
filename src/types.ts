@@ -117,6 +117,7 @@ export interface NotificationSettings {
   closetGapEnabled:       boolean;
   weeklyRecapEnabled:     boolean;
   weeklyRecapDay:         number;   // 0=Sun … 6=Sat
+  tripPackingEnabled:     boolean;
 }
 
 export interface OutfitHistoryEntry {

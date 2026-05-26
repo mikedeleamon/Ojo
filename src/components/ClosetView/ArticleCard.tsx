@@ -50,7 +50,8 @@ export const ArticleCard = ({
         harmonyScore < 0.55 &&
         !!article.color &&
         !COLOR_NEUTRALS.has(article.color);
-    const [imgError, setImgError] = useState(false);
+    const [erroredUrl, setErroredUrl] = useState<string | null>(null);
+    const imgError = !!article.imageUrl && erroredUrl === article.imageUrl;
 
     return (
         <Pressable
@@ -65,7 +66,7 @@ export const ArticleCard = ({
                         source={{ uri: article.imageUrl }}
                         style={styles.articleImgFill}
                         resizeMode='cover'
-                        onError={() => setImgError(true)}
+                        onError={() => setErroredUrl(article.imageUrl ?? null)}
                     />
                 ) : (
                     <HangerIcon size={18} color={colors.textMuted} decorative />
@@ -152,7 +153,8 @@ export const TileArticleCard = ({
         harmonyScore < 0.55 &&
         !!article.color &&
         !COLOR_NEUTRALS.has(article.color);
-    const [imgError, setImgError] = useState(false);
+    const [erroredUrl, setErroredUrl] = useState<string | null>(null);
+    const imgError = !!article.imageUrl && erroredUrl === article.imageUrl;
 
     const confirmDelete = () =>
         Alert.alert('Remove article?', article.name || article.clothingType, [
@@ -176,7 +178,7 @@ export const TileArticleCard = ({
                         source={{ uri: article.imageUrl }}
                         style={styles.tileImgFill}
                         resizeMode='cover'
-                        onError={() => setImgError(true)}
+                        onError={() => setErroredUrl(article.imageUrl ?? null)}
                     />
                 ) : (
                     <HangerIcon size={24} color={colors.textMuted} decorative />

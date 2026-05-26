@@ -369,13 +369,18 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
                                 { paddingTop: spacing.lg + topInset },
                             ]}
                         >
-                            <Pressable
+                            <GlassCard
+                                glassStyle="clear"
                                 style={[st.gearBtn, { top: topInset + 8 }]}
-                                onPress={() => nav.push('Account')}
-                                accessibilityLabel='Account settings'
                             >
-                                <GearIcon />
-                            </Pressable>
+                                <Pressable
+                                    onPress={() => nav.push('Account')}
+                                    accessibilityLabel='Account settings'
+                                    style={st.gearBtnInner}
+                                >
+                                    <GearIcon />
+                                </Pressable>
+                            </GlassCard>
                             <Text style={st.city}>{city?.LocalizedName}</Text>
                             <Text style={st.condition}>
                                 {weather.WeatherText}

@@ -25,6 +25,7 @@ import { useReduceMotion } from '../../hooks/useReduceMotion';
 import { generateOutfits } from '../../lib/outfitEngine';
 import type { OutfitResult } from '../../lib/outfitEngine';
 import { recordGapsFromNotes } from '../../lib/wardrobeGaps';
+import { scheduleTripPackingReminder } from '../../lib/notifications';
 import { useSettings } from '../../context/SettingsContext';
 import { gradientFor } from '../../components/WeatherHUD/weatherPalette';
 import api from '../../api/client';
@@ -178,11 +179,14 @@ const DayCard = ({
     const thumbSize = Math.floor((cardWidth - spacing.md * 2 - spacing.xs * 3) / 4);
     const gradColors = gradientFor(plan.day.dayPhrase, true) as string[];
 
-    const opacity    = animValue.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
+    // translateY only — no opacity on the Animated.View wrapper.
+    // GlassView (inside GlassCard) must be mounted at full opacity so iOS can
+    // sample the background immediately and initialize native blur. Mounting
+    // inside opacity:0 prevents that initialization. (See WeatherHUD.tsx comment.)
     const translateY = animValue.interpolate({ inputRange: [0, 1], outputRange: [20, 0] });
 
     return (
-        <Animated.View style={{ opacity, transform: [{ translateY }], width: cardWidth, paddingHorizontal: spacing.xs }}>
+        <Animated.View style={{ transform: [{ translateY }], width: cardWidth, paddingHorizontal: spacing.xs }}>
             <RNView style={{ borderRadius: radius.md, overflow: 'hidden', flex: 1 }}>
                 {/* Weather gradient tint behind glass card */}
                 <LinearGradient
@@ -298,26 +302,30 @@ const SkeletonCard = ({ cardWidth }: { cardWidth: number }) => {
         return () => loop.stop();
     }, [shimmer]);
 
-    const opacity = shimmer.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.7] });
+    // The outer GlassCard is always at full opacity so GlassView can initialise
+    // its native blur immediately. The shimmer animation runs only on the inner
+    // placeholder content — never on the GlassCard wrapper itself.
+    const shimmerOpacity = shimmer.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.85] });
 
     return (
-        <Animated.View style={[skSt.outer, { opacity, width: cardWidth, paddingHorizontal: spacing.xs }]}>
+        <RNView style={{ width: cardWidth, paddingHorizontal: spacing.xs }}>
             <GlassCard glassStyle="regular" style={skSt.card}>
-                <GlassCard glassStyle="clear" style={[skSt.line, { width: '45%' }]} />
-                <GlassCard glassStyle="clear" style={[skSt.line, { width: '70%' }]} />
-                <RNView style={skSt.thumbRow}>
-                    {[0, 1, 2, 3].map(i => (
-                        <GlassCard key={i} glassStyle="clear" style={skSt.thumbBox} />
-                    ))}
-                </RNView>
-                <GlassCard glassStyle="clear" style={[skSt.line, { width: '85%' }]} />
+                <Animated.View style={{ opacity: shimmerOpacity, gap: 10 }}>
+                    <GlassCard glassStyle="clear" style={[skSt.line, { width: '45%' }]} />
+                    <GlassCard glassStyle="clear" style={[skSt.line, { width: '70%' }]} />
+                    <RNView style={skSt.thumbRow}>
+                        {[0, 1, 2, 3].map(i => (
+                            <GlassCard key={i} glassStyle="clear" style={skSt.thumbBox} />
+                        ))}
+                    </RNView>
+                    <GlassCard glassStyle="clear" style={[skSt.line, { width: '85%' }]} />
+                </Animated.View>
             </GlassCard>
-        </Animated.View>
+        </RNView>
     );
 };
 
 const skSt = StyleSheet.create({
-    outer: {},
     card: {
         padding: spacing.sm,
         gap: 10,
@@ -746,6 +754,10 @@ export default function TripFitScreen() {
 
             setPlans(newPlans);
             runStagger(newPlans.length);
+
+            if (tripStart) {
+                scheduleTripPackingReminder(query, tripStart).catch(() => {});
+            }
         } catch (err: any) {
             const msg: string = err?.response?.data?.error ?? err?.message ?? 'Could not plan trip.';
             setError(msg);

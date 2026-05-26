@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 import axios from '../api/client';
 import { authHeaders, getToken } from './auth';
 import { NotificationSettings } from '../types';
+import { storage } from './storage';
 
 // Show alerts for foreground notifications
 Notifications.setNotificationHandler({
@@ -27,6 +28,7 @@ export const NOTIF_DEFAULTS: NotificationSettings = {
   closetGapEnabled:     false,
   weeklyRecapEnabled:   false,
   weeklyRecapDay:       0,    // Sunday
+  tripPackingEnabled:   false,
 };
 
 // ─── Permissions ──────────────────────────────────────────────────────────────
@@ -121,4 +123,47 @@ export const localHourToUTC = (localHour: number): number => {
 export const utcHourToLocal = (utcHour: number): number => {
   const offsetMinutes = new Date().getTimezoneOffset();
   return ((utcHour - offsetMinutes / 60) % 24 + 24) % 24;
+};
+
+// ─── Trip packing reminder ────────────────────────────────────────────────────
+// Scheduled locally when the user plans a trip in TripFit.
+// Fires 2 days before departure at 9am local time.
+
+const TRIP_PACKING_ID        = 'ojo_trip_packing';
+export const TRIP_PACKING_PREF_KEY = 'ojo_trip_packing_enabled';
+
+export const scheduleTripPackingReminder = async (
+  destination: string,
+  tripStart: Date,
+): Promise<void> => {
+  const enabled = await storage.getItem(TRIP_PACKING_PREF_KEY);
+  if (enabled !== 'true') return;
+
+  const { status } = await Notifications.getPermissionsAsync();
+  if (status !== 'granted') return;
+
+  // Cancel any existing trip reminder before scheduling a new one
+  await Notifications.cancelScheduledNotificationAsync(TRIP_PACKING_ID).catch(() => {});
+
+  const reminderDate = new Date(tripStart);
+  reminderDate.setDate(reminderDate.getDate() - 2);
+  reminderDate.setHours(9, 0, 0, 0);
+
+  if (reminderDate <= new Date()) return; // departure too soon to remind
+
+  await Notifications.scheduleNotificationAsync({
+    identifier: TRIP_PACKING_ID,
+    content: {
+      title: `Pack for ${destination}!`,
+      body: 'Your trip starts in 2 days. Check your TripFit packing list.',
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      date: reminderDate,
+    },
+  });
+};
+
+export const cancelTripPackingReminder = async (): Promise<void> => {
+  await Notifications.cancelScheduledNotificationAsync(TRIP_PACKING_ID).catch(() => {});
 };
