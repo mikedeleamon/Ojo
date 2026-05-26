@@ -376,7 +376,10 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
                                 <Pressable
                                     onPress={() => nav.push('Account')}
                                     accessibilityLabel='Account settings'
-                                    style={st.gearBtnInner}
+                                    style={({ pressed }) => [
+                                        st.gearBtnInner,
+                                        { opacity: pressed ? 0.6 : 1 },
+                                    ]}
                                 >
                                     <GearIcon />
                                 </Pressable>

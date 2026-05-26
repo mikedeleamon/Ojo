@@ -17,7 +17,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { View, Text, GlassCard } from '../../components/primitives';
 import { HangerIcon } from '../../components/shared';
 import { useTheme } from '../../theme/ThemeContext';
-import { fonts, fontSizes, fontWeights, radius, spacing } from '../../theme/tokens';
+import {
+    fonts,
+    fontSizes,
+    fontWeights,
+    radius,
+    spacing,
+} from '../../theme/tokens';
 import type { ColorTokens } from '../../theme/tokens';
 import { useClosets } from '../../hooks/useClosets';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
@@ -41,32 +47,32 @@ import type {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface DayPlan {
-    day:    DailyForecast;
+    day: DailyForecast;
     outfit: OutfitResult;
 }
 
 interface AccuDailyDay {
-    EpochDate:    number;
-    Temperature:  { Minimum?: { Value?: number }; Maximum?: { Value?: number } };
-    Day?:         { IconPhrase?: string; HasPrecipitation?: boolean };
+    EpochDate: number;
+    Temperature: { Minimum?: { Value?: number }; Maximum?: { Value?: number } };
+    Day?: { IconPhrase?: string; HasPrecipitation?: boolean };
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const OCCASION_CHIPS: { value: OutfitOccasion; label: string }[] = [
     { value: 'everyday', label: 'Everyday' },
-    { value: 'work',     label: 'Work' },
-    { value: 'weekend',  label: 'Weekend' },
-    { value: 'date',     label: 'Date' },
-    { value: 'outdoor',  label: 'Outdoor' },
+    { value: 'work', label: 'Work' },
+    { value: 'weekend', label: 'Weekend' },
+    { value: 'date', label: 'Date' },
+    { value: 'outdoor', label: 'Outdoor' },
     { value: 'athletic', label: 'Athletic' },
 ];
 
 const PACKING_GROUPS: { key: string; label: string; emoji: string }[] = [
-    { key: 'top',       label: 'Tops',        emoji: '👕' },
-    { key: 'bottom',    label: 'Bottoms',     emoji: '👖' },
-    { key: 'outerwear', label: 'Outerwear',   emoji: '🧥' },
-    { key: 'footwear',  label: 'Footwear',    emoji: '👟' },
+    { key: 'top', label: 'Tops', emoji: '👕' },
+    { key: 'bottom', label: 'Bottoms', emoji: '👖' },
+    { key: 'outerwear', label: 'Outerwear', emoji: '🧥' },
+    { key: 'footwear', label: 'Footwear', emoji: '👟' },
     { key: 'accessory', label: 'Accessories', emoji: '👜' },
 ];
 
@@ -75,21 +81,21 @@ const PACKING_GROUPS: { key: string; label: string; emoji: string }[] = [
 function buildTripWeather(day: DailyForecast): CurrentWeather {
     const midF = (day.minTempF + day.maxTempF) / 2;
     return {
-        WeatherText:           day.dayPhrase,
-        HasPrecipitation:      day.hasPrecipitation,
-        PrecipitationType:     day.hasPrecipitation ? 'Rain' : null,
-        IsDayTime:             true,
+        WeatherText: day.dayPhrase,
+        HasPrecipitation: day.hasPrecipitation,
+        PrecipitationType: day.hasPrecipitation ? 'Rain' : null,
+        IsDayTime: true,
         Temperature: {
-            Imperial: { Value: midF,                   Unit: 'F' },
-            Metric:   { Value: (midF - 32) * (5 / 9), Unit: 'C' },
+            Imperial: { Value: midF, Unit: 'F' },
+            Metric: { Value: (midF - 32) * (5 / 9), Unit: 'C' },
         },
         RealFeelTemperature: {
-            Imperial: { Value: midF,                   Unit: 'F' },
-            Metric:   { Value: (midF - 32) * (5 / 9), Unit: 'C' },
+            Imperial: { Value: midF, Unit: 'F' },
+            Metric: { Value: (midF - 32) * (5 / 9), Unit: 'C' },
         },
-        Wind:             { Speed: { Imperial: { Value: 5 }, Metric: { Value: 8 } } },
+        Wind: { Speed: { Imperial: { Value: 5 }, Metric: { Value: 8 } } },
         RelativeHumidity: 60,
-        UVIndexText:      'Moderate',
+        UVIndexText: 'Moderate',
     };
 }
 
@@ -97,17 +103,19 @@ function parseDailyForecasts(raw: unknown): DailyForecast[] {
     const data = raw as { DailyForecasts?: AccuDailyDay[] };
     if (!Array.isArray(data?.DailyForecasts)) return [];
     return data.DailyForecasts.map((d: AccuDailyDay) => ({
-        date:             new Date(d.EpochDate * 1000).toISOString().slice(0, 10),
-        minTempF:         d.Temperature?.Minimum?.Value ?? 60,
-        maxTempF:         d.Temperature?.Maximum?.Value ?? 75,
-        dayPhrase:        d.Day?.IconPhrase ?? 'Partly cloudy',
+        date: new Date(d.EpochDate * 1000).toISOString().slice(0, 10),
+        minTempF: d.Temperature?.Minimum?.Value ?? 60,
+        maxTempF: d.Temperature?.Maximum?.Value ?? 75,
+        dayPhrase: d.Day?.IconPhrase ?? 'Partly cloudy',
         hasPrecipitation: !!d.Day?.HasPrecipitation,
     }));
 }
 
 function fmtDate(iso: string): string {
     return new Date(iso + 'T12:00:00').toLocaleDateString('en-US', {
-        weekday: 'short', month: 'short', day: 'numeric',
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
     });
 }
 
@@ -117,42 +125,84 @@ function fmtShortDate(d: Date): string {
 
 function phraseEmoji(phrase: string): string {
     const p = phrase.toLowerCase();
-    if (p.includes('snow'))                           return '❄️';
-    if (p.includes('rain') || p.includes('shower'))  return '🌧️';
-    if (p.includes('thunder'))                        return '⛈️';
+    if (p.includes('snow')) return '❄️';
+    if (p.includes('rain') || p.includes('shower')) return '🌧️';
+    if (p.includes('thunder')) return '⛈️';
     if (p.includes('cloud') || p.includes('overcast')) return '☁️';
-    if (p.includes('sun') || p.includes('clear') || p.includes('fair')) return '☀️';
-    if (p.includes('wind'))                           return '💨';
+    if (p.includes('sun') || p.includes('clear') || p.includes('fair'))
+        return '☀️';
+    if (p.includes('wind')) return '💨';
     return '🌤️';
 }
 
 function categoryKey(a: ClothingArticle): string {
     if (a.isAccessory) return 'accessory';
-    const cat = (a.clothingCategory ?? a.topOrBottom ?? a.clothingType ?? '').toLowerCase();
-    if (cat.includes('outer') || cat.includes('jacket') || cat.includes('coat') || cat.includes('layer')) return 'outerwear';
-    if (cat.includes('shoe') || cat.includes('boot') || cat.includes('foot') || cat.includes('sandal')) return 'footwear';
-    if (cat.includes('bottom') || cat.includes('pant') || cat.includes('skirt') || cat.includes('short')) return 'bottom';
+    const cat = (
+        a.clothingCategory ??
+        a.topOrBottom ??
+        a.clothingType ??
+        ''
+    ).toLowerCase();
+    if (
+        cat.includes('outer') ||
+        cat.includes('jacket') ||
+        cat.includes('coat') ||
+        cat.includes('layer')
+    )
+        return 'outerwear';
+    if (
+        cat.includes('shoe') ||
+        cat.includes('boot') ||
+        cat.includes('foot') ||
+        cat.includes('sandal')
+    )
+        return 'footwear';
+    if (
+        cat.includes('bottom') ||
+        cat.includes('pant') ||
+        cat.includes('skirt') ||
+        cat.includes('short')
+    )
+        return 'bottom';
     return 'top';
 }
 
 // ─── ThumbImage ───────────────────────────────────────────────────────────────
 
-const ThumbImage = ({ article, size, colors }: { article: ClothingArticle; size: number; colors: ColorTokens }) => {
+const ThumbImage = ({
+    article,
+    size,
+    colors,
+}: {
+    article: ClothingArticle;
+    size: number;
+    colors: ColorTokens;
+}) => {
     const [err, setErr] = useState(false);
     return (
         <GlassCard
-            glassStyle="clear"
-            style={{ width: size, height: size, borderRadius: radius.sm - 2, alignItems: 'center', justifyContent: 'center' }}
+            glassStyle='clear'
+            style={{
+                width: size,
+                height: size,
+                borderRadius: radius.sm - 2,
+                alignItems: 'center',
+                justifyContent: 'center',
+            }}
         >
             {article.imageUrl && !err ? (
                 <Image
                     source={{ uri: article.imageUrl }}
                     style={{ width: size, height: size }}
-                    resizeMode="cover"
+                    resizeMode='cover'
                     onError={() => setErr(true)}
                 />
             ) : (
-                <HangerIcon size={size * 0.4} color={colors.textMuted} decorative />
+                <HangerIcon
+                    size={size * 0.4}
+                    color={colors.textMuted}
+                    decorative
+                />
             )}
         </GlassCard>
     );
@@ -168,26 +218,41 @@ const DayCard = ({
     isReplanning,
     onReplan,
 }: {
-    plan:         DayPlan;
-    colors:       ColorTokens;
-    cardWidth:    number;
-    animValue:    Animated.Value;
+    plan: DayPlan;
+    colors: ColorTokens;
+    cardWidth: number;
+    animValue: Animated.Value;
     isReplanning: boolean;
-    onReplan:     () => void;
+    onReplan: () => void;
 }) => {
-    const articles = plan.outfit.slots.map((s: { article: ClothingArticle }) => s.article);
-    const thumbSize = Math.floor((cardWidth - spacing.md * 2 - spacing.xs * 3) / 4);
+    const articles = plan.outfit.slots.map(
+        (s: { article: ClothingArticle }) => s.article,
+    );
+    const thumbSize = Math.floor(
+        (cardWidth - spacing.md * 2 - spacing.xs * 3) / 4,
+    );
     const gradColors = gradientFor(plan.day.dayPhrase, true) as string[];
 
     // translateY only — no opacity on the Animated.View wrapper.
     // GlassView (inside GlassCard) must be mounted at full opacity so iOS can
     // sample the background immediately and initialize native blur. Mounting
     // inside opacity:0 prevents that initialization. (See WeatherHUD.tsx comment.)
-    const translateY = animValue.interpolate({ inputRange: [0, 1], outputRange: [20, 0] });
+    const translateY = animValue.interpolate({
+        inputRange: [0, 1],
+        outputRange: [20, 0],
+    });
 
     return (
-        <Animated.View style={{ transform: [{ translateY }], width: cardWidth, paddingHorizontal: spacing.xs }}>
-            <RNView style={{ borderRadius: radius.md, overflow: 'hidden', flex: 1 }}>
+        <Animated.View
+            style={{
+                transform: [{ translateY }],
+                width: cardWidth,
+                paddingHorizontal: spacing.xs,
+            }}
+        >
+            <RNView
+                style={{ borderRadius: radius.md, overflow: 'hidden', flex: 1 }}
+            >
                 {/* Weather gradient tint behind glass card */}
                 <LinearGradient
                     colors={gradColors as [string, string, ...string[]]}
@@ -195,46 +260,82 @@ const DayCard = ({
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                 />
-                <GlassCard style={dayCardSt.card} glassStyle="regular">
+                <GlassCard
+                    style={dayCardSt.card}
+                    glassStyle='regular'
+                >
                     {/* Date + weather */}
-                    <Text style={[dayCardSt.dateLabel, { color: colors.textSecondary }]}>
-                        {phraseEmoji(plan.day.dayPhrase)} {fmtDate(plan.day.date)}
+                    <Text
+                        style={[
+                            dayCardSt.dateLabel,
+                            { color: colors.textSecondary },
+                        ]}
+                    >
+                        {phraseEmoji(plan.day.dayPhrase)}{' '}
+                        {fmtDate(plan.day.date)}
                     </Text>
-                    <Text style={[dayCardSt.tempRow, { color: colors.textMuted }]}>
-                        {Math.round(plan.day.minTempF)}° – {Math.round(plan.day.maxTempF)}°F · {plan.day.dayPhrase}
+                    <Text
+                        style={[dayCardSt.tempRow, { color: colors.textMuted }]}
+                    >
+                        {Math.round(plan.day.minTempF)}° –{' '}
+                        {Math.round(plan.day.maxTempF)}°F · {plan.day.dayPhrase}
                     </Text>
 
                     {/* Photo grid */}
                     <RNView style={dayCardSt.thumbGrid}>
-                        {articles.slice(0, 4).map((a: ClothingArticle, i: number) => (
-                            <ThumbImage key={a._id ?? i} article={a} size={thumbSize} colors={colors} />
-                        ))}
+                        {articles
+                            .slice(0, 4)
+                            .map((a: ClothingArticle, i: number) => (
+                                <ThumbImage
+                                    key={a._id ?? i}
+                                    article={a}
+                                    size={thumbSize}
+                                    colors={colors}
+                                />
+                            ))}
                     </RNView>
 
                     {/* Outfit note */}
                     {plan.outfit.notes.length > 0 && (
-                        <Text style={[dayCardSt.note, { color: colors.textMuted }]} numberOfLines={2}>
+                        <Text
+                            style={[
+                                dayCardSt.note,
+                                { color: colors.textMuted },
+                            ]}
+                            numberOfLines={2}
+                        >
                             {plan.outfit.notes[0]}
                         </Text>
                     )}
 
                     {/* Replan button */}
                     <GlassCard
-                        glassStyle="clear"
+                        glassStyle='clear'
                         style={dayCardSt.replanBtn}
                     >
                         <Pressable
                             onPress={onReplan}
                             disabled={isReplanning}
                             style={dayCardSt.replanInner}
-                            accessibilityRole="button"
-                            accessibilityLabel="Replan this day"
+                            accessibilityRole='button'
+                            accessibilityLabel='Replan this day'
                             hitSlop={8}
                         >
-                            {isReplanning
-                                ? <ActivityIndicator size="small" color={colors.textPrimary} />
-                                : <Text style={[dayCardSt.replanIcon, { color: colors.textSecondary }]}>↺</Text>
-                            }
+                            {isReplanning ? (
+                                <ActivityIndicator
+                                    size='small'
+                                    color={colors.textPrimary}
+                                />
+                            ) : (
+                                <Text
+                                    style={[
+                                        dayCardSt.replanIcon,
+                                        { color: colors.textSecondary },
+                                    ]}
+                                >
+                                    ↺
+                                </Text>
+                            )}
                         </Pressable>
                     </GlassCard>
                 </GlassCard>
@@ -294,9 +395,17 @@ const SkeletonCard = ({ cardWidth }: { cardWidth: number }) => {
     useEffect(() => {
         const loop = Animated.loop(
             Animated.sequence([
-                Animated.timing(shimmer, { toValue: 1, duration: 700, useNativeDriver: true }),
-                Animated.timing(shimmer, { toValue: 0, duration: 700, useNativeDriver: true }),
-            ])
+                Animated.timing(shimmer, {
+                    toValue: 1,
+                    duration: 700,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(shimmer, {
+                    toValue: 0,
+                    duration: 700,
+                    useNativeDriver: true,
+                }),
+            ]),
         );
         loop.start();
         return () => loop.stop();
@@ -305,20 +414,39 @@ const SkeletonCard = ({ cardWidth }: { cardWidth: number }) => {
     // The outer GlassCard is always at full opacity so GlassView can initialise
     // its native blur immediately. The shimmer animation runs only on the inner
     // placeholder content — never on the GlassCard wrapper itself.
-    const shimmerOpacity = shimmer.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.85] });
+    const shimmerOpacity = shimmer.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0.35, 0.85],
+    });
 
     return (
         <RNView style={{ width: cardWidth, paddingHorizontal: spacing.xs }}>
-            <GlassCard glassStyle="regular" style={skSt.card}>
+            <GlassCard
+                glassStyle='regular'
+                style={skSt.card}
+            >
                 <Animated.View style={{ opacity: shimmerOpacity, gap: 10 }}>
-                    <GlassCard glassStyle="clear" style={[skSt.line, { width: '45%' }]} />
-                    <GlassCard glassStyle="clear" style={[skSt.line, { width: '70%' }]} />
+                    <GlassCard
+                        glassStyle='clear'
+                        style={[skSt.line, { width: '45%' }]}
+                    />
+                    <GlassCard
+                        glassStyle='clear'
+                        style={[skSt.line, { width: '70%' }]}
+                    />
                     <RNView style={skSt.thumbRow}>
-                        {[0, 1, 2, 3].map(i => (
-                            <GlassCard key={i} glassStyle="clear" style={skSt.thumbBox} />
+                        {[0, 1, 2, 3].map((i) => (
+                            <GlassCard
+                                key={i}
+                                glassStyle='clear'
+                                style={skSt.thumbBox}
+                            />
                         ))}
                     </RNView>
-                    <GlassCard glassStyle="clear" style={[skSt.line, { width: '85%' }]} />
+                    <GlassCard
+                        glassStyle='clear'
+                        style={[skSt.line, { width: '85%' }]}
+                    />
                 </Animated.View>
             </GlassCard>
         </RNView>
@@ -349,18 +477,32 @@ const skSt = StyleSheet.create({
 
 // ─── HeroBanner ───────────────────────────────────────────────────────────────
 
-const HeroBanner = ({ plans, destination, colors }: { plans: DayPlan[]; destination: string; colors: ColorTokens }) => {
-    const allMin = plans.map(p => p.day.minTempF);
-    const allMax = plans.map(p => p.day.maxTempF);
+const HeroBanner = ({
+    plans,
+    destination,
+    colors,
+}: {
+    plans: DayPlan[];
+    destination: string;
+    colors: ColorTokens;
+}) => {
+    const allMin = plans.map((p) => p.day.minTempF);
+    const allMax = plans.map((p) => p.day.maxTempF);
     const minTemp = Math.round(Math.min(...allMin));
     const maxTemp = Math.round(Math.max(...allMax));
 
     const startStr = fmtShortDate(new Date(plans[0].day.date + 'T12:00:00'));
-    const endStr   = fmtShortDate(new Date(plans[plans.length - 1].day.date + 'T12:00:00'));
+    const endStr = fmtShortDate(
+        new Date(plans[plans.length - 1].day.date + 'T12:00:00'),
+    );
 
     const phraseCounts: Record<string, number> = {};
-    for (const p of plans) phraseCounts[p.day.dayPhrase] = (phraseCounts[p.day.dayPhrase] ?? 0) + 1;
-    const dominantPhrase = Object.entries(phraseCounts).sort((a, b) => b[1] - a[1])[0][0];
+    for (const p of plans)
+        phraseCounts[p.day.dayPhrase] =
+            (phraseCounts[p.day.dayPhrase] ?? 0) + 1;
+    const dominantPhrase = Object.entries(phraseCounts).sort(
+        (a, b) => b[1] - a[1],
+    )[0][0];
 
     const gradColors = gradientFor(dominantPhrase, true) as string[];
 
@@ -372,11 +514,37 @@ const HeroBanner = ({ plans, destination, colors }: { plans: DayPlan[]; destinat
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
             />
-            <GlassCard glassStyle="regular" style={heroBannerSt.card}>
-                <Text style={heroBannerSt.emoji}>{phraseEmoji(dominantPhrase)}</Text>
-                <Text style={[heroBannerSt.destination, { color: colors.textPrimary }]}>{destination}</Text>
-                <Text style={[heroBannerSt.dateRange, { color: colors.textSecondary }]}>{startStr} – {endStr}</Text>
-                <Text style={[heroBannerSt.tempRange, { color: colors.textPrimary }]}>{minTemp}° – {maxTemp}°F</Text>
+            <GlassCard
+                glassStyle='regular'
+                style={heroBannerSt.card}
+            >
+                <Text style={heroBannerSt.emoji}>
+                    {phraseEmoji(dominantPhrase)}
+                </Text>
+                <Text
+                    style={[
+                        heroBannerSt.destination,
+                        { color: colors.textPrimary },
+                    ]}
+                >
+                    {destination}
+                </Text>
+                <Text
+                    style={[
+                        heroBannerSt.dateRange,
+                        { color: colors.textSecondary },
+                    ]}
+                >
+                    {startStr} – {endStr}
+                </Text>
+                <Text
+                    style={[
+                        heroBannerSt.tempRange,
+                        { color: colors.textPrimary },
+                    ]}
+                >
+                    {minTemp}° – {maxTemp}°F
+                </Text>
             </GlassCard>
         </RNView>
     );
@@ -414,31 +582,52 @@ const PackingRow = ({
     isChecked,
     onToggle,
 }: {
-    article:   ClothingArticle;
-    colors:    ColorTokens;
+    article: ClothingArticle;
+    colors: ColorTokens;
     isChecked: boolean;
-    onToggle:  () => void;
+    onToggle: () => void;
 }) => (
     <Pressable
         onPress={onToggle}
         style={[packSt.row, { borderBottomColor: colors.glassBorder }]}
-        accessibilityRole="checkbox"
+        accessibilityRole='checkbox'
         accessibilityState={{ checked: isChecked }}
     >
         <GlassCard
-            glassStyle="clear"
-            style={[packSt.checkCircle, { borderColor: isChecked ? colors.saveBtnBg : colors.glassBorder }]}
+            glassStyle='clear'
+            style={[
+                packSt.checkCircle,
+                {
+                    borderColor: isChecked
+                        ? colors.saveBtnBg
+                        : colors.glassBorder,
+                },
+            ]}
         >
             {isChecked && (
-                <Text style={[packSt.checkMark, { color: colors.saveBtnBg }]}>✓</Text>
+                <Text style={[packSt.checkMark, { color: colors.saveBtnBg }]}>
+                    ✓
+                </Text>
             )}
         </GlassCard>
         <RNView style={{ flex: 1, gap: 2 }}>
-            <Text style={[packSt.name, { color: isChecked ? colors.textMuted : colors.textPrimary }, isChecked && packSt.checkedName]}>
+            <Text
+                style={[
+                    packSt.name,
+                    {
+                        color: isChecked
+                            ? colors.textMuted
+                            : colors.textPrimary,
+                    },
+                    isChecked && packSt.checkedName,
+                ]}
+            >
                 {article.name || article.clothingType}
             </Text>
             <Text style={[packSt.meta, { color: colors.textMuted }]}>
-                {[article.clothingType, article.color].filter(Boolean).join(' · ')}
+                {[article.clothingType, article.color]
+                    .filter(Boolean)
+                    .join(' · ')}
             </Text>
         </RNView>
     </Pressable>
@@ -487,9 +676,9 @@ const GroupedPackingList = ({
     colors,
 }: {
     packingList: ClothingArticle[];
-    checkedIds:  Set<string>;
-    onToggle:    (id: string) => void;
-    colors:      ColorTokens;
+    checkedIds: Set<string>;
+    onToggle: (id: string) => void;
+    colors: ColorTokens;
 }) => {
     const grouped = useMemo(() => {
         const map: Record<string, ClothingArticle[]> = {};
@@ -500,8 +689,8 @@ const GroupedPackingList = ({
         return map;
     }, [packingList]);
 
-    const unpacked = packingList.filter(a => !checkedIds.has(a._id));
-    const packed   = packingList.filter(a =>  checkedIds.has(a._id));
+    const unpacked = packingList.filter((a) => !checkedIds.has(a._id));
+    const packed = packingList.filter((a) => checkedIds.has(a._id));
 
     const unpGrouped: Record<string, ClothingArticle[]> = {};
     for (const a of unpacked) {
@@ -516,10 +705,15 @@ const GroupedPackingList = ({
                 if (!items?.length) return null;
                 return (
                     <RNView key={key}>
-                        <Text style={[groupSt.sectionHeader, { color: colors.textMuted }]}>
+                        <Text
+                            style={[
+                                groupSt.sectionHeader,
+                                { color: colors.textMuted },
+                            ]}
+                        >
                             {emoji} {label}
                         </Text>
-                        {items.map(a => (
+                        {items.map((a) => (
                             <PackingRow
                                 key={a._id}
                                 article={a}
@@ -534,10 +728,15 @@ const GroupedPackingList = ({
 
             {packed.length > 0 && (
                 <RNView>
-                    <Text style={[groupSt.sectionHeader, { color: colors.textMuted, marginTop: spacing.sm }]}>
+                    <Text
+                        style={[
+                            groupSt.sectionHeader,
+                            { color: colors.textMuted, marginTop: spacing.sm },
+                        ]}
+                    >
                         ✓ Packed
                     </Text>
-                    {packed.map(a => (
+                    {packed.map((a) => (
                         <PackingRow
                             key={a._id}
                             article={a}
@@ -564,11 +763,23 @@ const groupSt = StyleSheet.create({
 
 // ─── OccasionChips ────────────────────────────────────────────────────────────
 
-const OccasionChips = ({ active, onChange, colors }: { active: OutfitOccasion; onChange: (o: OutfitOccasion) => void; colors: ColorTokens }) => (
+const OccasionChips = ({
+    active,
+    onChange,
+    colors,
+}: {
+    active: OutfitOccasion;
+    onChange: (o: OutfitOccasion) => void;
+    colors: ColorTokens;
+}) => (
     <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ flexDirection: 'row', gap: 8, paddingVertical: 2 }}
+        contentContainerStyle={{
+            flexDirection: 'row',
+            gap: 8,
+            paddingVertical: 2,
+        }}
     >
         {OCCASION_CHIPS.map(({ value, label }) => (
             <GlassCard
@@ -576,21 +787,33 @@ const OccasionChips = ({ active, onChange, colors }: { active: OutfitOccasion; o
                 glassStyle={active === value ? 'regular' : 'clear'}
                 style={[
                     chipSt.chip,
-                    { borderColor: active === value ? colors.saveBtnBg : colors.glassBorder },
+                    {
+                        borderColor:
+                            active === value
+                                ? colors.saveBtnBg
+                                : colors.glassBorder,
+                    },
                 ]}
             >
                 <Pressable
                     onPress={() => onChange(value)}
                     hitSlop={4}
                     style={chipSt.chipInner}
-                    accessibilityRole="radio"
+                    accessibilityRole='radio'
                     accessibilityState={{ checked: active === value }}
                 >
-                    <Text style={[
-                        chipSt.chipText,
-                        { color: active === value ? colors.saveBtnText : colors.textSecondary },
-                        active === value && chipSt.chipTextActive,
-                    ]}>
+                    <Text
+                        style={[
+                            chipSt.chipText,
+                            {
+                                color:
+                                    active === value
+                                        ? colors.saveBtnText
+                                        : colors.textSecondary,
+                            },
+                            active === value && chipSt.chipTextActive,
+                        ]}
+                    >
                         {label}
                     </Text>
                 </Pressable>
@@ -622,8 +845,8 @@ const chipSt = StyleSheet.create({
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function TripFitScreen() {
-    const { colors }  = useTheme();
-    const { goBack }  = useAppNavigation();
+    const { colors } = useTheme();
+    const { goBack } = useAppNavigation();
     const { closets } = useClosets();
     const { settings } = useSettings();
     const reduceMotion = useReduceMotion();
@@ -633,31 +856,37 @@ export default function TripFitScreen() {
 
     // ── State ──
     const [destination, setDestination] = useState('');
-    const [tripStart, setTripStart]     = useState<Date | null>(null);
-    const [tripEnd, setTripEnd]         = useState<Date | null>(null);
-    const [selectedOccasion, setSelectedOccasion] = useState<OutfitOccasion>('everyday');
-    const [loading, setLoading]         = useState(false);
-    const [plans, setPlans]             = useState<DayPlan[]>([]);
-    const [error, setError]             = useState<string | null>(null);
-    const [activeIdx, setActiveIdx]     = useState(0);
-    const [checkedIds, setCheckedIds]   = useState<Set<string>>(new Set());
+    const [tripStart, setTripStart] = useState<Date | null>(null);
+    const [tripEnd, setTripEnd] = useState<Date | null>(null);
+    const [selectedOccasion, setSelectedOccasion] =
+        useState<OutfitOccasion>('everyday');
+    const [loading, setLoading] = useState(false);
+    const [plans, setPlans] = useState<DayPlan[]>([]);
+    const [error, setError] = useState<string | null>(null);
+    const [activeIdx, setActiveIdx] = useState(0);
+    const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
     const [replanningIdx, setReplanningIdx] = useState<number | null>(null);
     const [forecastLimited, setForecastLimited] = useState(false);
 
-    const pagerRef       = useRef<ScrollView>(null);
+    const pagerRef = useRef<ScrollView>(null);
     const forecastDaysRef = useRef<DailyForecast[]>([]);
-    const animValues      = useRef<Animated.Value[]>([]).current;
+    const animValues = useRef<Animated.Value[]>([]).current;
 
     // ── Derived ──
     const { days, forecastStartDate } = useMemo(() => {
         if (!tripStart || !tripEnd) return { days: 0, forecastStartDate: null };
-        const count = Math.round((tripEnd.getTime() - tripStart.getTime()) / 86400000) + 1;
-        return { days: count, forecastStartDate: tripStart.toISOString().slice(0, 10) };
+        const count =
+            Math.round((tripEnd.getTime() - tripStart.getTime()) / 86400000) +
+            1;
+        return {
+            days: count,
+            forecastStartDate: tripStart.toISOString().slice(0, 10),
+        };
     }, [tripStart, tripEnd]);
 
     const articles: ClothingArticle[] = useMemo(() => {
         if (!closets.length) return [];
-        const preferred = closets.find(c => c.isPreferred) ?? closets[0];
+        const preferred = closets.find((c) => c.isPreferred) ?? closets[0];
         return preferred.articles;
     }, [closets]);
 
@@ -676,29 +905,45 @@ export default function TripFitScreen() {
     }, [plans]);
 
     // ── Stagger animation ──
-    const runStagger = useCallback((count: number) => {
-        animValues.splice(0);
-        for (let i = 0; i < count; i++) animValues.push(new Animated.Value(0));
+    const runStagger = useCallback(
+        (count: number) => {
+            animValues.splice(0);
+            for (let i = 0; i < count; i++)
+                animValues.push(new Animated.Value(0));
 
-        if (reduceMotion) {
-            animValues.forEach(v => v.setValue(1));
-        } else {
-            Animated.stagger(
-                80,
-                animValues.map(v => Animated.timing(v, { toValue: 1, duration: 320, useNativeDriver: true }))
-            ).start();
-        }
-    }, [animValues, reduceMotion]);
+            if (reduceMotion) {
+                animValues.forEach((v) => v.setValue(1));
+            } else {
+                Animated.stagger(
+                    80,
+                    animValues.map((v) =>
+                        Animated.timing(v, {
+                            toValue: 1,
+                            duration: 320,
+                            useNativeDriver: true,
+                        }),
+                    ),
+                ).start();
+            }
+        },
+        [animValues, reduceMotion],
+    );
 
     // ── Plan trip ──
     const onPlan = useCallback(async () => {
         const query = destination.trim();
         if (!query) {
-            Alert.alert('Enter a destination', 'Type a city name to plan your trip.');
+            Alert.alert(
+                'Enter a destination',
+                'Type a city name to plan your trip.',
+            );
             return;
         }
         if (!tripStart || !tripEnd) {
-            Alert.alert('Select dates', 'Pick a start and end date on the calendar.');
+            Alert.alert(
+                'Select dates',
+                'Pick a start and end date on the calendar.',
+            );
             return;
         }
 
@@ -711,45 +956,65 @@ export default function TripFitScreen() {
 
         try {
             // City lookup
-            const cityRes = await api.get<{ Key: string; LocalizedName: string }>(
-                '/api/weather/city',
-                { params: { q: query }, ...authHeaders() },
-            );
+            const cityRes = await api.get<{
+                Key: string;
+                LocalizedName: string;
+            }>('/api/weather/city', { params: { q: query }, ...authHeaders() });
             const cityData = cityRes.data;
             if (!cityData?.Key) throw new Error(`City not found: "${query}"`);
 
             // Fetch forecast — try 10-day, fall back to 5-day
             let allDays: DailyForecast[] = [];
             try {
-                const res = await api.get(`/api/weather/forecast/daily10/${cityData.Key}`, authHeaders());
+                const res = await api.get(
+                    `/api/weather/forecast/daily10/${cityData.Key}`,
+                    authHeaders(),
+                );
                 allDays = parseDailyForecasts(res.data);
             } catch {
-                const res = await api.get(`/api/weather/forecast/daily/${cityData.Key}`, authHeaders());
+                const res = await api.get(
+                    `/api/weather/forecast/daily/${cityData.Key}`,
+                    authHeaders(),
+                );
                 allDays = parseDailyForecasts(res.data);
                 setForecastLimited(true);
             }
 
             // Slice to selected date range
             const slicedDays = forecastStartDate
-                ? allDays.filter(d => d.date >= forecastStartDate).slice(0, days)
+                ? allDays
+                      .filter((d) => d.date >= forecastStartDate)
+                      .slice(0, days)
                 : allDays.slice(0, days);
 
             if (!slicedDays.length) {
-                throw new Error('Selected dates are beyond the forecast window. Choose dates within the next 10 days.');
+                throw new Error(
+                    'Selected dates are beyond the forecast window. Choose dates within the next 10 days.',
+                );
             }
 
             forecastDaysRef.current = slicedDays;
 
             // Generate outfits
-            const effectiveSettings = { ...settings, occasion: selectedOccasion };
-            const newPlans: DayPlan[] = slicedDays.map(day => {
+            const effectiveSettings = {
+                ...settings,
+                occasion: selectedOccasion,
+            };
+            const newPlans: DayPlan[] = slicedDays.map((day) => {
                 const weather = buildTripWeather(day);
-                const { results } = generateOutfits(articles, weather, effectiveSettings, new Set(), 1);
+                const { results } = generateOutfits(
+                    articles,
+                    weather,
+                    effectiveSettings,
+                    new Set(),
+                    1,
+                );
                 return { day, outfit: results[0] };
             });
 
             for (const p of newPlans) {
-                if (p.outfit.notes.length) recordGapsFromNotes(p.outfit.notes).catch(() => {});
+                if (p.outfit.notes.length)
+                    recordGapsFromNotes(p.outfit.notes).catch(() => {});
             }
 
             setPlans(newPlans);
@@ -759,45 +1024,79 @@ export default function TripFitScreen() {
                 scheduleTripPackingReminder(query, tripStart).catch(() => {});
             }
         } catch (err: any) {
-            const msg: string = err?.response?.data?.error ?? err?.message ?? 'Could not plan trip.';
+            const msg: string =
+                err?.response?.data?.error ??
+                err?.message ??
+                'Could not plan trip.';
             setError(msg);
         } finally {
             setLoading(false);
         }
-    }, [destination, tripStart, tripEnd, days, forecastStartDate, articles, settings, selectedOccasion, runStagger]);
+    }, [
+        destination,
+        tripStart,
+        tripEnd,
+        days,
+        forecastStartDate,
+        articles,
+        settings,
+        selectedOccasion,
+        runStagger,
+    ]);
 
     // ── Replan single day ──
-    const onReplanDay = useCallback(async (idx: number) => {
-        const day = forecastDaysRef.current[idx];
-        if (!day) return;
-        setReplanningIdx(idx);
-        try {
-            const effectiveSettings = { ...settings, occasion: selectedOccasion };
-            const { results } = generateOutfits(articles, buildTripWeather(day), effectiveSettings, new Set(), 1);
-            setPlans(prev => {
-                const next = [...prev];
-                next[idx] = { day, outfit: results[0] };
-                return next;
-            });
-            if (!reduceMotion && animValues[idx]) {
-                animValues[idx].setValue(0);
-                Animated.timing(animValues[idx], { toValue: 1, duration: 320, useNativeDriver: true }).start();
+    const onReplanDay = useCallback(
+        async (idx: number) => {
+            const day = forecastDaysRef.current[idx];
+            if (!day) return;
+            setReplanningIdx(idx);
+            try {
+                const effectiveSettings = {
+                    ...settings,
+                    occasion: selectedOccasion,
+                };
+                const { results } = generateOutfits(
+                    articles,
+                    buildTripWeather(day),
+                    effectiveSettings,
+                    new Set(),
+                    1,
+                );
+                setPlans((prev) => {
+                    const next = [...prev];
+                    next[idx] = { day, outfit: results[0] };
+                    return next;
+                });
+                if (!reduceMotion && animValues[idx]) {
+                    animValues[idx].setValue(0);
+                    Animated.timing(animValues[idx], {
+                        toValue: 1,
+                        duration: 320,
+                        useNativeDriver: true,
+                    }).start();
+                }
+            } finally {
+                setReplanningIdx(null);
             }
-        } finally {
-            setReplanningIdx(null);
-        }
-    }, [articles, settings, selectedOccasion, reduceMotion, animValues]);
+        },
+        [articles, settings, selectedOccasion, reduceMotion, animValues],
+    );
 
     // ── Share packing list ──
     const handleSharePacking = useCallback(() => {
         if (!packingList.length) return;
-        const lines: string[] = [`✈️ TripFit Packing List — ${destination}`, ''];
+        const lines: string[] = [
+            `✈️ TripFit Packing List — ${destination}`,
+            '',
+        ];
         for (const { key, label, emoji } of PACKING_GROUPS) {
-            const items = packingList.filter(a => categoryKey(a) === key);
+            const items = packingList.filter((a) => categoryKey(a) === key);
             if (!items.length) continue;
             lines.push(`${emoji} ${label}:`);
             for (const a of items) {
-                lines.push(`  • ${a.name || a.clothingType}${a.color ? ` (${a.color})` : ''}`);
+                lines.push(
+                    `  • ${a.name || a.clothingType}${a.color ? ` (${a.color})` : ''}`,
+                );
             }
             lines.push('');
         }
@@ -807,41 +1106,65 @@ export default function TripFitScreen() {
 
     // ── Toggle packed item ──
     const toggleChecked = useCallback((id: string) => {
-        setCheckedIds(prev => {
+        setCheckedIds((prev) => {
             const next = new Set(prev);
-            if (next.has(id)) next.delete(id); else next.add(id);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
             return next;
         });
     }, []);
 
-    const st = useMemo(() => makeStyles(colors, cardWidth), [colors, cardWidth]);
+    const st = useMemo(
+        () => makeStyles(colors, cardWidth),
+        [colors, cardWidth],
+    );
 
     const calContainerWidth = windowWidth - spacing.md * 2;
 
     return (
-        <SafeAreaView style={st.root} edges={['top', 'bottom']}>
+        <SafeAreaView
+            style={st.root}
+            edges={['top', 'bottom']}
+        >
             {/* Header */}
             <View style={st.header}>
-                <Pressable onPress={goBack} style={st.backBtn} accessibilityLabel="Go back" accessibilityRole="button">
-                    <Text style={[st.backArrow, { color: colors.textPrimary }]}>‹</Text>
+                <Pressable
+                    onPress={goBack}
+                    style={st.backBtn}
+                    accessibilityLabel='Go back'
+                    accessibilityRole='button'
+                >
+                    <Text style={[st.backArrow, { color: colors.textPrimary }]}>
+                        ‹
+                    </Text>
                 </Pressable>
                 <Text style={st.title}>TripFit</Text>
             </View>
 
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={st.scroll} keyboardShouldPersistTaps="handled">
-
+            <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={st.scroll}
+                keyboardShouldPersistTaps='handled'
+            >
                 {/* Destination */}
                 <View style={st.inputSection}>
                     <Text style={st.label}>Destination</Text>
                     <TextInput
-                        style={[st.textInput, { color: colors.textPrimary, borderColor: colors.glassBorder, backgroundColor: colors.glassBg }]}
-                        placeholder="e.g. New York, Tokyo, London"
+                        style={[
+                            st.textInput,
+                            {
+                                color: colors.textPrimary,
+                                borderColor: colors.glassBorder,
+                                backgroundColor: colors.glassBg,
+                            },
+                        ]}
+                        placeholder='e.g. New York, Tokyo, London'
                         placeholderTextColor={colors.textMuted}
                         value={destination}
                         onChangeText={setDestination}
-                        returnKeyType="done"
+                        returnKeyType='done'
                         onSubmitEditing={onPlan}
-                        autoCapitalize="words"
+                        autoCapitalize='words'
                         autoCorrect={false}
                     />
                 </View>
@@ -852,13 +1175,22 @@ export default function TripFitScreen() {
                     <TripCalendar
                         startDate={tripStart}
                         endDate={tripEnd}
-                        onRangeChange={(start, end) => { setTripStart(start); setTripEnd(end); }}
+                        onRangeChange={(start, end) => {
+                            setTripStart(start);
+                            setTripEnd(end);
+                        }}
                         maxDays={10}
                         containerWidth={calContainerWidth}
                     />
                     {days > 0 && tripStart && tripEnd && (
-                        <Text style={[st.dateSummary, { color: colors.textSecondary }]}>
-                            {days} day{days !== 1 ? 's' : ''} · {fmtShortDate(tripStart)} – {fmtShortDate(tripEnd)}
+                        <Text
+                            style={[
+                                st.dateSummary,
+                                { color: colors.textSecondary },
+                            ]}
+                        >
+                            {days} day{days !== 1 ? 's' : ''} ·{' '}
+                            {fmtShortDate(tripStart)} – {fmtShortDate(tripEnd)}
                         </Text>
                     )}
                 </View>
@@ -866,36 +1198,74 @@ export default function TripFitScreen() {
                 {/* Occasion */}
                 <View style={st.inputSection}>
                     <Text style={st.label}>Occasion</Text>
-                    <OccasionChips active={selectedOccasion} onChange={setSelectedOccasion} colors={colors} />
+                    <OccasionChips
+                        active={selectedOccasion}
+                        onChange={setSelectedOccasion}
+                        colors={colors}
+                    />
                 </View>
 
                 {/* Plan button */}
                 <Pressable
-                    style={[st.planBtn, { backgroundColor: colors.saveBtnBg }, (loading || days === 0) && st.planBtnDisabled]}
+                    style={[
+                        st.planBtn,
+                        { backgroundColor: colors.saveBtnBg },
+                        (loading || days === 0) && st.planBtnDisabled,
+                    ]}
                     onPress={onPlan}
                     disabled={loading || days === 0}
-                    accessibilityRole="button"
-                    accessibilityLabel="Plan trip"
+                    accessibilityRole='button'
+                    accessibilityLabel='Plan trip'
                 >
-                    {loading
-                        ? <ActivityIndicator color={colors.saveBtnText} />
-                        : <Text style={[st.planBtnText, { color: colors.saveBtnText }]}>Plan my trip ✈️</Text>
-                    }
+                    {loading ? (
+                        <ActivityIndicator color={colors.saveBtnText} />
+                    ) : (
+                        <Text
+                            style={[
+                                st.planBtnText,
+                                { color: colors.saveBtnText },
+                            ]}
+                        >
+                            Plan my trip ✈️
+                        </Text>
+                    )}
                 </Pressable>
 
                 {/* Forecast limited notice */}
                 {forecastLimited && (
-                    <RNView style={{ borderRadius: radius.sm, borderWidth: 1, borderColor: 'rgba(251,191,36,0.4)', overflow: 'hidden' }}>
-                        <GlassCard glassStyle="clear" style={st.warnInner}>
-                            <Text style={[st.warnText, { color: '#fbbf24' }]}>Forecast limited to 5 days on current plan.</Text>
+                    <RNView
+                        style={{
+                            borderRadius: radius.sm,
+                            borderWidth: 1,
+                            borderColor: 'rgba(251,191,36,0.4)',
+                            overflow: 'hidden',
+                        }}
+                    >
+                        <GlassCard
+                            glassStyle='clear'
+                            style={st.warnInner}
+                        >
+                            <Text style={[st.warnText, { color: '#fbbf24' }]}>
+                                Forecast limited to 5 days on current plan.
+                            </Text>
                         </GlassCard>
                     </RNView>
                 )}
 
                 {/* Error */}
                 {error && (
-                    <RNView style={{ borderRadius: radius.sm, borderWidth: 1, borderColor: 'rgba(239,68,68,0.4)', overflow: 'hidden' }}>
-                        <GlassCard glassStyle="clear" style={st.errorInner}>
+                    <RNView
+                        style={{
+                            borderRadius: radius.sm,
+                            borderWidth: 1,
+                            borderColor: 'rgba(239,68,68,0.4)',
+                            overflow: 'hidden',
+                        }}
+                    >
+                        <GlassCard
+                            glassStyle='clear'
+                            style={st.errorInner}
+                        >
                             <Text style={st.errorText}>{error}</Text>
                         </GlassCard>
                     </RNView>
@@ -905,8 +1275,17 @@ export default function TripFitScreen() {
                 {loading && (
                     <>
                         <Text style={st.sectionHeader}>Day-by-Day Outfits</Text>
-                        <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}>
-                            {[0, 1, 2].map(i => <SkeletonCard key={i} cardWidth={cardWidth} />)}
+                        <ScrollView
+                            horizontal
+                            pagingEnabled
+                            showsHorizontalScrollIndicator={false}
+                        >
+                            {[0, 1, 2].map((i) => (
+                                <SkeletonCard
+                                    key={i}
+                                    cardWidth={cardWidth}
+                                />
+                            ))}
                         </ScrollView>
                     </>
                 )}
@@ -914,7 +1293,11 @@ export default function TripFitScreen() {
                 {/* Results */}
                 {!loading && plans.length > 0 && (
                     <>
-                        <HeroBanner plans={plans} destination={destination} colors={colors} />
+                        <HeroBanner
+                            plans={plans}
+                            destination={destination}
+                            colors={colors}
+                        />
 
                         <Text style={st.sectionHeader}>Day-by-Day Outfits</Text>
 
@@ -922,14 +1305,25 @@ export default function TripFitScreen() {
                         <ScrollView
                             ref={pagerRef}
                             horizontal
-                            pagingEnabled
-                            decelerationRate="fast"
+                            snapToInterval={cardWidth}
+                            snapToAlignment='start'
+                            disableIntervalMomentum
+                            decelerationRate='normal'
                             scrollEventThrottle={16}
                             showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={{ paddingVertical: spacing.xs }}
-                            onMomentumScrollEnd={e => {
-                                const page = Math.round(e.nativeEvent.contentOffset.x / cardWidth);
-                                setActiveIdx(Math.max(0, Math.min(page, plans.length - 1)));
+                            contentContainerStyle={{
+                                paddingVertical: spacing.xs,
+                            }}
+                            onMomentumScrollEnd={(e) => {
+                                const page = Math.round(
+                                    e.nativeEvent.contentOffset.x / cardWidth,
+                                );
+                                setActiveIdx(
+                                    Math.max(
+                                        0,
+                                        Math.min(page, plans.length - 1),
+                                    ),
+                                );
                             }}
                         >
                             {plans.map((plan, i) => (
@@ -938,7 +1332,9 @@ export default function TripFitScreen() {
                                     plan={plan}
                                     colors={colors}
                                     cardWidth={cardWidth}
-                                    animValue={animValues[i] ?? new Animated.Value(1)}
+                                    animValue={
+                                        animValues[i] ?? new Animated.Value(1)
+                                    }
                                     isReplanning={replanningIdx === i}
                                     onReplan={() => onReplanDay(i)}
                                 />
@@ -948,17 +1344,32 @@ export default function TripFitScreen() {
                         {/* Dot indicators */}
                         {plans.length > 1 && (
                             <RNView style={st.dotsRow}>
-                                <GlassCard glassStyle="clear" style={st.dotsPill}>
+                                <GlassCard
+                                    glassStyle='clear'
+                                    style={st.dotsPill}
+                                >
                                     {plans.map((_, i) => (
                                         <Pressable
                                             key={i}
                                             hitSlop={8}
                                             onPress={() => {
                                                 setActiveIdx(i);
-                                                pagerRef.current?.scrollTo({ x: i * cardWidth, animated: true });
+                                                pagerRef.current?.scrollTo({
+                                                    x: i * cardWidth,
+                                                    animated: true,
+                                                });
                                             }}
-                                            style={[st.dot, i === activeIdx && st.dotActive, { backgroundColor: i === activeIdx ? colors.textPrimary : colors.glassBorder }]}
-                                            accessibilityRole="button"
+                                            style={[
+                                                st.dot,
+                                                i === activeIdx && st.dotActive,
+                                                {
+                                                    backgroundColor:
+                                                        i === activeIdx
+                                                            ? colors.textPrimary
+                                                            : colors.glassBorder,
+                                                },
+                                            ]}
+                                            accessibilityRole='button'
                                             accessibilityLabel={`Day ${i + 1}`}
                                         />
                                     ))}
@@ -969,24 +1380,45 @@ export default function TripFitScreen() {
                         {/* Packing list header */}
                         <RNView style={st.sectionHeaderRow}>
                             <RNView>
-                                <Text style={st.sectionHeader}>Packing List</Text>
-                                <Text style={[st.sectionSub, { color: colors.textMuted }]}>
-                                    {packingList.length - checkedIds.size} remaining · {packingList.length} total
+                                <Text style={st.sectionHeader}>
+                                    Packing List
+                                </Text>
+                                <Text
+                                    style={[
+                                        st.sectionSub,
+                                        { color: colors.textMuted },
+                                    ]}
+                                >
+                                    {packingList.length - checkedIds.size}{' '}
+                                    remaining · {packingList.length} total
                                 </Text>
                             </RNView>
-                            <GlassCard glassStyle="clear" style={st.shareBtn}>
+                            <GlassCard
+                                glassStyle='clear'
+                                style={st.shareBtn}
+                            >
                                 <Pressable
                                     onPress={handleSharePacking}
                                     style={st.shareBtnInner}
-                                    accessibilityRole="button"
-                                    accessibilityLabel="Share packing list"
+                                    accessibilityRole='button'
+                                    accessibilityLabel='Share packing list'
                                 >
-                                    <Text style={[st.shareBtnText, { color: colors.textSecondary }]}>↑ Share</Text>
+                                    <Text
+                                        style={[
+                                            st.shareBtnText,
+                                            { color: colors.textSecondary },
+                                        ]}
+                                    >
+                                        ↑ Share
+                                    </Text>
                                 </Pressable>
                             </GlassCard>
                         </RNView>
 
-                        <GlassCard glassStyle="regular" style={st.packCard}>
+                        <GlassCard
+                            glassStyle='regular'
+                            style={st.packCard}
+                        >
                             <GroupedPackingList
                                 packingList={packingList}
                                 checkedIds={checkedIds}
@@ -1003,7 +1435,10 @@ export default function TripFitScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-function makeStyles(colors: ReturnType<typeof useTheme>['colors'], _cardWidth: number) {
+function makeStyles(
+    colors: ReturnType<typeof useTheme>['colors'],
+    _cardWidth: number,
+) {
     return StyleSheet.create({
         root: {
             flex: 1,
