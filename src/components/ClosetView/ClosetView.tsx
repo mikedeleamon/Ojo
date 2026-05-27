@@ -1,37 +1,19 @@
 import { useState, useMemo, useCallback } from 'react';
 import {
-    StyleSheet,
     ScrollView,
     TextInput,
     Pressable,
-    Image,
     Alert,
-    Animated,
     useWindowDimensions,
 } from 'react-native';
-import { Swipeable } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
 import { View, Text } from '../primitives';
 import { HangerIcon } from '../shared/HangerIcon';
 import ArticleModal from '../ArticleModal/ArticleModal';
 import { Closet, ClothingArticle, ArticleFormData } from '../../types';
-import {
-    ColorTokens,
-    fonts,
-    fontSizes,
-    fontWeights,
-    spacing,
-    radius,
-} from '../../theme/tokens';
+import { spacing } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
-import {
-    pairHarmony,
-    COLOR_NEUTRALS,
-    SEASONAL_COLORS,
-    currentSeason,
-    garmentWarmth,
-    Season,
-} from '../../lib/outfitEngine';
+import { pairHarmony, COLOR_NEUTRALS } from '../../lib/outfitEngine';
 import { makeStyles } from './ClosetView.styles';
 import { CSS_COLORS } from '../../lib/colors/cssColors';
 import { recentlyWornWithAge } from '../../lib/outfitHistory';
@@ -43,6 +25,8 @@ import {
 } from '../../lib/colors/metallicGradients';
 import { CATEGORIES, COLORS, FABRICS } from '../../lib/colors/palettes';
 import { SwipeableArticleCard, TileArticleCard } from './ArticleCard';
+
+type SortMode = 'default' | 'type' | 'color' | 'wornRecent' | 'wornStale';
 
 interface Props {
     closets: Closet[];
@@ -58,6 +42,7 @@ interface Props {
     ) => Promise<void>;
     onRemoveArticle: (closetId: string, articleId: string) => Promise<void>;
     onSetPreferred: (id: string) => Promise<void>;
+    onTripFit?: () => void;
 }
 
 const ClosetView = ({
@@ -70,23 +55,23 @@ const ClosetView = ({
     onEditArticle,
     onRemoveArticle,
     onSetPreferred,
+    onTripFit,
 }: Props) => {
     const { colors } = useTheme();
     const styles = useMemo(() => makeStyles(colors), [colors]);
     const { width: windowWidth } = useWindowDimensions();
-    const [viewMode, setViewMode] = useState<'list' | 'tile'>('list');
-    // Two columns with outer padding (md each side) and one inter-tile gap (sm)
     const tileWidth = Math.floor(
         (windowWidth - spacing.md * 2 - spacing.sm) / 2,
     );
+
+    const [viewMode, setViewMode] = useState<'list' | 'tile'>('list');
     const [selectedId, setSelectedId] = useState<string>(
         initialSelectedId && closets.find((c) => c._id === initialSelectedId)
             ? initialSelectedId
             : (closets[0]?._id ?? ''),
     );
     const [showModal, setShowModal] = useState(false);
-    const [editingArticle, setEditingArticle] =
-        useState<ClothingArticle | null>(null);
+    const [editingArticle, setEditingArticle] = useState<ClothingArticle | null>(null);
     const [creating, setCreating] = useState(false);
     const [newName, setNewName] = useState('');
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -97,6 +82,8 @@ const ClosetView = ({
     const [activeFabrics, setActiveFabrics] = useState<string[]>([]);
     const [showFilters, setShowFilters] = useState(false);
     const [wornAgeMap, setWornAgeMap] = useState<Map<string, number>>(new Map());
+    const [sortBy, setSortBy] = useState<SortMode>('default');
+    const [showLegend, setShowLegend] = useState(false);
 
     useFocusEffect(
         useCallback(() => {
@@ -105,8 +92,7 @@ const ClosetView = ({
     );
 
     const selected = closets.find((c) => c._id === selectedId) ?? closets[0];
-    const filterCount =
-        activeCategories.length + activeColors.length + activeFabrics.length;
+    const filterCount = activeCategories.length + activeColors.length + activeFabrics.length;
     const hasFilters = filterCount > 0 || !!query.trim();
 
     const clearFilters = () => {
@@ -128,20 +114,15 @@ const ClosetView = ({
                 continue;
             }
             const others = selected.articles.filter(
-                (a) =>
-                    a._id !== art._id &&
-                    a.color &&
-                    !COLOR_NEUTRALS.has(a.color),
+                (a) => a._id !== art._id && a.color && !COLOR_NEUTRALS.has(a.color),
             );
             if (others.length === 0) {
                 map.set(art._id, 1.0);
                 continue;
             }
             const avg =
-                others.reduce(
-                    (sum, o) => sum + pairHarmony(art.color!, o.color!),
-                    0,
-                ) / others.length;
+                others.reduce((sum, o) => sum + pairHarmony(art.color!, o.color!), 0) /
+                others.length;
             map.set(art._id, avg);
         }
         return map;
@@ -163,20 +144,28 @@ const ClosetView = ({
         }
         if (activeCategories.length)
             arts = arts.filter(
-                (a) =>
-                    a.clothingCategory &&
-                    activeCategories.includes(a.clothingCategory),
+                (a) => a.clothingCategory && activeCategories.includes(a.clothingCategory),
             );
         if (activeColors.length)
-            arts = arts.filter(
-                (a) => a.color && activeColors.includes(a.color),
-            );
+            arts = arts.filter((a) => a.color && activeColors.includes(a.color));
         if (activeFabrics.length)
-            arts = arts.filter(
-                (a) => a.fabricType && activeFabrics.includes(a.fabricType),
-            );
+            arts = arts.filter((a) => a.fabricType && activeFabrics.includes(a.fabricType));
         return arts;
     }, [selected, query, activeCategories, activeColors, activeFabrics]);
+
+    const sortedArticles = useMemo(() => {
+        if (sortBy === 'default') return filteredArticles;
+        const arr = [...filteredArticles];
+        if (sortBy === 'type')
+            arr.sort((a, b) => a.clothingType.localeCompare(b.clothingType));
+        else if (sortBy === 'color')
+            arr.sort((a, b) => (a.color ?? '').localeCompare(b.color ?? ''));
+        else if (sortBy === 'wornRecent')
+            arr.sort((a, b) => (wornAgeMap.get(a._id) ?? 999) - (wornAgeMap.get(b._id) ?? 999));
+        else if (sortBy === 'wornStale')
+            arr.sort((a, b) => (wornAgeMap.get(b._id) ?? 999) - (wornAgeMap.get(a._id) ?? 999));
+        return arr;
+    }, [filteredArticles, sortBy, wornAgeMap]);
 
     const submitCreate = async () => {
         if (!newName.trim()) return;
@@ -212,10 +201,7 @@ const ClosetView = ({
                         try {
                             await onDeleteCloset(id);
                             if (selectedId === id)
-                                setSelectedId(
-                                    closets.find((c) => c._id !== id)?._id ??
-                                        '',
-                                );
+                                setSelectedId(closets.find((c) => c._id !== id)?._id ?? '');
                         } catch {
                             Alert.alert('Error', 'Failed to delete closet.');
                         }
@@ -223,6 +209,41 @@ const ClosetView = ({
                 },
             ],
         );
+    };
+
+    const openTabMenu = (c: Closet) => {
+        Alert.alert(c.name, undefined, [
+            {
+                text: c.isPreferred ? '★  Remove preferred' : '☆  Set as preferred',
+                onPress: () => onSetPreferred(c._id),
+            },
+            {
+                text: 'Rename',
+                onPress: () => {
+                    setSelectedId(c._id);
+                    setEditingId(c._id);
+                    setEditName(c.name);
+                },
+            },
+            {
+                text: 'Delete closet',
+                style: 'destructive',
+                onPress: () => handleDelete(c._id),
+            },
+            { text: 'Cancel', style: 'cancel' },
+        ]);
+    };
+
+    const openSortMenu = () => {
+        const tick = (mode: SortMode) => (sortBy === mode ? '✓  ' : '    ');
+        Alert.alert('Sort articles', undefined, [
+            { text: `${tick('default')}Default order`, onPress: () => setSortBy('default') },
+            { text: `${tick('type')}By type`, onPress: () => setSortBy('type') },
+            { text: `${tick('color')}By color`, onPress: () => setSortBy('color') },
+            { text: `${tick('wornRecent')}Recently worn first`, onPress: () => setSortBy('wornRecent') },
+            { text: `${tick('wornStale')}Least worn first`, onPress: () => setSortBy('wornStale') },
+            { text: 'Cancel', style: 'cancel' },
+        ]);
     };
 
     const Chip = ({
@@ -238,10 +259,7 @@ const ClosetView = ({
     }) => {
         const gradient = METALLIC_GRADIENTS[label];
         return (
-            <Pressable
-                style={[styles.chip, active && styles.chipActive]}
-                onPress={onPress}
-            >
+            <Pressable style={[styles.chip, active && styles.chipActive]} onPress={onPress}>
                 {gradient ? (
                     <LinearGradient
                         colors={gradient}
@@ -250,22 +268,16 @@ const ClosetView = ({
                         style={styles.chipColor}
                     />
                 ) : color ? (
-                    <View
-                        style={[styles.chipColor, { backgroundColor: color }]}
-                    />
+                    <View style={[styles.chipColor, { backgroundColor: color }]} />
                 ) : null}
-                <Text
-                    style={[styles.chipText, active && styles.chipTextActive]}
-                >
-                    {label}
-                </Text>
+                <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
             </Pressable>
         );
     };
 
     return (
         <View style={styles.root}>
-            {/* ── Closet selector (horizontal scroll) ── */}
+            {/* ── Closet tab bar ── */}
             <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -283,6 +295,9 @@ const ClosetView = ({
                             setEditingId(null);
                             clearFilters();
                         }}
+                        onLongPress={() => openTabMenu(c)}
+                        delayLongPress={400}
+                        accessibilityLabel={`${c.name} closet, ${c.articles.length} items. Hold for options.`}
                     >
                         <HangerIcon
                             size={12}
@@ -295,21 +310,16 @@ const ClosetView = ({
                         <Text
                             style={[
                                 styles.closetTabText,
-                                selectedId === c._id &&
-                                    styles.closetTabTextActive,
+                                selectedId === c._id && styles.closetTabTextActive,
                             ]}
                         >
                             {c.name}
                         </Text>
-                        {c.isPreferred && (
-                            <Text style={styles.starBadge}>★</Text>
-                        )}
+                        {c.isPreferred && <Text style={styles.starBadge}>★</Text>}
                         <Text
                             style={[
-                                styles.closetCount,
-                                selectedId === c._id && {
-                                    color: colors.saveBtnText,
-                                },
+                                styles.countBadge,
+                                selectedId === c._id && styles.countBadgeActive,
                             ]}
                         >
                             {c.articles.length}
@@ -319,92 +329,48 @@ const ClosetView = ({
                 <Pressable
                     style={styles.newClosetBtn}
                     onPress={() => setCreating(true)}
+                    accessibilityLabel='New closet'
+                    accessibilityRole='button'
                 >
                     <Text style={styles.newClosetBtnText}>+</Text>
                 </Pressable>
             </ScrollView>
 
-            {/* ── Closet actions ── */}
-            {selected && (
-                <View style={styles.closetActions}>
-                    {editingId === selected._id ? (
-                        <View style={styles.inlineForm}>
-                            <TextInput
-                                style={styles.inlineInput}
-                                value={editName}
-                                autoFocus
-                                onChangeText={setEditName}
-                                placeholder='New name…'
-                                placeholderTextColor={colors.textMuted}
-                                onSubmitEditing={() =>
-                                    submitRename(selected._id)
-                                }
-                                accessibilityLabel="New closet name"
-                            />
-                            <Pressable
-                                style={styles.inlineOk}
-                                onPress={() => submitRename(selected._id)}
-                                accessibilityRole="button"
-                                accessibilityLabel="Confirm rename"
-                            >
-                                <Text style={styles.inlineOkText}>✓</Text>
-                            </Pressable>
-                            <Pressable
-                                style={styles.inlineCancel}
-                                onPress={() => setEditingId(null)}
-                                accessibilityRole="button"
-                                accessibilityLabel="Cancel rename"
-                            >
-                                <Text style={styles.inlineCancelText}>✕</Text>
-                            </Pressable>
-                        </View>
-                    ) : (
-                        <View style={styles.actionRow}>
-                            <Pressable
-                                style={styles.actionBtn}
-                                onPress={() => onSetPreferred(selected._id)}
-                            >
-                                <Text
-                                    style={[
-                                        styles.actionBtnText,
-                                        selected.isPreferred && {
-                                            color: '#fbbf24',
-                                        },
-                                    ]}
-                                >
-                                    {selected.isPreferred
-                                        ? '★ Preferred'
-                                        : '☆ Set preferred'}
-                                </Text>
-                            </Pressable>
-                            <Pressable
-                                style={styles.actionBtn}
-                                onPress={() => {
-                                    setEditingId(selected._id);
-                                    setEditName(selected.name);
-                                }}
-                            >
-                                <Text style={styles.actionBtnText}>Rename</Text>
-                            </Pressable>
-                            <Pressable
-                                style={[
-                                    styles.actionBtn,
-                                    styles.actionBtnDanger,
-                                ]}
-                                onPress={() => handleDelete(selected._id)}
-                            >
-                                <Text style={styles.actionBtnDangerText}>
-                                    Delete
-                                </Text>
-                            </Pressable>
-                        </View>
-                    )}
+            {/* ── Rename inline form ── */}
+            {selected && editingId === selected._id && (
+                <View style={[styles.inlineForm, { marginHorizontal: spacing.md, marginBottom: spacing.sm }]}>
+                    <TextInput
+                        style={styles.inlineInput}
+                        value={editName}
+                        autoFocus
+                        onChangeText={setEditName}
+                        placeholder='New name…'
+                        placeholderTextColor={colors.textMuted}
+                        onSubmitEditing={() => submitRename(selected._id)}
+                        accessibilityLabel="New closet name"
+                    />
+                    <Pressable
+                        style={styles.inlineOk}
+                        onPress={() => submitRename(selected._id)}
+                        accessibilityRole="button"
+                        accessibilityLabel="Confirm rename"
+                    >
+                        <Text style={styles.inlineOkText}>✓</Text>
+                    </Pressable>
+                    <Pressable
+                        style={styles.inlineCancel}
+                        onPress={() => setEditingId(null)}
+                        accessibilityRole="button"
+                        accessibilityLabel="Cancel rename"
+                    >
+                        <Text style={styles.inlineCancelText}>✕</Text>
+                    </Pressable>
                 </View>
             )}
 
             {/* ── Create closet form ── */}
             {creating && (
-                <View style={[styles.inlineForm, { margin: spacing.md }]}>
+                <View style={[styles.inlineForm, { marginHorizontal: spacing.md, marginBottom: spacing.sm }]}>
                     <TextInput
                         style={styles.inlineInput}
                         value={newName}
@@ -425,10 +391,7 @@ const ClosetView = ({
                     </Pressable>
                     <Pressable
                         style={styles.inlineCancel}
-                        onPress={() => {
-                            setCreating(false);
-                            setNewName('');
-                        }}
+                        onPress={() => { setCreating(false); setNewName(''); }}
                         accessibilityRole="button"
                         accessibilityLabel="Cancel"
                     >
@@ -437,58 +400,110 @@ const ClosetView = ({
                 </View>
             )}
 
-            {/* ── Main panel ── */}
+            {/* ── Content header: title + controls ── */}
             <View style={styles.mainHead}>
-                <Text style={styles.mainTitle}>{selected?.name}</Text>
-                <View style={styles.viewToggleWrap}>
+                <Text style={styles.mainTitle} numberOfLines={1}>
+                    {selected?.name ?? ''}
+                </Text>
+                {selected?.isPreferred && <Text style={styles.starBadge}>★</Text>}
+                <View style={styles.headerRight}>
                     <Pressable
-                        style={[
-                            styles.viewToggleBtn,
-                            viewMode === 'list' && styles.viewToggleBtnActive,
-                        ]}
-                        onPress={() => setViewMode('list')}
-                        accessibilityLabel='List view'
+                        style={styles.legendInfoBtn}
+                        onPress={() => setShowLegend((v) => !v)}
+                        accessibilityLabel='Legend'
                         accessibilityRole='button'
                     >
-                        <Text
-                            style={[
-                                styles.viewToggleIcon,
-                                viewMode === 'list' && styles.viewToggleIconActive,
-                            ]}
-                        >
-                            ≡
-                        </Text>
+                        <Text style={styles.legendInfoBtnText}>ⓘ</Text>
                     </Pressable>
-                    <Pressable
-                        style={[
-                            styles.viewToggleBtn,
-                            viewMode === 'tile' && styles.viewToggleBtnActive,
-                        ]}
-                        onPress={() => setViewMode('tile')}
-                        accessibilityLabel='Tile view'
-                        accessibilityRole='button'
-                    >
-                        <Text
-                            style={[
-                                styles.viewToggleIcon,
-                                viewMode === 'tile' && styles.viewToggleIconActive,
-                            ]}
+                    {selected && (
+                        <Pressable
+                            style={styles.overflowBtn}
+                            onPress={() => openTabMenu(selected)}
+                            accessibilityLabel='Closet options'
+                            accessibilityRole='button'
                         >
-                            ⊞
-                        </Text>
-                    </Pressable>
+                            <Text style={styles.overflowBtnText}>···</Text>
+                        </Pressable>
+                    )}
+                    <View style={styles.viewToggleWrap}>
+                        <Pressable
+                            style={[
+                                styles.viewToggleBtn,
+                                viewMode === 'list' && styles.viewToggleBtnActive,
+                            ]}
+                            onPress={() => setViewMode('list')}
+                            accessibilityLabel='List view'
+                            accessibilityRole='button'
+                        >
+                            <Text
+                                style={[
+                                    styles.viewToggleIcon,
+                                    viewMode === 'list' && styles.viewToggleIconActive,
+                                ]}
+                            >
+                                ☰
+                            </Text>
+                        </Pressable>
+                        <Pressable
+                            style={[
+                                styles.viewToggleBtn,
+                                viewMode === 'tile' && styles.viewToggleBtnActive,
+                            ]}
+                            onPress={() => setViewMode('tile')}
+                            accessibilityLabel='Tile view'
+                            accessibilityRole='button'
+                        >
+                            <Text
+                                style={[
+                                    styles.viewToggleIcon,
+                                    viewMode === 'tile' && styles.viewToggleIconActive,
+                                ]}
+                            >
+                                ⊞
+                            </Text>
+                        </Pressable>
+                    </View>
                 </View>
-                <Pressable
-                    style={styles.addBtn}
-                    onPress={() => setShowModal(true)}
-                >
-                    <Text style={styles.addBtnText}>+ Add article</Text>
-                </Pressable>
             </View>
 
-            {/* ── Search + filter ── */}
+            {/* ── Legend tooltip ── */}
+            {showLegend && (
+                <View style={styles.legendTooltip}>
+                    <View style={styles.legendTooltipRow}>
+                        <View style={styles.legendItem}>
+                            <View style={[styles.legendDot, { backgroundColor: '#38bdf8' }]} />
+                            <View style={[styles.legendDot, { backgroundColor: '#fbbf24' }]} />
+                            <View style={[styles.legendDot, { backgroundColor: '#f97316' }]} />
+                            <Text style={styles.legendLabel}>warmth level</Text>
+                        </View>
+                        <View style={styles.legendItem}>
+                            <Text style={styles.legendSeason}>◆</Text>
+                            <Text style={styles.legendLabel}>in season</Text>
+                        </View>
+                        <View style={styles.legendItem}>
+                            <Text style={styles.legendClash}>~</Text>
+                            <Text style={styles.legendLabel}>may clash</Text>
+                        </View>
+                        <View style={styles.legendItem}>
+                            <View
+                                style={{ width: 3, height: 14, borderRadius: 2, backgroundColor: '#fbbf24' }}
+                            />
+                            <Text style={styles.legendLabel}>recently worn</Text>
+                        </View>
+                        <View style={styles.legendItem}>
+                            <View
+                                style={{ width: 3, height: 14, borderRadius: 2, backgroundColor: 'rgba(99,102,241,0.7)' }}
+                            />
+                            <Text style={styles.legendLabel}>unworn / stale</Text>
+                        </View>
+                    </View>
+                </View>
+            )}
+
+            {/* ── Search + sort + filter row ── */}
             <View style={styles.searchBar}>
                 <View style={styles.searchInputWrap}>
+                    <Text style={styles.searchIcon}>🔍</Text>
                     <TextInput
                         style={styles.searchInput}
                         placeholder='Search articles…'
@@ -504,11 +519,20 @@ const ClosetView = ({
                     ) : null}
                 </View>
                 <Pressable
-                    style={[
-                        styles.filterBtn,
-                        showFilters && styles.filterBtnActive,
-                    ]}
+                    style={[styles.sortBtn, sortBy !== 'default' && styles.sortBtnActive]}
+                    onPress={openSortMenu}
+                    accessibilityLabel='Sort articles'
+                    accessibilityRole='button'
+                >
+                    <Text style={[styles.sortBtnText, sortBy !== 'default' && styles.sortBtnTextActive]}>
+                        ↕
+                    </Text>
+                </Pressable>
+                <Pressable
+                    style={[styles.filterBtn, showFilters && styles.filterBtnActive]}
                     onPress={() => setShowFilters((v) => !v)}
+                    accessibilityLabel={filterCount > 0 ? `Filters, ${filterCount} active` : 'Filters'}
+                    accessibilityRole='button'
                 >
                     <Text style={styles.filterBtnText}>
                         Filters{filterCount > 0 ? ` (${filterCount})` : ''}
@@ -528,13 +552,7 @@ const ClosetView = ({
                                 key={c}
                                 label={c}
                                 active={activeCategories.includes(c)}
-                                onPress={() =>
-                                    toggle(
-                                        activeCategories,
-                                        setActiveCategories,
-                                        c,
-                                    )
-                                }
+                                onPress={() => toggle(activeCategories, setActiveCategories, c)}
                             />
                         ))}
                     </View>
@@ -546,9 +564,7 @@ const ClosetView = ({
                                 label={c}
                                 active={activeColors.includes(c)}
                                 color={CSS_COLORS[c]}
-                                onPress={() =>
-                                    toggle(activeColors, setActiveColors, c)
-                                }
+                                onPress={() => toggle(activeColors, setActiveColors, c)}
                             />
                         ))}
                     </View>
@@ -559,55 +575,16 @@ const ClosetView = ({
                                 key={f}
                                 label={f}
                                 active={activeFabrics.includes(f)}
-                                onPress={() =>
-                                    toggle(activeFabrics, setActiveFabrics, f)
-                                }
+                                onPress={() => toggle(activeFabrics, setActiveFabrics, f)}
                             />
                         ))}
                     </View>
                     {hasFilters && (
                         <Pressable onPress={clearFilters}>
-                            <Text style={styles.clearFiltersText}>
-                                Clear all filters
-                            </Text>
+                            <Text style={styles.clearFiltersText}>Clear all filters</Text>
                         </Pressable>
                     )}
                 </ScrollView>
-            )}
-
-            {/* ── Indicator legend ── */}
-            {selected && selected.articles.length > 0 && (
-                <View style={styles.legend}>
-                    <View style={styles.legendItem}>
-                        <View
-                            style={[
-                                styles.legendDot,
-                                { backgroundColor: '#38bdf8' },
-                            ]}
-                        />
-                        <View
-                            style={[
-                                styles.legendDot,
-                                { backgroundColor: '#fbbf24' },
-                            ]}
-                        />
-                        <View
-                            style={[
-                                styles.legendDot,
-                                { backgroundColor: '#f97316' },
-                            ]}
-                        />
-                        <Text style={styles.legendLabel}>warmth</Text>
-                    </View>
-                    <View style={styles.legendItem}>
-                        <Text style={styles.legendSeason}>◆</Text>
-                        <Text style={styles.legendLabel}>in season</Text>
-                    </View>
-                    <View style={styles.legendItem}>
-                        <Text style={styles.legendClash}>~</Text>
-                        <Text style={styles.legendLabel}>may clash</Text>
-                    </View>
-                </View>
             )}
 
             {/* ── Article list / tile grid ── */}
@@ -624,22 +601,18 @@ const ClosetView = ({
                             style={styles.addBtn}
                             onPress={() => setShowModal(true)}
                         >
-                            <Text style={styles.addBtnText}>
-                                Add your first piece
-                            </Text>
+                            <Text style={styles.addBtnText}>Add your first piece</Text>
                         </Pressable>
                     </View>
-                ) : filteredArticles.length === 0 ? (
+                ) : sortedArticles.length === 0 ? (
                     <View style={styles.emptyState}>
                         <Text style={styles.emptyTitle}>No matches</Text>
                         <Pressable onPress={clearFilters}>
-                            <Text style={styles.clearFiltersText}>
-                                Clear filters
-                            </Text>
+                            <Text style={styles.clearFiltersText}>Clear filters</Text>
                         </Pressable>
                     </View>
                 ) : viewMode === 'tile' ? (
-                    filteredArticles.map((a) => (
+                    sortedArticles.map((a) => (
                         <TileArticleCard
                             key={a._id}
                             article={a}
@@ -647,25 +620,53 @@ const ClosetView = ({
                             wornAge={wornAgeMap.get(a._id)}
                             tileWidth={tileWidth}
                             onEdit={() => setEditingArticle(a)}
-                            onRemove={() =>
-                                onRemoveArticle(selected._id, a._id)
-                            }
+                            onRemove={() => onRemoveArticle(selected._id, a._id)}
                         />
                     ))
                 ) : (
-                    filteredArticles.map((a) => (
+                    sortedArticles.map((a) => (
                         <SwipeableArticleCard
                             key={a._id}
                             article={a}
                             harmonyScore={harmonyMap.get(a._id)}
+                            wornAge={wornAgeMap.get(a._id)}
                             onEdit={() => setEditingArticle(a)}
-                            onRemove={() =>
-                                onRemoveArticle(selected._id, a._id)
-                            }
+                            onRemove={() => onRemoveArticle(selected._id, a._id)}
                         />
                     ))
                 )}
+
+                {/* TripFit discovery banner */}
+                {onTripFit && selected && selected.articles.length > 0 && (
+                    <Pressable
+                        style={styles.tripBanner}
+                        onPress={onTripFit}
+                        accessibilityRole='button'
+                        accessibilityLabel='Open TripFit packing planner'
+                    >
+                        <Text style={styles.tripBannerIcon}>✈️</Text>
+                        <View style={styles.tripBannerInfo}>
+                            <Text style={styles.tripBannerTitle}>TripFit</Text>
+                            <Text style={styles.tripBannerDesc}>
+                                Pack smarter for your next trip
+                            </Text>
+                        </View>
+                        <Text style={styles.tripBannerChevron}>›</Text>
+                    </Pressable>
+                )}
             </ScrollView>
+
+            {/* ── Floating action button ── */}
+            {selected && !showModal && !editingArticle && (
+                <Pressable
+                    style={styles.fab}
+                    onPress={() => setShowModal(true)}
+                    accessibilityLabel='Add article'
+                    accessibilityRole='button'
+                >
+                    <Text style={styles.fabText}>+</Text>
+                </Pressable>
+            )}
 
             {showModal && (
                 <ArticleModal
@@ -687,11 +688,7 @@ const ClosetView = ({
                         setEditingArticle(null);
                     }}
                     onSubmit={async (data) => {
-                        await onEditArticle(
-                            selected._id,
-                            editingArticle._id,
-                            data,
-                        );
+                        await onEditArticle(selected._id, editingArticle._id, data);
                         setEditingArticle(null);
                     }}
                 />
@@ -701,4 +698,3 @@ const ClosetView = ({
 };
 
 export default ClosetView;
-

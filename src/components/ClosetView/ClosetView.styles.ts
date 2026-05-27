@@ -10,6 +10,8 @@ import {
 
 export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.bgDefault },
+
+    // ── Closet tab bar ─────────────────────────────────────────────────────────
     closetBar: {
         flexDirection: 'row',
         gap: 8,
@@ -42,10 +44,20 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         fontWeight: fontWeights.semibold,
     },
     starBadge: { color: '#fbbf24', fontSize: 10 },
-    closetCount: {
+    countBadge: {
         fontFamily: fonts.body,
         fontSize: 10,
         color: colors.textMuted,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        borderRadius: radius.pill,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        overflow: 'hidden',
+    },
+    countBadgeActive: {
+        color: colors.saveBtnText,
+        backgroundColor: 'rgba(0,0,0,0.18)',
+        opacity: 0.85,
     },
     newClosetBtn: {
         width: 36,
@@ -62,26 +74,8 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         fontSize: 20,
         lineHeight: 22,
     },
-    closetActions: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm },
-    actionRow: { flexDirection: 'row', gap: 8 },
-    actionBtn: {
-        paddingVertical: 5,
-        paddingHorizontal: 12,
-        borderRadius: radius.pill,
-        borderWidth: 1,
-        borderColor: colors.glassBorder,
-    },
-    actionBtnText: {
-        fontFamily: fonts.body,
-        fontSize: fontSizes.xs,
-        color: colors.textSecondary,
-    },
-    actionBtnDanger: { borderColor: colors.dangerBorder },
-    actionBtnDangerText: {
-        fontFamily: fonts.body,
-        fontSize: fontSizes.xs,
-        color: colors.dangerText,
-    },
+
+    // ── Inline forms (rename / create) ─────────────────────────────────────────
     inlineForm: { flexDirection: 'row', gap: 8, alignItems: 'center' },
     inlineInput: {
         flex: 1,
@@ -113,33 +107,110 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         fontSize: fontSizes.sm,
         color: colors.textMuted,
     },
+
+    // ── Content header row (title + controls) ──────────────────────────────────
     mainHead: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
         paddingHorizontal: spacing.md,
-        paddingVertical: spacing.sm,
+        paddingTop: 4,
+        paddingBottom: spacing.sm,
+        gap: 6,
     },
     mainTitle: {
         fontFamily: fonts.display,
-        fontSize: 28,
+        fontSize: 26,
         color: colors.textPrimary,
+        flex: 1,
     },
-    addBtn: {
-        paddingVertical: 8,
-        paddingHorizontal: 14,
-        backgroundColor: colors.saveBtnBg,
+    headerRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    legendInfoBtn: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        backgroundColor: colors.glassBg,
+        borderWidth: 1,
+        borderColor: colors.glassBorder,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    legendInfoBtnText: {
+        fontSize: 14,
+        color: colors.textSecondary,
+    },
+    overflowBtn: {
+        width: 30,
+        height: 30,
         borderRadius: radius.sm,
+        backgroundColor: colors.glassBg,
+        borderWidth: 1,
+        borderColor: colors.glassBorder,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
-    addBtnText: {
-        fontFamily: fonts.body,
-        fontSize: fontSizes.sm,
-        fontWeight: fontWeights.semibold,
+    overflowBtnText: {
+        fontSize: 13,
+        color: colors.textSecondary,
+        letterSpacing: 1.5,
+        lineHeight: 16,
+    },
+    viewToggleWrap: { flexDirection: 'row', gap: 3 },
+    viewToggleBtn: {
+        width: 30,
+        height: 30,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: radius.sm,
+        borderWidth: 1,
+        borderColor: colors.glassBorder,
+        backgroundColor: colors.glassBg,
+    },
+    viewToggleBtnActive: {
+        backgroundColor: colors.saveBtnBg,
+        borderColor: colors.saveBtnBg,
+    },
+    viewToggleIcon: {
+        fontSize: 14,
+        color: colors.textSecondary,
+    },
+    viewToggleIconActive: {
         color: colors.saveBtnText,
     },
+
+    // ── Legend tooltip ─────────────────────────────────────────────────────────
+    legendTooltip: {
+        marginHorizontal: spacing.md,
+        marginBottom: spacing.sm,
+        padding: 10,
+        backgroundColor: colors.glassBgStrong,
+        borderRadius: radius.sm,
+        borderWidth: 1,
+        borderColor: colors.glassBorder,
+    },
+    legendTooltipRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 12,
+        alignItems: 'center',
+    },
+    legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    legendDot: { width: 6, height: 6, borderRadius: 3 },
+    legendLabel: {
+        fontFamily: fonts.body,
+        fontSize: 11,
+        color: colors.textSecondary,
+    },
+    legendSeason: { fontSize: 9, color: '#34d399' },
+    legendClash: { fontFamily: fonts.body, fontSize: 12, color: '#f59e0b' },
+
+    // ── Search + sort + filter row ──────────────────────────────────────────────
     searchBar: {
         flexDirection: 'row',
-        gap: 8,
+        gap: 6,
         paddingHorizontal: spacing.md,
         paddingBottom: spacing.sm,
     },
@@ -151,7 +222,12 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         borderWidth: 1,
         borderColor: colors.glassBorder,
         borderRadius: radius.sm,
-        paddingHorizontal: 12,
+        paddingHorizontal: 10,
+        gap: 6,
+    },
+    searchIcon: {
+        fontSize: 15,
+        color: colors.textMuted,
     },
     searchInput: {
         flex: 1,
@@ -160,16 +236,38 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         color: colors.textPrimary,
         paddingVertical: 10,
     },
-    clearSearch: { color: colors.textMuted, paddingLeft: 8, fontSize: 13 },
-    filterBtn: {
-        paddingVertical: 10,
-        paddingHorizontal: 14,
+    clearSearch: { color: colors.textMuted, fontSize: 13 },
+    sortBtn: {
+        width: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
         backgroundColor: colors.glassBg,
         borderWidth: 1,
         borderColor: colors.glassBorder,
         borderRadius: radius.sm,
     },
-    filterBtnActive: { borderColor: colors.textSecondary },
+    sortBtnActive: {
+        borderColor: colors.textSecondary,
+        backgroundColor: colors.glassBgStrong,
+    },
+    sortBtnText: {
+        fontSize: 16,
+        color: colors.textSecondary,
+    },
+    sortBtnTextActive: {
+        color: colors.textPrimary,
+    },
+    filterBtn: {
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        backgroundColor: colors.glassBg,
+        borderWidth: 1,
+        borderColor: colors.glassBorder,
+        borderRadius: radius.sm,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    filterBtnActive: { borderColor: colors.textSecondary, backgroundColor: colors.glassBgStrong },
     filterBtnText: {
         fontFamily: fonts.body,
         fontSize: fontSizes.xs,
@@ -216,49 +314,12 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         color: colors.textSecondary,
         textDecorationLine: 'underline',
     },
-    legend: {
-        flexDirection: 'row',
-        gap: 14,
-        paddingHorizontal: spacing.md,
-        paddingBottom: spacing.sm,
-        alignItems: 'center',
-    },
-    legendItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 3,
-    },
-    legendDot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-    },
-    legendLabel: {
-        fontFamily: fonts.body,
-        fontSize: 10,
-        color: colors.textMuted,
-        marginLeft: 2,
-    },
-    legendSeason: {
-        fontSize: 8,
-        color: '#34d399',
-    },
-    legendClash: {
-        fontFamily: fonts.body,
-        fontSize: 11,
-        color: '#f59e0b',
-    },
-    legendOOS: {
-        width: 10,
-        height: 10,
-        borderRadius: 2,
-        backgroundColor: colors.glassBorder,
-        opacity: 0.5,
-    },
+
+    // ── Article list ───────────────────────────────────────────────────────────
     articleList: {
         padding: spacing.md,
         gap: spacing.sm,
-        paddingBottom: spacing.xl,
+        paddingBottom: 96,
     },
     articleCard: {
         flexDirection: 'row',
@@ -269,18 +330,39 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         borderWidth: 1,
         borderColor: colors.glassBorder,
         padding: 10,
+        overflow: 'hidden',
     },
     articleCardOOS: { opacity: 0.42 },
+    wornAgeBorderRecent: {
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        bottom: 0,
+        width: 3,
+        backgroundColor: '#fbbf24',
+        borderTopLeftRadius: radius.sm,
+        borderBottomLeftRadius: radius.sm,
+    },
+    wornAgeBorderStale: {
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        bottom: 0,
+        width: 3,
+        backgroundColor: 'rgba(99,102,241,0.6)',
+        borderTopLeftRadius: radius.sm,
+        borderBottomLeftRadius: radius.sm,
+    },
     articleImg: {
-        width: 48,
-        height: 48,
-        borderRadius: 8,
+        width: 52,
+        height: 52,
+        borderRadius: 10,
         backgroundColor: colors.glassBg,
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'hidden',
     },
-    articleImgFill: { width: 48, height: 48 },
+    articleImgFill: { width: 52, height: 52 },
     warmthDot: {
         position: 'absolute',
         bottom: 3,
@@ -300,18 +382,13 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         fontWeight: fontWeights.medium,
         flexShrink: 1,
     },
-    seasonBadge: {
-        fontSize: 8,
-        color: '#34d399',
-    },
+    seasonBadge: { fontSize: 8, color: '#34d399' },
     articleMeta: {
         fontFamily: fonts.body,
         fontSize: fontSizes.xs,
         color: colors.textMuted,
     },
-    articleMetaClash: {
-        color: '#f59e0b',
-    },
+    articleMetaClash: { color: '#f59e0b' },
     categoryTag: {
         fontFamily: fonts.body,
         fontSize: 10,
@@ -329,43 +406,31 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(0,0,0,0.2)',
     },
+
+    // ── Empty states ───────────────────────────────────────────────────────────
     emptyState: {
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
         gap: spacing.sm,
         padding: spacing.xl,
+        paddingTop: spacing.lg,
     },
     emptyTitle: {
         fontFamily: fonts.body,
         fontSize: fontSizes.base,
         color: colors.textSecondary,
     },
-
-    // ── View toggle ────────────────────────────────────────────────────────────
-    viewToggleWrap: {
-        flexDirection: 'row',
-        gap: 4,
-    },
-    viewToggleBtn: {
-        width: 34,
-        height: 34,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: radius.sm,
-        borderWidth: 1,
-        borderColor: colors.glassBorder,
-        backgroundColor: colors.glassBg,
-    },
-    viewToggleBtnActive: {
+    addBtn: {
+        paddingVertical: 8,
+        paddingHorizontal: 14,
         backgroundColor: colors.saveBtnBg,
-        borderColor: colors.saveBtnBg,
+        borderRadius: radius.sm,
     },
-    viewToggleIcon: {
-        fontSize: 15,
-        color: colors.textSecondary,
-    },
-    viewToggleIconActive: {
+    addBtnText: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.sm,
+        fontWeight: fontWeights.semibold,
         color: colors.saveBtnText,
     },
 
@@ -375,7 +440,7 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         flexWrap: 'wrap',
         padding: spacing.md,
         gap: spacing.sm,
-        paddingBottom: spacing.xl,
+        paddingBottom: 96,
     },
     tileCard: {
         borderRadius: radius.md,
@@ -403,15 +468,8 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(0,0,0,0.25)',
     },
-    tileInfo: {
-        padding: 8,
-        gap: 3,
-    },
-    tileNameRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-    },
+    tileInfo: { padding: 8, gap: 3 },
+    tileNameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     tileName: {
         fontFamily: fonts.body,
         fontSize: fontSizes.xs,
@@ -424,9 +482,7 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         fontSize: 10,
         color: colors.textMuted,
     },
-    tileMetaClash: {
-        color: '#f59e0b',
-    },
+    tileMetaClash: { color: '#f59e0b' },
     tileColorDot: {
         width: 10,
         height: 10,
@@ -434,5 +490,60 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(0,0,0,0.2)',
         marginTop: 2,
+    },
+
+    // ── TripFit discovery banner ────────────────────────────────────────────────
+    tripBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        marginTop: spacing.md,
+        padding: 14,
+        backgroundColor: colors.glassBg,
+        borderRadius: radius.md,
+        borderWidth: 1,
+        borderColor: colors.glassBorder,
+        // Span full width in both list (column) and tile (row-wrap) layouts
+        width: '100%',
+    },
+    tripBannerIcon: { fontSize: 22 },
+    tripBannerInfo: { flex: 1, gap: 2 },
+    tripBannerTitle: {
+        fontFamily: fonts.bodySemiBold,
+        fontSize: fontSizes.sm,
+        color: colors.textPrimary,
+    },
+    tripBannerDesc: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs,
+        color: colors.textMuted,
+    },
+    tripBannerChevron: {
+        fontSize: 20,
+        color: colors.textMuted,
+    },
+
+    // ── Floating action button ──────────────────────────────────────────────────
+    fab: {
+        position: 'absolute',
+        bottom: 28,
+        right: spacing.md,
+        width: 52,
+        height: 52,
+        borderRadius: 26,
+        backgroundColor: colors.saveBtnBg,
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 8,
+    },
+    fabText: {
+        fontSize: 28,
+        color: colors.saveBtnText,
+        lineHeight: 32,
+        marginTop: -1,
     },
 });

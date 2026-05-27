@@ -27,6 +27,7 @@ const WARMTH_DOT_COLOR = (w: number) =>
 interface ArticleCardProps {
     article: ClothingArticle;
     harmonyScore?: number;
+    wornAge?: number;
     outOfSeason?: boolean;
     onEdit: () => void;
     onRemove: () => void;
@@ -35,6 +36,7 @@ interface ArticleCardProps {
 export const ArticleCard = ({
     article,
     harmonyScore,
+    wornAge,
     outOfSeason,
     onEdit,
 }: ArticleCardProps) => {
@@ -53,6 +55,9 @@ export const ArticleCard = ({
     const [erroredUrl, setErroredUrl] = useState<string | null>(null);
     const imgError = !!article.imageUrl && erroredUrl === article.imageUrl;
 
+    const showRecentBorder = wornAge !== undefined && wornAge <= 3;
+    const showStaleBorder = wornAge === undefined || wornAge > 14;
+
     return (
         <Pressable
             style={[styles.articleCard, outOfSeason && styles.articleCardOOS]}
@@ -60,6 +65,8 @@ export const ArticleCard = ({
             accessibilityLabel='Edit article'
             accessibilityRole='button'
         >
+            {showRecentBorder && <View style={styles.wornAgeBorderRecent} />}
+            {!showRecentBorder && showStaleBorder && <View style={styles.wornAgeBorderStale} />}
             <View style={styles.articleImg}>
                 {article.imageUrl && !imgError ? (
                     <Image

@@ -1,12 +1,12 @@
 import { useMemo } from 'react';
-import { StyleSheet, Pressable } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { View, Text } from '../../components/primitives';
 import ClosetView from '../../components/ClosetView/ClosetView';
 import Loading from '../../components/Loading/Loading';
 import { useClosets } from '../../hooks/useClosets';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
-import { fonts, fontSizes, fontWeights, spacing, radius } from '../../theme/tokens';
+import { fonts, fontSizes, spacing, radius } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 
 export default function ClosetPage() {
@@ -19,9 +19,6 @@ export default function ClosetPage() {
     emptyState:  { alignItems: 'center', padding: spacing.xl, gap: spacing.sm },
     emptyTitle:  { fontFamily: fonts.body, fontSize: fontSizes.lg, color: colors.textPrimary },
     emptyDesc:   { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.textSecondary, textAlign: 'center' },
-    tripRow:     { paddingHorizontal: spacing.md, paddingBottom: spacing.sm },
-    tripBtn:     { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingVertical: 10, paddingHorizontal: spacing.sm, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.glassBorder, backgroundColor: colors.glassBg },
-    tripBtnText: { fontFamily: fonts.bodySemiBold, fontSize: fontSizes.sm, color: colors.textPrimary },
   }), [colors]);
 
   const {
@@ -58,19 +55,8 @@ export default function ClosetPage() {
         onEditArticle={editArticle}
         onRemoveArticle={removeArticle}
         onSetPreferred={setPreferred}
+        onTripFit={() => push('Account', { screen: 'TripFit' })}
       />
-
-      {/* Trip planner entry point */}
-      <View style={st.tripRow}>
-        <Pressable
-          style={st.tripBtn}
-          onPress={() => push('Account', { screen: 'TripFit' })}
-          accessibilityRole="button"
-          accessibilityLabel="Plan a trip"
-        >
-          <Text style={st.tripBtnText}>✈️  TripFit</Text>
-        </Pressable>
-      </View>
     </SafeAreaView>
   );
 }
