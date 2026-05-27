@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Svg, Path, Circle } from 'react-native-svg';
-import { View, Text, Pressable, GlassCard } from '../../components/primitives';
+import { View, Text, Pressable, GlassCard, GlassGroup } from '../../components/primitives';
 import { useSettings } from '../../hooks/useSettings';
 import { storage } from '../../lib/storage';
 import { auth } from '../../lib/auth';
@@ -199,7 +199,7 @@ export default function OnboardingPage({ onComplete }: Props) {
                     Let's take 60 seconds to set up your wardrobe so Ojo can suggest
                     perfect outfits every day.
                   </Text>
-                  <View style={st.illustrationRow}>
+                  <GlassGroup spacing={12} style={st.illustrationRow}>
                     <GlassCard style={st.iconPill}>
                       <Svg width={26} height={26} viewBox="0 0 24 24" fill="none">
                         <Path d="M12 2a3 3 0 0 1 3 3v1l4 2v14H5V8l4-2V5a3 3 0 0 1 3-3z"
@@ -224,7 +224,7 @@ export default function OnboardingPage({ onComplete }: Props) {
                           stroke={colors.textSecondary} strokeWidth={1.4} strokeLinejoin="round" />
                       </Svg>
                     </GlassCard>
-                  </View>
+                  </GlassGroup>
                   <Pressable style={st.primaryBtn} onPress={() => advance(2)}>
                     <Text style={st.primaryBtnText}>Let's go</Text>
                     <ArrowRight color={colors.saveBtnText} />

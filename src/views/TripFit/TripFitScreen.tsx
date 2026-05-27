@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { View, Text, GlassCard } from '../../components/primitives';
+import { View, Text, GlassCard, GlassGroup } from '../../components/primitives';
 import { HangerIcon } from '../../components/shared';
 import { useTheme } from '../../theme/ThemeContext';
 import {
@@ -1302,6 +1302,7 @@ export default function TripFitScreen() {
                         <Text style={st.sectionHeader}>Day-by-Day Outfits</Text>
 
                         {/* Full-width pager */}
+                        <GlassGroup spacing={12}>
                         <ScrollView
                             ref={pagerRef}
                             horizontal
@@ -1340,6 +1341,7 @@ export default function TripFitScreen() {
                                 />
                             ))}
                         </ScrollView>
+                        </GlassGroup>
 
                         {/* Dot indicators */}
                         {plans.length > 1 && (

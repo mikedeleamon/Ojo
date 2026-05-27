@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { View, Text } from '../../../components/primitives';
+import { View, Text, GlassCard } from '../../../components/primitives';
 import { makeStyles } from './SettingsSection.styles';
 import { SettingsSectionConfig, SettingsAction } from '../config';
 import { Settings } from '../../../types';
@@ -28,7 +28,7 @@ const SettingsSection = ({ section, settings, onAction }: Props) => {
   return (
     <View style={styles.section}>
       <Text style={styles.title}>{section.title}</Text>
-      <View style={styles.group}>
+      <GlassCard style={styles.group}>
         {section.items.map(item => (
           <SettingsItem
             key={item.key}
@@ -37,7 +37,7 @@ const SettingsSection = ({ section, settings, onAction }: Props) => {
             onPress={() => onAction(item.action)}
           />
         ))}
-      </View>
+      </GlassCard>
     </View>
   );
 };

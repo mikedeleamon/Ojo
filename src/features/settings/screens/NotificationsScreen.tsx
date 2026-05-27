@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Slider from '@react-native-community/slider';
-import { View, Text, Pressable } from '../../../components/primitives';
+import { View, Text, Pressable, GlassCard } from '../../../components/primitives';
 import Loading from '../../../components/Loading/Loading';
 import { useSpinAnimation } from '../../../hooks/useSpinAnimation';
 import { NotificationSettings } from '../../../types';
@@ -295,7 +295,7 @@ export default function NotificationsScreen() {
         <View style={st.section}>
           <Text style={s.sectionLabel}>Daily</Text>
 
-          <View style={st.card}>
+          <GlassCard style={st.card}>
             <Row st={st}>
               <RowLabel st={st}
                 title="Morning Outfit Brief"
@@ -320,9 +320,9 @@ export default function NotificationsScreen() {
                 />
               </View>
             )}
-          </View>
+          </GlassCard>
 
-          <View style={st.card}>
+          <GlassCard style={st.card}>
             <Row st={st}>
               <RowLabel st={st}
                 title="Temperature Swing Warning"
@@ -355,13 +355,13 @@ export default function NotificationsScreen() {
                 />
               </View>
             )}
-          </View>
+          </GlassCard>
         </View>
 
         <View style={st.section}>
           <Text style={s.sectionLabel}>Alerts</Text>
 
-          <View style={st.card}>
+          <GlassCard style={st.card}>
             <Row st={st}>
               <RowLabel st={st}
                 title="Weather Change Alert"
@@ -374,9 +374,9 @@ export default function NotificationsScreen() {
                 thumbColor={ns.weatherChangeEnabled ? colors.toggleThumbActive : colors.textMuted}
               />
             </Row>
-          </View>
+          </GlassCard>
 
-          <View style={st.card}>
+          <GlassCard style={st.card}>
             <Row st={st}>
               <RowLabel st={st}
                 title="Closet Gap Nudge"
@@ -389,13 +389,13 @@ export default function NotificationsScreen() {
                 thumbColor={ns.closetGapEnabled ? colors.toggleThumbActive : colors.textMuted}
               />
             </Row>
-          </View>
+          </GlassCard>
         </View>
 
         <View style={st.section}>
           <Text style={s.sectionLabel}>Trips</Text>
 
-          <View style={st.card}>
+          <GlassCard style={st.card}>
             <Row st={st}>
               <RowLabel st={st}
                 title="Trip Packing Reminder"
@@ -408,13 +408,13 @@ export default function NotificationsScreen() {
                 thumbColor={ns.tripPackingEnabled ? colors.toggleThumbActive : colors.textMuted}
               />
             </Row>
-          </View>
+          </GlassCard>
         </View>
 
         <View style={st.section}>
           <Text style={s.sectionLabel}>Weekly</Text>
 
-          <View style={st.card}>
+          <GlassCard style={st.card}>
             <Row st={st}>
               <RowLabel st={st}
                 title="Weekly Wardrobe Recap"
@@ -439,7 +439,7 @@ export default function NotificationsScreen() {
                 />
               </View>
             )}
-          </View>
+          </GlassCard>
         </View>
 
         {error !== '' && (

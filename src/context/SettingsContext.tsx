@@ -78,7 +78,7 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
                     '/api/user/settings',
                     authHeaders(),
                 );
-                const fresh = { ...defaults, ...data };
+                const fresh = { ...defaults, ...(cached ?? {}), ...data };
                 if (!cancelled) {
                     setSettings(fresh);
                     setSettingsReady(true);
@@ -134,7 +134,7 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
                 '/api/user/settings',
                 authHeaders(),
             );
-            const fresh = { ...defaults, ...data };
+            const fresh = { ...defaults, ...(cached ?? {}), ...data };
             setSettings(fresh);
             await writeCache(fresh);
         } catch (err: unknown) {

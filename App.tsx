@@ -113,8 +113,10 @@ function ThemedNavigationShell() {
               ...DarkTheme,
               colors: {
                   ...DarkTheme.colors,
-                  background: colors.bgDefault,
-                  card: colors.bgDefault,
+                  // Transparent so the floating tab bar's margin gap and safe-area
+                  // strip show the screen content behind them, not a solid slab.
+                  background: 'transparent',
+                  card: 'transparent',
                   border: colors.glassBorder,
                   text: colors.textPrimary,
               },
@@ -123,8 +125,8 @@ function ThemedNavigationShell() {
               ...DefaultTheme,
               colors: {
                   ...DefaultTheme.colors,
-                  background: colors.bgDefault,
-                  card: colors.bgDefault,
+                  background: 'transparent',
+                  card: 'transparent',
                   border: colors.glassBorder,
                   text: colors.textPrimary,
               },

@@ -67,6 +67,22 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         fontSize: fontSizes.xs,
         fontWeight: fontWeights.medium,
     },
+    overflowBtn: {
+        width: 28,
+        height: 28,
+        borderRadius: 8,
+        backgroundColor: colors.glassBg,
+        borderWidth: 1,
+        borderColor: colors.glassBorder,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    overflowBtnText: {
+        fontSize: 12,
+        color: colors.textSecondary,
+        letterSpacing: 1.5,
+        lineHeight: 14,
+    },
     pagerCard: {
         gap: spacing.sm,
         paddingBottom: 4,

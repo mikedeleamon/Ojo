@@ -17,7 +17,7 @@ import { useSpinAnimation } from '../../hooks/useSpinAnimation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Svg, Circle, Path } from 'react-native-svg';
-import { View, Text, GlassCard } from '../primitives';
+import { View, Text, GlassCard, GlassGroup } from '../primitives';
 import GearIcon from '../icons/GearIcon';
 import api from '../../api/client';
 import weatherConstants from '../../constants/weatherConstants';
@@ -413,23 +413,25 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
 
                         {/* Hourly forecast strip */}
                         {forecasts.length > 0 && (
-                            <ScrollView
-                                horizontal
-                                showsHorizontalScrollIndicator={false}
-                                contentContainerStyle={st.forecastStrip}
-                            >
-                                {forecasts.map((f, i) => (
-                                    <MinimizedWeatherDisplay
-                                        key={i}
-                                        weather={f.IconPhrase}
-                                        temperature={isMetric ? fToC(f.Temperature.Value) : f.Temperature.Value}
-                                        time={f.DateTime}
-                                        tempUnit={isMetric ? 'C' : f.Temperature.Unit}
-                                        isDay={f.IsDaylight}
-                                        isNow={i === 0}
-                                    />
-                                ))}
-                            </ScrollView>
+                            <GlassGroup spacing={8}>
+                                <ScrollView
+                                    horizontal
+                                    showsHorizontalScrollIndicator={false}
+                                    contentContainerStyle={st.forecastStrip}
+                                >
+                                    {forecasts.map((f, i) => (
+                                        <MinimizedWeatherDisplay
+                                            key={i}
+                                            weather={f.IconPhrase}
+                                            temperature={isMetric ? fToC(f.Temperature.Value) : f.Temperature.Value}
+                                            time={f.DateTime}
+                                            tempUnit={isMetric ? 'C' : f.Temperature.Unit}
+                                            isDay={f.IsDaylight}
+                                            isNow={i === 0}
+                                        />
+                                    ))}
+                                </ScrollView>
+                            </GlassGroup>
                         )}
 
                         {/* Details + outfit */}

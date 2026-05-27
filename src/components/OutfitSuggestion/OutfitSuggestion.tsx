@@ -4,6 +4,7 @@ import {
     ScrollView,
     Image,
     Pressable,
+    Alert,
     Linking,
     Share,
     useWindowDimensions,
@@ -12,7 +13,7 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Svg, Circle } from 'react-native-svg';
-import { View, Text, GlassCard } from '../primitives';
+import { View, Text, GlassCard, GlassGroup } from '../primitives';
 import { EmptyState } from '../shared';
 import { useClosets } from '../../hooks/useClosets';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
@@ -560,22 +561,18 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
                         isLearning={scoreLevel === 'learning'}
                     />
                     <Pressable
-                        onPress={handleShare}
-                        style={styles.shareBtn}
-                        accessibilityLabel="Share outfit"
+                        onPress={() =>
+                            Alert.alert('Outfit', undefined, [
+                                { text: '↑  Share outfit', onPress: handleShare },
+                                { text: 'Cancel', style: 'cancel' },
+                            ])
+                        }
+                        style={styles.overflowBtn}
+                        accessibilityLabel="More outfit options"
                         accessibilityRole="button"
                         hitSlop={8}
                     >
-                        <Text style={[styles.shareBtnText, { color: colors.textMuted }]}>↑ Share</Text>
-                    </Pressable>
-                    <Pressable
-                        onPress={() => nav.push('Account', { screen: 'ScanOutfit' })}
-                        style={styles.shareBtn}
-                        accessibilityLabel="Scan what you're wearing"
-                        accessibilityRole="button"
-                        hitSlop={8}
-                    >
-                        <Text style={[styles.shareBtnText, { color: colors.textMuted }]}>📷 Scan</Text>
+                        <Text style={styles.overflowBtnText}>···</Text>
                     </Pressable>
                 </View>
             </View>
@@ -627,7 +624,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
                                 key={i}
                                 style={[styles.pagerCard, { width: cardWidth }]}
                             >
-                                <View style={styles.pagerCardArticles}>
+                                <GlassGroup spacing={12} style={styles.pagerCardArticles}>
                                     {outfit.slots
                                         .filter((s) => !cardRemovedIds.has(s.article._id))
                                         .map((slot, j) => (
@@ -642,7 +639,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
                                                 }
                                             />
                                         ))}
-                                </View>
+                                </GlassGroup>
                                 <View style={styles.pagerCardFooter}>
                                     <Text style={styles.pagerSubtitle}>
                                         {outfitTabSubtitle(outfit)}

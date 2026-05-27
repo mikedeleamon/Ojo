@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
     ScrollView,
     TextInput,
@@ -7,10 +7,11 @@ import {
     useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { View, Text } from '../primitives';
+import { View, Text, GlassGroup } from '../primitives';
 import { HangerIcon } from '../shared/HangerIcon';
 import ArticleModal from '../ArticleModal/ArticleModal';
 import { Closet, ClothingArticle, ArticleFormData } from '../../types';
+import { QuickAddData } from '../../views/ClosetPage/ClosetPage';
 import { spacing } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 import { pairHarmony, COLOR_NEUTRALS } from '../../lib/outfitEngine';
@@ -43,6 +44,10 @@ interface Props {
     onRemoveArticle: (closetId: string, articleId: string) => Promise<void>;
     onSetPreferred: (id: string) => Promise<void>;
     onTripFit?: () => void;
+    quickAddImage?: QuickAddData | null;
+    onQuickAddConsumed?: () => void;
+    /** Bottom padding so scroll content clears the floating pill tab bar */
+    tabClearance?: number;
 }
 
 const ClosetView = ({
@@ -56,6 +61,9 @@ const ClosetView = ({
     onRemoveArticle,
     onSetPreferred,
     onTripFit,
+    quickAddImage,
+    onQuickAddConsumed,
+    tabClearance = 0,
 }: Props) => {
     const { colors } = useTheme();
     const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -72,6 +80,8 @@ const ClosetView = ({
     );
     const [showModal, setShowModal] = useState(false);
     const [editingArticle, setEditingArticle] = useState<ClothingArticle | null>(null);
+    // Image data provided by the tab-bar FAB quick-add flow
+    const [quickAddImageForModal, setQuickAddImageForModal] = useState<QuickAddData | null>(null);
     const [creating, setCreating] = useState(false);
     const [newName, setNewName] = useState('');
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -83,7 +93,6 @@ const ClosetView = ({
     const [showFilters, setShowFilters] = useState(false);
     const [wornAgeMap, setWornAgeMap] = useState<Map<string, number>>(new Map());
     const [sortBy, setSortBy] = useState<SortMode>('default');
-    const [showLegend, setShowLegend] = useState(false);
 
     useFocusEffect(
         useCallback(() => {
@@ -94,6 +103,14 @@ const ClosetView = ({
     const selected = closets.find((c) => c._id === selectedId) ?? closets[0];
     const filterCount = activeCategories.length + activeColors.length + activeFabrics.length;
     const hasFilters = filterCount > 0 || !!query.trim();
+
+    // When the tab-bar FAB provides a pre-captured image, open the modal immediately.
+    useEffect(() => {
+        if (!quickAddImage || !selected) return;
+        setQuickAddImageForModal(quickAddImage);
+        setShowModal(true);
+        onQuickAddConsumed?.();
+    }, [quickAddImage, selected]);
 
     const clearFilters = () => {
         setActiveCategories([]);
@@ -278,6 +295,7 @@ const ClosetView = ({
     return (
         <View style={styles.root}>
             {/* ── Closet tab bar ── */}
+            <GlassGroup spacing={8}>
             <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -312,6 +330,7 @@ const ClosetView = ({
                                 styles.closetTabText,
                                 selectedId === c._id && styles.closetTabTextActive,
                             ]}
+                            numberOfLines={1}
                         >
                             {c.name}
                         </Text>
@@ -335,6 +354,7 @@ const ClosetView = ({
                     <Text style={styles.newClosetBtnText}>+</Text>
                 </Pressable>
             </ScrollView>
+            </GlassGroup>
 
             {/* ── Rename inline form ── */}
             {selected && editingId === selected._id && (
@@ -400,20 +420,22 @@ const ClosetView = ({
                 </View>
             )}
 
-            {/* ── Content header: title + controls ── */}
+            {/* ── Content header: title + view toggle + overflow ── */}
             <View style={styles.mainHead}>
                 <Text style={styles.mainTitle} numberOfLines={1}>
                     {selected?.name ?? ''}
                 </Text>
-                {selected?.isPreferred && <Text style={styles.starBadge}>★</Text>}
                 <View style={styles.headerRight}>
+                    {/* Single cycling view-mode button — shows the mode you'll switch TO */}
                     <Pressable
-                        style={styles.legendInfoBtn}
-                        onPress={() => setShowLegend((v) => !v)}
-                        accessibilityLabel='Legend'
+                        style={styles.viewCycleBtn}
+                        onPress={() => setViewMode(viewMode === 'list' ? 'tile' : 'list')}
+                        accessibilityLabel={viewMode === 'list' ? 'Switch to tile view' : 'Switch to list view'}
                         accessibilityRole='button'
                     >
-                        <Text style={styles.legendInfoBtnText}>ⓘ</Text>
+                        <Text style={styles.viewCycleBtnText}>
+                            {viewMode === 'list' ? '⊞' : '☰'}
+                        </Text>
                     </Pressable>
                     {selected && (
                         <Pressable
@@ -425,80 +447,8 @@ const ClosetView = ({
                             <Text style={styles.overflowBtnText}>···</Text>
                         </Pressable>
                     )}
-                    <View style={styles.viewToggleWrap}>
-                        <Pressable
-                            style={[
-                                styles.viewToggleBtn,
-                                viewMode === 'list' && styles.viewToggleBtnActive,
-                            ]}
-                            onPress={() => setViewMode('list')}
-                            accessibilityLabel='List view'
-                            accessibilityRole='button'
-                        >
-                            <Text
-                                style={[
-                                    styles.viewToggleIcon,
-                                    viewMode === 'list' && styles.viewToggleIconActive,
-                                ]}
-                            >
-                                ☰
-                            </Text>
-                        </Pressable>
-                        <Pressable
-                            style={[
-                                styles.viewToggleBtn,
-                                viewMode === 'tile' && styles.viewToggleBtnActive,
-                            ]}
-                            onPress={() => setViewMode('tile')}
-                            accessibilityLabel='Tile view'
-                            accessibilityRole='button'
-                        >
-                            <Text
-                                style={[
-                                    styles.viewToggleIcon,
-                                    viewMode === 'tile' && styles.viewToggleIconActive,
-                                ]}
-                            >
-                                ⊞
-                            </Text>
-                        </Pressable>
-                    </View>
                 </View>
             </View>
-
-            {/* ── Legend tooltip ── */}
-            {showLegend && (
-                <View style={styles.legendTooltip}>
-                    <View style={styles.legendTooltipRow}>
-                        <View style={styles.legendItem}>
-                            <View style={[styles.legendDot, { backgroundColor: '#38bdf8' }]} />
-                            <View style={[styles.legendDot, { backgroundColor: '#fbbf24' }]} />
-                            <View style={[styles.legendDot, { backgroundColor: '#f97316' }]} />
-                            <Text style={styles.legendLabel}>warmth level</Text>
-                        </View>
-                        <View style={styles.legendItem}>
-                            <Text style={styles.legendSeason}>◆</Text>
-                            <Text style={styles.legendLabel}>in season</Text>
-                        </View>
-                        <View style={styles.legendItem}>
-                            <Text style={styles.legendClash}>~</Text>
-                            <Text style={styles.legendLabel}>may clash</Text>
-                        </View>
-                        <View style={styles.legendItem}>
-                            <View
-                                style={{ width: 3, height: 14, borderRadius: 2, backgroundColor: '#fbbf24' }}
-                            />
-                            <Text style={styles.legendLabel}>recently worn</Text>
-                        </View>
-                        <View style={styles.legendItem}>
-                            <View
-                                style={{ width: 3, height: 14, borderRadius: 2, backgroundColor: 'rgba(99,102,241,0.7)' }}
-                            />
-                            <Text style={styles.legendLabel}>unworn / stale</Text>
-                        </View>
-                    </View>
-                </View>
-            )}
 
             {/* ── Search + sort + filter row ── */}
             <View style={styles.searchBar}>
@@ -589,9 +539,10 @@ const ClosetView = ({
 
             {/* ── Article list / tile grid ── */}
             <ScrollView
-                contentContainerStyle={
-                    viewMode === 'tile' ? styles.tileGrid : styles.articleList
-                }
+                contentContainerStyle={[
+                    viewMode === 'tile' ? styles.tileGrid : styles.articleList,
+                    tabClearance > 0 && { paddingBottom: tabClearance },
+                ]}
             >
                 {!selected || selected.articles.length === 0 ? (
                     <View style={styles.emptyState}>
@@ -671,11 +622,13 @@ const ClosetView = ({
             {showModal && (
                 <ArticleModal
                     closetId={selected._id}
-                    onClose={() => setShowModal(false)}
+                    onClose={() => { setShowModal(false); setQuickAddImageForModal(null); }}
                     onSubmit={async (data) => {
                         await onAddArticle(selected._id, data);
                         setShowModal(false);
+                        setQuickAddImageForModal(null);
                     }}
+                    initialImageData={quickAddImageForModal}
                 />
             )}
             {editingArticle && (

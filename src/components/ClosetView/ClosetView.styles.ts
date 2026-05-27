@@ -29,6 +29,7 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         borderWidth: 1,
         borderColor: colors.glassBorder,
         backgroundColor: colors.glassBg,
+        flexShrink: 0,   // never compress — scroll instead
     },
     closetTabActive: {
         backgroundColor: colors.saveBtnBg,
@@ -128,20 +129,6 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         alignItems: 'center',
         gap: 4,
     },
-    legendInfoBtn: {
-        width: 30,
-        height: 30,
-        borderRadius: 15,
-        backgroundColor: colors.glassBg,
-        borderWidth: 1,
-        borderColor: colors.glassBorder,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    legendInfoBtnText: {
-        fontSize: 14,
-        color: colors.textSecondary,
-    },
     overflowBtn: {
         width: 30,
         height: 30,
@@ -158,8 +145,8 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         letterSpacing: 1.5,
         lineHeight: 16,
     },
-    viewToggleWrap: { flexDirection: 'row', gap: 3 },
-    viewToggleBtn: {
+    // Single cycling view-mode button
+    viewCycleBtn: {
         width: 30,
         height: 30,
         alignItems: 'center',
@@ -169,43 +156,10 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         borderColor: colors.glassBorder,
         backgroundColor: colors.glassBg,
     },
-    viewToggleBtnActive: {
-        backgroundColor: colors.saveBtnBg,
-        borderColor: colors.saveBtnBg,
-    },
-    viewToggleIcon: {
+    viewCycleBtnText: {
         fontSize: 14,
         color: colors.textSecondary,
     },
-    viewToggleIconActive: {
-        color: colors.saveBtnText,
-    },
-
-    // ── Legend tooltip ─────────────────────────────────────────────────────────
-    legendTooltip: {
-        marginHorizontal: spacing.md,
-        marginBottom: spacing.sm,
-        padding: 10,
-        backgroundColor: colors.glassBgStrong,
-        borderRadius: radius.sm,
-        borderWidth: 1,
-        borderColor: colors.glassBorder,
-    },
-    legendTooltipRow: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 12,
-        alignItems: 'center',
-    },
-    legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    legendDot: { width: 6, height: 6, borderRadius: 3 },
-    legendLabel: {
-        fontFamily: fonts.body,
-        fontSize: 11,
-        color: colors.textSecondary,
-    },
-    legendSeason: { fontSize: 9, color: '#34d399' },
-    legendClash: { fontFamily: fonts.body, fontSize: 12, color: '#f59e0b' },
 
     // ── Search + sort + filter row ──────────────────────────────────────────────
     searchBar: {

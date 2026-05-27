@@ -1,6 +1,8 @@
-import { useMemo } from 'react';
-import { StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useEffect, useMemo, useState } from 'react';
+import { Alert, StyleSheet } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { PILL_H } from '../../navigation/AppTabs';
 import { View, Text } from '../../components/primitives';
 import ClosetView from '../../components/ClosetView/ClosetView';
 import Loading from '../../components/Loading/Loading';
@@ -9,9 +11,22 @@ import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { fonts, fontSizes, spacing, radius } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 
+export type QuickAddData = {
+  uri:      string;
+  localUri: string;
+  width:    number;
+  height:   number;
+};
+
 export default function ClosetPage() {
   const { colors } = useTheme();
   const { push } = useAppNavigation();
+  const navigation = useNavigation<any>();
+  const route      = useRoute<any>();
+  const insets     = useSafeAreaInsets();
+  // Amount of bottom padding scrollable content needs to clear the floating pill
+  const tabClearance = PILL_H + insets.bottom;
+
   const st = useMemo(() => StyleSheet.create({
     root:        { flex: 1, backgroundColor: colors.bgDefault },
     errorBanner: { margin: spacing.md, padding: spacing.sm, backgroundColor: colors.errorBg, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.errorBorder },
@@ -27,10 +42,35 @@ export default function ClosetPage() {
     addArticle, editArticle, removeArticle, setPreferred,
   } = useClosets();
 
+  // Route param set by the tab-bar FAB after image capture
+  const quickAddParam = route.params?.quickAdd as QuickAddData | undefined;
+
+  const [pendingQuickAdd, setPendingQuickAdd] = useState<QuickAddData | null>(null);
+  const [activeQuickAdd,  setActiveQuickAdd]  = useState<QuickAddData | null>(null);
+
+  // Capture the param immediately and clear it from the route so
+  // navigating back to this tab later doesn't re-trigger the flow.
+  useEffect(() => {
+    if (!quickAddParam) return;
+    setPendingQuickAdd(quickAddParam);
+    navigation.setParams({ quickAdd: undefined });
+  }, [quickAddParam]);
+
+  // Once loading is done, either activate the quickAdd or explain why it can't run.
+  useEffect(() => {
+    if (!pendingQuickAdd || loading) return;
+    if (closets.length > 0) {
+      setActiveQuickAdd(pendingQuickAdd);
+    } else {
+      Alert.alert('No closet yet', 'Create a closet first, then you can add garments to it.', [{ text: 'OK' }]);
+    }
+    setPendingQuickAdd(null);
+  }, [pendingQuickAdd, loading, closets.length]);
+
   if (loading) return <Loading />;
 
   return (
-    <SafeAreaView style={st.root} edges={['top', 'bottom']}>
+    <SafeAreaView style={st.root} edges={['top']}>
       {error ? (
         <View style={st.errorBanner}>
           <Text style={st.errorText}>{error}</Text>
@@ -56,6 +96,9 @@ export default function ClosetPage() {
         onRemoveArticle={removeArticle}
         onSetPreferred={setPreferred}
         onTripFit={() => push('Account', { screen: 'TripFit' })}
+        quickAddImage={activeQuickAdd}
+        onQuickAddConsumed={() => setActiveQuickAdd(null)}
+        tabClearance={tabClearance}
       />
     </SafeAreaView>
   );

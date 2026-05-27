@@ -1,10 +1,10 @@
 import { useState, useMemo } from 'react';
 import { StyleSheet, Pressable } from 'react-native';
 import { Svg, Path } from 'react-native-svg';
-import { View, Text, GlassCard } from '../primitives';
+import { View, Text, GlassCard, GlassGroup } from '../primitives';
 import OutfitSuggestion from '../OutfitSuggestion/OutfitSuggestion';
 import { CurrentWeather, Forecast, Settings } from '../../types';
-import { ColorTokens, fonts, fontSizes, fontWeights, spacing, radius } from '../../theme/tokens';
+import { type ColorTokens, fonts, fontSizes, fontWeights, spacing, radius } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 
 interface Props { weather: CurrentWeather; settings: Settings; forecasts: Forecast[]; }
@@ -74,10 +74,10 @@ const WeatherDetails = ({ weather, settings, forecasts }: Props) => {
       <OutfitSuggestion weather={weather} settings={settings} forecasts={forecasts} />
 
       {/* Always-visible wind + humidity */}
-      <View style={st.grid}>
+      <GlassGroup spacing={spacing.sm} style={st.grid}>
         <Stat label="Wind"     value={`${weather.Wind.Speed.Imperial.Value} mph`} />
         <Stat label="Humidity" value={`${weather.RelativeHumidity}%`} />
-      </View>
+      </GlassGroup>
 
       <Pressable style={st.toggle} onPress={() => setExpanded(v => !v)}>
         <Text style={st.toggleText}>{expanded ? 'Less' : 'More details'}</Text>
@@ -89,12 +89,12 @@ const WeatherDetails = ({ weather, settings, forecasts }: Props) => {
 
       {expanded && (
         <>
-          <View style={st.grid}>
+          <GlassGroup spacing={spacing.sm} style={st.grid}>
             <Stat label="UV Index"   value={weather.UVIndexText} />
             <Stat label="Feels like" value={`${isMetric
               ? weather.RealFeelTemperature.Metric.Value
               : weather.RealFeelTemperature.Imperial.Value}°`} />
-          </View>
+          </GlassGroup>
 
           {hasConditionData && (
             <View style={st.pillRow}>

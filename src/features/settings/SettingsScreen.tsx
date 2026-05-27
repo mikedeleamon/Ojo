@@ -3,7 +3,7 @@ import { StyleSheet, Modal, ScrollView, AccessibilityInfo, findNodeHandle, View 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Svg, Path } from 'react-native-svg';
-import { View, Text, Pressable, GlassCard } from '../../components/primitives';
+import { View, Text, Pressable, GlassCard, GlassGroup } from '../../components/primitives';
 import { SETTINGS_CONFIG, SettingsAction } from './config';
 import SettingsSection from './components/SettingsSection';
 import { useSettings } from '../../hooks/useSettings';
@@ -31,12 +31,14 @@ export default function SettingsScreen({ onLogout }: Props) {
             borderBottomColor: colors.glassBorder,
         },
         homeBtn: {
-            padding: 8,
-            paddingHorizontal: 10,
             backgroundColor: colors.glassBg,
             borderWidth: 1,
             borderColor: colors.glassBorder,
             borderRadius: radius.sm,
+        },
+        homeBtnInner: {
+            padding: 8,
+            paddingHorizontal: 10,
         },
         title: {
             fontFamily: 'DMSerifDisplay',
@@ -49,13 +51,15 @@ export default function SettingsScreen({ onLogout }: Props) {
             paddingBottom: spacing.xl,
         },
         logoutBtn: {
-            paddingVertical: 14,
-            paddingHorizontal: spacing.md,
             backgroundColor: colors.glassBg,
             borderWidth: 1,
             borderColor: colors.glassBorder,
             borderRadius: radius.sm,
-            alignItems: 'center',
+        },
+        logoutBtnInner: {
+            paddingVertical: 14,
+            paddingHorizontal: spacing.md,
+            alignItems: 'center' as const,
         },
         logoutText: {
             fontFamily: fonts.body,
@@ -93,27 +97,27 @@ export default function SettingsScreen({ onLogout }: Props) {
         modalActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
         modalCancel: {
             flex: 1,
-            paddingVertical: 12,
             backgroundColor: colors.glassBg,
             borderWidth: 1,
             borderColor: colors.glassBorder,
             borderRadius: radius.sm,
-            alignItems: 'center',
+        },
+        modalConfirm: {
+            flex: 1,
+            backgroundColor: colors.glassBg,
+            borderWidth: 1,
+            borderColor: colors.glassBorder,
+            borderRadius: radius.sm,
+        },
+        modalBtnInner: {
+            paddingVertical: 12,
+            alignItems: 'center' as const,
         },
         modalCancelText: {
             fontFamily: fonts.body,
             fontSize: fontSizes.base - 1,
             fontWeight: fontWeights.medium,
             color: colors.textSecondary,
-        },
-        modalConfirm: {
-            flex: 1,
-            paddingVertical: 12,
-            backgroundColor: colors.glassBg,
-            borderWidth: 1,
-            borderColor: colors.glassBorder,
-            borderRadius: radius.sm,
-            alignItems: 'center',
         },
         modalConfirmText: {
             fontFamily: fonts.body,
@@ -164,45 +168,51 @@ export default function SettingsScreen({ onLogout }: Props) {
     return (
         <SafeAreaView style={styles.root}>
             <View style={styles.header}>
-                <Pressable
-                    onPress={() => nav.goBack()}
-                    style={styles.homeBtn}
-                    accessibilityLabel='Go to Home'
-                    accessibilityRole="button"
-                >
-                    <Svg width={18} height={18} viewBox='0 0 18 18' fill='none'
-                        accessibilityElementsHidden={true}
-                        importantForAccessibility="no"
+                <GlassCard glassStyle="clear" style={styles.homeBtn}>
+                    <Pressable
+                        onPress={() => nav.goBack()}
+                        style={styles.homeBtnInner}
+                        accessibilityLabel='Go to Home'
+                        accessibilityRole="button"
                     >
-                        <Path
-                            d='M11 14l-5-5 5-5'
-                            stroke={colors.textPrimary}
-                            strokeWidth={1.5}
-                            strokeLinecap='round'
-                            strokeLinejoin='round'
-                        />
-                    </Svg>
-                </Pressable>
+                        <Svg width={18} height={18} viewBox='0 0 18 18' fill='none'
+                            accessibilityElementsHidden={true}
+                            importantForAccessibility="no"
+                        >
+                            <Path
+                                d='M11 14l-5-5 5-5'
+                                stroke={colors.textPrimary}
+                                strokeWidth={1.5}
+                                strokeLinecap='round'
+                                strokeLinejoin='round'
+                            />
+                        </Svg>
+                    </Pressable>
+                </GlassCard>
                 <Text style={styles.title}>Account</Text>
             </View>
 
             <ScrollView contentContainerStyle={styles.content}>
-                {SETTINGS_CONFIG.map((section) => (
-                    <SettingsSection
-                        key={section.title}
-                        section={section}
-                        settings={settings}
-                        onAction={dispatch}
-                    />
-                ))}
+                <GlassGroup spacing={spacing.lg}>
+                    {SETTINGS_CONFIG.map((section) => (
+                        <SettingsSection
+                            key={section.title}
+                            section={section}
+                            settings={settings}
+                            onAction={dispatch}
+                        />
+                    ))}
+                </GlassGroup>
 
-                <Pressable
-                    style={styles.logoutBtn}
-                    onPress={() => setShowLogout(true)}
-                    accessibilityRole="button"
-                >
-                    <Text style={styles.logoutText}>Log out</Text>
-                </Pressable>
+                <GlassCard glassStyle="clear" style={styles.logoutBtn}>
+                    <Pressable
+                        onPress={() => setShowLogout(true)}
+                        accessibilityRole="button"
+                        style={styles.logoutBtnInner}
+                    >
+                        <Text style={styles.logoutText}>Log out</Text>
+                    </Pressable>
+                </GlassCard>
             </ScrollView>
 
             <Modal
@@ -223,22 +233,26 @@ export default function SettingsScreen({ onLogout }: Props) {
                     <Text style={styles.modalBody}>
                         You'll need to sign in again to access your wardrobe.
                     </Text>
-                    <View style={styles.modalActions}>
-                        <Pressable
-                            style={styles.modalCancel}
-                            onPress={() => setShowLogout(false)}
-                            accessibilityRole="button"
-                        >
-                            <Text style={styles.modalCancelText}>Cancel</Text>
-                        </Pressable>
-                        <Pressable
-                            style={styles.modalConfirm}
-                            onPress={handleLogout}
-                            accessibilityRole="button"
-                        >
-                            <Text style={styles.modalConfirmText}>Log out</Text>
-                        </Pressable>
-                    </View>
+                    <GlassGroup spacing={10} style={styles.modalActions}>
+                        <GlassCard glassStyle="clear" style={styles.modalCancel}>
+                            <Pressable
+                                onPress={() => setShowLogout(false)}
+                                accessibilityRole="button"
+                                style={styles.modalBtnInner}
+                            >
+                                <Text style={styles.modalCancelText}>Cancel</Text>
+                            </Pressable>
+                        </GlassCard>
+                        <GlassCard glassStyle="clear" style={styles.modalConfirm}>
+                            <Pressable
+                                onPress={handleLogout}
+                                accessibilityRole="button"
+                                style={styles.modalBtnInner}
+                            >
+                                <Text style={styles.modalConfirmText}>Log out</Text>
+                            </Pressable>
+                        </GlassCard>
+                    </GlassGroup>
                 </GlassCard>
             </Modal>
         </SafeAreaView>

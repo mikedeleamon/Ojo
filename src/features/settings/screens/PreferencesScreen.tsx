@@ -6,7 +6,8 @@ import {
     Switch,
     Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { PILL_H } from '../../../navigation/AppTabs';
 import {
     View,
     Text,
@@ -499,6 +500,9 @@ const PatternsSection = ({
 export default function PreferencesScreen() {
     const { colors, mode, setMode } = useTheme();
     const styles = useMemo(() => makeStyles(colors), [colors]);
+    const insets = useSafeAreaInsets();
+    // Padding so the last row of content isn't hidden behind the floating pill
+    const tabClearance = PILL_H + insets.bottom;
 
     const [history, setHistory] = useState<OutfitHistoryEntry[]>([]);
     const [prefs, setPrefs] = useState<UserPreferenceProfile>({
@@ -593,13 +597,13 @@ export default function PreferencesScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.root} edges={['bottom']}>
+        <SafeAreaView style={styles.root} edges={[]}>
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             >
                 <ScrollView
-                    contentContainerStyle={styles.content}
+                    contentContainerStyle={[styles.content, { paddingBottom: tabClearance }]}
                     keyboardShouldPersistTaps='handled'
                 >
                     {/* Outfit history */}

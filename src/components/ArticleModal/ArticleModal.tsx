@@ -218,14 +218,16 @@ const ColorField = ({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 interface Props {
-  closetId:     string;
-  onClose:      () => void;
-  onSubmit:     (data: ArticleFormData) => Promise<void>;
-  initialData?: ClothingArticle;
-  onDelete?:    () => Promise<void>;
+  closetId:          string;
+  onClose:           () => void;
+  onSubmit:          (data: ArticleFormData) => Promise<void>;
+  initialData?:      ClothingArticle;
+  onDelete?:         () => Promise<void>;
+  // Pre-captured image from the tab-bar FAB — triggers auto-identification on mount
+  initialImageData?: { uri: string; localUri: string; width: number; height: number } | null;
 }
 
-const ArticleModal = ({ closetId, onClose, onSubmit, initialData, onDelete }: Props) => {
+const ArticleModal = ({ closetId, onClose, onSubmit, initialData, onDelete, initialImageData }: Props) => {
   const { colors } = useTheme();
   const st = useMemo(() => makeSt(colors), [colors]);
   const isEditing = !!initialData;
@@ -247,6 +249,24 @@ const ArticleModal = ({ closetId, onClose, onSubmit, initialData, onDelete }: Pr
     }, 350); // allow the slide animation to finish
     return () => clearTimeout(id);
   }, []);
+
+  // When the tab-bar FAB provides a pre-captured image, kick off identification
+  // and upload automatically so the form arrives pre-filled.
+  useEffect(() => {
+    if (!initialImageData) return;
+    const { uri, localUri, width, height } = initialImageData;
+    if (localUri && width && height) {
+      runIdentification(localUri, width, height);
+    }
+    uploadImageToR2(uri, closetId).then(r2Url => {
+      if (r2Url) {
+        set('imageUrl', r2Url);
+      } else {
+        Alert.alert('Upload failed', 'Could not upload the image. You can add one manually.');
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally runs once on mount only
 
   const set = <K extends keyof ArticleFormData>(key: K, val: ArticleFormData[K]) => {
     if (key === 'imageUrl') setPreviewError(false);
