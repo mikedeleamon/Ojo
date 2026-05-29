@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { StyleSheet, Modal, ScrollView, AccessibilityInfo, findNodeHandle, View as RNView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
 import { Svg, Path } from 'react-native-svg';
 import { View, Text, Pressable, GlassCard, GlassGroup } from '../../components/primitives';
 import { SETTINGS_CONFIG, SettingsAction } from './config';
@@ -9,7 +9,6 @@ import SettingsSection from './components/SettingsSection';
 import { useSettings } from '../../hooks/useSettings';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { clearAuth } from '../../lib/auth';
-import { PRIVACY_POLICY, TERMS_OF_SERVICE } from '../../config/legal';
 import { spacing, radius, fonts, fontSizes, fontWeights } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 
@@ -153,9 +152,7 @@ export default function SettingsScreen({ onLogout }: Props) {
         if (action.type === 'navigate') {
             nav.push(action.to);
         } else if (action.type === 'legal') {
-            const doc =
-                action.doc === 'privacy' ? PRIVACY_POLICY : TERMS_OF_SERVICE;
-            nav.push('Legal', { doc });
+            nav.push('/account/legal', { docType: action.doc });
         }
     };
 

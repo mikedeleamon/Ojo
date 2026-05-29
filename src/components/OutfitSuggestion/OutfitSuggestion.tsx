@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
 import {
     ScrollView,
     Image,
@@ -434,7 +434,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
                 action={
                     <Pressable
                         style={styles.ctaBtn}
-                        onPress={() => nav.push('Closet')}
+                        onPress={() => nav.push('/(tabs)/closet')}
                     >
                         <Text style={styles.ctaBtnText}>Create closet</Text>
                     </Pressable>
@@ -478,7 +478,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
             <View style={styles.root}>
                 <PreferredBadge
                     name={preferred.name}
-                    onPress={() => nav.push('Closet')}
+                    onPress={() => nav.push('/(tabs)/closet')}
                 />
                 <EmptyState
                     icon={<HangerIcon size={32} />}
@@ -495,7 +495,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
                     action={
                         <Pressable
                             style={styles.ctaBtn}
-                            onPress={() => nav.push('Closet')}
+                            onPress={() => nav.push('/(tabs)/closet')}
                         >
                             <Text style={styles.ctaBtnText}>Add clothes</Text>
                         </Pressable>
@@ -552,7 +552,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
             <View style={styles.header}>
                 <PreferredBadge
                     name={preferred.name}
-                    onPress={() => nav.push('Closet')}
+                    onPress={() => nav.push('/(tabs)/closet')}
                 />
                 <View style={styles.scoreBadgeRow}>
                     <ScoreBadge

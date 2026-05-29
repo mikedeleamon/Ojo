@@ -3,7 +3,7 @@ import { StyleSheet, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { View, Text, Pressable } from '../../../components/primitives';
 import { loadHistory, deleteHistoryEntry, clearHistory } from '../../../lib/outfitHistory';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
 import { OutfitHistoryEntry } from '../../../types';
 import { makeStyles } from './screens.styles';
 import { spacing, radius, fonts, fontSizes } from '../../../theme/tokens';

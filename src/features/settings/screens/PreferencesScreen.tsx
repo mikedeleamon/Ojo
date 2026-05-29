@@ -6,8 +6,7 @@ import {
     Switch,
     Platform,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { PILL_H } from '../../../navigation/AppTabs';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
     View,
     Text,
@@ -17,7 +16,7 @@ import {
     GlassCard,
 } from '../../../components/primitives';
 import { useSettings } from '../../../hooks/useSettings';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
 import { spacing, radius, fonts, fontSizes, fontWeights } from '../../../theme/tokens';
 import { useTheme, ThemeMode } from '../../../theme/ThemeContext';
 import { fToC, cToF } from '../../../lib/units';
@@ -241,11 +240,13 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
         color: colors.textMuted,
         marginTop: 1,
     },
-    // Style DNA card
+    // Style DNA card — matches historyCard pattern so theme changes apply
     dnaCard: {
+        backgroundColor: colors.glassBg,
+        borderRadius: radius.sm,
         borderWidth: 1,
-        borderRadius: radius.md,
-        padding: spacing.sm,
+        borderColor: colors.glassBorder,
+        padding: 10,
         gap: 8,
     },
     dnaHeaderRow: {
@@ -404,7 +405,7 @@ const StyleDNACard = ({
     const progress   = LEVEL_PROGRESS[dna.level];
 
     return (
-        <GlassCard style={styles.dnaCard}>
+        <View style={styles.dnaCard}>
             <View style={styles.dnaHeaderRow}>
                 <Text style={[styles.dnaTitle, { color: colors.textPrimary }]}>Style Ranker</Text>
                 <Text style={[styles.dnaLevel, { color: levelColor }]}>
@@ -424,7 +425,7 @@ const StyleDNACard = ({
                     {dna.topFabric ? ` · Fabric: ${dna.topFabric}` : ''}
                 </Text>
             )}
-        </GlassCard>
+        </View>
     );
 };
 
@@ -500,9 +501,7 @@ const PatternsSection = ({
 export default function PreferencesScreen() {
     const { colors, mode, setMode } = useTheme();
     const styles = useMemo(() => makeStyles(colors), [colors]);
-    const insets = useSafeAreaInsets();
-    // Padding so the last row of content isn't hidden behind the floating pill
-    const tabClearance = PILL_H + insets.bottom;
+    // NativeTabs handles content insets automatically
 
     const [history, setHistory] = useState<OutfitHistoryEntry[]>([]);
     const [prefs, setPrefs] = useState<UserPreferenceProfile>({
@@ -603,7 +602,7 @@ export default function PreferencesScreen() {
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             >
                 <ScrollView
-                    contentContainerStyle={[styles.content, { paddingBottom: tabClearance }]}
+                    contentContainerStyle={styles.content}
                     keyboardShouldPersistTaps='handled'
                 >
                     {/* Outfit history */}

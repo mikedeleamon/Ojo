@@ -188,14 +188,27 @@ export default function NotificationsScreen() {
       const perm = await getPermissionStatus();
       if (!cancelled) setPermission(perm);
       try {
-        const { data } = await axios.get('/api/notifications/settings', authHeaders());
+        const [{ data }, localTripPacking] = await Promise.all([
+          axios.get('/api/notifications/settings', authHeaders()),
+          storage.getItem(TRIP_PACKING_PREF_KEY),
+        ]);
         if (!cancelled) {
           const merged = { ...NOTIF_DEFAULTS, ...data };
+          // tripPackingEnabled is stored locally — local value wins if present
+          if (localTripPacking !== null) {
+            merged.tripPackingEnabled = localTripPacking === 'true';
+          }
           setNs(merged);
           setLocalHour(utcHourToLocal(merged.morningBriefHourUTC));
         }
       } catch {
-        // Fall back to defaults
+        // Fall back to defaults; still try to read local trip-packing pref
+        try {
+          const localTripPacking = await storage.getItem(TRIP_PACKING_PREF_KEY);
+          if (!cancelled && localTripPacking !== null) {
+            setNs(prev => ({ ...prev, tripPackingEnabled: localTripPacking === 'true' }));
+          }
+        } catch { /* ignore */ }
       } finally {
         if (!cancelled) setLoading(false);
       }

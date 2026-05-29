@@ -213,7 +213,7 @@ export default function LoginPage({ onLogin }: Props) {
                                 Don't have an account?{' '}
                             </Text>
                             <Pressable
-                                onPress={() => nav.push('Signup')}
+                                onPress={() => nav.push('/(auth)/signup')}
                                 accessibilityRole="link"
                             >
                                 <Text style={styles.link}>Sign up</Text>

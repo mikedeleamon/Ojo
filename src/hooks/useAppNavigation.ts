@@ -1,12 +1,12 @@
-import { useNavigation } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 
 export const useAppNavigation = () => {
-  const nav = useNavigation<any>();
+  const router = useRouter();
   return {
     push:    (route: string, params?: Record<string, unknown>) =>
-               nav.navigate(route as never, params as never),
-    goBack:  () => nav.goBack(),
-    replace: (route: string) => nav.replace(route as never),
-    reset:   (route: string) => nav.reset({ index: 0, routes: [{ name: route }] }),
+               router.push({ pathname: route as any, params: params as any }),
+    goBack:  () => router.back(),
+    replace: (route: string) => router.replace(route as any),
+    reset:   (route: string) => router.replace(route as any),
   };
 };

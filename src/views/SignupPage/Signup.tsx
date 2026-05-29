@@ -140,7 +140,7 @@ export default function SignupPage({ onLogin }: Props) {
             >('/api/auth/signup', form);
             await saveAuth(data.token, data.user);
             onLogin?.();
-            nav.replace('Onboarding');
+            nav.replace('/(auth)/onboarding');
         } catch (err: unknown) {
             setError(getErrorMessage(err, 'Sign up failed. Please try again.'));
         } finally {

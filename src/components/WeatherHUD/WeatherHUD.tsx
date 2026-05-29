@@ -278,25 +278,6 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
     // Spinner rotation for the inline loading indicator
     const spinRotate = useSpinAnimation(2_000);
 
-    // ── Error state (#9: retry + check settings) ──────────────────────────────
-    if (error && !weather)
-        return (
-            <View style={st.center}>
-                <Text style={st.errorText}>
-                    {error ?? 'Something went wrong.'}
-                </Text>
-                <Pressable
-                    style={st.retryBtn}
-                    onPress={() => onRefresh?.()}
-                >
-                    <Text style={st.retryBtnText}>Try again</Text>
-                </Pressable>
-                <Pressable onPress={() => nav.push('Account')}>
-                    <Text style={st.settingsLink}>Check settings</Text>
-                </Pressable>
-            </View>
-        );
-
     const isMetric = settings.temperatureScale === 'Metric';
     const tempVal = weather
         ? isMetric
@@ -317,6 +298,25 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
         );
         return { hiTemp: Math.round(Math.max(...temps)), loTemp: Math.round(Math.min(...temps)) };
     }, [forecasts, isMetric]);
+
+    // ── Error state (#9: retry + check settings) ──────────────────────────────
+    if (error && !weather)
+        return (
+            <View style={st.center}>
+                <Text style={st.errorText}>
+                    {error ?? 'Something went wrong.'}
+                </Text>
+                <Pressable
+                    style={st.retryBtn}
+                    onPress={() => onRefresh?.()}
+                >
+                    <Text style={st.retryBtnText}>Try again</Text>
+                </Pressable>
+                <Pressable onPress={() => nav.push('/account')}>
+                    <Text style={st.settingsLink}>Check settings</Text>
+                </Pressable>
+            </View>
+        );
 
     return (
         <AnimatedLinearGradient
@@ -374,7 +374,7 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
                                 style={[st.gearBtn, { top: topInset + 8 }]}
                             >
                                 <Pressable
-                                    onPress={() => nav.push('Account')}
+                                    onPress={() => nav.push('/account')}
                                     accessibilityLabel='Account settings'
                                     style={({ pressed }) => [
                                         st.gearBtnInner,

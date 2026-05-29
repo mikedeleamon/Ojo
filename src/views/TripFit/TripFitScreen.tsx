@@ -26,7 +26,7 @@ import {
 } from '../../theme/tokens';
 import type { ColorTokens } from '../../theme/tokens';
 import { useClosets } from '../../hooks/useClosets';
-import { useAppNavigation } from '../../hooks/useAppNavigation';
+import { useRouter } from 'expo-router';
 import { useReduceMotion } from '../../hooks/useReduceMotion';
 import { generateOutfits } from '../../lib/outfitEngine';
 import type { OutfitResult } from '../../lib/outfitEngine';
@@ -231,7 +231,6 @@ const DayCard = ({
     const thumbSize = Math.floor(
         (cardWidth - spacing.md * 2 - spacing.xs * 3) / 4,
     );
-    const gradColors = gradientFor(plan.day.dayPhrase, true) as string[];
 
     // translateY only — no opacity on the Animated.View wrapper.
     // GlassView (inside GlassCard) must be mounted at full opacity so iOS can
@@ -250,16 +249,6 @@ const DayCard = ({
                 paddingHorizontal: spacing.xs,
             }}
         >
-            <RNView
-                style={{ borderRadius: radius.md, overflow: 'hidden', flex: 1 }}
-            >
-                {/* Weather gradient tint behind glass card */}
-                <LinearGradient
-                    colors={gradColors as [string, string, ...string[]]}
-                    style={[StyleSheet.absoluteFill, { opacity: 0.18 }]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                />
                 <GlassCard
                     style={dayCardSt.card}
                     glassStyle='regular'
@@ -339,7 +328,6 @@ const DayCard = ({
                         </Pressable>
                     </GlassCard>
                 </GlassCard>
-            </RNView>
         </Animated.View>
     );
 };
@@ -846,7 +834,7 @@ const chipSt = StyleSheet.create({
 
 export default function TripFitScreen() {
     const { colors } = useTheme();
-    const { goBack } = useAppNavigation();
+    const router = useRouter();
     const { closets } = useClosets();
     const { settings } = useSettings();
     const reduceMotion = useReduceMotion();
@@ -1129,9 +1117,9 @@ export default function TripFitScreen() {
             {/* Header */}
             <View style={st.header}>
                 <Pressable
-                    onPress={goBack}
+                    onPress={() => router.replace('/(tabs)/closet')}
                     style={st.backBtn}
-                    accessibilityLabel='Go back'
+                    accessibilityLabel='Go back to closet'
                     accessibilityRole='button'
                 >
                     <Text style={[st.backArrow, { color: colors.textPrimary }]}>

@@ -19,28 +19,28 @@ export const SETTINGS_CONFIG: SettingsSectionConfig[] = [
   {
     title: 'Account',
     items: [
-      { key: 'profile',        label: 'Profile',         action: { type: 'navigate', to: 'Profile' } },
-      { key: 'password',       label: 'Password',        action: { type: 'navigate', to: 'Password' } },
-      { key: 'history',        label: 'Outfit History',  action: { type: 'navigate', to: 'History' } },
+      { key: 'profile',        label: 'Profile',         action: { type: 'navigate', to: '/account/profile' } },
+      { key: 'password',       label: 'Password',        action: { type: 'navigate', to: '/account/password' } },
+      { key: 'history',        label: 'Outfit History',  action: { type: 'navigate', to: '/account/history' } },
     ],
   },
   {
     title: 'Preferences',
     items: [
-      { key: 'outfit-prefs', label: 'Style preference', sublabelKey: 'clothingStyle', action: { type: 'navigate', to: 'PreferencesScreen' } },
+      { key: 'outfit-prefs', label: 'Style preference', sublabelKey: 'clothingStyle', action: { type: 'navigate', to: '/account/preferences' } },
     ],
   },
   {
     title: 'Notifications',
     items: [
-      { key: 'notifications', label: 'Push Notifications', action: { type: 'navigate', to: 'Notifications' } },
+      { key: 'notifications', label: 'Push Notifications', action: { type: 'navigate', to: '/account/notifications' } },
     ],
   },
   {
     title: 'Privacy & Security',
     items: [
-      { key: 'permissions', label: 'Permissions', action: { type: 'navigate', to: 'Permissions' } },
-      { key: 'data-usage',  label: 'Data Usage',  action: { type: 'navigate', to: 'DataUsage' } },
+      { key: 'permissions', label: 'Permissions', action: { type: 'navigate', to: '/account/permissions' } },
+      { key: 'data-usage',  label: 'Data Usage',  action: { type: 'navigate', to: '/account/data-usage' } },
     ],
   },
   {

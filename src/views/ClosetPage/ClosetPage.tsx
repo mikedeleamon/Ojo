@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, StyleSheet } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation, useRoute } from '@react-navigation/native';
-import { PILL_H } from '../../navigation/AppTabs';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { View, Text } from '../../components/primitives';
 import ClosetView from '../../components/ClosetView/ClosetView';
 import Loading from '../../components/Loading/Loading';
@@ -21,11 +20,14 @@ export type QuickAddData = {
 export default function ClosetPage() {
   const { colors } = useTheme();
   const { push } = useAppNavigation();
-  const navigation = useNavigation<any>();
-  const route      = useRoute<any>();
+  const router     = useRouter();
+  const params     = useLocalSearchParams<{
+    quickAddUri?: string;
+    quickAddLocalUri?: string;
+    quickAddWidth?: string;
+    quickAddHeight?: string;
+  }>();
   const insets     = useSafeAreaInsets();
-  // Amount of bottom padding scrollable content needs to clear the floating pill
-  const tabClearance = PILL_H + insets.bottom;
 
   const st = useMemo(() => StyleSheet.create({
     root:        { flex: 1, backgroundColor: colors.bgDefault },
@@ -42,8 +44,16 @@ export default function ClosetPage() {
     addArticle, editArticle, removeArticle, setPreferred,
   } = useClosets();
 
-  // Route param set by the tab-bar FAB after image capture
-  const quickAddParam = route.params?.quickAdd as QuickAddData | undefined;
+  // Route params set by the QuickAdd FAB after image capture
+  const quickAddParam: QuickAddData | undefined =
+    params.quickAddUri
+      ? {
+          uri:      params.quickAddUri,
+          localUri: params.quickAddLocalUri!,
+          width:    Number(params.quickAddWidth),
+          height:   Number(params.quickAddHeight),
+        }
+      : undefined;
 
   const [pendingQuickAdd, setPendingQuickAdd] = useState<QuickAddData | null>(null);
   const [activeQuickAdd,  setActiveQuickAdd]  = useState<QuickAddData | null>(null);
@@ -53,8 +63,8 @@ export default function ClosetPage() {
   useEffect(() => {
     if (!quickAddParam) return;
     setPendingQuickAdd(quickAddParam);
-    navigation.setParams({ quickAdd: undefined });
-  }, [quickAddParam]);
+    router.setParams({ quickAddUri: undefined as any });
+  }, [quickAddParam?.uri]);
 
   // Once loading is done, either activate the quickAdd or explain why it can't run.
   useEffect(() => {
@@ -95,10 +105,10 @@ export default function ClosetPage() {
         onEditArticle={editArticle}
         onRemoveArticle={removeArticle}
         onSetPreferred={setPreferred}
-        onTripFit={() => push('Account', { screen: 'TripFit' })}
+        onTripFit={() => push('/account/tripfit')}
         quickAddImage={activeQuickAdd}
         onQuickAddConsumed={() => setActiveQuickAdd(null)}
-        tabClearance={tabClearance}
+        tabClearance={0}
       />
     </SafeAreaView>
   );

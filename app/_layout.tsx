@@ -1,0 +1,112 @@
+import { useEffect, useState } from 'react';
+import { Image, StyleSheet, useColorScheme, View } from 'react-native';
+import { Slot, useRouter, useSegments } from 'expo-router';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
+import * as SplashScreen from 'expo-splash-screen';
+import * as Font from 'expo-font';
+import { ThemeProvider, useTheme } from '../src/theme/ThemeContext';
+import { SettingsProvider } from '../src/context/SettingsContext';
+import { WeatherProvider } from '../src/context/WeatherContext';
+import { AuthProvider, useAuth } from '../src/context/AuthContext';
+
+SplashScreen.preventAutoHideAsync();
+
+// ─── Splash ──────────────────────────────────────────────────────────────────
+function CustomSplash() {
+  const scheme = useColorScheme();
+  const dark = scheme === 'dark';
+  return (
+    <View style={[styles.splashContainer, { backgroundColor: dark ? '#000000' : '#FFFFFF' }]}>
+      <Image
+        source={dark ? require('../assets/ojoLogo.png') : require('../assets/ojo_word_logo_2.png')}
+        style={styles.splashLogo}
+        resizeMode="contain"
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  splashContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  splashLogo: { width: 160, height: 160 },
+});
+
+// ─── Auth redirect ───────────────────────────────────────────────────────────
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const { isReady, isLoggedIn } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isReady) return;
+
+    const inAuthGroup = segments[0] === '(auth)';
+
+    if (!isLoggedIn && !inAuthGroup) {
+      // Not logged in and not on an auth screen — redirect to login
+      router.replace('/(auth)/login');
+    } else if (isLoggedIn && inAuthGroup) {
+      // Logged in but still on auth screen — go to main app
+      router.replace('/(tabs)');
+    }
+  }, [isReady, isLoggedIn, segments]);
+
+  if (!isReady) return null;
+
+  return <>{children}</>;
+}
+
+// ─── Root layout ─────────────────────────────────────────────────────────────
+export default function RootLayout() {
+  const [fontsLoaded, setFontsLoaded] = useState(false);
+
+  useEffect(() => {
+    SplashScreen.hideAsync();
+
+    const loadFonts = async () => {
+      try {
+        await Font.loadAsync({
+          DMSerifDisplay: require('../assets/fonts/DMSerifDisplay-Regular.ttf'),
+          Outfit:          require('../assets/fonts/Outfit_400Regular.ttf'),
+          'Outfit-Light':    require('../assets/fonts/Outfit_300Light.ttf'),
+          'Outfit-Regular':  require('../assets/fonts/Outfit_400Regular.ttf'),
+          'Outfit-Medium':   require('../assets/fonts/Outfit_500Medium.ttf'),
+          'Outfit-SemiBold': require('../assets/fonts/Outfit_600SemiBold.ttf'),
+          'Outfit-Bold':     require('../assets/fonts/Outfit_700Bold.ttf'),
+        });
+      } finally {
+        await new Promise((r) => setTimeout(r, 2500));
+        setFontsLoaded(true);
+      }
+    };
+    loadFonts();
+  }, []);
+
+  if (!fontsLoaded) return <CustomSplash />;
+
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemeProvider>
+        <SafeAreaProvider>
+          <AuthProvider>
+            <SettingsProvider>
+              <WeatherProvider>
+                <AuthGate>
+                  <ThemedStatusBar />
+                  <Slot />
+                </AuthGate>
+              </WeatherProvider>
+            </SettingsProvider>
+          </AuthProvider>
+        </SafeAreaProvider>
+      </ThemeProvider>
+    </GestureHandlerRootView>
+  );
+}
+
+function ThemedStatusBar() {
+  const { isDark } = useTheme();
+  return <StatusBar style={isDark ? 'light' : 'dark'} />;
+}

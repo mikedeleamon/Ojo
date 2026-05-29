@@ -477,10 +477,47 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         color: colors.textMuted,
     },
 
+    // ── Legend ─────────────────────────────────────────────────────────────────
+    legendRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 10,
+        paddingHorizontal: spacing.md,
+        paddingVertical: 6,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: colors.glassBorder,
+    },
+    legendItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    legendDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+    },
+    legendWarmth: {
+        width: 8,
+        height: 8,
+        borderRadius: 2,
+    },
+    legendClash: {
+        fontFamily: fonts.body,
+        fontSize: 9,
+        color: '#f87171',
+        fontStyle: 'italic',
+    },
+    legendText: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs - 1,
+        color: colors.textMuted,
+    },
+
     // ── Floating action button ──────────────────────────────────────────────────
     fab: {
         position: 'absolute',
-        bottom: 28,
+        bottom: 105,
         right: spacing.md,
         width: 52,
         height: 52,

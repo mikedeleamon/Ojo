@@ -18,7 +18,7 @@ import { pairHarmony, COLOR_NEUTRALS } from '../../lib/outfitEngine';
 import { makeStyles } from './ClosetView.styles';
 import { CSS_COLORS } from '../../lib/colors/cssColors';
 import { recentlyWornWithAge } from '../../lib/outfitHistory';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
 import {
     METALLIC_GRADIENTS,
     METALLIC_START,
@@ -537,6 +537,49 @@ const ClosetView = ({
                 </ScrollView>
             )}
 
+            {/* ── TripFit discovery banner (above article list so it's always reachable) ── */}
+            {onTripFit && selected && selected.articles.length > 0 && (
+                <Pressable
+                    style={styles.tripBanner}
+                    onPress={onTripFit}
+                    accessibilityRole='button'
+                    accessibilityLabel='Open TripFit packing planner'
+                >
+                    <Text style={styles.tripBannerIcon}>✈️</Text>
+                    <View style={styles.tripBannerInfo}>
+                        <Text style={styles.tripBannerTitle}>TripFit</Text>
+                        <Text style={styles.tripBannerDesc}>
+                            Pack smarter for your next trip
+                        </Text>
+                    </View>
+                    <Text style={styles.tripBannerChevron}>›</Text>
+                </Pressable>
+            )}
+
+            {/* ── Legend ── */}
+            <View style={styles.legendRow}>
+                <View style={styles.legendItem}>
+                    <View style={[styles.legendDot, { backgroundColor: 'rgba(251,191,36,0.85)' }]} />
+                    <Text style={styles.legendText}>Recent</Text>
+                </View>
+                <View style={styles.legendItem}>
+                    <View style={[styles.legendDot, { backgroundColor: 'rgba(99,102,241,0.75)' }]} />
+                    <Text style={styles.legendText}>Low wear</Text>
+                </View>
+                <View style={styles.legendItem}>
+                    <View style={[styles.legendWarmth, { backgroundColor: '#ef4444' }]} />
+                    <Text style={styles.legendText}>Warm</Text>
+                </View>
+                <View style={styles.legendItem}>
+                    <View style={[styles.legendWarmth, { backgroundColor: '#3b82f6' }]} />
+                    <Text style={styles.legendText}>Cool</Text>
+                </View>
+                <View style={styles.legendItem}>
+                    <Text style={styles.legendClash}>clash</Text>
+                    <Text style={styles.legendText}>Low harmony</Text>
+                </View>
+            </View>
+
             {/* ── Article list / tile grid ── */}
             <ScrollView
                 contentContainerStyle={[
@@ -587,24 +630,6 @@ const ClosetView = ({
                     ))
                 )}
 
-                {/* TripFit discovery banner */}
-                {onTripFit && selected && selected.articles.length > 0 && (
-                    <Pressable
-                        style={styles.tripBanner}
-                        onPress={onTripFit}
-                        accessibilityRole='button'
-                        accessibilityLabel='Open TripFit packing planner'
-                    >
-                        <Text style={styles.tripBannerIcon}>✈️</Text>
-                        <View style={styles.tripBannerInfo}>
-                            <Text style={styles.tripBannerTitle}>TripFit</Text>
-                            <Text style={styles.tripBannerDesc}>
-                                Pack smarter for your next trip
-                            </Text>
-                        </View>
-                        <Text style={styles.tripBannerChevron}>›</Text>
-                    </Pressable>
-                )}
             </ScrollView>
 
             {/* ── Floating action button ── */}
