@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { darkColors, lightColors, ColorTokens } from './tokens';
+import { setOverrideUserInterfaceStyle } from '../../modules/ojo-ui-style/src';
 
 export type ThemeMode = 'auto' | 'light' | 'dark';
 
@@ -30,6 +31,14 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
       if (v === 'light' || v === 'dark' || v === 'auto') setModeState(v);
     });
   }, []);
+
+  // Propagate every mode change to the native UIWindow override so iOS draws
+  // alerts, share sheets, glass materials, etc. in our chosen scheme. This is
+  // what makes the theme look fully consistent — without it, native surfaces
+  // would still follow the system appearance.
+  useEffect(() => {
+    setOverrideUserInterfaceStyle(mode);
+  }, [mode]);
 
   const setMode = (m: ThemeMode) => {
     setModeState(m);

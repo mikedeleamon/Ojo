@@ -27,6 +27,7 @@
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
+          <string>ojo</string>
           <string>com.placeholder.ojo</string>
         </array>
       </dict>
@@ -50,14 +51,16 @@
       <key>NSAllowsLocalNetworking</key>
       <true/>
     </dict>
-    <key>NSFaceIDUsageDescription</key>
-    <string>Ojo uses Face ID to securely access your saved login credentials from the device keychain.</string>
-    <key>NSLocationWhenInUseUsageDescription</key>
-    <string>Ojo uses your location to fetch local weather for outfit suggestions.</string>
     <key>NSCameraUsageDescription</key>
     <string>Ojo uses your camera so you can photograph clothing items to add to your closet.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Ojo uses your location for local weather.</string>
     <key>NSPhotoLibraryUsageDescription</key>
-    <string>Ojo uses your photo library so you can add images of your clothing items.</string>
+    <string>Ojo uses your photo library to add clothing images.</string>
+    <key>NSUserActivityTypes</key>
+    <array>
+      <string>$(PRODUCT_BUNDLE_IDENTIFIER).expo.index_route</string>
+    </array>
     <key>NSUserNotificationsUsageDescription</key>
     <string>Ojo sends daily outfit suggestions and weather alerts to help you dress for the day.</string>
     <key>RCTNewArchEnabled</key>
@@ -75,10 +78,7 @@
     <key>UISupportedInterfaceOrientations</key>
     <array>
       <string>UIInterfaceOrientationPortrait</string>
-      <string>UIInterfaceOrientationPortraitUpsideDown</string>
     </array>
-    <key>UIUserInterfaceStyle</key>
-    <string>Dark</string>
     <key>UIViewControllerBasedStatusBarAppearance</key>
     <false/>
   </dict>

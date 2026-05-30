@@ -1,0 +1,7 @@
+{
+  "name": "ojo-ui-style",
+  "version": "1.0.0",
+  "description": "Local Expo module that sets UIWindow.overrideUserInterfaceStyle so the in-app theme propagates to every native surface iOS draws (alerts, share sheets, glass materials, etc).",
+  "main": "src/index.ts",
+  "private": true
+}

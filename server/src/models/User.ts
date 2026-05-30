@@ -7,6 +7,7 @@ export interface ISettings {
   hiTempThreshold: number;
   lowTempThreshold: number;
   humidityPreference: number;
+  gender?: string;
 }
 
 export interface INotificationSettings {
@@ -38,6 +39,12 @@ export interface IUser extends Document {
   notificationSettings: INotificationSettings;
   tokenVersion: number;
   lastMorningSnapshot?: IMorningSnapshot;
+  // Gmail integration (Trip Planner)
+  googleRefreshToken?: string;
+  googleConnectedAt?: Date;
+  // Forgot-password flow — only the SHA-256 hash of the reset token is stored
+  resetPasswordTokenHash?: string;
+  resetPasswordExpires?: Date;
 }
 
 const settingsSchema = new Schema<ISettings>({
@@ -47,6 +54,7 @@ const settingsSchema = new Schema<ISettings>({
   hiTempThreshold:    { type: Number, default: 85 },
   lowTempThreshold:   { type: Number, default: 50 },
   humidityPreference: { type: Number, default: 60 },
+  gender:             { type: String, enum: ["Men's", "Women's", "All"], default: 'All' },
 }, { _id: false });
 
 const notificationSettingsSchema = new Schema<INotificationSettings>({
@@ -78,6 +86,12 @@ const userSchema = new Schema<IUser>({
   notificationSettings: { type: notificationSettingsSchema, default: () => ({}) },
   tokenVersion:         { type: Number, default: 0 },
   lastMorningSnapshot:  { type: morningSnapshotSchema },
+  // Gmail integration (Trip Planner)
+  googleRefreshToken:   { type: String, select: false }, // excluded from default queries
+  googleConnectedAt:    { type: Date },
+  // Password reset — token hash never leaves the server
+  resetPasswordTokenHash: { type: String, select: false },
+  resetPasswordExpires:   { type: Date,   select: false },
 }, { timestamps: true });
 
 export default mongoose.model<IUser>('User', userSchema);

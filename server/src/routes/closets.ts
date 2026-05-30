@@ -84,19 +84,6 @@ router.post('/:closetId/upload-image', async (req: AuthRequest, res: Response): 
   }
 });
 
-router.post('/:closetId/articles', async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const closet = await Closet.findOne({ _id: req.params.closetId, userId: req.userId });
-    if (!closet) { res.status(404).json({ error: 'Closet not found' }); return; }
-    closet.articles.push(req.body);
-    await closet.save();
-    res.status(201).json(closet);
-  } catch (err) {
-    console.error('[closets] add article error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
 const ARTICLE_EDITABLE_FIELDS = [
   'name',
   'clothingType',
@@ -113,6 +100,27 @@ const ARTICLE_EDITABLE_FIELDS = [
   'detectedFabric',
   'identificationConfidence',
 ] as const;
+
+router.post('/:closetId/articles', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const closet = await Closet.findOne({ _id: req.params.closetId, userId: req.userId });
+    if (!closet) { res.status(404).json({ error: 'Closet not found' }); return; }
+
+    // Whitelist incoming fields so callers cannot plant arbitrary keys on the subdoc
+    const articleInput: Record<string, unknown> = {};
+    for (const field of ARTICLE_EDITABLE_FIELDS) {
+      if (Object.prototype.hasOwnProperty.call(req.body, field)) {
+        articleInput[field] = req.body[field];
+      }
+    }
+    closet.articles.push(articleInput);
+    await closet.save();
+    res.status(201).json(closet);
+  } catch (err) {
+    console.error('[closets] add article error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 router.put('/:closetId/articles/:articleId', async (req: AuthRequest, res: Response): Promise<void> => {
   try {

@@ -8,10 +8,12 @@ export interface IArticle extends Document {
   clothingCategory?: string;
   fabricType?: string;
   color?: string;
+  gender?: string;
   isAccessory?: boolean;
   isWristWear?: boolean;
   isAnkleWear?: boolean;
   merchant?: string;
+  purchasePrice?: number;
   imageUrl?: string;
   createdAt?: Date;
 }
@@ -31,10 +33,12 @@ const articleSchema = new Schema<IArticle>({
   clothingCategory: { type: String },
   fabricType:       { type: String },
   color:            { type: String },
+  gender:           { type: String, enum: ["Men's", "Women's", 'Unisex'], default: 'Unisex' },
   isAccessory:      { type: Boolean, default: false },
   isWristWear:      { type: Boolean, default: false },
   isAnkleWear:      { type: Boolean, default: false },
   merchant:         { type: String },
+  purchasePrice:    { type: Number },
   imageUrl:         { type: String },
 }, { timestamps: true });
 

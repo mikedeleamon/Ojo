@@ -29,3 +29,6 @@ export const FABRICS = [
     'Cotton', 'Wool', 'Linen', 'Silk', 'Polyester',
     'Denim', 'Leather', 'Synthetic', 'Other',
 ];
+
+export const GENDERS = ["Men's", "Women's", 'All'] as const;
+export const ARTICLE_GENDERS = ["Men's", "Women's", 'Unisex'] as const;

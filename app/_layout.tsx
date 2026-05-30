@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Image, StyleSheet, useColorScheme, View } from 'react-native';
-import { Slot, useRouter, useSegments } from 'expo-router';
+import { Slot, Stack, useRouter, useSegments } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -10,6 +10,8 @@ import { ThemeProvider, useTheme } from '../src/theme/ThemeContext';
 import { SettingsProvider } from '../src/context/SettingsContext';
 import { WeatherProvider } from '../src/context/WeatherContext';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
+import { ErrorBoundary } from '../src/components/ErrorBoundary';
+import { isOnboardingComplete } from '../src/lib/onboarding';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -42,14 +44,31 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isReady) return;
 
-    const inAuthGroup = segments[0] === '(auth)';
+    const segs = segments as readonly string[];
+    const inAuthGroup    = segs[0] === '(auth)';
+    const onResetScreen  = segs[1] === 'reset-password';
+    const onOnboarding   = segs[1] === 'onboarding';
+
+    // Reset-password deep link must always reach its screen, even for users
+    // who are already signed in.
+    if (onResetScreen) return;
 
     if (!isLoggedIn && !inAuthGroup) {
-      // Not logged in and not on an auth screen — redirect to login
       router.replace('/(auth)/login');
-    } else if (isLoggedIn && inAuthGroup) {
-      // Logged in but still on auth screen — go to main app
-      router.replace('/(tabs)');
+      return;
+    }
+
+    if (isLoggedIn) {
+      // Newly signed-up users land at /(auth)/* logged in; route them to
+      // onboarding if they haven't completed it yet. Existing users skip
+      // straight to the tabs.
+      isOnboardingComplete().then((done) => {
+        if (!done && !onOnboarding) {
+          router.replace('/(auth)/onboarding');
+        } else if (done && inAuthGroup) {
+          router.replace('/(tabs)');
+        }
+      });
     }
   }, [isReady, isLoggedIn, segments]);
 
@@ -77,7 +96,6 @@ export default function RootLayout() {
           'Outfit-Bold':     require('../assets/fonts/Outfit_700Bold.ttf'),
         });
       } finally {
-        await new Promise((r) => setTimeout(r, 2500));
         setFontsLoaded(true);
       }
     };
@@ -87,22 +105,36 @@ export default function RootLayout() {
   if (!fontsLoaded) return <CustomSplash />;
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <ThemeProvider>
-        <SafeAreaProvider>
-          <AuthProvider>
-            <SettingsProvider>
-              <WeatherProvider>
-                <AuthGate>
-                  <ThemedStatusBar />
-                  <Slot />
-                </AuthGate>
-              </WeatherProvider>
-            </SettingsProvider>
-          </AuthProvider>
-        </SafeAreaProvider>
-      </ThemeProvider>
-    </GestureHandlerRootView>
+    <ErrorBoundary>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <ThemeProvider>
+          <SafeAreaProvider>
+            <AuthProvider>
+              <SettingsProvider>
+                <WeatherProvider>
+                  <AuthGate>
+                    <ThemedStatusBar />
+                    {/* Stack so the camera screen can present as a fullScreenModal
+                        that covers the native tab bar. All other routes are
+                        auto-discovered and inherit default options. */}
+                    <Stack screenOptions={{ headerShown: false }}>
+                      <Stack.Screen
+                        name="camera"
+                        options={{
+                          presentation: 'fullScreenModal',
+                          animation: 'slide_from_bottom',
+                          gestureEnabled: false,
+                        }}
+                      />
+                    </Stack>
+                  </AuthGate>
+                </WeatherProvider>
+              </SettingsProvider>
+            </AuthProvider>
+          </SafeAreaProvider>
+        </ThemeProvider>
+      </GestureHandlerRootView>
+    </ErrorBoundary>
   );
 }
 

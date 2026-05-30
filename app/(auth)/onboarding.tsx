@@ -1,7 +1,10 @@
+import { useRouter } from 'expo-router';
 import OnboardingPage from '../../src/views/OnboardingPage/OnboardingPage';
-import { useAuth } from '../../src/context/AuthContext';
 
 export default function OnboardingScreen() {
-  const { login } = useAuth();
-  return <OnboardingPage onComplete={login} />;
+  const router = useRouter();
+  // OnboardingPage marks completion in storage before calling onComplete; we
+  // navigate explicitly here because the AuthGate effect won't re-fire on a
+  // mere storage write.
+  return <OnboardingPage onComplete={() => router.replace('/(tabs)')} />;
 }

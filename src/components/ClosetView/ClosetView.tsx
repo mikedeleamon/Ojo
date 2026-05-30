@@ -18,13 +18,13 @@ import { pairHarmony, COLOR_NEUTRALS } from '../../lib/outfitEngine';
 import { makeStyles } from './ClosetView.styles';
 import { CSS_COLORS } from '../../lib/colors/cssColors';
 import { recentlyWornWithAge } from '../../lib/outfitHistory';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import {
     METALLIC_GRADIENTS,
     METALLIC_START,
     METALLIC_END,
 } from '../../lib/colors/metallicGradients';
-import { CATEGORIES, COLORS, FABRICS } from '../../lib/colors/palettes';
+import { CATEGORIES, COLORS, FABRICS, ARTICLE_GENDERS } from '../../lib/colors/palettes';
 import { SwipeableArticleCard, TileArticleCard } from './ArticleCard';
 
 type SortMode = 'default' | 'type' | 'color' | 'wornRecent' | 'wornStale';
@@ -44,8 +44,6 @@ interface Props {
     onRemoveArticle: (closetId: string, articleId: string) => Promise<void>;
     onSetPreferred: (id: string) => Promise<void>;
     onTripFit?: () => void;
-    quickAddImage?: QuickAddData | null;
-    onQuickAddConsumed?: () => void;
     /** Bottom padding so scroll content clears the floating pill tab bar */
     tabClearance?: number;
 }
@@ -61,11 +59,10 @@ const ClosetView = ({
     onRemoveArticle,
     onSetPreferred,
     onTripFit,
-    quickAddImage,
-    onQuickAddConsumed,
     tabClearance = 0,
 }: Props) => {
     const { colors } = useTheme();
+    const router = useRouter();
     const styles = useMemo(() => makeStyles(colors), [colors]);
     const { width: windowWidth } = useWindowDimensions();
     const tileWidth = Math.floor(
@@ -78,10 +75,7 @@ const ClosetView = ({
             ? initialSelectedId
             : (closets[0]?._id ?? ''),
     );
-    const [showModal, setShowModal] = useState(false);
     const [editingArticle, setEditingArticle] = useState<ClothingArticle | null>(null);
-    // Image data provided by the tab-bar FAB quick-add flow
-    const [quickAddImageForModal, setQuickAddImageForModal] = useState<QuickAddData | null>(null);
     const [creating, setCreating] = useState(false);
     const [newName, setNewName] = useState('');
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -90,6 +84,7 @@ const ClosetView = ({
     const [activeCategories, setActiveCategories] = useState<string[]>([]);
     const [activeColors, setActiveColors] = useState<string[]>([]);
     const [activeFabrics, setActiveFabrics] = useState<string[]>([]);
+    const [activeGenders, setActiveGenders] = useState<string[]>([]);
     const [showFilters, setShowFilters] = useState(false);
     const [wornAgeMap, setWornAgeMap] = useState<Map<string, number>>(new Map());
     const [sortBy, setSortBy] = useState<SortMode>('default');
@@ -101,21 +96,14 @@ const ClosetView = ({
     );
 
     const selected = closets.find((c) => c._id === selectedId) ?? closets[0];
-    const filterCount = activeCategories.length + activeColors.length + activeFabrics.length;
+    const filterCount = activeCategories.length + activeColors.length + activeFabrics.length + activeGenders.length;
     const hasFilters = filterCount > 0 || !!query.trim();
-
-    // When the tab-bar FAB provides a pre-captured image, open the modal immediately.
-    useEffect(() => {
-        if (!quickAddImage || !selected) return;
-        setQuickAddImageForModal(quickAddImage);
-        setShowModal(true);
-        onQuickAddConsumed?.();
-    }, [quickAddImage, selected]);
 
     const clearFilters = () => {
         setActiveCategories([]);
         setActiveColors([]);
         setActiveFabrics([]);
+        setActiveGenders([]);
         setQuery('');
     };
 
@@ -167,8 +155,10 @@ const ClosetView = ({
             arts = arts.filter((a) => a.color && activeColors.includes(a.color));
         if (activeFabrics.length)
             arts = arts.filter((a) => a.fabricType && activeFabrics.includes(a.fabricType));
+        if (activeGenders.length)
+            arts = arts.filter((a) => activeGenders.includes(a.gender ?? 'Unisex'));
         return arts;
-    }, [selected, query, activeCategories, activeColors, activeFabrics]);
+    }, [selected, query, activeCategories, activeColors, activeFabrics, activeGenders]);
 
     const sortedArticles = useMemo(() => {
         if (sortBy === 'default') return filteredArticles;
@@ -495,6 +485,17 @@ const ClosetView = ({
                     style={styles.filterPanel}
                     contentContainerStyle={{ gap: 12, padding: spacing.md }}
                 >
+                    <Text style={styles.filterGroupLabel}>Gender</Text>
+                    <View style={styles.chipRow}>
+                        {[...ARTICLE_GENDERS].map((g) => (
+                            <Chip
+                                key={g}
+                                label={g}
+                                active={activeGenders.includes(g)}
+                                onPress={() => toggle(activeGenders, setActiveGenders, g)}
+                            />
+                        ))}
+                    </View>
                     <Text style={styles.filterGroupLabel}>Category</Text>
                     <View style={styles.chipRow}>
                         {CATEGORIES.map((c) => (
@@ -593,7 +594,7 @@ const ClosetView = ({
                         <Text style={styles.emptyTitle}>No articles yet</Text>
                         <Pressable
                             style={styles.addBtn}
-                            onPress={() => setShowModal(true)}
+                            onPress={() => router.push('/camera')}
                         >
                             <Text style={styles.addBtnText}>Add your first piece</Text>
                         </Pressable>
@@ -632,30 +633,18 @@ const ClosetView = ({
 
             </ScrollView>
 
-            {/* ── Floating action button ── */}
-            {selected && !showModal && !editingArticle && (
+            {/* ── Floating action button — opens the camera flow ── */}
+            {selected && !editingArticle && (
                 <Pressable
                     style={styles.fab}
-                    onPress={() => setShowModal(true)}
-                    accessibilityLabel='Add article'
+                    onPress={() => router.push('/camera')}
+                    accessibilityLabel='Add article — open camera'
                     accessibilityRole='button'
                 >
                     <Text style={styles.fabText}>+</Text>
                 </Pressable>
             )}
 
-            {showModal && (
-                <ArticleModal
-                    closetId={selected._id}
-                    onClose={() => { setShowModal(false); setQuickAddImageForModal(null); }}
-                    onSubmit={async (data) => {
-                        await onAddArticle(selected._id, data);
-                        setShowModal(false);
-                        setQuickAddImageForModal(null);
-                    }}
-                    initialImageData={quickAddImageForModal}
-                />
-            )}
             {editingArticle && (
                 <ArticleModal
                     closetId={selected._id}

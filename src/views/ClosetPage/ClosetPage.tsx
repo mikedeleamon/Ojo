@@ -1,15 +1,17 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Alert, StyleSheet } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useMemo } from 'react';
+import { StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { View, Text } from '../../components/primitives';
 import ClosetView from '../../components/ClosetView/ClosetView';
 import Loading from '../../components/Loading/Loading';
 import { useClosets } from '../../hooks/useClosets';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
+import { useTabBarPadding } from '../../hooks/useTabBarPadding';
 import { fonts, fontSizes, spacing, radius } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 
+// Retained for backward import compatibility — adding new articles now flows
+// through the /camera modal route, not URL params.
 export type QuickAddData = {
   uri:      string;
   localUri: string;
@@ -20,14 +22,7 @@ export type QuickAddData = {
 export default function ClosetPage() {
   const { colors } = useTheme();
   const { push } = useAppNavigation();
-  const router     = useRouter();
-  const params     = useLocalSearchParams<{
-    quickAddUri?: string;
-    quickAddLocalUri?: string;
-    quickAddWidth?: string;
-    quickAddHeight?: string;
-  }>();
-  const insets     = useSafeAreaInsets();
+  const tabPad = useTabBarPadding();
 
   const st = useMemo(() => StyleSheet.create({
     root:        { flex: 1, backgroundColor: colors.bgDefault },
@@ -43,39 +38,6 @@ export default function ClosetPage() {
     createCloset, renameCloset, deleteCloset,
     addArticle, editArticle, removeArticle, setPreferred,
   } = useClosets();
-
-  // Route params set by the QuickAdd FAB after image capture
-  const quickAddParam: QuickAddData | undefined =
-    params.quickAddUri
-      ? {
-          uri:      params.quickAddUri,
-          localUri: params.quickAddLocalUri!,
-          width:    Number(params.quickAddWidth),
-          height:   Number(params.quickAddHeight),
-        }
-      : undefined;
-
-  const [pendingQuickAdd, setPendingQuickAdd] = useState<QuickAddData | null>(null);
-  const [activeQuickAdd,  setActiveQuickAdd]  = useState<QuickAddData | null>(null);
-
-  // Capture the param immediately and clear it from the route so
-  // navigating back to this tab later doesn't re-trigger the flow.
-  useEffect(() => {
-    if (!quickAddParam) return;
-    setPendingQuickAdd(quickAddParam);
-    router.setParams({ quickAddUri: undefined as any });
-  }, [quickAddParam?.uri]);
-
-  // Once loading is done, either activate the quickAdd or explain why it can't run.
-  useEffect(() => {
-    if (!pendingQuickAdd || loading) return;
-    if (closets.length > 0) {
-      setActiveQuickAdd(pendingQuickAdd);
-    } else {
-      Alert.alert('No closet yet', 'Create a closet first, then you can add garments to it.', [{ text: 'OK' }]);
-    }
-    setPendingQuickAdd(null);
-  }, [pendingQuickAdd, loading, closets.length]);
 
   if (loading) return <Loading />;
 
@@ -106,9 +68,7 @@ export default function ClosetPage() {
         onRemoveArticle={removeArticle}
         onSetPreferred={setPreferred}
         onTripFit={() => push('/account/tripfit')}
-        quickAddImage={activeQuickAdd}
-        onQuickAddConsumed={() => setActiveQuickAdd(null)}
-        tabClearance={0}
+        tabClearance={tabPad}
       />
     </SafeAreaView>
   );

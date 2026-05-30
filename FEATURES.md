@@ -4,6 +4,20 @@ This document describes every product feature built into Ojo, how it works under
 
 ---
 
+## Recent Changes (since 2026-05-26)
+
+- **New feature: Wardrobe Insights tab** (`Feature 12`) — full Tier-2 surface showing wardrobe utilization, cost-per-wear, sleeping items, and a donation queue.
+- **New feature: Forgot Password** (`Feature 13`) — full reset flow with hashed tokens, deep-link email handoff, and auto sign-in after reset.
+- **Navigation migrated to Expo Router** — the legacy `AppTabs` / `AccountStack` / `RootNavigator` stack was deleted; routes now live under `app/`. Native iOS tabs (`expo-router/unstable-native-tabs`) replace the custom JS tab bar.
+- **New top-level Camera tab** — the "Add" tab triggers a fullScreenModal camera (`app/camera.tsx`) instead of pushing within a stack. The native tab bar hides while the camera is active.
+- **Wardrobe Heat Map upgrade** — the heat map now reads from a `wornAge` attribute computed at closet load, not from a per-card history scan. See Feature 6.
+- **Scan Outfit removed** — the vision-capture screen that previously stood as Feature 11 has been removed pending a redesign. Its TFLite identification pipeline still lives in `clothingIdentifier.ts` and powers the camera capture flow.
+- **Liquid glass refactor** — adopted `expo-glass-effect` (iOS 26 GlassView) across primary cards, chips, pills, and overlays. No behavior change; visual depth and translucency are now native rather than blur-approximated.
+- **App Store hardening** — removed forced dark mode, stripped unused iOS permission strings, dropped the legacy `App.tsx` shell, added a root `ErrorBoundary`, expanded the privacy policy to cover Cloudflare R2 image storage and Gmail OAuth.
+- **Server hardening** — HMAC-signed Gmail OAuth state, field-whitelisted `PUT /api/user/settings` and `POST /api/closets/:id/articles`, `cityKey` validation on weather routes, future-`wornAt` rejection in history, CORS dev fallback gated behind `NODE_ENV`.
+
+---
+
 ## Table of Contents
 
 - [Core Architecture](#core-architecture)
@@ -17,10 +31,12 @@ This document describes every product feature built into Ojo, how it works under
   - [Wardrobe Health Heat Map](#6-wardrobe-health-heat-map)
   - [Outfit History Server Sync](#7-outfit-history-server-sync)
   - [TripFit — Trip Planner](#8-tripfit--trip-planner)
+  - [Wardrobe Insights Tab](#12-wardrobe-insights-tab)
 - [Tier 3 — Differentiation Layer](#tier-3--differentiation-layer)
   - [Personal Style Ranker](#9-personal-style-ranker)
   - [Outfit Sharing Cards](#10-outfit-sharing-cards)
-  - [Scan Outfit — Vision Capture](#11-scan-outfit--vision-capture)
+- [Auth & Account](#auth--account)
+  - [Forgot Password](#13-forgot-password)
 
 ---
 
@@ -195,7 +211,7 @@ In tile view, each article card gets a subtle color overlay that encodes how rec
 | Stronger indigo `rgba(99,102,241,0.22)` | Never logged in Ojo at all |
 
 **How it works**  
-`ClosetView.tsx` calls `recentlyWornWithAge(30)` inside a `useFocusEffect` on every screen focus, receiving a `Map<articleId, daysSinceWorn>`. This map is passed as a `wornAge` prop to each `TileArticleCard`.
+`ClosetView.tsx` calls `recentlyWornWithAge(30)` inside a `useFocusEffect` on every screen focus, receiving a `Map<articleId, daysSinceWorn>`. The map is decorated onto every article as a `wornAge` attribute (added 2026-05-27, replacing the earlier per-card prop pattern) so downstream sorting, filtering, and the new Insights tab can read it without re-scanning history.
 
 Inside `TileArticleCard`, `wornAgeOverlay(wornAge)` computes the overlay color string, which is applied as an absolutely-positioned, full-size translucent `View` layered on top of the thumbnail image.
 
@@ -372,50 +388,101 @@ The ★ only appears when the score is personalized (Feature 9 active). The weat
 
 ---
 
-### 11. Scan Outfit — Vision Capture
+### 12. Wardrobe Insights Tab
 
 **What it does**  
-"Score what you're wearing today." A camera-powered flow where the user photographs each garment they have on. Ojo's on-device TFLite model identifies each garment, matches it to the best article in the user's closet, assembles the matched articles into an outfit, and scores it — giving real-time AI feedback on an actual outfit in the world, not a hypothetical one.
+A dedicated top-level **Insights** tab that turns the wardrobe data Ojo already collects into a personal analytics dashboard. Users see how much of their closet they actually wear, which items are the best (and worst) value, which items are "sleeping," and they can queue items for donation directly from the insights surface.
+
+**Top-level surfaces**
+
+| Surface | Data shown |
+|---|---|
+| **Utilization ring** | Active-articles / total-articles ratio as a circular progress ring with a "% worn in the last 90 days" headline |
+| **Cost-per-wear stat** | Lowest CPW item ("best value") and highest CPW item ("worst value"), computed from `purchasePrice` ÷ `totalWears`. Hidden if no items have a price set |
+| **Total wardrobe value** | Sum of `purchasePrice` across all articles; shown alongside the count of priced items |
+| **Top worn carousel** | Top 10 articles by `totalWears`, horizontal scroll, with thumbnail + wear count |
+| **Sleeping items** | Articles with `daysSinceWorn >= 90` OR `totalWears === 0`. Each card has a "Donate" toggle that adds/removes from the donation queue |
+| **Donation queue** | Persistent local list of articles flagged for donation. "Mark donated" removes the article from the closet and clears the queue entry |
+| **Wardrobe gaps** | Same `GapSuggestion[]` surface used by the Home gap card (Feature 2), with a "🛍 Shop" button per gap that opens Google Shopping |
+| **Style DNA card** | Top colors, top fabric, and top category from `computeStyleDNA(profile)` — same intelligence as Feature 9 |
+| **Top color pairs** | Top 8 color combinations the user has actually worn, derived from `profile.colorPairs` |
 
 **How it works**
 
-**Step 1 — Photo capture**  
-The user taps "📷 Camera" or "🖼️ Library" (up to 4 times). Each selection calls `captureImage()` or `pickImage()` from `imageService.ts` — the same functions used when adding articles to the closet.
+**Pure computation layer**  
+`insightsEngine.ts` exports `computeInsights(closets, history, profile)` which returns `InsightsData` — no UI, no I/O. The screen calls it once on mount and again on focus.
 
-**Step 2 — On-device identification**  
-`identifyClothing(localUri)` runs the full pipeline:
-1. TFLite inference → garment type (34 classes) + sleeve length
-2. Sleeve override rules (e.g., "t-shirt + long-sleeve" → "long-sleeve-shirt")
-3. `colorExtractor` → dominant colors from the image pixels
-4. Heuristic fabric guess from garment type
+**Key derived fields**
+- `WardrobeHealth.utilizationRate` = `activeArticles / totalArticles` where active = worn within `ACTIVE_WINDOW_DAYS` (90)
+- `ArticleInsight.costPerWear` = `purchasePrice ÷ totalWears`, `null` if either is missing
+- `ArticleInsight.isSleeping` = `totalWears === 0 || daysSinceWorn >= SLEEPING_THRESHOLD` (90)
+- `WardrobeHealth.bestCPW` / `worstCPW` — scanned across all priced + worn items
 
-The dominant color name and `GarmentType` are extracted from the result.
+**Donation queue**  
+`donationQueue.ts` is a local-only AsyncStorage list keyed by user ID (`ojo_donation_queue_<userId>`). API is `add`, `remove`, `isIn`, `load`, `clear`. Ephemeral by design — once items are donated the entries are gone; nothing syncs to the server.
 
-**Step 3 — Closet matching**  
-`matchToCloset(formType, detectedColor, articles)` maps the detected `GarmentType` to the app's form `clothingType` via `GARMENT_TO_FORM_TYPE`, then searches the user's preferred closet for articles with the same type. If multiple articles match the type, the one whose color most closely matches the detected color wins. If no article in the closet matches at all, a minimal synthetic `ClothingArticle` is constructed from the scan data as a stand-in.
-
-**Step 4 — Scoring**  
-`generateOutfits()` is called with the matched/synthetic articles as the full "closet". The engine scores all valid combinations of those articles and returns the highest-scoring result. A neutral `CurrentWeather` (68°F, partly cloudy) is used since the scan is about the outfit itself, not the forecast.
-
-**Step 5 — Result display**  
-The score badge (personalized-aware: "Your Score ★" if Feature 9 is active), a five-factor breakdown bar chart, and any outfit notes are shown inline on the same screen.
-
-**Each scanned item card shows:**
-- Thumbnail of the photo
-- Detected garment type and dominant color
-- Whether a closet match was found (green "✓ Matched: Navy Slim Jeans") or a synthetic stand-in was used
-- ML confidence percentage
+**Performance**  
+History scan is O(history-entries × articleIds) and runs only on screen focus. The article list passed to the screen is sorted once and sliced for previews (4 sleeping, 10 top worn).
 
 **Entry point**  
-A "📷 Scan" pill button in the home screen outfit header, next to the score badge and Share button. Navigates to the `ScanOutfit` screen in the Account stack.
+The **Insights** native tab (rightmost in the tab bar) → `app/(tabs)/insights.tsx` → `InsightsPage`.
 
 **Key files**
-- `src/views/ScanOutfit/ScanOutfitScreen.tsx` — full scan UI and orchestration logic
-- `src/services/clothingIdentifier.ts` — `identifyClothing()` TFLite pipeline
-- `src/components/ArticleModal/detection.ts` — `GARMENT_TO_FORM_TYPE` mapping
-- `src/lib/imageService.ts` — `captureImage()`, `pickImage()`
-- `src/navigation/AccountStack.tsx` — `ScanOutfit` screen registration
-- `src/components/OutfitSuggestion/OutfitSuggestion.tsx` — "📷 Scan" entry button
+- `src/lib/insightsEngine.ts` — `computeInsights()`, `ArticleInsight`, `WardrobeHealth`, formatting helpers
+- `src/lib/donationQueue.ts` — local AsyncStorage queue
+- `src/views/InsightsPage/InsightsPage.tsx` — full UI: utilization ring, CPW cards, carousels, donation toggles
+- `app/(tabs)/insights.tsx` — Expo Router screen wrapper
+
+---
+
+## Auth & Account
+
+---
+
+### 13. Forgot Password
+
+**What it does**  
+A complete password-recovery flow on the sign-in screen. Tapping "Forgot password?" opens a screen where the user enters their email; if an account exists, Ojo emails a one-hour, single-use reset link that opens the app via deep link to a "Choose a new password" screen. After a successful reset the user is auto signed-in.
+
+**How it works**
+
+**Step 1 — Request**  
+`POST /api/auth/forgot-password { email }` always returns `204`, whether or not the email is registered, so the endpoint cannot be used to enumerate accounts. On a match, the server calls `generateResetToken()`:
+- 32 random bytes → base64url-encoded "raw" token (this is what goes in the email)
+- SHA-256 hash of the raw token → stored on the user as `resetPasswordTokenHash`
+- Expiry: now + 1 hour → stored as `resetPasswordExpires`
+
+Both fields are `select: false` on the schema so they never leak in routine `GET /me` calls.
+
+**Step 2 — Email delivery**  
+`sendResetEmail(email, deepLink)` is a thin abstraction over the chosen email provider. The deep link looks like `ojo://reset-password?token=<raw>`. The actual send is currently stubbed to `console.log` and is the only piece of the flow that needs a provider wired up (Resend / SendGrid / SES).
+
+**Step 3 — Deep link**  
+Tapping the link opens the app at `app/(auth)/reset-password.tsx`, which reads the token from `useLocalSearchParams()` and renders `ResetPasswordPage`. The route lives inside the `(auth)` group so `AuthGate` always allows it for logged-out users.
+
+**Step 4 — Reset**  
+`POST /api/auth/reset-password { token, newPassword }` hashes the supplied token, looks up a user whose `resetPasswordTokenHash` matches AND `resetPasswordExpires > now`, and:
+- bcrypt-hashes the new password (cost 12) and writes it
+- increments `tokenVersion` to revoke any existing sessions on other devices
+- clears `resetPasswordTokenHash` and `resetPasswordExpires`
+- returns a fresh JWT + user payload so the client signs in immediately
+
+If no matching unexpired user is found, the route returns `400 "Reset link is invalid or has expired"`.
+
+**Security properties**
+- Token enumeration: impossible — forgot endpoint is constant-response.
+- DB exfiltration: only token hashes are stored; raw tokens cannot be recovered.
+- Old sessions: revoked on reset via `tokenVersion` bump.
+- Rate limiting: both routes are mounted under `/api/auth`, which uses `authLimiter` (20 req / 15 min).
+
+**Key files**
+- `server/src/lib/passwordReset.ts` — `generateResetToken()`, `hashResetToken()`, `buildResetDeepLink()`, `sendResetEmail()` stub
+- `server/src/routes/auth.ts` — `POST /forgot-password`, `POST /reset-password`
+- `server/src/models/User.ts` — `resetPasswordTokenHash`, `resetPasswordExpires` (both `select: false`)
+- `src/views/ForgotPasswordPage/ForgotPasswordPage.tsx` — email entry screen
+- `src/views/ResetPasswordPage/ResetPasswordPage.tsx` — new-password screen
+- `app/(auth)/forgot-password.tsx`, `app/(auth)/reset-password.tsx` — Expo Router wrappers
+- `src/views/LoginPage/LoginPage.tsx` — "Forgot password?" link
 
 ---
 
@@ -428,7 +495,9 @@ Some features are more powerful in combination:
 | **Server Sync** + **History Screen** | History that survives reinstalls and syncs across devices |
 | **Style Ranker** + **Occasion Quick-Switch** | Personalized suggestions that also respect the moment (Work Monday, Date Friday) |
 | **Heat Map** + **History** | A visual answer to "what am I actually wearing vs what I think I wear" |
-| **Scan Outfit** + **Style Ranker** | Your real-world outfit scored against your own learned preferences, not generic rules |
+| **Insights** + **Style Ranker** | Wardrobe value and CPW are framed by your personalized style fingerprint, not a generic average |
+| **Insights** + **Heat Map** | Sleeping items surfaced in Insights mirror the indigo overlays in the closet — one click to flag for donation |
+| **Insights** + **Gap Card** | The Insights tab reuses `getGapSuggestions()` so the same gap signal that appears at home also drives an actionable shopping flow |
 | **TripFit** + **Gap Card** | A packing plan that also surfaces what you'd need to buy for the trip |
 | **TripFit** + **Occasion Quick-Switch** | Per-trip occasion selection (e.g. "Work" for a conference trip, "Athletic" for a ski trip) shapes every day's outfit independently |
 | **AQI/Pollen** + **Sensitivities** | Outfit notes that are personalized to your health context, not generic weather advice |
@@ -437,26 +506,48 @@ Some features are more powerful in combination:
 
 ## Navigation Map
 
+Routing is now driven by Expo Router (`app/` directory) with native iOS tabs via `expo-router/unstable-native-tabs`. There is no JS tab bar.
+
 ```
-Root Navigator
-├── App (AppTabs)
-│   ├── Home tab        → MainPage → WeatherHUD → OutfitSuggestion
-│   │                       ├── Occasion chips        [Feature 1]
-│   │                       ├── Gap card              [Feature 2]
-│   │                       ├── Score badge + Share   [Features 9, 10]
-│   │                       └── 📷 Scan button        [Feature 11]
-│   ├── Closet tab      → ClosetPage → ClosetView
-│   │                       ├── Tile heat map overlays [Feature 6]
-│   │                       └── ✈️ TripFit button      [Feature 8]
-│   └── Style tab       → PreferencesScreen
-│                           ├── History timeline       [Feature 3]
-│                           ├── Wear pattern bars      [Feature 4]
-│                           ├── Style Ranker DNA card  [Feature 9]
-│                           └── Sensitivities toggles  [Feature 5]
+app/
+├── _layout.tsx                  Root: providers + ErrorBoundary + AuthGate
 │
-└── Account (AccountStack)
-    ├── Settings
-    ├── History                                        [Feature 3]
-    ├── TripFit                                        [Feature 8]
-    └── ScanOutfit                                     [Feature 11]
+├── (auth)/                      Logged-out group
+│   ├── login.tsx                LoginPage  → "Forgot password?"      [Feature 13]
+│   ├── signup.tsx               SignupPage
+│   ├── onboarding.tsx           OnboardingPage (first run)
+│   ├── forgot-password.tsx      ForgotPasswordPage                   [Feature 13]
+│   └── reset-password.tsx       ResetPasswordPage (deep link)        [Feature 13]
+│
+├── (tabs)/                      Native iOS tabs (logged-in)
+│   ├── index.tsx       Home     MainPage → WeatherHUD → OutfitSuggestion
+│   │                              ├── Occasion chips                 [Feature 1]
+│   │                              ├── Gap card                       [Feature 2]
+│   │                              └── Score badge + Share            [Features 9, 10]
+│   ├── closet.tsx      Closet   ClosetPage → ClosetView
+│   │                              ├── Tile heat map overlays         [Feature 6]
+│   │                              └── ✈️ TripFit entry                [Feature 8]
+│   ├── camera.tsx      Add      Redirect → fullScreenModal /camera
+│   ├── style.tsx       Style    PreferencesScreen
+│   │                              ├── History timeline               [Feature 3]
+│   │                              ├── Wear pattern bars              [Feature 4]
+│   │                              ├── Style Ranker DNA card          [Feature 9]
+│   │                              └── Sensitivities toggles          [Feature 5]
+│   └── insights.tsx    Insights InsightsPage                         [Feature 12]
+│
+├── camera.tsx                   Full-screen modal: CameraPage (TFLite identify)
+│
+└── account/                     Settings + sub-screens (push navigation)
+    ├── index.tsx                Account home
+    ├── profile.tsx
+    ├── password.tsx
+    ├── preferences.tsx
+    ├── permissions.tsx
+    ├── notifications.tsx
+    ├── location.tsx
+    ├── units.tsx
+    ├── history.tsx                                                   [Feature 3]
+    ├── tripfit.tsx                                                   [Feature 8]
+    ├── data-usage.tsx
+    └── legal.tsx
 ```

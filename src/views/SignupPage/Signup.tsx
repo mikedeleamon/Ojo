@@ -139,8 +139,9 @@ export default function SignupPage({ onLogin }: Props) {
                 AuthState & { settings: Settings }
             >('/api/auth/signup', form);
             await saveAuth(data.token, data.user);
+            // AuthGate handles the redirect to /(auth)/onboarding for new users
+            // and /(tabs) for users who've completed onboarding.
             onLogin?.();
-            nav.replace('/(auth)/onboarding');
         } catch (err: unknown) {
             setError(getErrorMessage(err, 'Sign up failed. Please try again.'));
         } finally {
@@ -195,7 +196,12 @@ export default function SignupPage({ onLogin }: Props) {
                 >
                     <Text style={styles.title}>Create account</Text>
                     {error ? (
-                        <View style={styles.errorBox}>
+                        <View
+                            style={styles.errorBox}
+                            accessibilityLiveRegion="assertive"
+                            accessible
+                            accessibilityLabel={error}
+                        >
                             <Text style={styles.errorText}>{error}</Text>
                         </View>
                     ) : null}
@@ -230,6 +236,7 @@ export default function SignupPage({ onLogin }: Props) {
                                 }
                                 value={form[f.key]}
                                 onChangeText={set(f.key)}
+                                accessibilityLabel={f.label}
                             />
                         </View>
                     ))}
@@ -238,6 +245,9 @@ export default function SignupPage({ onLogin }: Props) {
                         style={[styles.btn, loading && { opacity: 0.5 }]}
                         onPress={handleSubmit}
                         disabled={loading}
+                        accessibilityRole="button"
+                        accessibilityLabel={loading ? 'Creating account' : 'Create account'}
+                        accessibilityState={{ busy: loading, disabled: loading }}
                     >
                         <Text style={styles.btnText}>
                             {loading ? 'Creating account…' : 'Create account'}
@@ -248,7 +258,11 @@ export default function SignupPage({ onLogin }: Props) {
                         <Text style={styles.footerText}>
                             Already have an account?{' '}
                         </Text>
-                        <Pressable onPress={() => nav.goBack()}>
+                        <Pressable
+                            onPress={() => nav.goBack()}
+                            accessibilityRole="link"
+                            accessibilityLabel="Sign in"
+                        >
                             <Text style={styles.link}>Sign in</Text>
                         </Pressable>
                     </View>

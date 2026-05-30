@@ -14,6 +14,7 @@ import Animated, {
     Easing as REasing,
 } from 'react-native-reanimated';
 import { useSpinAnimation } from '../../hooks/useSpinAnimation';
+import { useTabBarPadding } from '../../hooks/useTabBarPadding';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Svg, Circle, Path } from 'react-native-svg';
@@ -55,6 +56,7 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
     const st = useMemo(() => makeStyles(colors), [colors]);
     const { setFooterBg } = useWeatherTheme();
     const { top: topInset } = useSafeAreaInsets();
+    const tabPad = useTabBarPadding();
     const nav = useAppNavigation();
     const [city, setCity] = useState<CityData | null>(null);
     const [weather, setWeather] = useState<CurrentWeather | null>(null);
@@ -348,7 +350,7 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
                     pointerEvents={loading ? 'none' : 'auto'}
                 >
                     <ScrollView
-                        contentContainerStyle={st.scroll}
+                        contentContainerStyle={[st.scroll, { paddingBottom: tabPad }]}
                         showsVerticalScrollIndicator={false}
                         refreshControl={
                             <RefreshControl

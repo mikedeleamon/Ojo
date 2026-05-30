@@ -6,6 +6,10 @@
  *
  * Background/border styles are stripped before forwarding to GlassView so they
  * don't add a semi-transparent overlay on top of the native glass material.
+ *
+ * The in-app theme is propagated to the system via the ojo-ui-style module
+ * (UIWindow.overrideUserInterfaceStyle), so `colorScheme="auto"` resolves to
+ * the correct appearance for both system-driven and user-overridden themes.
  */
 
 import { forwardRef } from 'react';
@@ -44,6 +48,9 @@ const GlassCard = forwardRef<View, GlassCardProps>(
         <GlassView
           ref={ref}
           glassEffectStyle={glassStyle}
+          // 'auto' resolves to the window's overrideUserInterfaceStyle, which
+          // ThemeContext drives via the ojo-ui-style native module. So this
+          // tracks the in-app theme without needing any prop plumbing here.
           colorScheme="auto"
           style={[styles.base, passStyle]}
           {...rest}

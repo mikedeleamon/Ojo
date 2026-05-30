@@ -15,7 +15,7 @@ export const LEGAL_URLS = {
   termsOfService:  'https://www.ojoapp.io/terms',
 } as const;
 
-export const EFFECTIVE_DATE = 'June 15, 2026';
+export const EFFECTIVE_DATE = 'May 29, 2026';
 export const DEVELOPER_NAME = 'Ojo Studio, LLC';
 export const CONTACT_EMAIL  = 'support@ojoapp.io';
 export const WEBSITE_URL    = 'https://www.ojoapp.io';
@@ -75,40 +75,44 @@ export const PRIVACY_POLICY: LegalDocument = {
         'Email address — used to create and authenticate your account',
         'Username — a display name of your choosing',
         'Location (city name) — entered manually to retrieve local weather data for outfit suggestions',
-        'Clothing and wardrobe data — descriptions, categories, colours, fabrics, and images of clothing items',
+        'Clothing item photos and metadata — images you upload or capture of your garments, plus descriptions, categories, colours, fabrics, and (optionally) merchant and purchase price',
         'Outfit wear history — records of which outfit suggestions you marked as "Wore this today"',
+        'Push notification token — a device-specific token used solely to deliver notifications you have enabled (e.g. morning brief, weather changes)',
+        'Trip information (optional, only if you connect Gmail) — airline name, confirmation number, travel dates, and origin/destination airports parsed from airline confirmation emails',
         'Device information — device model, OS version, and app version',
-        'Usage analytics — feature interactions and session duration (aggregated and anonymised)',
         'Crash reports — error logs to help us identify and fix bugs',
       ],
     },
     {
       heading: '3. How We Use Your Information',
       body: [
-        'We use the information we collect solely to operate and improve the App: account creation and authentication; generating personalised outfit suggestions based on your closet, preferences, and local weather; remembering your style preferences and outfit history across sessions; and diagnosing crashes.',
+        'We use the information we collect solely to operate and improve the App: account creation and authentication; generating personalised outfit suggestions based on your closet, preferences, and local weather; remembering your style preferences and outfit history across sessions; sending notifications you have enabled; powering the optional Smart Trip Planner; and diagnosing crashes.',
         'We do not use your data for advertising, and we do not sell your personal information to any third party.',
       ],
     },
     {
       heading: '4. How We Store and Protect Your Information',
       body: [
-        'Your account data, closets, and clothing articles are stored in MongoDB Atlas, a cloud database service. All data is transmitted over HTTPS/TLS encrypted connections. We implement access controls limiting database access to authorised systems only.',
+        'Your account data, closet metadata, outfit history, and trip information are stored in MongoDB Atlas, a cloud database service. The images of your clothing items are stored on Cloudflare R2, an object-storage service used as our image CDN; image filenames are random identifiers that contain no personal information. All data is transmitted over HTTPS/TLS encrypted connections, and access is limited to authorised systems.',
         'No method of electronic storage or transmission is 100% secure. If a breach occurs that is likely to affect your rights, we will notify you promptly.',
       ],
     },
     {
       heading: '5. Third-Party Services',
-      body: ['The App uses a limited number of third-party services to function:'],
+      body: ['The App uses a limited number of third-party services to function. Each service receives only the data needed to perform its role:'],
       bullets: [
-        'AccuWeather API — used to retrieve weather conditions for your specified city. Your city name is sent to AccuWeather to fetch local weather data.',
-        'MongoDB Atlas — cloud database provider used to store your account and wardrobe data.',
+        'MongoDB Atlas — cloud database used to store your account, closet metadata, outfit history, and trip information.',
+        'Cloudflare R2 — object storage used to host the clothing item images you upload or capture. Images are served via CDN over HTTPS.',
+        'AccuWeather API — receives the city name you have set in order to return local weather conditions. AccuWeather does not receive your account identifier.',
+        'Expo Push Notification Service — receives your device push token (and the contents of the notifications you have enabled) so it can deliver them to your device.',
+        'Google (Gmail API, optional) — only invoked if you connect Gmail in the Smart Trip Planner. We request read-only access to your Gmail (scope: gmail.readonly) for the sole purpose of scanning airline confirmation emails to populate your trip list. The refresh token granting this access is stored server-side; you can revoke it at any time from inside the App, which removes the token from our servers. We never read, store, or transmit the body or attachments of emails other than the structured trip fields (airline, dates, airports, confirmation number) extracted from airline confirmations.',
       ],
     },
     {
       heading: '6. Data Sharing and Disclosure',
       body: ['We do not sell, rent, or trade your personal information. We may disclose your information only in these limited circumstances:'],
       bullets: [
-        'Service providers: Third-party vendors (e.g., MongoDB Atlas) under strict confidentiality obligations.',
+        'Service providers: Third-party vendors (MongoDB Atlas, Cloudflare R2, AccuWeather, Expo Push, and — only if you connect Gmail — Google) acting on our behalf under their published privacy and security terms.',
         'Legal compliance: If required by law, court order, or governmental authority.',
         'Safety: To protect the rights, property, or safety of our users or the public.',
         'Business transfer: If we merge with or are acquired by another company, with advance notice to you.',

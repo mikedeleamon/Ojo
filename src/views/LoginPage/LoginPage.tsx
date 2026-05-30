@@ -99,6 +99,13 @@ export default function LoginPage({ onLogin }: Props) {
             color: colors.textPrimary,
             textDecorationLine: 'underline',
         },
+        forgotRow: { width: '100%', alignItems: 'flex-end', marginTop: -spacing.xs },
+        forgotLink: {
+            fontFamily: fonts.body,
+            fontSize: fontSizes.sm,
+            color: colors.textSecondary,
+            textDecorationLine: 'underline',
+        },
     }), [colors]);
 
     const nav = useAppNavigation();
@@ -193,6 +200,16 @@ export default function LoginPage({ onLogin }: Props) {
                                     accessibilityLabel="Password"
                                 />
                             </View>
+                        </View>
+
+                        <View style={styles.forgotRow}>
+                            <Pressable
+                                onPress={() => nav.push('/(auth)/forgot-password')}
+                                accessibilityRole="link"
+                                accessibilityLabel="Forgot password"
+                            >
+                                <Text style={styles.forgotLink}>Forgot password?</Text>
+                            </Pressable>
                         </View>
 
                         <Pressable

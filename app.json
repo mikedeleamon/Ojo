@@ -6,12 +6,12 @@
     "scheme": "ojo",
     "orientation": "portrait",
     "icon": "./assets/ojo_app_icon@1x.png",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/ojoLogo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#87DE5A"
+      "backgroundColor": "#000000"
     },
     "ios": {
       "supportsTablet": false,
@@ -46,8 +46,16 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Ojo uses your photo library to add clothing images.",
+          "photosPermission": "Ojo uses your photo library to add clothing images to add to your closet.",
           "cameraPermission": "Ojo uses your camera so you can photograph clothing items to add to your closet."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Ojo uses your camera so you can photograph clothing items to add to your closet.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
         }
       ],
       [

@@ -10,9 +10,11 @@ export interface ArticleFormData {
   clothingCategory: string;
   fabricType:       string;
   color:            string;
+  gender?:          string;
   isAccessory:      boolean;
   bodyZone?:        BodyZone;
   merchant:         string;
+  purchasePrice?:   number;
   imageUrl:         string;
   detectedGarmentType?:      GarmentType;
   detectedColors?:           DetectedColor[];
@@ -85,6 +87,7 @@ export interface Settings {
   hiTempThreshold: number;
   lowTempThreshold: number;
   humidityPreference: number;
+  gender?:         string;
   occasion?:       OutfitOccasion;  // optional — defaults to 'everyday' if not set
   sensitivities?:  { allergies?: boolean; asthma?: boolean };
 }
@@ -97,9 +100,11 @@ export interface ClothingArticle {
   clothingCategory?:string;
   fabricType?:      string;
   color?:           string;
+  gender?:          string;
   isAccessory?:     boolean;
   bodyZone?:        BodyZone;
   merchant?:        string;
+  purchasePrice?:   number;
   imageUrl?:        string;
   createdAt?:       string;
   detectedGarmentType?:      GarmentType;

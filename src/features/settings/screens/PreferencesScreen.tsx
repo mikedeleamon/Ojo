@@ -16,6 +16,7 @@ import {
     GlassCard,
 } from '../../../components/primitives';
 import { useSettings } from '../../../hooks/useSettings';
+import { useTabBarPadding } from '../../../hooks/useTabBarPadding';
 import { useFocusEffect } from 'expo-router';
 import { spacing, radius, fonts, fontSizes, fontWeights } from '../../../theme/tokens';
 import { useTheme, ThemeMode } from '../../../theme/ThemeContext';
@@ -26,9 +27,11 @@ import {
     UserPreferenceProfile,
     computeStyleDNA,
     StyleDNA,
+    PERSONALIZATION_THRESHOLD,
 } from '../../../lib/userPreferences';
 import { OutfitHistoryEntry } from '../../../types';
 import { CSS_COLORS } from '../../../lib/colors/cssColors';
+import { GENDERS } from '../../../lib/colors/palettes';
 
 const STYLES = [
     'Casual',
@@ -390,7 +393,6 @@ const LEVEL_COLORS: Record<StyleDNA['level'], string> = {
     learning: 'rgba(251,191,36,0.9)',
     active:   'rgba(99,102,241,0.9)',
 };
-const LEVEL_PROGRESS: Record<StyleDNA['level'], number> = { none: 0.15, learning: 0.5, active: 1.0 };
 
 const StyleDNACard = ({
     prefs,
@@ -402,7 +404,10 @@ const StyleDNACard = ({
     const { colors } = useTheme();
     const dna = computeStyleDNA(prefs);
     const levelColor = LEVEL_COLORS[dna.level];
-    const progress   = LEVEL_PROGRESS[dna.level];
+    // Continuous progress: 0 → 30 outfits maps linearly to 0% → 100%, so the
+    // bar tracks how close the user is to "Personalized" rather than jumping
+    // in three discrete steps tied only to `level`.
+    const progress = Math.min(1, dna.totalOutfits / PERSONALIZATION_THRESHOLD);
 
     return (
         <View style={styles.dnaCard}>
@@ -501,7 +506,9 @@ const PatternsSection = ({
 export default function PreferencesScreen() {
     const { colors, mode, setMode } = useTheme();
     const styles = useMemo(() => makeStyles(colors), [colors]);
-    // NativeTabs handles content insets automatically
+    // NativeTabs reports a baseline safe-area inset, but the iOS 26 floating
+    // tab bar still occludes the last scroll item — pad explicitly.
+    const tabPad = useTabBarPadding();
 
     const [history, setHistory] = useState<OutfitHistoryEntry[]>([]);
     const [prefs, setPrefs] = useState<UserPreferenceProfile>({
@@ -517,6 +524,7 @@ export default function PreferencesScreen() {
 
     const { settings, saveSettings, settingsReady } = useSettings();
     const [clothingStyle, setClothingStyle] = useState(settings.clothingStyle);
+    const [gender,        setGender]        = useState(settings.gender || 'All');
     const [location, setLocation] = useState(settings.location);
     const [tempScale, setTempScale] = useState<'Imperial' | 'Metric'>(
         settings.temperatureScale as 'Imperial' | 'Metric',
@@ -543,6 +551,7 @@ export default function PreferencesScreen() {
         if (!settingsReady) return;
         const isCelsius = settings.temperatureScale === 'Metric';
         setClothingStyle(settings.clothingStyle);
+        setGender(settings.gender || 'All');
         setLocation(settings.location);
         setTempScale(settings.temperatureScale as 'Imperial' | 'Metric');
         setHiTemp(settings.hiTempThreshold);
@@ -556,6 +565,7 @@ export default function PreferencesScreen() {
 
     const currentSettings = (overrides: Partial<typeof settings>) => ({
         clothingStyle,
+        gender,
         location,
         temperatureScale: tempScale,
         hiTempThreshold: hiTemp,
@@ -577,6 +587,11 @@ export default function PreferencesScreen() {
     const handleStyleChange = (s: string) => {
         setClothingStyle(s);
         saveSettings(currentSettings({ clothingStyle: s })).catch(() => {});
+    };
+
+    const handleGenderChange = (g: string) => {
+        setGender(g);
+        saveSettings(currentSettings({ gender: g })).catch(() => {});
     };
 
     const handleScaleChange = (scale: 'Imperial' | 'Metric') => {
@@ -602,7 +617,7 @@ export default function PreferencesScreen() {
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             >
                 <ScrollView
-                    contentContainerStyle={styles.content}
+                    contentContainerStyle={[styles.content, { paddingBottom: tabPad }]}
                     keyboardShouldPersistTaps='handled'
                 >
                     {/* Outfit history */}
@@ -675,6 +690,33 @@ export default function PreferencesScreen() {
                                         clothingStyle === s && styles.chipTextActive,
                                     ]}>
                                         {s}
+                                    </Text>
+                                </Pressable>
+                            ))}
+                        </View>
+                    </View>
+
+                    {/* Wardrobe gender */}
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Wardrobe style</Text>
+                        <View style={styles.chipGrid}>
+                            {GENDERS.map((g) => (
+                                <Pressable
+                                    key={g}
+                                    style={[
+                                        styles.chip,
+                                        gender === g && styles.chipActive,
+                                    ]}
+                                    onPress={() => handleGenderChange(g)}
+                                    accessibilityRole="radio"
+                                    accessibilityLabel={g}
+                                    accessibilityState={{ selected: gender === g }}
+                                >
+                                    <Text style={[
+                                        styles.chipText,
+                                        gender === g && styles.chipTextActive,
+                                    ]}>
+                                        {g}
                                     </Text>
                                 </Pressable>
                             ))}

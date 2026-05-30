@@ -7,15 +7,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Svg, Path, Circle } from 'react-native-svg';
 import { View, Text, Pressable, GlassCard, GlassGroup } from '../../components/primitives';
 import { useSettings } from '../../hooks/useSettings';
-import { storage } from '../../lib/storage';
+import { markOnboardingComplete } from '../../lib/onboarding';
 import { auth } from '../../lib/auth';
 import axios from '../../api/client';
 import { spacing, radius, fonts, fontSizes, fontWeights, shadows } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 import { ColorTokens } from '../../theme/tokens';
 import { makeStyles } from './OnboardingPage.styles';
+import { GENDERS } from '../../lib/colors/palettes';
 
-const ONBOARD_KEY = 'ojo_onboarding_done';
 const STYLES_LIST = ['Casual', 'Business Casual', 'Formal', 'Athletic', 'Streetwear', 'Minimalist'];
 const TEMP_UNITS  = ['Imperial', 'Metric'] as const;
 const TOTAL_STEPS = 4;
@@ -109,8 +109,9 @@ export default function OnboardingPage({ onComplete }: Props) {
   const [closetErr,     setClosetErr]     = useState<string | null>(null);
   const [closetLoading, setClosetLoading] = useState(false);
 
-  const [styleChoice, setStyleChoice] = useState(settings.clothingStyle || 'Casual');
-  const [tempUnit,    setTempUnit]    = useState<'Imperial' | 'Metric'>(
+  const [styleChoice,  setStyleChoice]  = useState(settings.clothingStyle || 'Casual');
+  const [genderChoice, setGenderChoice] = useState<string>(settings.gender || 'All');
+  const [tempUnit,     setTempUnit]     = useState<'Imperial' | 'Metric'>(
     (settings.temperatureScale as 'Imperial' | 'Metric') || 'Imperial',
   );
 
@@ -152,14 +153,14 @@ export default function OnboardingPage({ onComplete }: Props) {
 
   const handleFinish = async () => {
     try {
-      await saveSettings({ ...settings, clothingStyle: styleChoice, temperatureScale: tempUnit });
+      await saveSettings({ ...settings, clothingStyle: styleChoice, temperatureScale: tempUnit, gender: genderChoice });
     } catch { /* non-fatal */ }
-    await storage.setItem(ONBOARD_KEY, 'true');
+    await markOnboardingComplete();
     advance(4);
   };
 
   const handleSkip = async () => {
-    await storage.setItem(ONBOARD_KEY, 'true');
+    await markOnboardingComplete();
     onComplete?.();
   };
 
@@ -225,11 +226,20 @@ export default function OnboardingPage({ onComplete }: Props) {
                       </Svg>
                     </GlassCard>
                   </GlassGroup>
-                  <Pressable style={st.primaryBtn} onPress={() => advance(2)}>
+                  <Pressable
+                    style={st.primaryBtn}
+                    onPress={() => advance(2)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Let's go"
+                  >
                     <Text style={st.primaryBtnText}>Let's go</Text>
                     <ArrowRight color={colors.saveBtnText} />
                   </Pressable>
-                  <Pressable onPress={handleSkip}>
+                  <Pressable
+                    onPress={handleSkip}
+                    accessibilityRole="button"
+                    accessibilityLabel="Skip setup"
+                  >
                     <Text style={st.skipLink}>Skip setup</Text>
                   </Pressable>
                 </View>
@@ -280,6 +290,9 @@ export default function OnboardingPage({ onComplete }: Props) {
                         style={[st.primaryBtn, (closetLoading || !closetName.trim()) && st.primaryBtnDisabled]}
                         onPress={handleCreateCloset}
                         disabled={closetLoading || !closetName.trim()}
+                        accessibilityRole="button"
+                        accessibilityLabel={closetLoading ? 'Creating closet' : 'Create closet'}
+                        accessibilityState={{ busy: closetLoading, disabled: closetLoading || !closetName.trim() }}
                       >
                         <Text style={st.primaryBtnText}>{closetLoading ? 'Creating…' : 'Create closet'}</Text>
                       </Pressable>
@@ -287,13 +300,21 @@ export default function OnboardingPage({ onComplete }: Props) {
                   )}
 
                   <View style={st.navRow}>
-                    <Pressable style={st.ghostBtn} onPress={() => goBack(1)}>
+                    <Pressable
+                      style={st.ghostBtn}
+                      onPress={() => goBack(1)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Back"
+                    >
                       <Text style={st.ghostBtnText}>Back</Text>
                     </Pressable>
                     <Pressable
                       style={[st.primaryBtn, (!closetDone && !closetErr) && st.primaryBtnDisabled]}
                       onPress={() => advance(3)}
                       disabled={!closetDone && !closetErr}
+                      accessibilityRole="button"
+                      accessibilityLabel={closetErr ? 'Skip this step' : 'Next'}
+                      accessibilityState={{ disabled: !closetDone && !closetErr }}
                     >
                       <Text style={st.primaryBtnText}>{closetErr ? 'Skip this step' : 'Next'}</Text>
                       <ArrowRight color={colors.saveBtnText} />
@@ -327,8 +348,29 @@ export default function OnboardingPage({ onComplete }: Props) {
                           key={s}
                           style={[st.chip, styleChoice === s && st.chipActive]}
                           onPress={() => setStyleChoice(s)}
+                          accessibilityRole="radio"
+                          accessibilityLabel={s}
+                          accessibilityState={{ selected: styleChoice === s }}
                         >
                           <Text style={[st.chipText, styleChoice === s && st.chipTextActive]}>{s}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+
+                  <View style={st.prefSection}>
+                    <Text style={st.prefLabel}>Wardrobe style</Text>
+                    <View style={st.chipGrid}>
+                      {GENDERS.map(g => (
+                        <Pressable
+                          key={g}
+                          style={[st.chip, genderChoice === g && st.chipActive]}
+                          onPress={() => setGenderChoice(g)}
+                          accessibilityRole="radio"
+                          accessibilityLabel={g}
+                          accessibilityState={{ selected: genderChoice === g }}
+                        >
+                          <Text style={[st.chipText, genderChoice === g && st.chipTextActive]}>{g}</Text>
                         </Pressable>
                       ))}
                     </View>
@@ -346,6 +388,9 @@ export default function OnboardingPage({ onComplete }: Props) {
                             i < TEMP_UNITS.length - 1 && st.segDivider,
                           ]}
                           onPress={() => setTempUnit(u)}
+                          accessibilityRole="radio"
+                          accessibilityLabel={u === 'Imperial' ? 'Fahrenheit, Imperial' : 'Celsius, Metric'}
+                          accessibilityState={{ selected: tempUnit === u }}
                         >
                           <Text style={[st.segText, tempUnit === u && st.segTextActive]}>
                             {u === 'Imperial' ? '°F Imperial' : '°C Metric'}
@@ -356,10 +401,20 @@ export default function OnboardingPage({ onComplete }: Props) {
                   </View>
 
                   <View style={st.navRow}>
-                    <Pressable style={st.ghostBtn} onPress={() => goBack(2)}>
+                    <Pressable
+                      style={st.ghostBtn}
+                      onPress={() => goBack(2)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Back"
+                    >
                       <Text style={st.ghostBtnText}>Back</Text>
                     </Pressable>
-                    <Pressable style={st.primaryBtn} onPress={handleFinish}>
+                    <Pressable
+                      style={st.primaryBtn}
+                      onPress={handleFinish}
+                      accessibilityRole="button"
+                      accessibilityLabel="Finish setup"
+                    >
                       <Text style={st.primaryBtnText}>Finish setup</Text>
                       <ArrowRight color={colors.saveBtnText} />
                     </Pressable>

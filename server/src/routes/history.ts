@@ -40,9 +40,21 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       return;
     }
 
+    const wornAtDate = new Date(wornAt);
+    if (isNaN(wornAtDate.getTime())) {
+      res.status(400).json({ error: 'wornAt must be a valid date' });
+      return;
+    }
+    // Small skew tolerance so a client clock slightly ahead of the server
+    // doesn't get rejected.
+    if (wornAtDate.getTime() > Date.now() + 5 * 60 * 1000) {
+      res.status(400).json({ error: 'wornAt cannot be in the future' });
+      return;
+    }
+
     const entry = await OutfitHistory.findOneAndUpdate(
       { userId: req.userId, clientId: id },
-      { $setOnInsert: { userId: req.userId, clientId: id, wornAt: new Date(wornAt), closetId, closetName, articleIds: articleIds ?? [], articleSummary: articleSummary ?? '' } },
+      { $setOnInsert: { userId: req.userId, clientId: id, wornAt: wornAtDate, closetId, closetName, articleIds: articleIds ?? [], articleSummary: articleSummary ?? '' } },
       { upsert: true, new: true },
     );
     res.status(201).json({ id: entry.clientId });

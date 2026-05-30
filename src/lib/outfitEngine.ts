@@ -759,9 +759,14 @@ export const generateOutfits = (
   const bucket      = getWeatherBucket(effectiveFeelsLike, settings.hiTempThreshold, settings.lowTempThreshold);
 
   // ── Phase 1: Hard filter → role bucketing → pre-rank per bucket ───────────
+  const userGender = settings.gender ?? 'All';
   const byRole = new Map<OutfitRole, ClothingArticle[]>();
   for (const a of articles) {
     if (!isWeatherAppropriate(a, bucket)) continue;
+    // Skip items whose gender tag doesn't match the user's wardrobe preference.
+    // Unisex items and "All" users always pass through.
+    const itemGender = a.gender ?? 'Unisex';
+    if (userGender !== 'All' && itemGender !== 'Unisex' && itemGender !== userGender) continue;
     const r = roleOf(a);
     if (!byRole.has(r)) byRole.set(r, []);
     byRole.get(r)!.push(a);

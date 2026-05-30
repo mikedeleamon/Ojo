@@ -16,7 +16,7 @@ import type { GarmentType, FabricGuess, DetectedColor } from '../../services/clo
 import { ColorTokens, fonts, fontSizes, fontWeights, spacing, radius } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 
-import { CATEGORIES, COLORS, FABRICS } from '../../lib/colors/palettes';
+import { CATEGORIES, COLORS, FABRICS, ARTICLE_GENDERS } from '../../lib/colors/palettes';
 import {
   TYPE_GROUPS,
   TYPE_DEFAULTS,
@@ -57,8 +57,8 @@ import { makeSt } from './ArticleModal.styles';
 
 const EMPTY: ArticleFormData = {
   name: '', clothingType: '', topOrBottom: '', clothingCategory: '',
-  fabricType: '', color: '', isAccessory: false, bodyZone: undefined,
-  merchant: '', imageUrl: '',
+  fabricType: '', color: '', gender: 'Unisex', isAccessory: false, bodyZone: undefined,
+  merchant: '', purchasePrice: undefined, imageUrl: '',
   detectedGarmentType: undefined, detectedColors: undefined,
   detectedFabric: undefined, identificationConfidence: undefined,
 };
@@ -70,9 +70,11 @@ const toForm = (a: ClothingArticle): ArticleFormData => ({
   clothingCategory: a.clothingCategory ?? '',
   fabricType:       a.fabricType       ?? '',
   color:            a.color            ?? '',
+  gender:           a.gender           ?? 'Unisex',
   isAccessory:      a.isAccessory      ?? false,
   bodyZone:         a.bodyZone,
   merchant:         a.merchant         ?? '',
+  purchasePrice:    a.purchasePrice,
   imageUrl:         a.imageUrl         ?? '',
   detectedGarmentType:      a.detectedGarmentType,
   detectedColors:           a.detectedColors,
@@ -316,6 +318,7 @@ const ArticleModal = ({ closetId, onClose, onSubmit, initialData, onDelete, init
           next.clothingType = formType;
           const defaults = TYPE_DEFAULTS[formType] ?? {};
           next.topOrBottom  = defaults.topOrBottom  ?? f.topOrBottom;
+          next.gender       = defaults.gender       ?? 'Unisex';
           next.isAccessory  = defaults.isAccessory  ?? false;
           next.bodyZone     = defaults.isAccessory
             ? (defaults.bodyZone as BodyZone ?? f.bodyZone)
@@ -363,11 +366,17 @@ const ArticleModal = ({ closetId, onClose, onSubmit, initialData, onDelete, init
       const fabricIsAutoValue =
         f.fabricType === '' || f.fabricType === prevDefaults.fabricType;
 
+      // Gender: follow the new type's default only when the current value still
+      // matches the previous type's suggestion (i.e. user hasn't manually changed it).
+      const genderIsAutoValue =
+        f.gender === 'Unisex' || f.gender === prevDefaults.gender || f.gender === undefined;
+
       return {
         ...f,
         clothingType: type,
         topOrBottom:  newDefaults.topOrBottom ?? f.topOrBottom,
         fabricType:   fabricIsAutoValue ? (newDefaults.fabricType ?? '') : f.fabricType,
+        gender:       genderIsAutoValue ? (newDefaults.gender ?? 'Unisex') : f.gender,
         isAccessory:  newDefaults.isAccessory ?? false,
         bodyZone:     newDefaults.isAccessory
                         ? (newDefaults.bodyZone ?? f.bodyZone)  // accessory → keep or set zone
@@ -591,6 +600,14 @@ const ArticleModal = ({ closetId, onClose, onSubmit, initialData, onDelete, init
             onValueChange={v => set('clothingCategory', v)}
           />
 
+          {/* Gender — auto-set for Dress/Skirt/Blouse, always overridable */}
+          <ChipField
+            label='Gender'
+            value={form.gender ?? 'Unisex'}
+            items={[...ARTICLE_GENDERS]}
+            onValueChange={v => set('gender', v || 'Unisex')}
+          />
+
           {/* Fabric — auto-suggested for some types, always overridable */}
           <ChipField
             label='Fabric'
@@ -612,6 +629,25 @@ const ArticleModal = ({ closetId, onClose, onSubmit, initialData, onDelete, init
               value={form.merchant}
               onChangeText={v => set('merchant', v)}
               accessibilityLabel="Merchant"
+            />
+          </View>
+
+          {/* Purchase Price — optional; unlocks cost-per-wear analytics */}
+          <View style={st.field}>
+            <FieldLabel>
+              Purchase Price <Text style={st.optional}>(optional)</Text>
+            </FieldLabel>
+            <TextInput
+              style={st.input}
+              placeholder='e.g. 79.99'
+              placeholderTextColor={colors.textMuted}
+              keyboardType='decimal-pad'
+              value={form.purchasePrice != null ? String(form.purchasePrice) : ''}
+              onChangeText={v => {
+                const parsed = parseFloat(v);
+                set('purchasePrice', v === '' ? undefined : isNaN(parsed) ? undefined : parsed);
+              }}
+              accessibilityLabel="Purchase price in dollars (optional)"
             />
           </View>
 

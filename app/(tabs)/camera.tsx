@@ -1,91 +1,34 @@
-import { useEffect, useRef } from 'react';
-import { Alert, View, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
-import { captureImage, pickImage } from '../../src/lib/imageService';
+import { View } from 'react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
 
-// This screen acts as a pure action tab — it shows a transparent background
-// and immediately presents the photo-source picker when focused. After the user
-// picks an image (or cancels), it navigates to the Closet tab with the result.
-export default function CameraTab() {
+/**
+ * Camera tab — redirect placeholder.
+ *
+ * The native tab bar (expo-router/unstable-native-tabs) cannot intercept tab
+ * presses, so we use the focus event to push the top-level /camera fullScreen
+ * modal (defined at app/camera.tsx). The `return` param tells CameraPage
+ * where to land on close.
+ *
+ * The focus loop (dismissing the modal re-focuses this tab → re-pushes) is
+ * broken on the *modal* side: CameraPage uses router.dismissTo(return) which
+ * pops the modal AND switches the active tab in one atomic step, so we never
+ * re-focus this placeholder.
+ */
+export default function CameraTabRedirect() {
   const router = useRouter();
-  const hasActed = useRef(false);
 
   useFocusEffect(
     useCallback(() => {
-      // Reset guard so the sheet re-opens if the user returns to this tab
-      hasActed.current = false;
-
-      const open = async () => {
-        if (hasActed.current) return;
-        hasActed.current = true;
-
-        Alert.alert('Add Garment', 'Choose a photo source', [
-          {
-            text: 'Camera',
-            onPress: async () => {
-              const result = await captureImage();
-              if (result.error) {
-                Alert.alert('Error', result.error);
-                router.replace('/(tabs)/closet');
-                return;
-              }
-              if (result.uri && result.localUri && result.width && result.height) {
-                router.replace({
-                  pathname: '/(tabs)/closet',
-                  params: {
-                    quickAddUri: result.uri,
-                    quickAddLocalUri: result.localUri,
-                    quickAddWidth: String(result.width),
-                    quickAddHeight: String(result.height),
-                  },
-                });
-              } else {
-                router.replace('/(tabs)/closet');
-              }
-            },
-          },
-          {
-            text: 'Photo Library',
-            onPress: async () => {
-              const result = await pickImage();
-              if (result.error) {
-                Alert.alert('Error', result.error);
-                router.replace('/(tabs)/closet');
-                return;
-              }
-              if (result.uri && result.localUri && result.width && result.height) {
-                router.replace({
-                  pathname: '/(tabs)/closet',
-                  params: {
-                    quickAddUri: result.uri,
-                    quickAddLocalUri: result.localUri,
-                    quickAddWidth: String(result.width),
-                    quickAddHeight: String(result.height),
-                  },
-                });
-              } else {
-                router.replace('/(tabs)/closet');
-              }
-            },
-          },
-          {
-            text: 'Cancel',
-            style: 'cancel',
-            onPress: () => router.replace('/(tabs)/closet'),
-          },
-        ]);
-      };
-
-      open();
-    }, []),
+      // Object form avoids URL-parsing issues with the parens / slashes
+      // in the `return` value.
+      router.push({
+        pathname: '/camera',
+        params: { return: '/(tabs)' },
+      });
+    }, [router]),
   );
 
-  // Transparent screen — the alert sheet is the only visible UI
-  return <View style={styles.root} />;
+  // Blank black screen during the brief moment before the modal slides up.
+  return <View style={{ flex: 1, backgroundColor: '#000' }} />;
 }
-
-const styles = StyleSheet.create({
-  root: { flex: 1 },
-});

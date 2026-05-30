@@ -90,12 +90,29 @@ router.get('/settings', async (req: AuthRequest, res: Response): Promise<void> =
   }
 });
 
+const SETTINGS_EDITABLE_FIELDS = [
+  'clothingStyle',
+  'location',
+  'temperatureScale',
+  'hiTempThreshold',
+  'lowTempThreshold',
+  'humidityPreference',
+  'gender',
+] as const;
+
 router.put('/settings', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    // Merge individual fields rather than replacing the whole sub-document
+    // Merge individual fields rather than replacing the whole sub-document.
+    // Whitelist keys so callers cannot write arbitrary settings paths.
     const updateFields: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(req.body)) {
-      updateFields[`settings.${key}`] = value;
+    for (const field of SETTINGS_EDITABLE_FIELDS) {
+      if (Object.prototype.hasOwnProperty.call(req.body, field)) {
+        updateFields[`settings.${field}`] = req.body[field];
+      }
+    }
+    if (Object.keys(updateFields).length === 0) {
+      res.sendStatus(204);
+      return;
     }
     await User.findByIdAndUpdate(req.userId, { $set: updateFields });
     res.sendStatus(204);
