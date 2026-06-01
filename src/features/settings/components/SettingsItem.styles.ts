@@ -66,8 +66,7 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   },
 
   chevron: {
-    color:     colors.textSecondary,
-    opacity:   0.4,
+    color:     colors.textMuted,
     flexShrink: 0,
   },
 });

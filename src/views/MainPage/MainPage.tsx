@@ -5,13 +5,13 @@ import WeatherHUD from '../../components/WeatherHUD/WeatherHUD';
 import Loading from '../../components/Loading/Loading';
 import { useSettings } from '../../hooks/useSettings';
 import { getCurrentLocation, formatCoords } from '../../lib/location';
-import { useTheme } from '../../theme/ThemeContext';
+import { ForceDarkPalette } from '../../theme/ThemeContext';
+import { darkColors } from '../../theme/tokens';
 
 export default function MainPage() {
-  const { colors } = useTheme();
   const st = useMemo(() => StyleSheet.create({
-    root: { flex: 1, backgroundColor: colors.bgDefault },
-  }), [colors]);
+    root: { flex: 1, backgroundColor: darkColors.bgDefault },
+  }), []);
 
   const { settings, settingsReady } = useSettings();
   const [location,   setLocation]  = useState('');
@@ -29,16 +29,18 @@ export default function MainPage() {
   // Block only on settings (fast AsyncStorage read). WeatherHUD owns its own
   // loading state — showing a second outer spinner causes a position jerk on
   // mount and adds unnecessary latency while GPS resolves (up to 8 s).
-  if (!settingsReady) return <Loading />;
+  if (!settingsReady) return <ForceDarkPalette><Loading /></ForceDarkPalette>;
 
   return (
-    <View style={st.root}>
-      <WeatherHUD
-        location={location || settings.location}
-        settings={settings}
-        refreshKey={refreshKey}
-        onRefresh={handleRefresh}
-      />
-    </View>
+    <ForceDarkPalette>
+      <View style={st.root}>
+        <WeatherHUD
+          location={location || settings.location}
+          settings={settings}
+          refreshKey={refreshKey}
+          onRefresh={handleRefresh}
+        />
+      </View>
+    </ForceDarkPalette>
   );
 }

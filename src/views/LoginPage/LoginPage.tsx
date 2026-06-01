@@ -1,16 +1,18 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
     StyleSheet,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
-    Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { View, Text, TextInput, Pressable, GlassCard } from '../../components/primitives';
+import OjoLogoIcon from '../../components/icons/OjoLogoIcon';
 import axios from '../../api/client';
 import { AuthState, Settings } from '../../types';
 import { getErrorMessage, saveAuth } from '../../lib/auth';
+import { isAppleSignInAvailable, signInWithApple } from '../../lib/appleSignIn';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { spacing, radius, fonts, fontSizes, fontWeights } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
@@ -106,6 +108,29 @@ export default function LoginPage({ onLogin }: Props) {
             color: colors.textSecondary,
             textDecorationLine: 'underline',
         },
+        dividerRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            width: '100%',
+            gap: spacing.sm,
+            marginVertical: spacing.xs,
+        },
+        dividerLine: {
+            flex: 1,
+            height: StyleSheet.hairlineWidth,
+            backgroundColor: colors.glassBorder,
+        },
+        dividerText: {
+            fontFamily: fonts.body,
+            fontSize: fontSizes.xs,
+            color: colors.textMuted,
+            textTransform: 'uppercase',
+            letterSpacing: 1,
+        },
+        appleBtn: {
+            width: '100%',
+            height: 48,
+        },
     }), [colors]);
 
     const nav = useAppNavigation();
@@ -113,6 +138,30 @@ export default function LoginPage({ onLogin }: Props) {
     const [password, setPassword] = useState('');
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const [appleAvailable, setAppleAvailable] = useState(false);
+    const [appleLoading, setAppleLoading] = useState(false);
+
+    useEffect(() => {
+        let mounted = true;
+        isAppleSignInAvailable().then((ok) => {
+            if (mounted) setAppleAvailable(ok);
+        });
+        return () => { mounted = false; };
+    }, []);
+
+    const handleApple = async () => {
+        if (appleLoading) return;
+        setError(null);
+        setAppleLoading(true);
+        const result = await signInWithApple();
+        setAppleLoading(false);
+        if (result.ok) {
+            onLogin?.();
+            return;
+        }
+        if (result.cancelled) return; // silent — user dismissed the sheet
+        setError(result.error);
+    };
 
     const handleSubmit = async () => {
         setError(null);
@@ -145,13 +194,7 @@ export default function LoginPage({ onLogin }: Props) {
                     keyboardShouldPersistTaps='handled'
                 >
                     <GlassCard style={styles.card}>
-                        <Image
-                            source={require('../../assets/images/logos/ojoLogo.png')}
-                            style={styles.logo}
-                            resizeMode='contain'
-                            accessibilityLabel="Ojo"
-                            accessibilityRole="image"
-                        />
+                        <OjoLogoIcon width={styles.logo.width} height={styles.logo.height} />
                         <Text style={styles.tagline}>
                             Dress for the weather.
                         </Text>
@@ -224,6 +267,27 @@ export default function LoginPage({ onLogin }: Props) {
                                 {loading ? 'Signing in…' : 'Sign in'}
                             </Text>
                         </Pressable>
+
+                        {appleAvailable && (
+                            <>
+                                <View style={styles.dividerRow}>
+                                    <View style={styles.dividerLine} />
+                                    <Text style={styles.dividerText}>or</Text>
+                                    <View style={styles.dividerLine} />
+                                </View>
+                                <AppleAuthentication.AppleAuthenticationButton
+                                    buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                                    buttonStyle={
+                                        colors.bgDefault.toLowerCase() === '#f1f5f9'
+                                            ? AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                                            : AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                                    }
+                                    cornerRadius={radius.sm}
+                                    style={[styles.appleBtn, appleLoading && { opacity: 0.5 }]}
+                                    onPress={handleApple}
+                                />
+                            </>
+                        )}
 
                         <View style={styles.footer}>
                             <Text style={styles.footerText}>

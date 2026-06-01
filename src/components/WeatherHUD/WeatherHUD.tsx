@@ -5,7 +5,6 @@ import {
     Pressable,
     Animated as RNAnimated,
     Easing as RNEasing,
-    Image,
 } from 'react-native';
 import Animated, {
     useSharedValue,
@@ -23,6 +22,7 @@ import GearIcon from '../icons/GearIcon';
 import api from '../../api/client';
 import weatherConstants from '../../constants/weatherConstants';
 import WeatherIconDisplay from '../WeatherIconDisplay/WeatherIconDisplay';
+import SunnyIcon from '../WeatherIcons/SunnyIcon';
 import Loading from '../Loading/Loading';
 import WeatherDetails from '../WeatherDetails/WeatherDetails';
 import MinimizedWeatherDisplay from '../MinimizedWeatherDisplay/MinimizedWeatherDisplay';
@@ -31,7 +31,7 @@ import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { CityData, CurrentWeather, Forecast, Settings } from '../../types';
 import { spacing } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
-import { lerpGradient, lerpColor, easeInOut } from './colorMath';
+import { flattenHsl, hslToHex, lerpHslFlat } from './colorMath';
 
 // LinearGradient driven by a UI-thread worklet via useAnimatedProps. The
 // gradient's colors prop is updated directly on the native view each frame,
@@ -202,64 +202,75 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
         colors.bgDefault,
     ], [colors.bgDefault]);
 
-    const fromColors = useSharedValue<string[]>([...DEFAULT_GRADIENT]);
-    const toColors = useSharedValue<string[]>([...DEFAULT_GRADIENT]);
+    // Hex parsing happens once when from/to change (JS thread). The worklet
+    // only does numeric HSL interpolation + one hslToHex per stop per frame,
+    // avoiding ~6 `parseInt` calls per stop per frame that previously ran on
+    // the UI thread and were the dominant source of gradient jank.
+    const defaultHsl = useMemo(() => flattenHsl(DEFAULT_GRADIENT), [DEFAULT_GRADIENT]);
+    const fromHsl = useSharedValue<number[]>(defaultHsl);
+    const toHsl = useSharedValue<number[]>(defaultHsl);
     const progress = useSharedValue(1);
 
     const loadingOpacity = useRef(new RNAnimated.Value(1)).current;
 
-    // Compute target gradient from weather data
-    const targetGradient = weather
-        ? gradientFor(weather.WeatherText, weather.IsDayTime)
-        : DEFAULT_GRADIENT;
+    // Compute target gradient from weather data. Memoised so the dependency
+    // array gets a stable reference (was `.join(',')` on every render).
+    const targetGradient = useMemo(
+        () => (weather
+            ? gradientFor(weather.WeatherText, weather.IsDayTime)
+            : DEFAULT_GRADIENT),
+        [weather?.WeatherText, weather?.IsDayTime, DEFAULT_GRADIENT],
+    );
 
-    const prevTargetRef = useRef<string>(DEFAULT_GRADIENT.join(','));
+    const prevTargetRef = useRef<readonly string[]>(DEFAULT_GRADIENT);
 
     const animatedGradientProps = useAnimatedProps(() => {
         'worklet';
-        const from = fromColors.value;
-        const to = toColors.value;
+        const from = fromHsl.value;
+        const to = toHsl.value;
         const t = progress.value;
         const stagger = 0.15;
-        const n = to.length;
-        const result: string[] = [];
-        for (let i = 0; i < n; i++) {
-            const offset = (i / Math.max(1, n - 1)) * stagger;
+        const stops = to.length / 3;
+        const result: string[] = new Array(stops);
+        for (let i = 0; i < stops; i++) {
+            const offset = (i / Math.max(1, stops - 1)) * stagger;
             let stopT = (t - offset) / (1 - stagger);
             if (stopT < 0) stopT = 0;
             else if (stopT > 1) stopT = 1;
-            result.push(
-                lerpColor(from[i] ?? from[0], to[i] ?? to[0], easeInOut(stopT)),
-            );
+            const e = stopT < 0.5 ? 2 * stopT * stopT : 1 - Math.pow(-2 * stopT + 2, 2) / 2;
+            const b = i * 3;
+            const h1 = from[b],     s1 = from[b + 1], l1 = from[b + 2];
+            const h2 = to[b],       s2 = to[b + 1],   l2 = to[b + 2];
+            let dh = h2 - h1;
+            if (dh > 180) dh -= 360;
+            else if (dh < -180) dh += 360;
+            const h = s1 < 0.05 ? h2 : h1 + dh * e;
+            const s = s1 + (s2 - s1) * e;
+            const l = l1 + (l2 - l1) * e;
+            result[i] = hslToHex(h, s, l);
         }
         return { colors: result as unknown as [string, string, ...string[]] };
     });
 
     useEffect(() => {
-        const targetKey = targetGradient.join(',');
-        if (targetKey === prevTargetRef.current) return;
+        if (targetGradient === prevTargetRef.current) return;
 
         // Detect "first paint" (solid dark → vibrant weather) — use a longer
         // duration so the user really sees the colors shift through hue space.
-        const isFirstPaint =
-            prevTargetRef.current === DEFAULT_GRADIENT.join(',');
-        prevTargetRef.current = targetKey;
+        const isFirstPaint = prevTargetRef.current === DEFAULT_GRADIENT;
+        prevTargetRef.current = targetGradient;
 
-        // Snapshot whatever's currently on screen as the new "from", so an
-        // interruption mid-transition reads as a continuous shift, not a jump.
-        const snapshot = lerpGradient(
-            fromColors.value,
-            toColors.value,
-            progress.value,
-        );
-        fromColors.value = snapshot;
-        toColors.value = [...targetGradient];
+        // Snapshot the in-flight interpolation in HSL space so an interruption
+        // mid-transition reads as a continuous shift, not a jump.
+        const snapshot = lerpHslFlat(fromHsl.value, toHsl.value, progress.value);
+        fromHsl.value = snapshot;
+        toHsl.value = flattenHsl(targetGradient);
         progress.value = 0;
         progress.value = withTiming(1, {
             duration: isFirstPaint ? 2500 : 2000,
             easing: REasing.inOut(REasing.cubic),
         });
-    }, [targetGradient.join(',')]);
+    }, [targetGradient]);
 
     // Spinner fades out once weather data arrives; the content layer renders at
     // full opacity from the start so GlassView can sample the background
@@ -322,7 +333,7 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
 
     return (
         <AnimatedLinearGradient
-            colors={toColors.value as [string, string, ...string[]]}
+            colors={DEFAULT_GRADIENT as unknown as [string, string, ...string[]]}
             animatedProps={animatedGradientProps}
             style={st.root}
         >
@@ -331,14 +342,11 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
                 style={[st.loadingOverlay, { opacity: loadingOpacity }]}
                 pointerEvents={loading ? 'auto' : 'none'}
             >
-                <RNAnimated.Image
-                    source={require('../../assets/images/weatherIcons/Sunny.png')}
-                    style={[
-                        st.loadingIcon,
-                        { transform: [{ rotate: spinRotate }] },
-                    ]}
-                    resizeMode='contain'
-                />
+                <RNAnimated.View
+                    style={[st.loadingIcon, { transform: [{ rotate: spinRotate }] }]}
+                >
+                    <SunnyIcon size={st.loadingIcon.width} />
+                </RNAnimated.View>
             </RNAnimated.View>
 
             {/* Content renders at full opacity so GlassView can initialise its

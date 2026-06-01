@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   StyleSheet, Animated, TextInput as RNTextInput,
-  Image, ScrollView, KeyboardAvoidingView, Platform,
+  ScrollView, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Svg, Path, Circle } from 'react-native-svg';
 import { View, Text, Pressable, GlassCard, GlassGroup } from '../../components/primitives';
+import OjoLogoIcon from '../../components/icons/OjoLogoIcon';
 import { useSettings } from '../../hooks/useSettings';
 import { markOnboardingComplete } from '../../lib/onboarding';
 import { auth } from '../../lib/auth';
@@ -190,11 +191,7 @@ export default function OnboardingPage({ onComplete }: Props) {
               {step === 1 && (
                 <View style={st.stepShell}>
                   <Dots step={1} colors={colors} />
-                  <Image
-                    source={require('../../assets/images/logos/ojoLogo.png')}
-                    style={st.logo}
-                    resizeMode="contain"
-                  />
+                  <OjoLogoIcon width={st.logo.width} height={st.logo.height} />
                   <Text style={st.heading}>Welcome to Ojo</Text>
                   <Text style={st.sub}>
                     Let's take 60 seconds to set up your wardrobe so Ojo can suggest

@@ -19,7 +19,7 @@ import { useSettings } from '../../../hooks/useSettings';
 import { useTabBarPadding } from '../../../hooks/useTabBarPadding';
 import { useFocusEffect } from 'expo-router';
 import { spacing, radius, fonts, fontSizes, fontWeights } from '../../../theme/tokens';
-import { useTheme, ThemeMode } from '../../../theme/ThemeContext';
+import { useTheme } from '../../../theme/ThemeContext';
 import { fToC, cToF } from '../../../lib/units';
 import { loadHistory } from '../../../lib/outfitHistory';
 import {
@@ -45,11 +45,6 @@ const STYLES = [
     'Preppy',
 ];
 
-const APPEARANCE_MODES: { label: string; value: ThemeMode }[] = [
-    { label: 'Auto', value: 'auto' },
-    { label: 'Light', value: 'light' },
-    { label: 'Dark', value: 'dark' },
-];
 
 interface SliderFieldProps {
     label: string;
@@ -278,22 +273,6 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) => StyleSheet
         fontFamily: fonts.body,
         fontSize: fontSizes.xs,
     },
-    // Appearance segmented — full-width
-    appearanceSegmented: {
-        flexDirection: 'row',
-        gap: 4,
-        backgroundColor: colors.glassBg,
-        borderWidth: 1,
-        borderColor: colors.glassBorder,
-        borderRadius: radius.sm,
-        padding: 4,
-    },
-    appearanceSeg: {
-        flex: 1,
-        paddingVertical: 8,
-        borderRadius: 6,
-        alignItems: 'center',
-    },
 });
 
 const SliderField = ({
@@ -311,7 +290,7 @@ const SliderField = ({
         <View style={styles.sliderMeta}>
             <Text style={styles.sliderLabel}>{label}</Text>
             <Text style={styles.sliderValue}>
-                {value}
+                {Math.round(value)}
                 {unit}
             </Text>
         </View>
@@ -504,7 +483,7 @@ const PatternsSection = ({
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function PreferencesScreen() {
-    const { colors, mode, setMode } = useTheme();
+    const { colors } = useTheme();
     const styles = useMemo(() => makeStyles(colors), [colors]);
     // NativeTabs reports a baseline safe-area inset, but the iOS 26 floating
     // tab bar still occludes the last scroll item — pad explicitly.
@@ -641,33 +620,6 @@ export default function PreferencesScreen() {
                             <PatternsSection prefs={prefs} styles={styles} />
                         </View>
                     )}
-
-                    {/* Appearance */}
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Appearance</Text>
-                        <View style={styles.appearanceSegmented}>
-                            {APPEARANCE_MODES.map(({ label, value }) => (
-                                <Pressable
-                                    key={value}
-                                    style={[
-                                        styles.appearanceSeg,
-                                        mode === value && styles.segActive,
-                                    ]}
-                                    onPress={() => setMode(value)}
-                                    accessibilityRole="radio"
-                                    accessibilityLabel={label}
-                                    accessibilityState={{ selected: mode === value }}
-                                >
-                                    <Text style={[
-                                        styles.segText,
-                                        mode === value && styles.segTextActive,
-                                    ]}>
-                                        {label}
-                                    </Text>
-                                </Pressable>
-                            ))}
-                        </View>
-                    </View>
 
                     {/* Style preference */}
                     <View style={styles.section}>

@@ -22,7 +22,7 @@ function CustomSplash() {
   return (
     <View style={[styles.splashContainer, { backgroundColor: dark ? '#000000' : '#FFFFFF' }]}>
       <Image
-        source={dark ? require('../assets/ojoLogo.png') : require('../assets/ojo_word_logo_2.png')}
+        source={dark ? require('../assets/images/logos/ojoLogo.png') : require('../assets/images/logos/ojo_word_logo_2.png')}
         style={styles.splashLogo}
         resizeMode="contain"
       />

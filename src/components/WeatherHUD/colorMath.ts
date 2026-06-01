@@ -118,6 +118,78 @@ export const easeInOut = (t: number): number => {
     return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 };
 
+// ── Fast HSL path for the per-frame gradient worklet ─────────────────────────
+// Pre-parsing hex to HSL once on the JS side lets the UI-thread worklet skip
+// `parseInt` and `toString(16)` for the "from" side every frame. Only the
+// final HSL→hex serialisation happens in the worklet.
+
+/** Parse #RRGGBB / #RGB to [h, s, l]. JS-side (called once per transition). */
+export const hexToHsl = (hex: string): [number, number, number] => {
+    const [r, g, b] = hexToRgb(hex);
+    return rgbToHsl(r, g, b);
+};
+
+/** Flatten an array of hex colors to a packed [h0,s0,l0, h1,s1,l1, …] buffer. */
+export const flattenHsl = (colors: readonly string[]): number[] => {
+    const out: number[] = new Array(colors.length * 3);
+    for (let i = 0; i < colors.length; i++) {
+        const [h, s, l] = hexToHsl(colors[i]);
+        out[i * 3] = h;
+        out[i * 3 + 1] = s;
+        out[i * 3 + 2] = l;
+    }
+    return out;
+};
+
+const HEX_CHARS = '0123456789abcdef';
+
+/** HSL → #RRGGBB. Worklet-safe; avoids padStart by indexing a constant table. */
+export const hslToHex = (h: number, s: number, l: number): string => {
+    'worklet';
+    const [r, g, b] = hslToRgb(h, s, l);
+    const ri = r < 0 ? 0 : r > 255 ? 255 : Math.round(r);
+    const gi = g < 0 ? 0 : g > 255 ? 255 : Math.round(g);
+    const bi = b < 0 ? 0 : b > 255 ? 255 : Math.round(b);
+    return (
+        '#' +
+        HEX_CHARS[(ri >> 4) & 0xf] + HEX_CHARS[ri & 0xf] +
+        HEX_CHARS[(gi >> 4) & 0xf] + HEX_CHARS[gi & 0xf] +
+        HEX_CHARS[(bi >> 4) & 0xf] + HEX_CHARS[bi & 0xf]
+    );
+};
+
+/**
+ * Interpolate a packed HSL gradient with per-stop staggering and shortest-path
+ * hue blending. JS-side helper for snapshotting an in-flight transition.
+ */
+export const lerpHslFlat = (
+    from: readonly number[],
+    to: readonly number[],
+    t: number,
+): number[] => {
+    const stagger = 0.15;
+    const stops = from.length / 3;
+    const out = new Array(from.length);
+    for (let i = 0; i < stops; i++) {
+        const offset = (i / Math.max(1, stops - 1)) * stagger;
+        let stopT = (t - offset) / (1 - stagger);
+        if (stopT < 0) stopT = 0;
+        else if (stopT > 1) stopT = 1;
+        const e = easeInOut(stopT);
+        const b = i * 3;
+        const h1 = from[b],     s1 = from[b + 1], l1 = from[b + 2];
+        const h2 = to[b],       s2 = to[b + 1],   l2 = to[b + 2];
+        let dh = h2 - h1;
+        if (dh > 180) dh -= 360;
+        else if (dh < -180) dh += 360;
+        const h = s1 < 0.05 ? h2 : h1 + dh * e;
+        out[b]     = h;
+        out[b + 1] = s1 + (s2 - s1) * e;
+        out[b + 2] = l1 + (l2 - l1) * e;
+    }
+    return out;
+};
+
 /**
  * Interpolate an array of color stops with per-stop staggering.
  * Each stop's animation is offset by a small delay so the gradient appears to

@@ -4,6 +4,7 @@ import { View } from '../primitives';
 import { ColorTokens } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 import { useSpinAnimation } from '../../hooks/useSpinAnimation';
+import SunnyIcon from '../WeatherIcons/SunnyIcon';
 
 const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     root: {
@@ -22,11 +23,9 @@ const Loading = () => {
 
     return (
         <View style={styles.root}>
-            <Animated.Image
-                source={require('../../assets/images/weatherIcons/Sunny.png')}
-                style={[styles.icon, { transform: [{ rotate }] }]}
-                resizeMode='contain'
-            />
+            <Animated.View style={[styles.icon, { transform: [{ rotate }] }]}>
+                <SunnyIcon size={80} />
+            </Animated.View>
         </View>
     );
 };

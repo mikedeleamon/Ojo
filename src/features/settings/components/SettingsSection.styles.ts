@@ -26,7 +26,6 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     letterSpacing:  0.08 * fontSizes.xs,
     textTransform:  'uppercase' as const,
     color:          colors.textSecondary,
-    opacity:        0.45,
     paddingHorizontal: 4,
   },
 

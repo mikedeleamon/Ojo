@@ -28,7 +28,7 @@ interface GlassCardProps extends ViewProps {
 
 const GlassCard = forwardRef<View, GlassCardProps>(
   ({ style, glassStyle = 'regular', children, ...rest }, ref) => {
-    const { colors } = useTheme();
+    const { colors, isDark } = useTheme();
 
     if (LIQUID_GLASS) {
       // Strip properties that would muddy the native glass material
@@ -48,10 +48,11 @@ const GlassCard = forwardRef<View, GlassCardProps>(
         <GlassView
           ref={ref}
           glassEffectStyle={glassStyle}
-          // 'auto' resolves to the window's overrideUserInterfaceStyle, which
-          // ThemeContext drives via the ojo-ui-style native module. So this
-          // tracks the in-app theme without needing any prop plumbing here.
-          colorScheme="auto"
+          // Drive the material's appearance from our React context's isDark
+          // rather than the native UIWindow style. This lets ForceDarkPalette
+          // (used by MainPage) flip nested glass to dark even when the user's
+          // selected app theme is light.
+          colorScheme={isDark ? 'dark' : 'light'}
           style={[styles.base, passStyle]}
           {...rest}
         >

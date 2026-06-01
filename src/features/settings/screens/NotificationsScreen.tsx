@@ -10,6 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Slider from '@react-native-community/slider';
 import { View, Text, Pressable, GlassCard } from '../../../components/primitives';
 import Loading from '../../../components/Loading/Loading';
+import SunnyIcon from '../../../components/WeatherIcons/SunnyIcon';
 import { useSpinAnimation } from '../../../hooks/useSpinAnimation';
 import { NotificationSettings } from '../../../types';
 import {
@@ -476,11 +477,9 @@ export default function NotificationsScreen() {
           disabled={saving}
         >
           {saving
-            ? <Animated.Image
-                source={require('../../../../assets/images/weatherIcons/Sunny.png')}
-                style={{ width: 20, height: 20, transform: [{ rotate: savingRotate }] }}
-                resizeMode='contain'
-              />
+            ? <Animated.View style={{ width: 20, height: 20, transform: [{ rotate: savingRotate }] }}>
+                <SunnyIcon size={20} />
+              </Animated.View>
             : <Text style={s.saveBtnText}>Save Changes</Text>
           }
         </Pressable>

@@ -9,33 +9,38 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/ojoLogo.png",
+      "image": "./assets/images/logos/ojoLogo.png",
       "resizeMode": "contain",
       "backgroundColor": "#000000"
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.placeholder.ojo",
+      "bundleIdentifier": "com.ojostudio.ojo",
+      "usesAppleSignIn": true,
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Ojo uses your location to fetch local weather for outfit suggestions.",
         "NSCameraUsageDescription": "Ojo uses your camera so you can photograph clothing items to add to your closet.",
         "NSPhotoLibraryUsageDescription": "Ojo uses your photo library so you can add images of your clothing items.",
         "NSUserNotificationsUsageDescription": "Ojo sends daily outfit suggestions and weather alerts to help you dress for the day."
-      }
+      },
+      "appleTeamId": "37L8H5D9PQ"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/ojoLogo.png",
+        "foregroundImage": "./assets/images/logos/ojoLogo.png",
         "backgroundColor": "#87DE5A"
       },
-      "package": "com.placeholder.ojo",
+      "package": "com.ojostudio.ojo",
       "permissions": [
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
-        "READ_MEDIA_IMAGES"
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA"
       ]
     },
     "plugins": [
+      "expo-apple-authentication",
       "expo-secure-store",
       [
         "expo-location",

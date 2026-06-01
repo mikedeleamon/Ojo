@@ -7,7 +7,7 @@ export const useSpinAnimation = (durationMs = 10_000) => {
     const anim = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
-        if (reduceMotion) {
+        if (reduceMotion || durationMs <= 0) {
             anim.stopAnimation();
             anim.setValue(0);
             return;

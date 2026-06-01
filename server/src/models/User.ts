@@ -45,6 +45,10 @@ export interface IUser extends Document {
   // Forgot-password flow — only the SHA-256 hash of the reset token is stored
   resetPasswordTokenHash?: string;
   resetPasswordExpires?: Date;
+  // Sign in with Apple — Apple's stable per-app `sub` claim, used to find or
+  // link the local account. Indexed sparse so accounts that haven't used SIWA
+  // don't collide on a missing value.
+  appleSub?: string;
 }
 
 const settingsSchema = new Schema<ISettings>({
@@ -92,6 +96,9 @@ const userSchema = new Schema<IUser>({
   // Password reset — token hash never leaves the server
   resetPasswordTokenHash: { type: String, select: false },
   resetPasswordExpires:   { type: Date,   select: false },
+  // Sign in with Apple — Apple's per-app `sub`. Unique sparse so users
+  // without SIWA don't all collide on a missing field.
+  appleSub:               { type: String, unique: true, sparse: true },
 }, { timestamps: true });
 
 export default mongoose.model<IUser>('User', userSchema);

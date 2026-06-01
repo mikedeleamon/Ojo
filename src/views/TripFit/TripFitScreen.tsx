@@ -48,8 +48,12 @@ import type {
 
 interface DayPlan {
     day: DailyForecast;
-    outfit: OutfitResult;
+    candidates: OutfitResult[];
+    candidateIdx: number;
 }
+
+const activeOutfit = (p: DayPlan): OutfitResult =>
+    p.candidates[p.candidateIdx] ?? p.candidates[0];
 
 interface AccuDailyDay {
     EpochDate: number;
@@ -225,7 +229,8 @@ const DayCard = ({
     isReplanning: boolean;
     onReplan: () => void;
 }) => {
-    const articles = plan.outfit.slots.map(
+    const outfit = activeOutfit(plan);
+    const articles = outfit.slots.map(
         (s: { article: ClothingArticle }) => s.article,
     );
     const thumbSize = Math.floor(
@@ -285,7 +290,7 @@ const DayCard = ({
                     </RNView>
 
                     {/* Outfit note */}
-                    {plan.outfit.notes.length > 0 && (
+                    {outfit.notes.length > 0 && (
                         <Text
                             style={[
                                 dayCardSt.note,
@@ -293,7 +298,7 @@ const DayCard = ({
                             ]}
                             numberOfLines={2}
                         >
-                            {plan.outfit.notes[0]}
+                            {outfit.notes[0]}
                         </Text>
                     )}
 
@@ -334,9 +339,10 @@ const DayCard = ({
 
 const dayCardSt = StyleSheet.create({
     card: {
-        padding: spacing.sm,
+        padding: spacing.md,
         gap: 8,
         minHeight: 200,
+        borderRadius: radius.lg,
     },
     dateLabel: {
         fontFamily: fonts.bodySemiBold,
@@ -443,10 +449,10 @@ const SkeletonCard = ({ cardWidth }: { cardWidth: number }) => {
 
 const skSt = StyleSheet.create({
     card: {
-        padding: spacing.sm,
+        padding: spacing.md,
         gap: 10,
-        minHeight: 180,
-        borderRadius: radius.md,
+        minHeight: 200,
+        borderRadius: radius.lg,
     },
     line: {
         height: 11,
@@ -882,7 +888,9 @@ export default function TripFitScreen() {
         const seen = new Set<string>();
         const result: ClothingArticle[] = [];
         for (const plan of plans) {
-            for (const slot of plan.outfit.slots) {
+            const outfit = activeOutfit(plan);
+            if (!outfit) continue;
+            for (const slot of outfit.slots) {
                 if (!seen.has(slot.article._id)) {
                     seen.add(slot.article._id);
                     result.push(slot.article);
@@ -983,26 +991,35 @@ export default function TripFitScreen() {
 
             forecastDaysRef.current = slicedDays;
 
-            // Generate outfits
+            // Generate outfits — produce K candidates per day so the user can
+            // refresh through alternatives. Accumulate worn article IDs across
+            // days so each day's #1 pick is biased away from prior days.
             const effectiveSettings = {
                 ...settings,
                 occasion: selectedOccasion,
             };
+            const usedAcrossTrip = new Set<string>();
             const newPlans: DayPlan[] = slicedDays.map((day) => {
                 const weather = buildTripWeather(day);
                 const { results } = generateOutfits(
                     articles,
                     weather,
                     effectiveSettings,
-                    new Set(),
-                    1,
+                    new Set(usedAcrossTrip),
+                    8,
                 );
-                return { day, outfit: results[0] };
+                const top = results[0];
+                if (top) {
+                    for (const slot of top.slots)
+                        usedAcrossTrip.add(slot.article._id);
+                }
+                return { day, candidates: results, candidateIdx: 0 };
             });
 
             for (const p of newPlans) {
-                if (p.outfit.notes.length)
-                    recordGapsFromNotes(p.outfit.notes).catch(() => {});
+                const top = p.candidates[0];
+                if (top?.notes.length)
+                    recordGapsFromNotes(top.notes).catch(() => {});
             }
 
             setPlans(newPlans);
@@ -1039,20 +1056,42 @@ export default function TripFitScreen() {
             if (!day) return;
             setReplanningIdx(idx);
             try {
-                const effectiveSettings = {
-                    ...settings,
-                    occasion: selectedOccasion,
-                };
-                const { results } = generateOutfits(
-                    articles,
-                    buildTripWeather(day),
-                    effectiveSettings,
-                    new Set(),
-                    1,
-                );
                 setPlans((prev) => {
                     const next = [...prev];
-                    next[idx] = { day, outfit: results[0] };
+                    const current = next[idx];
+                    if (!current) return prev;
+
+                    const nextIdx = current.candidateIdx + 1;
+                    if (nextIdx < current.candidates.length) {
+                        // Cycle to the next pre-generated candidate
+                        next[idx] = { ...current, candidateIdx: nextIdx };
+                        return next;
+                    }
+
+                    // Exhausted candidates — regenerate while penalising
+                    // articles from the current outfit so we get fresh picks.
+                    const excluded = new Set<string>();
+                    const cur = current.candidates[current.candidateIdx];
+                    if (cur) {
+                        for (const slot of cur.slots)
+                            excluded.add(slot.article._id);
+                    }
+                    const effectiveSettings = {
+                        ...settings,
+                        occasion: selectedOccasion,
+                    };
+                    const { results } = generateOutfits(
+                        articles,
+                        buildTripWeather(day),
+                        effectiveSettings,
+                        excluded,
+                        8,
+                    );
+                    next[idx] = {
+                        day,
+                        candidates: results.length ? results : current.candidates,
+                        candidateIdx: 0,
+                    };
                     return next;
                 });
                 if (!reduceMotion && animValues[idx]) {

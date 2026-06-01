@@ -1,10 +1,6 @@
-import { useRef, useEffect } from 'react';
-import { Animated, PanResponder, View, StyleSheet, ViewStyle } from 'react-native';
-import { useReduceMotion } from '../../hooks/useReduceMotion';
-
-const THUMB_W = 30;
-const THUMB_H = 20;
-const TRACK = 3;
+import { useEffect, useRef } from 'react';
+import { Slider } from '@expo/ui/swift-ui';
+import type { ViewStyle } from 'react-native';
 
 interface AppSliderProps {
     value: number;
@@ -13,6 +9,9 @@ interface AppSliderProps {
     step?: number;
     onValueChange?: (v: number) => void;
     onSlidingComplete?: (v: number) => void;
+    // Tint props are kept for API compatibility with the previous wrapper.
+    // SwiftUI's Slider only accepts a single accent color; we map
+    // `minimumTrackTintColor` to it and ignore the others.
     minimumTrackTintColor?: string;
     maximumTrackTintColor?: string;
     thumbTintColor?: string;
@@ -20,6 +19,22 @@ interface AppSliderProps {
     accessibilityLabel?: string;
 }
 
+const COMMIT_DEBOUNCE_MS = 250;
+
+/**
+ * Wraps @expo/ui's SwiftUI Slider so it presents the true native iOS 26
+ * control. Chosen over @react-native-community/slider because the latter
+ * does not reliably re-sync when value/min/max all change in the same
+ * render (the °F ↔ °C toggle case).
+ *
+ * Two API gaps from the previous wrapper are bridged here:
+ *
+ * 1. `step` (increment) → `steps` (count). @expo/ui takes the *number*
+ *    of discrete stops between min and max, so we compute it.
+ * 2. `onSlidingComplete` — @expo/ui 0.1.1-alpha.10 does not expose an
+ *    editing-changed callback, so we debounce the last value from
+ *    `onValueChange` and emit it as the commit signal.
+ */
 export function AppSlider({
     value,
     minimumValue,
@@ -27,191 +42,40 @@ export function AppSlider({
     step = 1,
     onValueChange,
     onSlidingComplete,
-    minimumTrackTintColor = '#ffffff',
-    maximumTrackTintColor = '#555555',
-    thumbTintColor = '#ffffff',
+    minimumTrackTintColor,
     style,
     accessibilityLabel,
 }: AppSliderProps) {
-    // Keep always-current refs for values accessed inside PanResponder closures
-    const minRef = useRef(minimumValue);
-    const maxRef = useRef(maximumValue);
-    const stepRef = useRef(step);
-    const onChangeRef = useRef(onValueChange);
+    const commitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const onCompleteRef = useRef(onSlidingComplete);
-
-    // Update refs synchronously during render so PanResponder always sees fresh values
-    minRef.current = minimumValue;
-    maxRef.current = maximumValue;
-    stepRef.current = step;
-    onChangeRef.current = onValueChange;
     onCompleteRef.current = onSlidingComplete;
 
-    const reduceMotion = useReduceMotion();
-    const trackWidth = useRef(0);
-    const animX = useRef(new Animated.Value(0)).current;
-    const sliding = useRef(false);
-    const dragStartX = useRef(0);
-    // Mirror of animX so we can read the current pixel position synchronously
-    const lastX = useRef(0);
+    useEffect(() => () => {
+        if (commitTimer.current) clearTimeout(commitTimer.current);
+    }, []);
 
-    const clamp = (n: number, lo: number, hi: number) =>
-        Math.min(Math.max(n, lo), hi);
-
-    const xToValue = (x: number) => {
-        const ratio = clamp(x / (trackWidth.current || 1), 0, 1);
-        const raw = minRef.current + ratio * (maxRef.current - minRef.current);
-        return Math.round(raw / stepRef.current) * stepRef.current;
-    };
-
-    const valueToX = (v: number, width = trackWidth.current) => {
-        const range = maxRef.current - minRef.current || 1;
-        return (clamp(v, minRef.current, maxRef.current) - minRef.current) / range * width;
-    };
-
-    const setX = (x: number) => {
-        lastX.current = x;
-        animX.setValue(x);
-    };
-
-    // Smoothly animate thumb whenever value/min/max changes externally (e.g. unit toggle).
-    // Snaps immediately when the user prefers reduced motion.
-    useEffect(() => {
-        if (sliding.current || trackWidth.current === 0) return;
-        const target = valueToX(value);
-        if (reduceMotion) {
-            setX(target);
-            return;
-        }
-        Animated.timing(animX, {
-            toValue: target,
-            duration: 200,
-            useNativeDriver: false,
-        }).start(({ finished }) => {
-            if (finished) lastX.current = target;
-        });
-        lastX.current = target;
-    }, [value, minimumValue, maximumValue, reduceMotion]);
-
-    const panResponder = useRef(
-        PanResponder.create({
-            onStartShouldSetPanResponder: () => true,
-            onMoveShouldSetPanResponder: () => true,
-            onPanResponderGrant: () => {
-                sliding.current = true;
-                animX.stopAnimation();
-                // Start from wherever the thumb currently sits
-                dragStartX.current = lastX.current;
-            },
-            onPanResponderMove: (_, gs) => {
-                const x = clamp(
-                    dragStartX.current + gs.dx,
-                    0,
-                    trackWidth.current,
-                );
-                setX(x);
-                onChangeRef.current?.(xToValue(x));
-            },
-            onPanResponderRelease: (_, gs) => {
-                const x = clamp(
-                    dragStartX.current + gs.dx,
-                    0,
-                    trackWidth.current,
-                );
-                setX(x);
-                sliding.current = false;
-                onCompleteRef.current?.(xToValue(x));
-            },
-            onPanResponderTerminate: (_, gs) => {
-                const x = clamp(
-                    dragStartX.current + gs.dx,
-                    0,
-                    trackWidth.current,
-                );
-                setX(x);
-                sliding.current = false;
-                onCompleteRef.current?.(xToValue(x));
-            },
-        }),
-    ).current;
+    const steps = step > 0 ? Math.round((maximumValue - minimumValue) / step) : 0;
 
     return (
-        <View
-            style={[styles.container, style]}
-            onLayout={(e) => {
-                const w = e.nativeEvent.layout.width - THUMB_W;
-                const changed = w !== trackWidth.current;
-                trackWidth.current = w;
-                if (changed) setX(valueToX(value, w));
+        <Slider
+            value={value}
+            min={minimumValue}
+            max={maximumValue}
+            steps={steps}
+            color={minimumTrackTintColor}
+            onValueChange={(v) => {
+                onValueChange?.(v);
+                if (commitTimer.current) clearTimeout(commitTimer.current);
+                commitTimer.current = setTimeout(() => {
+                    onCompleteRef.current?.(v);
+                }, COMMIT_DEBOUNCE_MS);
             }}
-            accessibilityRole="adjustable"
-            accessibilityLabel={accessibilityLabel}
-            accessibilityValue={{ min: minimumValue, max: maximumValue, now: value }}
-            accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
-            onAccessibilityAction={({ nativeEvent }) => {
-                if (nativeEvent.actionName === 'increment') {
-                    const next = Math.min(value + step, maximumValue);
-                    onValueChange?.(next);
-                    onSlidingComplete?.(next);
-                } else if (nativeEvent.actionName === 'decrement') {
-                    const next = Math.max(value - step, minimumValue);
-                    onValueChange?.(next);
-                    onSlidingComplete?.(next);
-                }
-            }}
-            {...panResponder.panHandlers}
-        >
-            {/* Inactive track */}
-            <View style={[styles.track, { backgroundColor: maximumTrackTintColor }]}>
-                {/* Active fill — width is the Animated.Value directly in pixels */}
-                <Animated.View
-                    style={[
-                        styles.fill,
-                        { width: animX, backgroundColor: minimumTrackTintColor },
-                    ]}
-                />
-            </View>
-            {/* Thumb */}
-            <Animated.View
-                style={[
-                    styles.thumb,
-                    {
-                        backgroundColor: thumbTintColor,
-                        transform: [{ translateX: animX }],
-                    },
-                ]}
-            />
-        </View>
+            style={[{ width: '100%' }, style]}
+            // Slider's props type omits accessibilityLabel even though it
+            // forwards to the underlying View. Cast via `as` so the prop
+            // still reaches VoiceOver without a TS escape hatch on the
+            // component itself.
+            {...({ accessibilityLabel } as { accessibilityLabel?: string })}
+        />
     );
 }
-
-const styles = StyleSheet.create({
-    container: {
-        height: 40,
-        justifyContent: 'center',
-    },
-    track: {
-        position: 'absolute',
-        left: THUMB_W / 2,
-        right: THUMB_W / 2,
-        height: TRACK,
-        borderRadius: TRACK / 2,
-        overflow: 'hidden',
-    },
-    fill: {
-        height: TRACK,
-        borderRadius: TRACK / 2,
-    },
-    thumb: {
-        position: 'absolute',
-        width: THUMB_W,
-        height: THUMB_H,
-        borderRadius: THUMB_H / 2,
-        top: (40 - THUMB_H) / 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.25,
-        shadowRadius: 2,
-        elevation: 3,
-    },
-});

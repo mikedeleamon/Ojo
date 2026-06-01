@@ -1,28 +1,36 @@
 import { useMemo } from 'react';
-import { StyleSheet, Image, Animated } from 'react-native';
+import { StyleSheet, Animated } from 'react-native';
 import { View, Text } from '../primitives';
 import { ColorTokens, fonts, fontSizes } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 import { useSpinAnimation } from '../../hooks/useSpinAnimation';
+import ClearNightIcon from '../WeatherIcons/ClearNightIcon';
+import RainyIcon from '../WeatherIcons/RainyIcon';
+import StormIcon from '../WeatherIcons/StormIcon';
+import PartlyCloudyNightIcon from '../WeatherIcons/PartlyCloudyNightIcon';
+import PartlyCloudyIcon from '../WeatherIcons/PartlyCloudyIcon';
+import SunnyIcon from '../WeatherIcons/SunnyIcon';
+import CloudyIcon from '../WeatherIcons/CloudyIcon';
+import SnowIcon from '../WeatherIcons/SnowIcon';
 
 // ─── Icon map ─────────────────────────────────────────────────────────────────
 
 const ICONS = {
-    Cloudy: require('../../../assets/images/weatherIcons/Cloudy.png'),
-    Snow: require('../../../assets/images/weatherIcons/Snow.png'),
-    Rainy: require('../../../assets/images/weatherIcons/Rainy.png'),
-    Sunny: require('../../../assets/images/weatherIcons/Sunny.png'),
-    ClearNight: require('../../../assets/images/weatherIcons/ClearNight.png'),
-    Storm: require('../../../assets/images/weatherIcons/Storm.png'),
-    PartlyCloudy: require('../../../assets/images/weatherIcons/PartlyCloudy.png'),
-    PartlyCloudyNight: require('../../../assets/images/weatherIcons/PartlyCloudyNight.png'),
+    Cloudy: 'cloudy' as const,
+    Snow: 'snow' as const,
+    Sunny: 'sunny' as const,
+    ClearNight: 'clear-night' as const,
+    Rainy: 'rainy' as const,
+    Storm: 'storm' as const,
+    PartlyCloudy: 'partly-cloudy' as const,
+    PartlyCloudyNight: 'partly-cloudy-night' as const,
 };
 
 const iconFor = (condition: string, isDay: boolean) => {
     const c = condition.toLowerCase();
     if (c.includes('thunder') || c.includes('t-storm')) return ICONS.Storm;
     if (c.includes('snow') || c.includes('flurr')) return ICONS.Snow;
-    if (c.includes('rain') || c.includes('shower') || c.includes('drizzle'))
+    if (c.includes('rain') || c.includes('shower') || c.includes('drizzle') || c.includes('precip'))
         return ICONS.Rainy;
     if (c.includes('sunny') || c.includes('mostly sunny')) return ICONS.Sunny;
     if (c.includes('clear') || c.includes('mostly clear'))
@@ -85,27 +93,52 @@ const WeatherIconDisplay = ({
     const icon = iconFor(condition, isDay);
     const isLarge = size === 'large';
     const isSunny = icon === ICONS.Sunny;
-    const rotate = useSpinAnimation(12_000);
+    const isClearNight = icon === ICONS.ClearNight;
+    const isRainy = icon === ICONS.Rainy;
+    const isStorm = icon === ICONS.Storm;
+    const isPartlyCloudyNight = icon === ICONS.PartlyCloudyNight;
+    const isPartlyCloudy = icon === ICONS.PartlyCloudy;
+    const isCloudy = icon === ICONS.Cloudy;
+    const isSnow = icon === ICONS.Snow;
+    // Spin only matters at the hero size. At 36px the rotation is imperceptible
+    // and the per-frame transform updates pile up across ~12 forecast cells,
+    // adding noticeable scroll cost. Skip the hook entirely when small.
+    const rotate = useSpinAnimation(isLarge && isSunny ? 12_000 : 0);
 
+    const iconSize = isLarge ? 180 : 36;
     const iconStyle = isLarge ? styles.iconLarge : styles.iconSmall;
 
     return (
         <View style={[styles.root, isLarge ? styles.large : styles.small]}>
-            {isSunny ? (
-                <Animated.Image
-                    source={icon}
-                    style={[iconStyle, { transform: [{ rotate }] }]}
-                    resizeMode='contain'
-                    accessibilityLabel={condition}
+            {isClearNight ? (
+                <ClearNightIcon
+                    size={iconSize}
+                    starCount={isLarge ? 40 : 10}
+                    fullWidth={isLarge}
+                    fullHeight={isLarge}
+                    animate={isLarge}
                 />
-            ) : (
-                <Image
-                    source={icon}
-                    style={iconStyle}
-                    resizeMode='contain'
-                    accessibilityLabel={condition}
-                />
-            )}
+            ) : isRainy ? (
+                <RainyIcon size={iconSize} />
+            ) : isStorm ? (
+                <StormIcon size={iconSize} />
+            ) : isPartlyCloudyNight ? (
+                <PartlyCloudyNightIcon size={iconSize} />
+            ) : isPartlyCloudy ? (
+                <PartlyCloudyIcon size={iconSize} />
+            ) : isCloudy ? (
+                <CloudyIcon size={iconSize} />
+            ) : isSunny ? (
+                isLarge ? (
+                    <Animated.View style={[iconStyle, { transform: [{ rotate }] }]}>
+                        <SunnyIcon size={iconSize} />
+                    </Animated.View>
+                ) : (
+                    <SunnyIcon size={iconSize} />
+                )
+            ) : isSnow ? (
+                <SnowIcon size={iconSize} />
+            ) : null}
             {isLarge && temperature !== undefined && (
                 <View style={styles.temps}>
                     <Text style={styles.temp}>{temperature}°</Text>
