@@ -5,6 +5,7 @@ import { ColorTokens, fonts, fontSizes } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 import { useSpinAnimation } from '../../hooks/useSpinAnimation';
 import ClearNightIcon from '../WeatherIcons/ClearNightIcon';
+import ClearNightIconMoon from '../WeatherIcons/ClearNightIconMoon';
 import RainyIcon from '../WeatherIcons/RainyIcon';
 import StormIcon from '../WeatherIcons/StormIcon';
 import PartlyCloudyNightIcon from '../WeatherIcons/PartlyCloudyNightIcon';
@@ -111,13 +112,11 @@ const WeatherIconDisplay = ({
     return (
         <View style={[styles.root, isLarge ? styles.large : styles.small]}>
             {isClearNight ? (
-                <ClearNightIcon
-                    size={iconSize}
-                    starCount={isLarge ? 40 : 10}
-                    fullWidth={isLarge}
-                    fullHeight={isLarge}
-                    animate={isLarge}
-                />
+                isLarge ? (
+                    <ClearNightIconMoon size={iconSize} showStars={false} />
+                ) : (
+                    <ClearNightIcon size={iconSize} starCount={10} animate={false} />
+                )
             ) : isRainy ? (
                 <RainyIcon size={iconSize} />
             ) : isStorm ? (

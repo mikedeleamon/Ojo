@@ -21,7 +21,10 @@
   },
   "submit": {
     "production": {
-      "ios": { "language": "en-US" },
+      "ios": { "language": "en-US",
+      "appleId": "mikeamon@ojoapp.io",
+      "ascAppId": "6743219085",
+      "appleTeamId": "37L8H5D9PQ" },
       "android": { "track": "production" }
     }
   }

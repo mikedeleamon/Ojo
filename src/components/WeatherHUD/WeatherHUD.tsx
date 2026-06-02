@@ -22,6 +22,7 @@ import GearIcon from '../icons/GearIcon';
 import api from '../../api/client';
 import weatherConstants from '../../constants/weatherConstants';
 import WeatherIconDisplay from '../WeatherIconDisplay/WeatherIconDisplay';
+import ClearNightIconMoon from '../WeatherIcons/ClearNightIconMoon';
 import SunnyIcon from '../WeatherIcons/SunnyIcon';
 import Loading from '../Loading/Loading';
 import WeatherDetails from '../WeatherDetails/WeatherDetails';
@@ -312,6 +313,10 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
         return { hiTemp: Math.round(Math.max(...temps)), loTemp: Math.round(Math.min(...temps)) };
     }, [forecasts, isMetric]);
 
+    // True for "Clear" / "Mostly Clear" at night — drives the full-screen star backdrop.
+    const isClearNightBg = !!(weather && !weather.IsDayTime &&
+        weather.WeatherText.toLowerCase().includes('clear'));
+
     // ── Error state (#9: retry + check settings) ──────────────────────────────
     if (error && !weather)
         return (
@@ -337,6 +342,16 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
             animatedProps={animatedGradientProps}
             style={st.root}
         >
+            {/* Full-screen star field — absolute layer behind all content */}
+            {isClearNightBg && (
+                <View
+                    style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                    pointerEvents="none"
+                >
+                    <ClearNightIconMoon fullWidth fullHeight showMoon={false} />
+                </View>
+            )}
+
             {/* Transparent loading spinner — sits over the animating gradient */}
             <RNAnimated.View
                 style={[st.loadingOverlay, { opacity: loadingOpacity }]}

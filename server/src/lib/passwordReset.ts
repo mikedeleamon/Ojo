@@ -17,6 +17,9 @@
  */
 
 import crypto from 'crypto';
+import { Resend } from 'resend';
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 
@@ -37,17 +40,50 @@ export function buildResetDeepLink(rawToken: string): string {
 }
 
 /**
- * Send the reset-password email.
+ * Send the reset-password email via Resend.
  *
- * TODO: wire to a real email provider (SendGrid / Resend / SES / Postmark).
- * For now this logs the link so flows can be tested end-to-end in dev.
+ * Does NOT throw on send failure — the route always returns 204 to avoid
+ * leaking which email addresses are registered in the system.
  *
- * When you implement this, do NOT throw on send failure — the route below
- * always returns 204 to avoid leaking which emails are registered.
+ * Requires RESEND_API_KEY in the environment.
+ * The FROM address must match a domain you have verified in Resend.
+ * During development you can use the Resend sandbox: onboarding@resend.dev
+ * (sends only to your own verified email address).
  */
 export async function sendResetEmail(email: string, deepLink: string): Promise<void> {
-  if (process.env.NODE_ENV === 'production') {
-    console.warn('[passwordReset] sendResetEmail is not wired to a provider — set up SendGrid/Resend before production.');
+  const from = process.env.RESEND_FROM_EMAIL ?? 'Ojo <noreply@ojoapp.io>';
+
+  try {
+    const { error } = await resend.emails.send({
+      from,
+      to: email,
+      subject: 'Reset your Ojo password',
+      html: `
+        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;">
+          <img src="https://ojoapp.io/logo.png" alt="Ojo" width="64" style="margin-bottom:24px;" />
+          <h2 style="margin:0 0 8px;font-size:22px;color:#111;">Reset your password</h2>
+          <p style="margin:0 0 24px;color:#555;font-size:15px;line-height:1.5;">
+            We received a request to reset the password for your Ojo account.
+            Tap the button below — this link expires in <strong>1 hour</strong>.
+          </p>
+          <a href="${deepLink}"
+             style="display:inline-block;padding:14px 28px;background:#87DE5A;color:#111;
+                    font-weight:600;font-size:15px;border-radius:10px;text-decoration:none;">
+            Reset password
+          </a>
+          <p style="margin:24px 0 0;color:#999;font-size:13px;line-height:1.5;">
+            If you didn't request this, you can safely ignore this email.
+            Your password will not change.
+          </p>
+        </div>
+      `,
+    });
+
+    if (error) {
+      console.error('[passwordReset] Resend error:', error);
+    }
+  } catch (err) {
+    // Never surface send errors to the caller — the route always returns 204
+    console.error('[passwordReset] sendResetEmail failed:', err);
   }
-  console.log(`[passwordReset] reset link for ${email}: ${deepLink}`);
 }

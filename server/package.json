@@ -20,6 +20,7 @@
     "jwks-rsa": "^4.0.1",
     "mongoose": "^8.4.0",
     "node-cron": "^4.0.0",
+    "resend": "^6.12.4",
     "uuid": "^14.0.0"
   },
   "devDependencies": {
