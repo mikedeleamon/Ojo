@@ -41,14 +41,16 @@ export async function getCurrent(
   return data;
 }
 
-/** Fetch 5-day daily forecast. Cached 3 hours. */
+/** Fetch 5-day daily forecast. Cached 3 hours.
+ *  details=true is required for Sun.Rise / Sun.Set fields (used by the
+ *  sunrise/sunset tiles in the hourly strip). */
 export async function get5DayForecast(cityKey: string): Promise<unknown> {
-  const cacheKey = `daily5:${cityKey}`;
+  const cacheKey = `daily5:${cityKey}:v2`;
   const cached = ttlGet<unknown>(cacheKey);
   if (cached) return cached;
 
   const { data } = await accu.get(`/forecasts/v1/daily/5day/${cityKey}`, {
-    params: { apikey: key(), details: false, metric: false },
+    params: { apikey: key(), details: true, metric: false },
   });
   if (data) ttlSet(cacheKey, data, TTL_DAILY);
   return data;

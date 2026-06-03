@@ -4,6 +4,7 @@ const weatherConstants = {
   GET_CITY:             '/api/weather/city',
   GET_CURRENT_WEATHER:  '/api/weather/current',
   GET_CURRENT_FORECAST: '/api/weather/forecast',
+  GET_DAILY_FORECAST:   '/api/weather/forecast/daily',
 } as const;
 
 export default weatherConstants;

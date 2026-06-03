@@ -19,6 +19,11 @@ import { startNotificationService } from './services/notificationService';
 
 const app = express();
 app.disable('x-powered-by');
+// Railway (and most PaaS) put a reverse proxy in front of the app, so the real
+// client IP arrives in X-Forwarded-For. Trust the first proxy hop so
+// express-rate-limit keys on the actual client IP instead of lumping every
+// user into a single shared bucket (which would throttle legitimate traffic).
+app.set('trust proxy', 1);
 const PORT = process.env.PORT ?? 4000;
 const IS_PROD = process.env.NODE_ENV === 'production';
 
@@ -44,25 +49,24 @@ app.get('/health', (_req: Request, res: Response) => {
 });
 
 // ─── CORS ─────────────────────────────────────────────────────────────────────
-// In production ALLOWED_ORIGIN must be set. The permissive localhost fallback
-// is gated behind NODE_ENV !== 'production' so a missing env var in prod fails
-// closed rather than silently allowing all no-origin callers.
+// CORS is a browser-only mechanism. Native mobile clients (our primary caller),
+// curl, and server-to-server requests send NO Origin header and must always be
+// allowed — they are not subject to the same-origin policy at all. Only browser
+// requests that DO carry an Origin header are checked against the allowlist.
+//
+// ALLOWED_ORIGIN (optional) is the web origin permitted in production, e.g.
+// https://www.ojoapp.io. Localhost origins are permitted only outside prod.
 const allowedOrigin = process.env.ALLOWED_ORIGIN;
 app.use(cors({
-  origin: allowedOrigin
-    ? allowedOrigin
-    : (origin, cb) => {
-        if (IS_PROD) {
-          cb(new Error('Not allowed by CORS'));
-          return;
-        }
-        // Dev only: allow requests with no origin (mobile apps) or any localhost port
-        if (!origin || /^http:\/\/localhost(:\d+)?$/.test(origin)) {
-          cb(null, true);
-        } else {
-          cb(new Error('Not allowed by CORS'));
-        }
-      },
+  origin: (origin, cb) => {
+    // No Origin header → native app / curl / server-to-server. CORS does not
+    // apply; always allow. (This is what unblocks the iOS/Android app.)
+    if (!origin) return cb(null, true);
+    // Browser request with an Origin: enforce the allowlist.
+    if (allowedOrigin && origin === allowedOrigin) return cb(null, true);
+    if (!IS_PROD && /^http:\/\/localhost(:\d+)?$/.test(origin)) return cb(null, true);
+    return cb(new Error('Not allowed by CORS'));
+  },
   credentials: true,
 }));
 

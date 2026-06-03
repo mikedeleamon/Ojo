@@ -23,10 +23,12 @@ import api from '../../api/client';
 import weatherConstants from '../../constants/weatherConstants';
 import WeatherIconDisplay from '../WeatherIconDisplay/WeatherIconDisplay';
 import ClearNightIconMoon from '../WeatherIcons/ClearNightIconMoon';
+import StormIconLightning from '../WeatherIcons/StormIconLightning';
 import SunnyIcon from '../WeatherIcons/SunnyIcon';
 import Loading from '../Loading/Loading';
 import WeatherDetails from '../WeatherDetails/WeatherDetails';
 import MinimizedWeatherDisplay from '../MinimizedWeatherDisplay/MinimizedWeatherDisplay';
+import SunEventTile from '../SunEventTile/SunEventTile';
 import { useWeatherTheme } from '../../context/WeatherContext';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { CityData, CurrentWeather, Forecast, Settings } from '../../types';
@@ -41,6 +43,52 @@ const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 import { gradientFor, footerBgFor, formatLastUpdated } from './weatherPalette';
 import { fToC } from '../../lib/units';
 import { makeStyles } from './WeatherHUD.styles';
+
+// ─── Sun-event helpers ────────────────────────────────────────────────────────
+// AccuWeather's 5-day daily forecast embeds Sun.Rise / Sun.Set ISO timestamps
+// per day. We extract them into a flat list so they can be merged into the
+// hourly strip in chronological order.
+
+type SunEventKind = 'sunrise' | 'sunset';
+interface SunEvent { kind: SunEventKind; time: string }
+
+interface AccuDailyDay {
+    Sun?: { Rise?: string; Set?: string };
+}
+
+const extractSunEvents = (raw: unknown): SunEvent[] => {
+    const data = raw as { DailyForecasts?: AccuDailyDay[] };
+    if (!Array.isArray(data?.DailyForecasts)) return [];
+    const out: SunEvent[] = [];
+    for (const d of data.DailyForecasts) {
+        if (d.Sun?.Rise) out.push({ kind: 'sunrise', time: d.Sun.Rise });
+        if (d.Sun?.Set)  out.push({ kind: 'sunset',  time: d.Sun.Set  });
+    }
+    return out;
+};
+
+// Linear interpolation of forecast temperature at an arbitrary ISO timestamp.
+// Forecasts are returned in Fahrenheit; the caller converts to metric if needed.
+const tempAtTime = (target: number, forecasts: Forecast[]): number | null => {
+    if (forecasts.length === 0) return null;
+    const sorted = [...forecasts].sort(
+        (a, b) => new Date(a.DateTime).getTime() - new Date(b.DateTime).getTime(),
+    );
+    for (let i = 0; i < sorted.length - 1; i++) {
+        const t0 = new Date(sorted[i].DateTime).getTime();
+        const t1 = new Date(sorted[i + 1].DateTime).getTime();
+        if (target >= t0 && target <= t1) {
+            const r = (target - t0) / (t1 - t0);
+            const v0 = sorted[i].Temperature.Value;
+            const v1 = sorted[i + 1].Temperature.Value;
+            return v0 + (v1 - v0) * r;
+        }
+    }
+    // Clamp to nearest endpoint if outside the forecast window
+    const first = sorted[0], last = sorted[sorted.length - 1];
+    if (target < new Date(first.DateTime).getTime()) return first.Temperature.Value;
+    return last.Temperature.Value;
+};
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -62,6 +110,7 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
     const [city, setCity] = useState<CityData | null>(null);
     const [weather, setWeather] = useState<CurrentWeather | null>(null);
     const [forecasts, setForecasts] = useState<Forecast[]>([]);
+    const [sunEvents, setSunEvents] = useState<SunEvent[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
@@ -75,14 +124,16 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
     const pendingRef = useRef<{
         weather: CurrentWeather;
         forecasts: Forecast[];
+        sunEvents: SunEvent[];
     } | null>(null);
     const isRefreshRef = useRef(false);
 
     const flushPending = () => {
         if (pendingRef.current) {
-            const { weather: w, forecasts: f } = pendingRef.current;
+            const { weather: w, forecasts: f, sunEvents: s } = pendingRef.current;
             setWeather(w);
             setForecasts(f);
+            setSunEvents(s);
             setFooterBg(footerBgFor(w.WeatherText, w.IsDayTime));
             setLastUpdated(new Date());
             pendingRef.current = null;
@@ -137,8 +188,9 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
                 params: { details: true },
             }),
             api.get(`${weatherConstants.GET_CURRENT_FORECAST}/${city.Key}`),
+            api.get(`${weatherConstants.GET_DAILY_FORECAST}/${city.Key}`),
         ])
-            .then(([wRes, fRes]) => {
+            .then(([wRes, fRes, dRes]) => {
                 const raw = wRes.data?.[0];
                 if (!raw) throw new Error('Empty response');
 
@@ -162,15 +214,19 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
                     PollenCategory:  worstPollen?.Category ?? undefined,
                 };
 
+                const events = extractSunEvents(dRes.data);
+
                 if (isRefreshRef.current) {
                     // Pull-to-refresh in flight — buffer until finally() flushes atomically
                     pendingRef.current = {
                         weather: w,
                         forecasts: fRes.data ?? [],
+                        sunEvents: events,
                     };
                 } else {
                     setWeather(w);
                     setForecasts(fRes.data ?? []);
+                    setSunEvents(events);
                     setFooterBg(footerBgFor(w.WeatherText, w.IsDayTime));
                     setLastUpdated(new Date());
                 }
@@ -313,9 +369,40 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
         return { hiTemp: Math.round(Math.max(...temps)), loTemp: Math.round(Math.min(...temps)) };
     }, [forecasts, isMetric]);
 
+    // Merge hourly forecasts + sunrise/sunset events into a single chronological
+    // list for the strip. Sun events outside the forecast window are dropped so
+    // they don't add tiles for times not in view.
+    type StripItem =
+        | { kind: 'forecast'; time: string; data: Forecast }
+        | { kind: 'sun';      time: string; sun: SunEvent; temp: number };
+    const stripItems = useMemo<StripItem[]>(() => {
+        if (forecasts.length === 0) return [];
+        const sorted = [...forecasts].sort(
+            (a, b) => new Date(a.DateTime).getTime() - new Date(b.DateTime).getTime(),
+        );
+        const windowStart = new Date(sorted[0].DateTime).getTime();
+        const windowEnd   = new Date(sorted[sorted.length - 1].DateTime).getTime();
+        const items: StripItem[] = sorted.map((f) => ({ kind: 'forecast', time: f.DateTime, data: f }));
+        for (const ev of sunEvents) {
+            const t = new Date(ev.time).getTime();
+            if (Number.isNaN(t) || t < windowStart || t > windowEnd) continue;
+            const tempF = tempAtTime(t, forecasts);
+            if (tempF === null) continue;
+            const temp = Math.round(isMetric ? fToC(tempF) : tempF);
+            items.push({ kind: 'sun', time: ev.time, sun: ev, temp });
+        }
+        return items.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+    }, [forecasts, sunEvents, isMetric]);
+
     // True for "Clear" / "Mostly Clear" at night — drives the full-screen star backdrop.
     const isClearNightBg = !!(weather && !weather.IsDayTime &&
         weather.WeatherText.toLowerCase().includes('clear'));
+
+    // True for thunderstorm conditions — drives the full-screen rain + sheet-flash backdrop.
+    const isStormBg = !!(weather && (
+        weather.WeatherText.toLowerCase().includes('thunder') ||
+        weather.WeatherText.toLowerCase().includes('t-storm')
+    ));
 
     // ── Error state (#9: retry + check settings) ──────────────────────────────
     if (error && !weather)
@@ -349,6 +436,23 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
                     pointerEvents="none"
                 >
                     <ClearNightIconMoon fullWidth fullHeight showMoon={false} />
+                </View>
+            )}
+
+            {/* Full-screen storm backdrop — falling rain + occasional sheet flash */}
+            {isStormBg && (
+                <View
+                    style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+                    pointerEvents="none"
+                >
+                    <StormIconLightning
+                        fullWidth
+                        fullHeight
+                        showCloud={false}
+                        showBolts={false}
+                        showRain
+                        showFlash
+                    />
                 </View>
             )}
 
@@ -436,23 +540,30 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
                             )}
                         </View>
 
-                        {/* Hourly forecast strip */}
-                        {forecasts.length > 0 && (
+                        {/* Hourly forecast strip — interleaves sunrise/sunset tiles */}
+                        {stripItems.length > 0 && (
                             <GlassGroup spacing={8}>
                                 <ScrollView
                                     horizontal
                                     showsHorizontalScrollIndicator={false}
                                     contentContainerStyle={st.forecastStrip}
                                 >
-                                    {forecasts.map((f, i) => (
+                                    {stripItems.map((item, i) => item.kind === 'forecast' ? (
                                         <MinimizedWeatherDisplay
-                                            key={i}
-                                            weather={f.IconPhrase}
-                                            temperature={isMetric ? fToC(f.Temperature.Value) : f.Temperature.Value}
-                                            time={f.DateTime}
-                                            tempUnit={isMetric ? 'C' : f.Temperature.Unit}
-                                            isDay={f.IsDaylight}
+                                            key={`f-${item.time}`}
+                                            weather={item.data.IconPhrase}
+                                            temperature={isMetric ? fToC(item.data.Temperature.Value) : item.data.Temperature.Value}
+                                            time={item.data.DateTime}
+                                            tempUnit={isMetric ? 'C' : item.data.Temperature.Unit}
+                                            isDay={item.data.IsDaylight}
                                             isNow={i === 0}
+                                        />
+                                    ) : (
+                                        <SunEventTile
+                                            key={`s-${item.sun.kind}-${item.time}`}
+                                            time={item.time}
+                                            temperature={item.temp}
+                                            tempUnit={isMetric ? 'C' : 'F'}
                                         />
                                     ))}
                                 </ScrollView>

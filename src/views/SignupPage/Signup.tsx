@@ -17,6 +17,7 @@ import { getErrorMessage, saveAuth } from '../../lib/auth';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { spacing, radius, fonts, fontSizes, fontWeights } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
+import LegalConsentNotice from '../../components/LegalConsentNotice';
 
 /* ─── Validation ─────────────────────────────────────────────────────────── */
 
@@ -631,6 +632,8 @@ export default function SignupPage({ onLogin }: Props) {
                             {loading ? 'Creating account…' : 'Create account'}
                         </Text>
                     </Pressable>
+
+                    <LegalConsentNotice prefix="By creating an account" />
 
                     <View style={styles.footer}>
                         <Text style={styles.footerText}>

@@ -16,6 +16,7 @@ import { isAppleSignInAvailable, signInWithApple } from '../../lib/appleSignIn';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { spacing, radius, fonts, fontSizes, fontWeights } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
+import LegalConsentNotice from '../../components/LegalConsentNotice';
 
 interface Props {
     onLogin?: () => void;
@@ -300,6 +301,8 @@ export default function LoginPage({ onLogin }: Props) {
                                 <Text style={styles.link}>Sign up</Text>
                             </Pressable>
                         </View>
+
+                        <LegalConsentNotice prefix="By continuing" />
                     </GlassCard>
                 </ScrollView>
             </KeyboardAvoidingView>

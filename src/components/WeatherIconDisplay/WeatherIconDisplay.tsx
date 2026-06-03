@@ -8,6 +8,7 @@ import ClearNightIcon from '../WeatherIcons/ClearNightIcon';
 import ClearNightIconMoon from '../WeatherIcons/ClearNightIconMoon';
 import RainyIcon from '../WeatherIcons/RainyIcon';
 import StormIcon from '../WeatherIcons/StormIcon';
+import StormIconLightning from '../WeatherIcons/StormIconLightning';
 import PartlyCloudyNightIcon from '../WeatherIcons/PartlyCloudyNightIcon';
 import PartlyCloudyIcon from '../WeatherIcons/PartlyCloudyIcon';
 import SunnyIcon from '../WeatherIcons/SunnyIcon';
@@ -120,7 +121,11 @@ const WeatherIconDisplay = ({
             ) : isRainy ? (
                 <RainyIcon size={iconSize} />
             ) : isStorm ? (
-                <StormIcon size={iconSize} />
+                isLarge ? (
+                    <StormIconLightning size={iconSize} />
+                ) : (
+                    <StormIcon size={iconSize} />
+                )
             ) : isPartlyCloudyNight ? (
                 <PartlyCloudyNightIcon size={iconSize} />
             ) : isPartlyCloudy ? (
