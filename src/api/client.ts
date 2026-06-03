@@ -5,7 +5,6 @@ const client = axios.create({
   headers: { 'Content-Type': 'application/json' },
   timeout: 15_000,
 });
-
 /**
  * 401 Unauthorised: attempt silent token refresh, then retry once.
  * The 431 cookie handler from the web version is omitted — no cookies in RN.

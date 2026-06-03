@@ -3,7 +3,9 @@
     "development-simulator": {
       "developmentClient": true,
       "distribution": "internal",
-      "ios": { "simulator": true }
+      "ios": {
+        "simulator": true
+      }
     },
     "development": {
       "developmentClient": true,
@@ -11,21 +13,34 @@
     },
     "preview": {
       "distribution": "internal",
-      "ios": { "resourceClass": "m-medium" },
-      "env": { "APP_ENV": "preview" }
+      "ios": {
+        "resourceClass": "m-medium"
+      },
+      "env": {
+        "APP_ENV": "preview"
+      }
     },
     "production": {
       "autoIncrement": true,
-      "env": { "APP_ENV": "production" }
+      "env": {
+        "APP_ENV": "production"
+      }
     }
   },
   "submit": {
     "production": {
-      "ios": { "language": "en-US",
-      "appleId": "mikeamon@ojoapp.io",
-      "ascAppId": "6743219085",
-      "appleTeamId": "37L8H5D9PQ" },
-      "android": { "track": "production" }
+      "ios": {
+        "language": "en-US",
+        "appleId": "mikeamon@ojoapp.io",
+        "ascAppId": "6743219085",
+        "appleTeamId": "37L8H5D9PQ"
+      },
+      "android": {
+        "track": "production"
+      }
     }
+  },
+  "cli": {
+    "appVersionSource": "remote"
   }
 }

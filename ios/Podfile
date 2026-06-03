@@ -41,6 +41,11 @@ target 'Ojo' do
 
   config = use_native_modules!(config_command)
 
+  # NitroModules is a transitive dependency of react-native-fast-tflite.
+  # It ships its own podspec locally but is not picked up by Expo autolinking,
+  # so we reference it explicitly to avoid CocoaPods searching the CDN trunk.
+  pod 'NitroModules', :path => '../node_modules/react-native-nitro-modules'
+
   use_frameworks! :linkage => podfile_properties['ios.useFrameworks'].to_sym if podfile_properties['ios.useFrameworks']
   use_frameworks! :linkage => ENV['USE_FRAMEWORKS'].to_sym if ENV['USE_FRAMEWORKS']
 

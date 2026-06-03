@@ -5,6 +5,7 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
+import mongoose from 'mongoose';
 import { connectDB } from './db';
 import authRoutes from './routes/auth';
 import userRoutes from './routes/user';
@@ -20,6 +21,27 @@ const app = express();
 app.disable('x-powered-by');
 const PORT = process.env.PORT ?? 4000;
 const IS_PROD = process.env.NODE_ENV === 'production';
+
+// ─── Health check ─────────────────────────────────────────────────────────────
+// Declared before CORS + rate limiters so it is never throttled or origin-gated.
+// Used by Railway's healthcheck, uptime monitors, and App Review (a reviewer
+// hitting a dead server = rejection). Always returns 200 while the process is
+// alive; DB reachability is reported in the body rather than failing the check,
+// so a transient Mongo blip doesn't take the whole instance out of rotation.
+const DB_STATE = ['disconnected', 'connected', 'connecting', 'disconnecting'];
+app.get('/health', (_req: Request, res: Response) => {
+  const mem = process.memoryUsage();
+  res.json({
+    status: 'ok',
+    uptimeSeconds: Math.round(process.uptime()),
+    db: DB_STATE[mongoose.connection.readyState] ?? 'unknown',
+    memory: {
+      rssMb: Math.round(mem.rss / 1024 / 1024),
+      heapUsedMb: Math.round(mem.heapUsed / 1024 / 1024),
+    },
+    timestamp: new Date().toISOString(),
+  });
+});
 
 // ─── CORS ─────────────────────────────────────────────────────────────────────
 // In production ALLOWED_ORIGIN must be set. The permissive localhost fallback
@@ -107,9 +129,29 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
+// ─── Memory telemetry ─────────────────────────────────────────────────────────
+// Periodic log line so Railway's log view shows real RSS/heap growth over time.
+// This is the data to base tier-upgrade decisions on: sustained RSS climbing
+// toward your instance's RAM ceiling (or OOM restarts) is the true upgrade
+// signal, not raw user count. Interval is unref'd so it never keeps the process
+// alive on its own.
+function startMemoryLogging(intervalMs = 15 * 60 * 1000): void {
+  const log = () => {
+    const mem = process.memoryUsage();
+    console.log(
+      `[mem] rss=${Math.round(mem.rss / 1024 / 1024)}MB ` +
+      `heapUsed=${Math.round(mem.heapUsed / 1024 / 1024)}MB ` +
+      `uptime=${Math.round(process.uptime())}s`
+    );
+  };
+  log(); // emit once at boot for a baseline
+  setInterval(log, intervalMs).unref();
+}
+
 connectDB().then(() => {
   app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   startNotificationService();
+  startMemoryLogging();
 }).catch((err) => {
   console.error('Failed to connect to MongoDB:', err);
   process.exit(1);

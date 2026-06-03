@@ -1,0 +1,90 @@
+# .easignore — controls what gets uploaded to EAS Build.
+# NOTE: when this file exists it REPLACES .gitignore for the upload, so the
+# relevant .gitignore rules are re-listed here. The lockfile is intentionally
+# NOT ignored — EAS needs it for deterministic installs.
+
+# --- Backend / non-mobile code (not part of the app bundle) ---
+server/
+web-server/
+
+# --- Python virtualenv ---
+.venv/
+__pycache__/
+*.pyc
+
+# --- Docs & project notes ---
+FEATURES.md
+R2_MIGRATION.md
+*.md
+!README.md
+
+# --- Dependencies (EAS installs these fresh) ---
+node_modules/
+**/node_modules/
+
+# --- Build output ---
+dist/
+build/
+*.tsbuildinfo
+server/dist/
+web-build/
+
+# --- Expo / Metro ---
+.expo/
+expo-env.d.ts
+.metro-health-check*
+
+# --- Native build artifacts (regenerated during build) ---
+ios/build/
+ios/Pods/
+ios/.xcode.env.local
+ios/Podfile.lock
+android/build/
+android/.gradle/
+android/.idea/
+android/app/build/
+.kotlin/
+
+# --- Secrets & signing material (use EAS secrets / credentials instead) ---
+.env
+.env.*
+!.env.example
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+
+# --- Tests & coverage ---
+**/__tests__/
+**/*.test.ts
+**/*.test.tsx
+jest.setup.ts
+tsconfig.test.json
+coverage/
+*.lcov
+
+# --- Logs ---
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.log
+
+# --- Editor / OS cruft ---
+.vscode/
+.idea/
+.claude/
+*.swp
+*.swo
+*~
+.DS_Store
+.AppleDouble
+.LSOverride
+*.sublime-project
+*.sublime-workspace
+
+# --- VCS / tooling ---
+.git/
+.pre-commit-config.yaml
