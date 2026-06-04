@@ -97,10 +97,27 @@ interface Props {
     settings: Settings;
     refreshKey?: number;
     onRefresh?: () => void;
+    /**
+     * Fired once the first load settles (weather resolved OR errored). Lets a
+     * parent own a single loading gate instead of stacking a second spinner.
+     */
+    onReady?: () => void;
+    /**
+     * When false, the inline spinner overlay is not rendered — the parent is
+     * showing its own loading screen. Defaults to true (standalone use).
+     */
+    showInlineLoader?: boolean;
 }
 
 
-const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
+const WeatherHUD = ({
+    location,
+    settings,
+    refreshKey,
+    onRefresh,
+    onReady,
+    showInlineLoader = true,
+}: Props) => {
     const { colors } = useTheme();
     const st = useMemo(() => makeStyles(colors), [colors]);
     const { setFooterBg } = useWeatherTheme();
@@ -345,6 +362,16 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
         }
     }, [loading, weather]);
 
+    // Tell the parent the first load has settled (success or error), so it can
+    // drop its single loading gate. Fires once.
+    const readyFiredRef = useRef(false);
+    useEffect(() => {
+        if (!loading && !readyFiredRef.current) {
+            readyFiredRef.current = true;
+            onReady?.();
+        }
+    }, [loading, onReady]);
+
     // Spinner rotation for the inline loading indicator
     const spinRotate = useSpinAnimation(2_000);
 
@@ -456,17 +483,20 @@ const WeatherHUD = ({ location, settings, refreshKey, onRefresh }: Props) => {
                 </View>
             )}
 
-            {/* Transparent loading spinner — sits over the animating gradient */}
-            <RNAnimated.View
-                style={[st.loadingOverlay, { opacity: loadingOpacity }]}
-                pointerEvents={loading ? 'auto' : 'none'}
-            >
+            {/* Transparent loading spinner — sits over the animating gradient.
+                Suppressed when a parent owns the loading gate (showInlineLoader). */}
+            {showInlineLoader && (
                 <RNAnimated.View
-                    style={[st.loadingIcon, { transform: [{ rotate: spinRotate }] }]}
+                    style={[st.loadingOverlay, { opacity: loadingOpacity }]}
+                    pointerEvents={loading ? 'auto' : 'none'}
                 >
-                    <SunnyIcon size={st.loadingIcon.width} />
+                    <RNAnimated.View
+                        style={[st.loadingIcon, { transform: [{ rotate: spinRotate }] }]}
+                    >
+                        <SunnyIcon size={st.loadingIcon.width} />
+                    </RNAnimated.View>
                 </RNAnimated.View>
-            </RNAnimated.View>
+            )}
 
             {/* Content renders at full opacity so GlassView can initialise its
                 native material correctly. The loading overlay sits on top and

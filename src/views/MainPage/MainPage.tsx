@@ -14,8 +14,9 @@ export default function MainPage() {
   }), []);
 
   const { settings, settingsReady } = useSettings();
-  const [location,   setLocation]  = useState('');
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [location,    setLocation]    = useState('');
+  const [refreshKey,  setRefreshKey]  = useState(0);
+  const [weatherReady, setWeatherReady] = useState(false);
 
   useEffect(() => {
     if (!settingsReady) return;
@@ -24,22 +25,35 @@ export default function MainPage() {
     });
   }, [settingsReady, settings.location, refreshKey]);
 
-  const handleRefresh = useCallback(() => setRefreshKey(k => k + 1), []);
+  const handleRefresh      = useCallback(() => setRefreshKey(k => k + 1), []);
+  const handleWeatherReady = useCallback(() => setWeatherReady(true), []);
 
-  // Block only on settings (fast AsyncStorage read). WeatherHUD owns its own
-  // loading state — showing a second outer spinner causes a position jerk on
-  // mount and adds unnecessary latency while GPS resolves (up to 8 s).
-  if (!settingsReady) return <ForceDarkPalette><Loading /></ForceDarkPalette>;
+  // Single loading gate for the whole home screen. The spinner is mounted on
+  // the very first render — before WeatherHUD's heavy gradient/GlassView tree
+  // exists — so its native spin loop starts on an idle JS thread and keeps
+  // rotating continuously until weather settles. Previously there were two
+  // short-lived spinners (this settings gate, then WeatherHUD's own overlay),
+  // neither of which lived long enough on a free thread to visibly spin.
+  const loading = !settingsReady || !weatherReady;
 
   return (
     <ForceDarkPalette>
       <View style={st.root}>
-        <WeatherHUD
-          location={location || settings.location}
-          settings={settings}
-          refreshKey={refreshKey}
-          onRefresh={handleRefresh}
-        />
+        {settingsReady && (
+          <WeatherHUD
+            location={location || settings.location}
+            settings={settings}
+            refreshKey={refreshKey}
+            onRefresh={handleRefresh}
+            onReady={handleWeatherReady}
+            showInlineLoader={false}
+          />
+        )}
+        {loading && (
+          <View style={StyleSheet.absoluteFill}>
+            <Loading />
+          </View>
+        )}
       </View>
     </ForceDarkPalette>
   );
