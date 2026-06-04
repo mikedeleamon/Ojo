@@ -3,7 +3,7 @@ import { NativeTabs, Label, Icon } from 'expo-router/unstable-native-tabs';
 
 // ─── Tab layout ──────────────────────────────────────────────────────────────
 // The `camera` trigger points to a thin redirect screen at app/(tabs)/camera.tsx
-// that immediately presents the fullScreenModal at app/camera.tsx — this is the
+// that immediately presents the fullScreenModal at app/capture.tsx — this is the
 // only way to keep the camera icon in the native tab bar AND have iOS hide the
 // bar while the camera UI is active. See plan: there-s-got-to-be-joyful-garden.
 

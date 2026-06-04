@@ -594,7 +594,7 @@ const ClosetView = ({
                         <Text style={styles.emptyTitle}>No articles yet</Text>
                         <Pressable
                             style={styles.addBtn}
-                            onPress={() => router.push('/camera')}
+                            onPress={() => router.push('/capture')}
                         >
                             <Text style={styles.addBtnText}>Add your first piece</Text>
                         </Pressable>
@@ -637,7 +637,7 @@ const ClosetView = ({
             {selected && !editingArticle && (
                 <Pressable
                     style={styles.fab}
-                    onPress={() => router.push('/camera')}
+                    onPress={() => router.push('/capture')}
                     accessibilityLabel='Add article — open camera'
                     accessibilityRole='button'
                 >

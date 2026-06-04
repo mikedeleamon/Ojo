@@ -122,7 +122,7 @@ export default function RootLayout() {
                         auto-discovered and inherit default options. */}
                     <Stack screenOptions={{ headerShown: false }}>
                       <Stack.Screen
-                        name="camera"
+                        name="capture"
                         options={{
                           presentation: 'fullScreenModal',
                           animation: 'slide_from_bottom',
