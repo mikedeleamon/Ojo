@@ -128,7 +128,7 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     paddingHorizontal: spacing.md,
     backgroundColor:   colors.glassBg,
     borderWidth:       1,
-    borderColor:       'rgba(255,255,255,0.28)',
+    borderColor:       colors.glassBorder,
     borderRadius:      radius.sm,
     color:             colors.textPrimary,
     fontFamily:        fonts.body,
@@ -214,7 +214,7 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     borderRightColor: colors.glassBorder,
   },
   segActive: {
-    backgroundColor: 'rgba(255,255,255,0.9)',
+    backgroundColor: colors.saveBtnBg,
   },
   segText: {
     fontFamily: fonts.body,

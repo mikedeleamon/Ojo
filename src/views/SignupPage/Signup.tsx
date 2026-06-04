@@ -14,6 +14,7 @@ import { View, Text, TextInput, Pressable } from '../../components/primitives';
 import axios from '../../api/client';
 import { AuthState, Settings } from '../../types';
 import { getErrorMessage, saveAuth } from '../../lib/auth';
+import { markOnboardingPending } from '../../lib/onboarding';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { spacing, radius, fonts, fontSizes, fontWeights } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
@@ -356,7 +357,9 @@ export default function SignupPage({ onLogin }: Props) {
                 },
             );
             await saveAuth(data.token, data.user);
-            // AuthGate handles redirect to /(auth)/onboarding for new users
+            // Completing the sign-up form is the only thing that triggers
+            // first-run onboarding; AuthGate reads this flag to redirect.
+            await markOnboardingPending();
             onLogin?.();
         } catch (err: unknown) {
             setError(getErrorMessage(err, 'Sign up failed. Please try again.'));

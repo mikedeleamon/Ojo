@@ -1,4 +1,5 @@
 import Svg, { Path, G, Defs, LinearGradient, Stop } from 'react-native-svg';
+import { useTheme } from '../../theme/ThemeContext';
 
 // The original SVG gradient used gradientTransform="translate(193.29 -166.43) scale(.24)"
 // with userSpaceOnUse coordinates. Pre-computed here:
@@ -14,6 +15,9 @@ interface Props {
 }
 
 export default function OjoLogoIcon({ width = 120, height = 48 }: Props) {
+    const { isDark } = useTheme();
+    // The two O's track the device theme: white in dark mode, black in light.
+    const oFill = isDark ? '#fff' : '#000';
     return (
         <Svg
             viewBox="0 0 307.2 307.2"
@@ -48,7 +52,7 @@ export default function OjoLogoIcon({ width = 120, height = 48 }: Props) {
             {/* Left O */}
             <G id="letter-o-left">
                 <Path
-                    fill="#fefefe"
+                    fill={oFill}
                     fillRule="evenodd"
                     d="M76,112.43l.57.03,5.17.09c10.43.85,20.35,4.35,28.88,10.39,14.02,9.92,22.97,25.42,24.29,42.6l.02,8.63c-2.03,28.51-24.81,51.24-53.32,53.31h-8.65c-28.31-2.12-50.95-24.63-53.19-52.96l-.02-8.63c2.14-29.63,26.57-52.83,56.25-53.46ZM119.73,167.21c-1.51-23.36-21.91-41.03-45.15-39.47-23.52,1.58-41.15,21.66-39.63,45.11,1.37,21.11,18.34,38.06,39.45,39.45,25.84,1.69,46.98-19.4,45.33-45.08Z"
                 />
@@ -57,7 +61,7 @@ export default function OjoLogoIcon({ width = 120, height = 48 }: Props) {
             {/* Right O */}
             <G id="letter-o-right">
                 <Path
-                    fill="#fefefe"
+                    fill={oFill}
                     fillRule="evenodd"
                     d="M245.09,112.48l.46-.04c29.49.74,53.81,23.77,56.04,53.22v8.52c-2.02,28.51-24.8,51.24-53.31,53.31h-8.65c-28.31-2.12-50.99-24.66-53.18-52.97l-.02-8.63c2.03-28.53,24.82-51.23,53.31-53.32l5.35-.08ZM286.4,167.21c-1.51-23.36-21.91-41.03-45.15-39.47-23.52,1.58-41.15,21.66-39.63,45.11,1.37,21.11,18.34,38.06,39.45,39.45,25.84,1.69,46.98-19.4,45.33-45.08Z"
                 />

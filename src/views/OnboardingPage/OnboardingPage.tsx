@@ -31,7 +31,7 @@ const Dots = ({ step, colors }: { step: number; colors: ColorTokens }) => (
         key={i}
         style={[
           { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.glassBorder },
-          i === step - 1 && { width: 18, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.7)' },
+          i === step - 1 && { width: 18, borderRadius: radius.pill, backgroundColor: colors.saveBtnBg },
           i < step - 1  && { backgroundColor: 'rgba(52,211,153,0.65)' },
         ]}
       />

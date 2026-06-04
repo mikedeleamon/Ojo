@@ -23,7 +23,7 @@ interface Props {
 }
 
 export default function LoginPage({ onLogin }: Props) {
-    const { colors } = useTheme();
+    const { colors, isDark } = useTheme();
     const styles = useMemo(() => StyleSheet.create({
         root: { flex: 1, backgroundColor: colors.bgDefault },
         content: { flexGrow: 1, justifyContent: 'center', padding: spacing.md },
@@ -279,9 +279,9 @@ export default function LoginPage({ onLogin }: Props) {
                                 <AppleAuthentication.AppleAuthenticationButton
                                     buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
                                     buttonStyle={
-                                        colors.bgDefault.toLowerCase() === '#f1f5f9'
-                                            ? AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
-                                            : AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                                        isDark
+                                            ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                                            : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
                                     }
                                     cornerRadius={radius.sm}
                                     style={[styles.appleBtn, appleLoading && { opacity: 0.5 }]}

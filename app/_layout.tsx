@@ -11,7 +11,7 @@ import { SettingsProvider } from '../src/context/SettingsContext';
 import { WeatherProvider } from '../src/context/WeatherContext';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
-import { isOnboardingComplete } from '../src/lib/onboarding';
+import { isOnboardingComplete, isOnboardingPending } from '../src/lib/onboarding';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -59,16 +59,19 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     }
 
     if (isLoggedIn) {
-      // Newly signed-up users land at /(auth)/* logged in; route them to
-      // onboarding if they haven't completed it yet. Existing users skip
-      // straight to the tabs.
-      isOnboardingComplete().then((done) => {
-        if (!done && !onOnboarding) {
-          router.replace('/(auth)/onboarding');
-        } else if (done && inAuthGroup) {
-          router.replace('/(tabs)');
-        }
-      });
+      // Onboarding is shown only when it was explicitly requested by completing
+      // the sign-up form (the `pending` flag) and hasn't been finished yet.
+      // Users signed in from remembered credentials or the login screen have no
+      // pending flag, so they skip straight to the tabs.
+      Promise.all([isOnboardingPending(), isOnboardingComplete()]).then(
+        ([pending, done]) => {
+          if (pending && !done && !onOnboarding) {
+            router.replace('/(auth)/onboarding');
+          } else if ((!pending || done) && inAuthGroup && !onOnboarding) {
+            router.replace('/(tabs)');
+          }
+        },
+      );
     }
   }, [isReady, isLoggedIn, segments]);
 
