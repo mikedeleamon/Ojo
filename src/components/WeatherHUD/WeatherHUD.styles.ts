@@ -65,6 +65,8 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         textDecorationLine: 'underline',
     },
     hero: { alignItems: 'center', paddingVertical: spacing.lg },
+    weatherAttribution: { alignItems: 'center', paddingVertical: spacing.sm },
+
     hiLo: {
         fontFamily: fonts.body,
         fontSize: fontSizes.sm,

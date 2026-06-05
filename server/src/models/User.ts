@@ -3,6 +3,11 @@ import mongoose, { Document, Schema } from 'mongoose';
 export interface ISettings {
   clothingStyle: string;
   location: string;
+  // Coordinates of `location`, resolved client-side via expo-location and
+  // pushed up so the notification cron jobs can call WeatherKit directly
+  // without re-geocoding every tick.
+  lat?: number;
+  lon?: number;
   temperatureScale: string;
   hiTempThreshold: number;
   lowTempThreshold: number;
@@ -54,6 +59,8 @@ export interface IUser extends Document {
 const settingsSchema = new Schema<ISettings>({
   clothingStyle:      { type: String, default: '' },
   location:           { type: String, default: '' },
+  lat:                { type: Number },
+  lon:                { type: Number },
   temperatureScale:   { type: String, default: 'Imperial' },
   hiTempThreshold:    { type: Number, default: 85 },
   lowTempThreshold:   { type: Number, default: 50 },

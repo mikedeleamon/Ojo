@@ -28,42 +28,44 @@ function generateSparkle(cx: number, cy: number, r: number): string {
 // xf/yf are 0–1 fractions of the viewBox so paths recompute for any canvas size.
 // Middle-band seeds (yf 0.35–0.66) stay outside xf 0.38–0.62 to clear the moon.
 const EXTRA_STAR_SEEDS: {
-    xf: number; yf: number; r: number;
+    xf: number;
+    yf: number;
+    r: number;
 }[] = [
     // ── Top strip ──────────────────────────────────────────────────────────
-    { xf: 0.02, yf: 0.020, r: 14 },
+    { xf: 0.02, yf: 0.02, r: 14 },
     { xf: 0.18, yf: 0.012, r: 12 },
     { xf: 0.35, yf: 0.027, r: 16 },
-    { xf: 0.50, yf: 0.014, r: 14 },
+    { xf: 0.5, yf: 0.014, r: 14 },
     { xf: 0.65, yf: 0.023, r: 18 },
     { xf: 0.82, yf: 0.016, r: 12 },
     { xf: 0.98, yf: 0.022, r: 16 },
     // ── Upper ──────────────────────────────────────────────────────────────
     { xf: 0.02, yf: 0.125, r: 15 },
     { xf: 0.12, yf: 0.156, r: 12 },
-    { xf: 0.25, yf: 0.070, r: 16 },
+    { xf: 0.25, yf: 0.07, r: 16 },
     { xf: 0.75, yf: 0.078, r: 14 },
     { xf: 0.88, yf: 0.172, r: 18 },
     { xf: 0.97, yf: 0.133, r: 14 },
     // ── Middle sides ───────────────────────────────────────────────────────
     { xf: 0.02, yf: 0.352, r: 16 },
-    { xf: 0.08, yf: 0.500, r: 14 },
+    { xf: 0.08, yf: 0.5, r: 14 },
     { xf: 0.15, yf: 0.609, r: 12 },
     { xf: 0.25, yf: 0.406, r: 15 },
     { xf: 0.75, yf: 0.391, r: 15 },
     { xf: 0.85, yf: 0.563, r: 14 },
     { xf: 0.92, yf: 0.352, r: 16 },
-    { xf: 0.98, yf: 0.500, r: 18 },
+    { xf: 0.98, yf: 0.5, r: 18 },
     // ── Lower ──────────────────────────────────────────────────────────────
     { xf: 0.03, yf: 0.684, r: 16 },
-    { xf: 0.20, yf: 0.719, r: 14 },
-    { xf: 0.50, yf: 0.703, r: 20 },
-    { xf: 0.80, yf: 0.734, r: 16 },
+    { xf: 0.2, yf: 0.719, r: 14 },
+    { xf: 0.5, yf: 0.703, r: 20 },
+    { xf: 0.8, yf: 0.734, r: 16 },
     { xf: 0.97, yf: 0.684, r: 18 },
     // ── Bottom strip ───────────────────────────────────────────────────────
     { xf: 0.07, yf: 0.813, r: 18 },
-    { xf: 0.30, yf: 0.875, r: 14 },
-    { xf: 0.50, yf: 0.836, r: 22 },
+    { xf: 0.3, yf: 0.875, r: 14 },
+    { xf: 0.5, yf: 0.836, r: 22 },
     { xf: 0.72, yf: 0.875, r: 16 },
     { xf: 0.93, yf: 0.813, r: 20 },
 ];
@@ -85,8 +87,8 @@ function getGeneratedStars(vbW: number, vbH: number, count: number) {
 
 const NUM_GROUPS = 5;
 const GROUP_CONFIGS = [
-    { delay: 0,    duration: 3200 },
-    { delay: 700,  duration: 3800 },
+    { delay: 0, duration: 3200 },
+    { delay: 700, duration: 3800 },
     { delay: 1400, duration: 2800 },
     { delay: 2100, duration: 4200 },
     { delay: 2800, duration: 3400 },
@@ -105,7 +107,15 @@ interface StarLayerProps {
 }
 
 function StarLayer({
-    stars, vbW, vbH, width, height, fill, delay, duration, animate,
+    stars,
+    vbW,
+    vbH,
+    width,
+    height,
+    fill,
+    delay,
+    duration,
+    animate,
 }: StarLayerProps) {
     const opacity = useRef(new Animated.Value(1)).current;
 
@@ -117,8 +127,16 @@ function StarLayer({
         const half = duration / 2;
         const loop = Animated.loop(
             Animated.sequence([
-                Animated.timing(opacity, { toValue: 0.15, duration: half, useNativeDriver: true }),
-                Animated.timing(opacity, { toValue: 1,    duration: half, useNativeDriver: true }),
+                Animated.timing(opacity, {
+                    toValue: 0.15,
+                    duration: half,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(opacity, {
+                    toValue: 1,
+                    duration: half,
+                    useNativeDriver: true,
+                }),
             ]),
         );
         const timer = setTimeout(() => loop.start(), delay);
@@ -129,10 +147,22 @@ function StarLayer({
     }, [animate, delay, duration, opacity]);
 
     return (
-        <Animated.View style={[StyleSheet.absoluteFill, { opacity }]} pointerEvents="none">
-            <Svg viewBox={`0 0 ${vbW} ${vbH}`} width={width} height={height}>
+        <Animated.View
+            style={[StyleSheet.absoluteFill, { opacity }]}
+            pointerEvents='none'
+        >
+            <Svg
+                viewBox={`0 0 ${vbW} ${vbH}`}
+                width={width}
+                height={height}
+            >
                 {stars.map((star) => (
-                    <Path key={star.id} fill={fill} fillRule="evenodd" d={star.d} />
+                    <Path
+                        key={star.id}
+                        fill={fill}
+                        fillRule='evenodd'
+                        d={star.d}
+                    />
                 ))}
             </Svg>
         </Animated.View>
@@ -171,49 +201,63 @@ export default function ClearNightIcon({
     const animateStars = animate && showStars && !reduceMotion;
     const { width: screenWidth, height: screenHeight } = useWindowDimensions();
 
-    const vbW = fullWidth  ? Math.round((screenWidth  / size) * 1280) : 1280;
+    const vbW = fullWidth ? Math.round((screenWidth / size) * 1280) : 1280;
     const vbH = fullHeight ? Math.round((screenHeight / size) * 1280) : 1280;
     const offsetX = (vbW - 1280) / 2;
     const offsetY = (vbH - 1280) / 2;
 
-    const width  = fullWidth  ? screenWidth  : size;
+    const width = fullWidth ? screenWidth : size;
     const height = fullHeight ? screenHeight : size;
 
     const allStars = useMemo(
-        () => (showStars ? getGeneratedStars(vbW, vbH, 31) : []),
+        () => (showStars ? getGeneratedStars(vbW, vbH, 100) : []),
         [vbW, vbH, showStars],
     );
     // Round-robin partition so each group spans every sky band rather than one
     // vertical slice — the shared-opacity grouping is then visually unobtrusive.
     const groups = useMemo(() => {
-        const g: { id: string; d: string }[][] = Array.from({ length: NUM_GROUPS }, () => []);
+        const g: { id: string; d: string }[][] = Array.from(
+            { length: NUM_GROUPS },
+            () => [],
+        );
         allStars.forEach((s, i) => g[i % NUM_GROUPS].push(s));
         return g;
     }, [allStars]);
 
     return (
-        <View style={{ width, height }} accessibilityLabel="Clear night">
+        <View
+            style={{ width, height }}
+            accessibilityLabel='Clear night'
+        >
             {showMoon && (
-                <Svg viewBox={`0 0 ${vbW} ${vbH}`} width={width} height={height}>
+                <Svg
+                    viewBox={`0 0 ${vbW} ${vbH}`}
+                    width={width}
+                    height={height}
+                >
                     <G transform={`translate(${offsetX}, ${offsetY})`}>
-                        <Path fill={color} d={MOON_D} />
+                        <Path
+                            fill={color}
+                            d={MOON_D}
+                        />
                     </G>
                 </Svg>
             )}
-            {showStars && groups.map((stars, gi) => (
-                <StarLayer
-                    key={gi}
-                    stars={stars}
-                    vbW={vbW}
-                    vbH={vbH}
-                    width={width}
-                    height={height}
-                    fill={color}
-                    delay={GROUP_CONFIGS[gi].delay}
-                    duration={GROUP_CONFIGS[gi].duration}
-                    animate={animateStars}
-                />
-            ))}
+            {showStars &&
+                groups.map((stars, gi) => (
+                    <StarLayer
+                        key={gi}
+                        stars={stars}
+                        vbW={vbW}
+                        vbH={vbH}
+                        width={width}
+                        height={height}
+                        fill={color}
+                        delay={GROUP_CONFIGS[gi].delay}
+                        duration={GROUP_CONFIGS[gi].duration}
+                        animate={animateStars}
+                    />
+                ))}
         </View>
     );
 }

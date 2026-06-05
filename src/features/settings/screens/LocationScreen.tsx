@@ -7,6 +7,7 @@ import { useSettings } from '../../../hooks/useSettings';
 import { useFormSubmit } from '../../../hooks/useFormSubmit';
 import { spacing, radius, fonts, fontSizes, fontWeights } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/ThemeContext';
+import { geocodeCity } from '../../../lib/geocoding';
 
 export default function LocationScreen() {
   const { colors } = useTheme();
@@ -25,7 +26,17 @@ export default function LocationScreen() {
   const [city, setCity]             = useState(settings.location);
   const { status, loading, submit } = useFormSubmit('Location saved.', 2000);
 
-  const save = () => submit(() => saveSettings({ ...settings, location: city.trim() }));
+  const save = () => submit(async () => {
+    const trimmed = city.trim();
+    // Resolve coords client-side so the server cron can call WeatherKit directly.
+    const coords = await geocodeCity(trimmed);
+    await saveSettings({
+      ...settings,
+      location: trimmed,
+      lat: coords?.lat,
+      lon: coords?.lon,
+    });
+  });
 
   return (
     <SafeAreaView style={st.root} edges={['bottom']}>

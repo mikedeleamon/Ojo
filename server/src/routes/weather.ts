@@ -1,90 +1,63 @@
 import { Router, Response } from 'express';
 import { AxiosError } from 'axios';
-import { lookupCity, getCurrent, getHourlyForecast, get5DayForecast, get10DayForecast } from '../lib/accuWeather';
+import { getCurrent, getHourly, getDaily } from '../lib/weatherKit';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 router.use(requireAuth);
 
-// AccuWeather city keys are numeric strings, typically 3–8 digits.
-// Rejecting non-matching inputs prevents arbitrary path segments from being
-// forwarded to AccuWeather.
-const CITY_KEY_RE = /^[0-9]{3,8}$/;
-
-function isValidCityKey(value: string): boolean {
-  return CITY_KEY_RE.test(value);
+// Reject anything that isn't a finite lat/lon in valid range so we never forward
+// arbitrary path segments / parameters to WeatherKit.
+function parseCoords(req: AuthRequest): { lat: number; lon: number } | null {
+  const lat = Number(req.query.lat);
+  const lon = Number(req.query.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+  return { lat, lon };
 }
 
-// Surface AccuWeather's status (especially 429) rather than swallowing it as 500.
-function handleAccuError(err: unknown, res: Response, label: string) {
+// Surface WeatherKit's status (especially 429 / 401) rather than swallowing it as 500.
+function handleWeatherError(err: unknown, res: Response, label: string) {
   const status = (err as AxiosError)?.response?.status;
   console.error(`[weather] ${label} error (${status ?? 'unknown'}):`, err);
   if (status === 429) {
     res.status(429).json({ error: 'Weather API rate limit reached. Try again later.' });
+  } else if (status === 401 || status === 403) {
+    res.status(502).json({ error: 'Weather service authorisation failed.' });
   } else {
     res.status(500).json({ error: 'Weather service unavailable' });
   }
 }
 
-router.get('/city', async (req: AuthRequest, res: Response): Promise<void> => {
-  const { q } = req.query;
-  if (!q) {
-    res.status(400).json({ error: 'q is required' });
-    return;
-  }
+router.get('/current', async (req: AuthRequest, res: Response): Promise<void> => {
+  const coords = parseCoords(req);
+  if (!coords) { res.status(400).json({ error: 'lat and lon required' }); return; }
   try {
-    res.json(await lookupCity(String(q)));
+    const data = await getCurrent(coords.lat, coords.lon);
+    if (!data) { res.status(502).json({ error: 'Empty weather response' }); return; }
+    res.json(data);
   } catch (err) {
-    handleAccuError(err, res, 'city lookup');
+    handleWeatherError(err, res, 'current');
   }
 });
 
-router.get('/current/:cityKey', async (req: AuthRequest, res: Response): Promise<void> => {
-  if (!isValidCityKey(req.params.cityKey)) {
-    res.status(400).json({ error: 'Invalid cityKey' });
-    return;
-  }
+router.get('/hourly', async (req: AuthRequest, res: Response): Promise<void> => {
+  const coords = parseCoords(req);
+  if (!coords) { res.status(400).json({ error: 'lat and lon required' }); return; }
   try {
-    const details = req.query.details === undefined ? true : Boolean(req.query.details);
-    res.json(await getCurrent(req.params.cityKey, details));
+    res.json(await getHourly(coords.lat, coords.lon));
   } catch (err) {
-    handleAccuError(err, res, 'current conditions');
+    handleWeatherError(err, res, 'hourly');
   }
 });
 
-router.get('/forecast/:cityKey', async (req: AuthRequest, res: Response): Promise<void> => {
-  if (!isValidCityKey(req.params.cityKey)) {
-    res.status(400).json({ error: 'Invalid cityKey' });
-    return;
-  }
+router.get('/daily', async (req: AuthRequest, res: Response): Promise<void> => {
+  const coords = parseCoords(req);
+  if (!coords) { res.status(400).json({ error: 'lat and lon required' }); return; }
   try {
-    res.json(await getHourlyForecast(req.params.cityKey));
+    res.json(await getDaily(coords.lat, coords.lon));
   } catch (err) {
-    handleAccuError(err, res, 'forecast');
-  }
-});
-
-router.get('/forecast/daily/:cityKey', async (req: AuthRequest, res: Response): Promise<void> => {
-  if (!isValidCityKey(req.params.cityKey)) {
-    res.status(400).json({ error: 'Invalid cityKey' });
-    return;
-  }
-  try {
-    res.json(await get5DayForecast(req.params.cityKey));
-  } catch (err) {
-    handleAccuError(err, res, 'daily forecast');
-  }
-});
-
-router.get('/forecast/daily10/:cityKey', async (req: AuthRequest, res: Response): Promise<void> => {
-  if (!isValidCityKey(req.params.cityKey)) {
-    res.status(400).json({ error: 'Invalid cityKey' });
-    return;
-  }
-  try {
-    res.json(await get10DayForecast(req.params.cityKey));
-  } catch (err) {
-    handleAccuError(err, res, 'daily10 forecast');
+    handleWeatherError(err, res, 'daily');
   }
 });
 

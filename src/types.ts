@@ -34,13 +34,15 @@ export interface AuthState {
   token: string;
 }
 
-export interface CityData {
-  Key: string;
-  LocalizedName: string;
+/** Resolved coordinates for a location query (client-side geocoding result). */
+export interface LocationCoords {
+  lat:  number;
+  lon:  number;
+  name: string;
 }
 
 export interface CurrentWeather {
-  WeatherText: string;
+  WeatherText: string;                 // Apple WeatherKit conditionCode (e.g. "MostlyClear")
   HasPrecipitation: boolean;
   PrecipitationType?: string | null;   // "Rain", "Snow", "Ice", "Mixed", or null
   Precip1hr?: { Imperial?: { Value: number }; Metric?: { Value: number } };  // last-hour amount
@@ -56,26 +58,30 @@ export interface CurrentWeather {
   Wind: { Speed: { Imperial: { Value: number }; Metric: { Value: number } } };
   RelativeHumidity: number;
   UVIndexText: string;
-  // Parsed from AccuWeather AirAndPollen (details: true)
-  AirQualityText?:  string;   // e.g. "Good", "Moderate", "Unhealthy"
-  AirQualityIndex?: number;   // 0–500 AQI numeric value
-  PollenCategory?:  string;   // worst of Tree/Grass/Ragweed e.g. "Low", "High", "Very High"
+  // AQI / pollen are not provided by Apple WeatherKit. Kept optional so the
+  // outfit engine and UI keep compiling; values are always undefined today
+  // (and can be backfilled by a secondary provider later without a refactor).
+  AirQualityText?:  string;
+  AirQualityIndex?: number;
+  PollenCategory?:  string;
 }
 
 export interface Forecast {
-  IconPhrase: string;
+  IconPhrase: string;        // WeatherKit conditionCode
   Temperature: { Value: number; Unit: string };
   DateTime: string;
   IsDaylight: boolean;
 }
 
-/** One day from the AccuWeather 5-day daily forecast, normalised for Ojo. */
+/** One day from the WeatherKit 10-day daily forecast, normalised for Ojo. */
 export interface DailyForecast {
-  date:             string;   // ISO date string e.g. "2026-05-26"
+  date:             string;   // ISO date e.g. "2026-05-26"
   minTempF:         number;
   maxTempF:         number;
-  dayPhrase:        string;   // e.g. "Partly cloudy"
+  dayPhrase:        string;   // WeatherKit conditionCode
   hasPrecipitation: boolean;
+  sunrise?:         string;   // ISO timestamp
+  sunset?:          string;   // ISO timestamp
 }
 
 export type OutfitOccasion = 'everyday' | 'work' | 'weekend' | 'date' | 'outdoor' | 'athletic';
@@ -83,6 +89,9 @@ export type OutfitOccasion = 'everyday' | 'work' | 'weekend' | 'date' | 'outdoor
 export interface Settings {
   clothingStyle: string;
   location: string;
+  /** Coordinates resolved from `location`; sent up so the server cron can call WeatherKit. */
+  lat?: number;
+  lon?: number;
   temperatureScale: string;
   hiTempThreshold: number;
   lowTempThreshold: number;

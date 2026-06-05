@@ -104,43 +104,49 @@ function generateSparkle(cx: number, cy: number, r: number): string {
 // yf*1280 reproduce the original absolute positions.
 // Stars in the moon zone (y 350–840, x 390–890 in the 1280² space) stay at
 // xf < 0.38 or xf > 0.62 to clear the centred moon on any canvas width.
-const EXTRA_STAR_SEEDS: { xf: number; yf: number; r: number; delay: number; duration: number }[] = [
+const EXTRA_STAR_SEEDS: {
+    xf: number;
+    yf: number;
+    r: number;
+    delay: number;
+    duration: number;
+}[] = [
     // ── Top strip ─────────────────────────────────────────────────────────────
-    { xf: 0.02, yf: 0.020, r: 14, delay: 600,  duration: 3600 },
+    { xf: 0.02, yf: 0.02, r: 14, delay: 600, duration: 3600 },
     { xf: 0.18, yf: 0.012, r: 12, delay: 2100, duration: 2800 },
-    { xf: 0.35, yf: 0.027, r: 16, delay: 900,  duration: 3400 },
-    { xf: 0.50, yf: 0.014, r: 14, delay: 1400, duration: 4000 },
+    { xf: 0.35, yf: 0.027, r: 16, delay: 900, duration: 3400 },
+    { xf: 0.5, yf: 0.014, r: 14, delay: 1400, duration: 4000 },
     { xf: 0.65, yf: 0.023, r: 18, delay: 3000, duration: 2600 },
-    { xf: 0.82, yf: 0.016, r: 12, delay: 500,  duration: 3200 },
+    { xf: 0.82, yf: 0.016, r: 12, delay: 500, duration: 3200 },
     { xf: 0.98, yf: 0.022, r: 16, delay: 1800, duration: 3800 },
     // ── Upper ─────────────────────────────────────────────────────────────────
     { xf: 0.02, yf: 0.125, r: 15, delay: 1700, duration: 3800 },
-    { xf: 0.12, yf: 0.156, r: 12, delay: 300,  duration: 3200 },
-    { xf: 0.25, yf: 0.070, r: 16, delay: 2400, duration: 2800 },
-    { xf: 0.75, yf: 0.078, r: 14, delay: 700,  duration: 4200 },
+    { xf: 0.12, yf: 0.156, r: 12, delay: 300, duration: 3200 },
+    { xf: 0.25, yf: 0.07, r: 16, delay: 2400, duration: 2800 },
+    { xf: 0.75, yf: 0.078, r: 14, delay: 700, duration: 4200 },
     { xf: 0.88, yf: 0.172, r: 18, delay: 1900, duration: 3000 },
     { xf: 0.97, yf: 0.133, r: 14, delay: 2600, duration: 2600 },
     // ── Middle band sides (avoid xf 0.38–0.62 to clear the centred moon) ──────
     { xf: 0.02, yf: 0.352, r: 16, delay: 2700, duration: 2600 },
-    { xf: 0.08, yf: 0.500, r: 14, delay: 500,  duration: 3800 },
+    { xf: 0.08, yf: 0.5, r: 14, delay: 500, duration: 3800 },
     { xf: 0.15, yf: 0.609, r: 12, delay: 1300, duration: 3400 },
     { xf: 0.25, yf: 0.406, r: 15, delay: 2200, duration: 2800 },
     { xf: 0.75, yf: 0.391, r: 15, delay: 3400, duration: 3600 },
-    { xf: 0.85, yf: 0.563, r: 14, delay: 800,  duration: 4000 },
+    { xf: 0.85, yf: 0.563, r: 14, delay: 800, duration: 4000 },
     { xf: 0.92, yf: 0.352, r: 16, delay: 2000, duration: 2600 },
-    { xf: 0.98, yf: 0.500, r: 18, delay: 1100, duration: 3200 },
+    { xf: 0.98, yf: 0.5, r: 18, delay: 1100, duration: 3200 },
     // ── Lower ─────────────────────────────────────────────────────────────────
     { xf: 0.03, yf: 0.684, r: 16, delay: 2800, duration: 2800 },
-    { xf: 0.20, yf: 0.719, r: 14, delay: 400,  duration: 3800 },
-    { xf: 0.50, yf: 0.703, r: 20, delay: 1600, duration: 3400 },
-    { xf: 0.80, yf: 0.734, r: 16, delay: 2600, duration: 2600 },
-    { xf: 0.97, yf: 0.684, r: 18, delay: 650,  duration: 4200 },
+    { xf: 0.2, yf: 0.719, r: 14, delay: 400, duration: 3800 },
+    { xf: 0.5, yf: 0.703, r: 20, delay: 1600, duration: 3400 },
+    { xf: 0.8, yf: 0.734, r: 16, delay: 2600, duration: 2600 },
+    { xf: 0.97, yf: 0.684, r: 18, delay: 650, duration: 4200 },
     // ── Bottom strip ──────────────────────────────────────────────────────────
     { xf: 0.07, yf: 0.813, r: 18, delay: 1800, duration: 3000 },
-    { xf: 0.30, yf: 0.875, r: 14, delay: 3100, duration: 2800 },
-    { xf: 0.50, yf: 0.836, r: 22, delay: 900,  duration: 3600 },
+    { xf: 0.3, yf: 0.875, r: 14, delay: 3100, duration: 2800 },
+    { xf: 0.5, yf: 0.836, r: 22, delay: 900, duration: 3600 },
     { xf: 0.72, yf: 0.875, r: 16, delay: 2300, duration: 3200 },
-    { xf: 0.93, yf: 0.813, r: 20, delay: 600,  duration: 4000 },
+    { xf: 0.93, yf: 0.813, r: 20, delay: 600, duration: 4000 },
 ];
 
 function getGeneratedStars(vbW: number, vbH: number, count: number) {
@@ -168,7 +174,14 @@ interface TwinklingStarProps {
     clock: SharedValue<number>;
 }
 
-function TwinklingStar({ d, delay, duration, fill, animate, clock }: TwinklingStarProps) {
+function TwinklingStar({
+    d,
+    delay,
+    duration,
+    fill,
+    animate,
+    clock,
+}: TwinklingStarProps) {
     const animatedProps = useAnimatedProps(() => {
         'worklet';
         if (!animate) return { opacity: 1 };
@@ -186,7 +199,7 @@ function TwinklingStar({ d, delay, duration, fill, animate, clock }: TwinklingSt
         <AnimatedPath
             animatedProps={animatedProps}
             fill={fill}
-            fillRule="evenodd"
+            fillRule='evenodd'
             d={d}
         />
     );
@@ -224,7 +237,7 @@ export default function ClearNightIcon({
     // Expand the viewBox to match the physical screen dimensions while keeping
     // the scale factor (1280/size units per pixel) identical in both axes so
     // the moon always renders at the same physical size.
-    const vbW = fullWidth  ? Math.round((screenWidth  / size) * 1280) : 1280;
+    const vbW = fullWidth ? Math.round((screenWidth / size) * 1280) : 1280;
     const vbH = fullHeight ? Math.round((screenHeight / size) * 1280) : 1280;
     // Translate the moon + Illustrator stars so they remain visually centred.
     const offsetX = (vbW - 1280) / 2;
@@ -252,11 +265,14 @@ export default function ClearNightIcon({
             viewBox={`0 0 ${vbW} ${vbH}`}
             width={fullWidth ? screenWidth : size}
             height={fullHeight ? screenHeight : size}
-            accessibilityLabel="Clear night"
+            accessibilityLabel='Clear night'
         >
             {/* Moon and Illustrator stars stay centred in the canvas */}
             <G transform={`translate(${offsetX}, ${offsetY})`}>
-                <Path fill={color} d={MOON_D} />
+                <Path
+                    fill={color}
+                    d={MOON_D}
+                />
                 {illustratorStars.map((star) => (
                     <TwinklingStar
                         key={star.id}

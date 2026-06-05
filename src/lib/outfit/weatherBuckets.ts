@@ -38,8 +38,9 @@ export const isWeatherAppropriate = (
 
 /**
  * Grades precipitation on a 0–1 intensity scale.
- * AccuWeather rates (in/hr): light < 0.1, moderate 0.1–0.3, heavy > 0.3.
- * Falls back to WeatherText keywords when Precip1hr is missing.
+ * Intensity thresholds (in/hr): light < 0.1, moderate 0.1–0.3, heavy > 0.3.
+ * Falls back to WeatherText keywords (matches WeatherKit conditionCodes and
+ * AccuWeather phrases alike) when Precip1hr is missing.
  */
 export const classifyPrecipitation = (weather: CurrentWeather): PrecipIntensity => {
   if (!weather.HasPrecipitation) return 'none';
@@ -48,7 +49,7 @@ export const classifyPrecipitation = (weather: CurrentWeather): PrecipIntensity 
   if (amountInch >= 0.1) return 'moderate';
   const text = (weather.WeatherText ?? '').toLowerCase();
   if (text.includes('heavy') || text.includes('downpour')) return 'heavy';
-  if (text.includes('shower') || text.includes('storm')) return 'moderate';
+  if (text.includes('shower') || text.includes('storm') || text.includes('thunder')) return 'moderate';
   return 'light';
 };
 
@@ -62,10 +63,12 @@ export const precipMultiplier = (intensity: PrecipIntensity): number => {
   }
 };
 
-/** AccuWeather UVIndexText values considered high enough to warrant a hat note. */
+/** UVIndexText values considered high enough to warrant a hat note. */
 export const UV_HIGH_LABELS = new Set(['High', 'Very High', 'Extreme']);
 
-/** AccuWeather AirQuality Category values that warrant an air quality note. */
+/** Air-quality category values that warrant an air quality note. Currently
+ *  unused at runtime because Apple WeatherKit does not provide AQI; kept for
+ *  forward-compat with a future secondary AQI provider. */
 export const AQI_HIGH_LABELS = new Set([
   'Unhealthy for Sensitive Groups', 'Unhealthy', 'Very Unhealthy', 'Hazardous',
 ]);

@@ -3,6 +3,7 @@ import {
     ScrollView,
     RefreshControl,
     Pressable,
+    Linking,
     Animated as RNAnimated,
     Easing as RNEasing,
 } from 'react-native';
@@ -31,7 +32,14 @@ import MinimizedWeatherDisplay from '../MinimizedWeatherDisplay/MinimizedWeather
 import SunEventTile from '../SunEventTile/SunEventTile';
 import { useWeatherTheme } from '../../context/WeatherContext';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
-import { CityData, CurrentWeather, Forecast, Settings } from '../../types';
+import {
+    CurrentWeather,
+    DailyForecast,
+    Forecast,
+    LocationCoords,
+    Settings,
+} from '../../types';
+import { geocodeCity } from '../../lib/geocoding';
 import { spacing } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 import { flattenHsl, hslToHex, lerpHslFlat } from './colorMath';
@@ -45,24 +53,21 @@ import { fToC } from '../../lib/units';
 import { makeStyles } from './WeatherHUD.styles';
 
 // ─── Sun-event helpers ────────────────────────────────────────────────────────
-// AccuWeather's 5-day daily forecast embeds Sun.Rise / Sun.Set ISO timestamps
-// per day. We extract them into a flat list so they can be merged into the
-// hourly strip in chronological order.
+// WeatherKit's daily forecast embeds `sunrise` / `sunset` ISO timestamps per
+// day. We flatten them into a chronological list so they can be merged with
+// the hourly strip.
 
 type SunEventKind = 'sunrise' | 'sunset';
-interface SunEvent { kind: SunEventKind; time: string }
-
-interface AccuDailyDay {
-    Sun?: { Rise?: string; Set?: string };
+interface SunEvent {
+    kind: SunEventKind;
+    time: string;
 }
 
-const extractSunEvents = (raw: unknown): SunEvent[] => {
-    const data = raw as { DailyForecasts?: AccuDailyDay[] };
-    if (!Array.isArray(data?.DailyForecasts)) return [];
+const extractSunEvents = (days: DailyForecast[]): SunEvent[] => {
     const out: SunEvent[] = [];
-    for (const d of data.DailyForecasts) {
-        if (d.Sun?.Rise) out.push({ kind: 'sunrise', time: d.Sun.Rise });
-        if (d.Sun?.Set)  out.push({ kind: 'sunset',  time: d.Sun.Set  });
+    for (const d of days) {
+        if (d.sunrise) out.push({ kind: 'sunrise', time: d.sunrise });
+        if (d.sunset) out.push({ kind: 'sunset', time: d.sunset });
     }
     return out;
 };
@@ -72,7 +77,8 @@ const extractSunEvents = (raw: unknown): SunEvent[] => {
 const tempAtTime = (target: number, forecasts: Forecast[]): number | null => {
     if (forecasts.length === 0) return null;
     const sorted = [...forecasts].sort(
-        (a, b) => new Date(a.DateTime).getTime() - new Date(b.DateTime).getTime(),
+        (a, b) =>
+            new Date(a.DateTime).getTime() - new Date(b.DateTime).getTime(),
     );
     for (let i = 0; i < sorted.length - 1; i++) {
         const t0 = new Date(sorted[i].DateTime).getTime();
@@ -85,8 +91,10 @@ const tempAtTime = (target: number, forecasts: Forecast[]): number | null => {
         }
     }
     // Clamp to nearest endpoint if outside the forecast window
-    const first = sorted[0], last = sorted[sorted.length - 1];
-    if (target < new Date(first.DateTime).getTime()) return first.Temperature.Value;
+    const first = sorted[0],
+        last = sorted[sorted.length - 1];
+    if (target < new Date(first.DateTime).getTime())
+        return first.Temperature.Value;
     return last.Temperature.Value;
 };
 
@@ -109,7 +117,6 @@ interface Props {
     showInlineLoader?: boolean;
 }
 
-
 const WeatherHUD = ({
     location,
     settings,
@@ -124,7 +131,7 @@ const WeatherHUD = ({
     const { top: topInset } = useSafeAreaInsets();
     const tabPad = useTabBarPadding();
     const nav = useAppNavigation();
-    const [city, setCity] = useState<CityData | null>(null);
+    const [place, setPlace] = useState<LocationCoords | null>(null);
     const [weather, setWeather] = useState<CurrentWeather | null>(null);
     const [forecasts, setForecasts] = useState<Forecast[]>([]);
     const [sunEvents, setSunEvents] = useState<SunEvent[]>([]);
@@ -147,7 +154,11 @@ const WeatherHUD = ({
 
     const flushPending = () => {
         if (pendingRef.current) {
-            const { weather: w, forecasts: f, sunEvents: s } = pendingRef.current;
+            const {
+                weather: w,
+                forecasts: f,
+                sunEvents: s,
+            } = pendingRef.current;
             setWeather(w);
             setForecasts(f);
             setSunEvents(s);
@@ -163,7 +174,7 @@ const WeatherHUD = ({
         return () => clearInterval(id);
     }, [lastUpdated]);
 
-    // ── Fetch city ──────────────────────────────────────────────────────────────
+    // ── Resolve location → coordinates (expo-location geocoder) ────────────────
     useEffect(() => {
         if (!location) {
             setError(
@@ -175,63 +186,36 @@ const WeatherHUD = ({
         }
         setLoading(true);
         setError(null);
-        api.get(weatherConstants.GET_CITY, { params: { q: location } })
-            .then(({ data }) => {
-                if (data?.Key) {
-                    setCity(data);
-                } else {
-                    setError('Location not found. Check your city name.');
-                    setLoading(false);
-                    setRefreshing(false);
-                }
-            })
-            .catch((err) => {
-                const status = err?.response?.status;
-                setError(
-                    status === 429
-                        ? 'Weather API rate limit reached. Wait a few minutes and try again.'
-                        : 'Could not resolve location. Please try again later.',
-                );
+        let cancelled = false;
+        geocodeCity(location).then((coords) => {
+            if (cancelled) return;
+            if (coords) {
+                setPlace(coords);
+            } else {
+                setError('Location not found. Check your city name.');
                 setLoading(false);
                 setRefreshing(false);
-            });
+            }
+        });
+        return () => {
+            cancelled = true;
+        };
     }, [location, refreshKey]);
 
-    // ── Fetch weather ───────────────────────────────────────────────────────────
+    // ── Fetch weather (WeatherKit via server proxy) ────────────────────────────
     useEffect(() => {
-        if (!city?.Key) return;
+        if (!place) return;
+        const params = { params: { lat: place.lat, lon: place.lon } };
         Promise.all([
-            api.get(`${weatherConstants.GET_CURRENT_WEATHER}/${city.Key}`, {
-                params: { details: true },
-            }),
-            api.get(`${weatherConstants.GET_CURRENT_FORECAST}/${city.Key}`),
-            api.get(`${weatherConstants.GET_DAILY_FORECAST}/${city.Key}`),
+            api.get<CurrentWeather>(weatherConstants.GET_CURRENT, params),
+            api.get<Forecast[]>(weatherConstants.GET_HOURLY, params),
+            api.get<DailyForecast[]>(weatherConstants.GET_DAILY, params),
         ])
             .then(([wRes, fRes, dRes]) => {
-                const raw = wRes.data?.[0];
-                if (!raw) throw new Error('Empty response');
+                const w = wRes.data;
+                if (!w) throw new Error('Empty response');
 
-                // Parse AirAndPollen (present when details: true)
-                const airPollen: { Name: string; Value: number; Category: string }[] =
-                    raw.AirAndPollen ?? [];
-                const airQuality = airPollen.find((e: any) => e.Name === 'AirQuality');
-                const POLLEN_NAMES = new Set(['Tree', 'Grass', 'Ragweed', 'Weed']);
-                const POLLEN_ORDER = ['Low', 'Moderate', 'High', 'Very High'];
-                const pollenEntries = airPollen.filter((e: any) => POLLEN_NAMES.has(e.Name));
-                const worstPollen = pollenEntries.reduce(
-                    (worst: any, e: any) =>
-                        POLLEN_ORDER.indexOf(e.Category) > POLLEN_ORDER.indexOf(worst?.Category ?? 'Low')
-                            ? e : worst,
-                    null,
-                );
-                const w = {
-                    ...raw,
-                    AirQualityText:  airQuality?.Category ?? undefined,
-                    AirQualityIndex: airQuality?.Value    ?? undefined,
-                    PollenCategory:  worstPollen?.Category ?? undefined,
-                };
-
-                const events = extractSunEvents(dRes.data);
+                const events = extractSunEvents(dRes.data ?? []);
 
                 if (isRefreshRef.current) {
                     // Pull-to-refresh in flight — buffer until finally() flushes atomically
@@ -262,7 +246,7 @@ const WeatherHUD = ({
                 setLoading(false);
                 setRefreshing(false);
             });
-    }, [city]);
+    }, [place]);
 
     // ── Animated gradient color interpolation ───────────────────────────────────
     // The "from" and "to" gradients live in shared values; a single progress
@@ -270,17 +254,19 @@ const WeatherHUD = ({
     // useAnimatedProps worklet recomputes interpolated colors per frame natively,
     // so the gradient stays smooth even while the JS thread is busy (image
     // decoding, fetch parsing, scroll handlers).
-    const DEFAULT_GRADIENT: readonly string[] = useMemo(() => [
-        colors.bgDefault,
-        colors.bgDefault,
-        colors.bgDefault,
-    ], [colors.bgDefault]);
+    const DEFAULT_GRADIENT: readonly string[] = useMemo(
+        () => [colors.bgDefault, colors.bgDefault, colors.bgDefault],
+        [colors.bgDefault],
+    );
 
     // Hex parsing happens once when from/to change (JS thread). The worklet
     // only does numeric HSL interpolation + one hslToHex per stop per frame,
     // avoiding ~6 `parseInt` calls per stop per frame that previously ran on
     // the UI thread and were the dominant source of gradient jank.
-    const defaultHsl = useMemo(() => flattenHsl(DEFAULT_GRADIENT), [DEFAULT_GRADIENT]);
+    const defaultHsl = useMemo(
+        () => flattenHsl(DEFAULT_GRADIENT),
+        [DEFAULT_GRADIENT],
+    );
     const fromHsl = useSharedValue<number[]>(defaultHsl);
     const toHsl = useSharedValue<number[]>(defaultHsl);
     const progress = useSharedValue(1);
@@ -290,9 +276,10 @@ const WeatherHUD = ({
     // Compute target gradient from weather data. Memoised so the dependency
     // array gets a stable reference (was `.join(',')` on every render).
     const targetGradient = useMemo(
-        () => (weather
-            ? gradientFor(weather.WeatherText, weather.IsDayTime)
-            : DEFAULT_GRADIENT),
+        () =>
+            weather
+                ? gradientFor(weather.WeatherText, weather.IsDayTime)
+                : DEFAULT_GRADIENT,
         [weather?.WeatherText, weather?.IsDayTime, DEFAULT_GRADIENT],
     );
 
@@ -311,10 +298,17 @@ const WeatherHUD = ({
             let stopT = (t - offset) / (1 - stagger);
             if (stopT < 0) stopT = 0;
             else if (stopT > 1) stopT = 1;
-            const e = stopT < 0.5 ? 2 * stopT * stopT : 1 - Math.pow(-2 * stopT + 2, 2) / 2;
+            const e =
+                stopT < 0.5
+                    ? 2 * stopT * stopT
+                    : 1 - Math.pow(-2 * stopT + 2, 2) / 2;
             const b = i * 3;
-            const h1 = from[b],     s1 = from[b + 1], l1 = from[b + 2];
-            const h2 = to[b],       s2 = to[b + 1],   l2 = to[b + 2];
+            const h1 = from[b],
+                s1 = from[b + 1],
+                l1 = from[b + 2];
+            const h2 = to[b],
+                s2 = to[b + 1],
+                l2 = to[b + 2];
             let dh = h2 - h1;
             if (dh > 180) dh -= 360;
             else if (dh < -180) dh += 360;
@@ -336,7 +330,11 @@ const WeatherHUD = ({
 
         // Snapshot the in-flight interpolation in HSL space so an interruption
         // mid-transition reads as a continuous shift, not a jump.
-        const snapshot = lerpHslFlat(fromHsl.value, toHsl.value, progress.value);
+        const snapshot = lerpHslFlat(
+            fromHsl.value,
+            toHsl.value,
+            progress.value,
+        );
         fromHsl.value = snapshot;
         toHsl.value = flattenHsl(targetGradient);
         progress.value = 0;
@@ -393,7 +391,10 @@ const WeatherHUD = ({
         const temps = forecasts.map((f) =>
             isMetric ? fToC(f.Temperature.Value) : f.Temperature.Value,
         );
-        return { hiTemp: Math.round(Math.max(...temps)), loTemp: Math.round(Math.min(...temps)) };
+        return {
+            hiTemp: Math.round(Math.max(...temps)),
+            loTemp: Math.round(Math.min(...temps)),
+        };
     }, [forecasts, isMetric]);
 
     // Merge hourly forecasts + sunrise/sunset events into a single chronological
@@ -401,15 +402,22 @@ const WeatherHUD = ({
     // they don't add tiles for times not in view.
     type StripItem =
         | { kind: 'forecast'; time: string; data: Forecast }
-        | { kind: 'sun';      time: string; sun: SunEvent; temp: number };
+        | { kind: 'sun'; time: string; sun: SunEvent; temp: number };
     const stripItems = useMemo<StripItem[]>(() => {
         if (forecasts.length === 0) return [];
         const sorted = [...forecasts].sort(
-            (a, b) => new Date(a.DateTime).getTime() - new Date(b.DateTime).getTime(),
+            (a, b) =>
+                new Date(a.DateTime).getTime() - new Date(b.DateTime).getTime(),
         );
         const windowStart = new Date(sorted[0].DateTime).getTime();
-        const windowEnd   = new Date(sorted[sorted.length - 1].DateTime).getTime();
-        const items: StripItem[] = sorted.map((f) => ({ kind: 'forecast', time: f.DateTime, data: f }));
+        const windowEnd = new Date(
+            sorted[sorted.length - 1].DateTime,
+        ).getTime();
+        const items: StripItem[] = sorted.map((f) => ({
+            kind: 'forecast',
+            time: f.DateTime,
+            data: f,
+        }));
         for (const ev of sunEvents) {
             const t = new Date(ev.time).getTime();
             if (Number.isNaN(t) || t < windowStart || t > windowEnd) continue;
@@ -418,18 +426,24 @@ const WeatherHUD = ({
             const temp = Math.round(isMetric ? fToC(tempF) : tempF);
             items.push({ kind: 'sun', time: ev.time, sun: ev, temp });
         }
-        return items.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+        return items.sort(
+            (a, b) => new Date(a.time).getTime() - new Date(b.time).getTime(),
+        );
     }, [forecasts, sunEvents, isMetric]);
 
     // True for "Clear" / "Mostly Clear" at night — drives the full-screen star backdrop.
-    const isClearNightBg = !!(weather && !weather.IsDayTime &&
-        weather.WeatherText.toLowerCase().includes('clear'));
+    const isClearNightBg = !!(
+        weather &&
+        !weather.IsDayTime &&
+        weather.WeatherText.toLowerCase().includes('clear')
+    );
 
     // True for thunderstorm conditions — drives the full-screen rain + sheet-flash backdrop.
-    const isStormBg = !!(weather && (
-        weather.WeatherText.toLowerCase().includes('thunder') ||
-        weather.WeatherText.toLowerCase().includes('t-storm')
-    ));
+    const isStormBg = !!(
+        weather &&
+        (weather.WeatherText.toLowerCase().includes('thunder') ||
+            weather.WeatherText.toLowerCase().includes('t-storm'))
+    );
 
     // ── Error state (#9: retry + check settings) ──────────────────────────────
     if (error && !weather)
@@ -452,25 +466,43 @@ const WeatherHUD = ({
 
     return (
         <AnimatedLinearGradient
-            colors={DEFAULT_GRADIENT as unknown as [string, string, ...string[]]}
+            colors={
+                DEFAULT_GRADIENT as unknown as [string, string, ...string[]]
+            }
             animatedProps={animatedGradientProps}
             style={st.root}
         >
             {/* Full-screen star field — absolute layer behind all content */}
             {isClearNightBg && (
                 <View
-                    style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-                    pointerEvents="none"
+                    style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                    }}
+                    pointerEvents='none'
                 >
-                    <ClearNightIconMoon fullWidth fullHeight showMoon={false} />
+                    <ClearNightIconMoon
+                        fullWidth
+                        fullHeight
+                        showMoon={false}
+                    />
                 </View>
             )}
 
             {/* Full-screen storm backdrop — falling rain + occasional sheet flash */}
             {isStormBg && (
                 <View
-                    style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-                    pointerEvents="none"
+                    style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                    }}
+                    pointerEvents='none'
                 >
                     <StormIconLightning
                         fullWidth
@@ -491,7 +523,10 @@ const WeatherHUD = ({
                     pointerEvents={loading ? 'auto' : 'none'}
                 >
                     <RNAnimated.View
-                        style={[st.loadingIcon, { transform: [{ rotate: spinRotate }] }]}
+                        style={[
+                            st.loadingIcon,
+                            { transform: [{ rotate: spinRotate }] },
+                        ]}
                     >
                         <SunnyIcon size={st.loadingIcon.width} />
                     </RNAnimated.View>
@@ -507,7 +542,10 @@ const WeatherHUD = ({
                     pointerEvents={loading ? 'none' : 'auto'}
                 >
                     <ScrollView
-                        contentContainerStyle={[st.scroll, { paddingBottom: tabPad }]}
+                        contentContainerStyle={[
+                            st.scroll,
+                            { paddingBottom: tabPad },
+                        ]}
                         showsVerticalScrollIndicator={false}
                         refreshControl={
                             <RefreshControl
@@ -529,7 +567,7 @@ const WeatherHUD = ({
                             ]}
                         >
                             <GlassCard
-                                glassStyle="clear"
+                                glassStyle='clear'
                                 style={[st.gearBtn, { top: topInset + 8 }]}
                             >
                                 <Pressable
@@ -543,7 +581,7 @@ const WeatherHUD = ({
                                     <GearIcon />
                                 </Pressable>
                             </GlassCard>
-                            <Text style={st.city}>{city?.LocalizedName}</Text>
+                            <Text style={st.city}>{place?.name}</Text>
                             <Text style={st.condition}>
                                 {weather.WeatherText}
                             </Text>
@@ -578,24 +616,40 @@ const WeatherHUD = ({
                                     showsHorizontalScrollIndicator={false}
                                     contentContainerStyle={st.forecastStrip}
                                 >
-                                    {stripItems.map((item, i) => item.kind === 'forecast' ? (
-                                        <MinimizedWeatherDisplay
-                                            key={`f-${item.time}`}
-                                            weather={item.data.IconPhrase}
-                                            temperature={isMetric ? fToC(item.data.Temperature.Value) : item.data.Temperature.Value}
-                                            time={item.data.DateTime}
-                                            tempUnit={isMetric ? 'C' : item.data.Temperature.Unit}
-                                            isDay={item.data.IsDaylight}
-                                            isNow={i === 0}
-                                        />
-                                    ) : (
-                                        <SunEventTile
-                                            key={`s-${item.sun.kind}-${item.time}`}
-                                            time={item.time}
-                                            temperature={item.temp}
-                                            tempUnit={isMetric ? 'C' : 'F'}
-                                        />
-                                    ))}
+                                    {stripItems.map((item, i) =>
+                                        item.kind === 'forecast' ? (
+                                            <MinimizedWeatherDisplay
+                                                key={`f-${item.time}`}
+                                                weather={item.data.IconPhrase}
+                                                temperature={
+                                                    isMetric
+                                                        ? fToC(
+                                                              item.data
+                                                                  .Temperature
+                                                                  .Value,
+                                                          )
+                                                        : item.data.Temperature
+                                                              .Value
+                                                }
+                                                time={item.data.DateTime}
+                                                tempUnit={
+                                                    isMetric
+                                                        ? 'C'
+                                                        : item.data.Temperature
+                                                              .Unit
+                                                }
+                                                isDay={item.data.IsDaylight}
+                                                isNow={i === 0}
+                                            />
+                                        ) : (
+                                            <SunEventTile
+                                                key={`s-${item.sun.kind}-${item.time}`}
+                                                time={item.time}
+                                                temperature={item.temp}
+                                                tempUnit={isMetric ? 'C' : 'F'}
+                                            />
+                                        ),
+                                    )}
                                 </ScrollView>
                             </GlassGroup>
                         )}
@@ -608,6 +662,24 @@ const WeatherHUD = ({
                                 forecasts={forecasts}
                             />
                         </GlassCard>
+                        {/* WeatherKit attribution — required by Apple. */}
+                        <View style={st.weatherAttribution}>
+                            <Pressable
+                                onPress={() =>
+                                    Linking.openURL(
+                                        'https://weatherkit.apple.com/legal-attribution.html',
+                                    ).catch(() => {})
+                                }
+                                hitSlop={6}
+                                accessibilityRole='link'
+                                accessibilityLabel='Weather data provided by Apple Weather'
+                            >
+                                <Text style={st.lastUpdated}>
+                                    {' '}
+                                    Weather data provided by Apple Weather
+                                </Text>
+                            </Pressable>
+                        </View>
                     </ScrollView>
                 </View>
             )}

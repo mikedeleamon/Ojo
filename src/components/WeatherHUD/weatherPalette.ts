@@ -1,31 +1,37 @@
 import { weatherGradients } from '../../theme/tokens';
 
-/** Maps an AccuWeather condition string + day/night flag to a gradient palette. */
+/**
+ * Maps an Apple WeatherKit `conditionCode` (e.g. "MostlyClear", "PartlyCloudy",
+ * "HeavyRain", "Thunderstorms", "BlowingSnow") + day/night flag to a gradient
+ * palette. Substring-based so it also tolerates free-form phrases.
+ */
 export const gradientFor = (condition: string, isDay: boolean): readonly string[] => {
     const c = condition.toLowerCase();
 
-    if (!isDay && (c.includes('clear') || c.includes('mostly clear')||c.includes('partly cloudy')))
+    if (!isDay && (c.includes('clear') || c.includes('mostly clear') || c.includes('mostlyclear') || c.includes('partly')))
         return weatherGradients.clearNight;
 
     if (c.includes('fog') || c.includes('mist')) return weatherGradients.foggy;
-    if (c.includes('haz') || c.includes('smoke')) return weatherGradients.hazy;
+    if (c.includes('haz') || c.includes('haze') || c.includes('smoke') || c.includes('dust'))
+        return weatherGradients.hazy;
 
     if (c.includes('hot')) return weatherGradients.hot;
 
-    if (c.includes('sunny') || c.includes('mostly sunny'))
+    if (c.includes('sunny'))
         return weatherGradients.clearDay;
     if (c.includes('clear'))
         return isDay ? weatherGradients.clearDay : weatherGradients.clearNight;
 
-    // if (c.includes('partly') || c.includes('intermittent'))
-    //     return weatherGradients.partlyCloudy;
-    if (c.includes('mostly cloudy') || c.includes('overcast'))
+    if (c.includes('partly') || c.includes('intermittent'))
+        return weatherGradients.partlyCloudy;
+    if (c.includes('cloud') || c.includes('overcast'))
         return weatherGradients.cloudy;
 
     if (c.includes('snow') || c.includes('flurr') || c.includes('blizzard'))
         return weatherGradients.snow;
     if (
         c.includes('sleet') ||
+        c.includes('hail') ||
         c.includes('ice') ||
         c.includes('freez') ||
         c.includes('wintry')
@@ -36,7 +42,7 @@ export const gradientFor = (condition: string, isDay: boolean): readonly string[
         return weatherGradients.drizzle;
     if (c.includes('rain') || c.includes('shower'))
         return weatherGradients.rainy;
-    if (c.includes('thunder') || c.includes('storm'))
+    if (c.includes('thunder') || c.includes('storm') || c.includes('hurricane'))
         return weatherGradients.stormy;
 
     return isDay ? weatherGradients.clearDay : weatherGradients.clearNight;
@@ -46,14 +52,15 @@ export const gradientFor = (condition: string, isDay: boolean): readonly string[
 export const footerBgFor = (condition: string, isDay: boolean): string => {
     const c = condition.toLowerCase();
 
-    if (!isDay && (c.includes('clear') || c.includes('mostly clear')))
+    if (!isDay && (c.includes('clear') || c.includes('mostly clear') || c.includes('mostlyclear')))
         return 'rgba(2,6,23,0.97)';
 
     if (c.includes('fog') || c.includes('mist')) return 'rgba(31,41,55,0.97)';
-    if (c.includes('haz') || c.includes('smoke')) return 'rgba(41,32,20,0.97)';
+    if (c.includes('haz') || c.includes('haze') || c.includes('smok') || c.includes('dust'))
+        return 'rgba(41,32,20,0.97)';
     if (c.includes('hot')) return 'rgba(92,35,8,0.97)';
 
-    if (c.includes('sunny') || c.includes('mostly sunny'))
+    if (c.includes('sunny'))
         return 'rgba(2,78,142,0.97)';
     if (c.includes('clear'))
         return isDay ? 'rgba(2,78,142,0.97)' : 'rgba(2,6,23,0.97)';
@@ -67,6 +74,7 @@ export const footerBgFor = (condition: string, isDay: boolean): string => {
         return 'rgba(50,90,130,0.97)';
     if (
         c.includes('sleet') ||
+        c.includes('hail') ||
         c.includes('ice') ||
         c.includes('freeze') ||
         c.includes('wintry')
@@ -76,7 +84,7 @@ export const footerBgFor = (condition: string, isDay: boolean): string => {
     if (c.includes('drizzle') || c.includes('sprinkle'))
         return 'rgba(10,26,48,0.97)';
     if (c.includes('rain') || c.includes('shower')) return 'rgba(6,18,36,0.97)';
-    if (c.includes('thunder') || c.includes('storm'))
+    if (c.includes('thunder') || c.includes('storm') || c.includes('hurricane'))
         return 'rgba(10,8,28,0.97)';
 
     return isDay ? 'rgba(2,78,142,0.97)' : 'rgba(10,16,32,0.97)';

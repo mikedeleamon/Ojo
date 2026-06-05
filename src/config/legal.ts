@@ -103,7 +103,7 @@ export const PRIVACY_POLICY: LegalDocument = {
       bullets: [
         'MongoDB Atlas — cloud database used to store your account, closet metadata, outfit history, and trip information.',
         'Cloudflare R2 — object storage used to host the clothing item images you upload or capture. Images are served via CDN over HTTPS.',
-        'AccuWeather API — receives the city name you have set in order to return local weather conditions. AccuWeather does not receive your account identifier.',
+        'Apple WeatherKit — receives the latitude/longitude resolved from the city you have set in order to return local weather conditions. Apple does not receive your account identifier. See https://weatherkit.apple.com/legal-attribution.html for the full list of data sources.',
         'Expo Push Notification Service — receives your device push token (and the contents of the notifications you have enabled) so it can deliver them to your device.',
         'Google (Gmail API, optional) — only invoked if you connect Gmail in the Smart Trip Planner. We request read-only access to your Gmail (scope: gmail.readonly) for the sole purpose of scanning airline confirmation emails to populate your trip list. The refresh token granting this access is stored server-side; you can revoke it at any time from inside the App, which removes the token from our servers. We never read, store, or transmit the body or attachments of emails other than the structured trip fields (airline, dates, airports, confirmation number) extracted from airline confirmations.',
       ],
@@ -112,7 +112,7 @@ export const PRIVACY_POLICY: LegalDocument = {
       heading: '6. Data Sharing and Disclosure',
       body: ['We do not sell, rent, or trade your personal information. We may disclose your information only in these limited circumstances:'],
       bullets: [
-        'Service providers: Third-party vendors (MongoDB Atlas, Cloudflare R2, AccuWeather, Expo Push, and — only if you connect Gmail — Google) acting on our behalf under their published privacy and security terms.',
+        'Service providers: Third-party vendors (MongoDB Atlas, Cloudflare R2, Apple WeatherKit, Expo Push, and — only if you connect Gmail — Google) acting on our behalf under their published privacy and security terms.',
         'Legal compliance: If required by law, court order, or governmental authority.',
         'Safety: To protect the rights, property, or safety of our users or the public.',
         'Business transfer: If we merge with or are acquired by another company, with advance notice to you.',

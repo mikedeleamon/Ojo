@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { geocodeCity } from '../../../lib/geocoding';
 import {
     StyleSheet,
     ScrollView,
@@ -584,8 +585,16 @@ export default function PreferencesScreen() {
     const handleLocationChange = (text: string) => {
         setLocation(text);
         if (locationTimer.current) clearTimeout(locationTimer.current);
-        locationTimer.current = setTimeout(() => {
-            saveSettings(currentSettings({ location: text })).catch(() => {});
+        locationTimer.current = setTimeout(async () => {
+            // Geocode client-side so the server can hit WeatherKit directly
+            // (no city-key round-trip). On failure we still save the text so the
+            // user's typed city sticks; coords just stay undefined.
+            const coords = await geocodeCity(text);
+            saveSettings(currentSettings({
+                location: text,
+                lat: coords?.lat,
+                lon: coords?.lon,
+            })).catch(() => {});
         }, 800);
     };
 

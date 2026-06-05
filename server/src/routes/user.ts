@@ -95,6 +95,8 @@ router.get('/settings', async (req: AuthRequest, res: Response): Promise<void> =
 const SETTINGS_EDITABLE_FIELDS = [
   'clothingStyle',
   'location',
+  'lat',
+  'lon',
   'temperatureScale',
   'hiTempThreshold',
   'lowTempThreshold',

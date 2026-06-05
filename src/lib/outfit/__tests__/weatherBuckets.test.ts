@@ -71,13 +71,14 @@ describe('classifyPrecipitation', () => {
     }))).toBe('light');
   });
   it('falls back to WeatherText keywords', () => {
+    // WeatherKit conditionCodes — substring matchers should still trigger.
     expect(classifyPrecipitation(weather({
       HasPrecipitation: true,
-      WeatherText: 'Heavy downpour',
+      WeatherText: 'HeavyRain',
     }))).toBe('heavy');
     expect(classifyPrecipitation(weather({
       HasPrecipitation: true,
-      WeatherText: 'Scattered showers',
+      WeatherText: 'Thunderstorms',
     }))).toBe('moderate');
   });
 });

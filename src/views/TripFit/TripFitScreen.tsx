@@ -36,6 +36,7 @@ import { useSettings } from '../../context/SettingsContext';
 import { gradientFor } from '../../components/WeatherHUD/weatherPalette';
 import api from '../../api/client';
 import { authHeaders } from '../../lib/auth';
+import { geocodeCity } from '../../lib/geocoding';
 import TripCalendar from './TripCalendar';
 import type {
     DailyForecast,
@@ -54,12 +55,6 @@ interface DayPlan {
 
 const activeOutfit = (p: DayPlan): OutfitResult =>
     p.candidates[p.candidateIdx] ?? p.candidates[0];
-
-interface AccuDailyDay {
-    EpochDate: number;
-    Temperature: { Minimum?: { Value?: number }; Maximum?: { Value?: number } };
-    Day?: { IconPhrase?: string; HasPrecipitation?: boolean };
-}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -101,18 +96,6 @@ function buildTripWeather(day: DailyForecast): CurrentWeather {
         RelativeHumidity: 60,
         UVIndexText: 'Moderate',
     };
-}
-
-function parseDailyForecasts(raw: unknown): DailyForecast[] {
-    const data = raw as { DailyForecasts?: AccuDailyDay[] };
-    if (!Array.isArray(data?.DailyForecasts)) return [];
-    return data.DailyForecasts.map((d: AccuDailyDay) => ({
-        date: new Date(d.EpochDate * 1000).toISOString().slice(0, 10),
-        minTempF: d.Temperature?.Minimum?.Value ?? 60,
-        maxTempF: d.Temperature?.Maximum?.Value ?? 75,
-        dayPhrase: d.Day?.IconPhrase ?? 'Partly cloudy',
-        hasPrecipitation: !!d.Day?.HasPrecipitation,
-    }));
 }
 
 function fmtDate(iso: string): string {
@@ -860,7 +843,6 @@ export default function TripFitScreen() {
     const [activeIdx, setActiveIdx] = useState(0);
     const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
     const [replanningIdx, setReplanningIdx] = useState<number | null>(null);
-    const [forecastLimited, setForecastLimited] = useState(false);
 
     const pagerRef = useRef<ScrollView>(null);
     const forecastDaysRef = useRef<DailyForecast[]>([]);
@@ -948,33 +930,18 @@ export default function TripFitScreen() {
         setPlans([]);
         setActiveIdx(0);
         setCheckedIds(new Set());
-        setForecastLimited(false);
 
         try {
-            // City lookup
-            const cityRes = await api.get<{
-                Key: string;
-                LocalizedName: string;
-            }>('/api/weather/city', { params: { q: query }, ...authHeaders() });
-            const cityData = cityRes.data;
-            if (!cityData?.Key) throw new Error(`City not found: "${query}"`);
+            // Resolve destination → coordinates via on-device geocoder
+            const coords = await geocodeCity(query);
+            if (!coords) throw new Error(`City not found: "${query}"`);
 
-            // Fetch forecast — try 10-day, fall back to 5-day
-            let allDays: DailyForecast[] = [];
-            try {
-                const res = await api.get(
-                    `/api/weather/forecast/daily10/${cityData.Key}`,
-                    authHeaders(),
-                );
-                allDays = parseDailyForecasts(res.data);
-            } catch {
-                const res = await api.get(
-                    `/api/weather/forecast/daily/${cityData.Key}`,
-                    authHeaders(),
-                );
-                allDays = parseDailyForecasts(res.data);
-                setForecastLimited(true);
-            }
+            // WeatherKit always returns up to 10 days on the free tier — single call.
+            const res = await api.get<DailyForecast[]>('/api/weather/daily', {
+                params: { lat: coords.lat, lon: coords.lon },
+                ...authHeaders(),
+            });
+            const allDays: DailyForecast[] = res.data ?? [];
 
             // Slice to selected date range
             const slicedDays = forecastStartDate
@@ -1258,27 +1225,6 @@ export default function TripFitScreen() {
                     )}
                 </Pressable>
 
-                {/* Forecast limited notice */}
-                {forecastLimited && (
-                    <RNView
-                        style={{
-                            borderRadius: radius.sm,
-                            borderWidth: 1,
-                            borderColor: 'rgba(251,191,36,0.4)',
-                            overflow: 'hidden',
-                        }}
-                    >
-                        <GlassCard
-                            glassStyle='clear'
-                            style={st.warnInner}
-                        >
-                            <Text style={[st.warnText, { color: '#fbbf24' }]}>
-                                Forecast limited to 5 days on current plan.
-                            </Text>
-                        </GlassCard>
-                    </RNView>
-                )}
-
                 {/* Error */}
                 {error && (
                     <RNView
@@ -1521,11 +1467,6 @@ function makeStyles(
         planBtnText: {
             fontFamily: fonts.bodySemiBold,
             fontSize: fontSizes.base,
-        },
-        warnInner: { padding: spacing.sm },
-        warnText: {
-            fontFamily: fonts.body,
-            fontSize: fontSizes.sm,
         },
         errorInner: {
             padding: spacing.sm,

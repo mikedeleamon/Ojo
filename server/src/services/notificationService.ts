@@ -22,23 +22,9 @@ import cron from 'node-cron';
 import { Expo, ExpoPushMessage } from 'expo-server-sdk';
 import User from '../models/User';
 import Closet from '../models/Closet';
-import {
-  lookupCity,
-  getCurrent as accuGetCurrent,
-  getHourlyForecast as accuGetForecast,
-} from '../lib/accuWeather';
+import { getCurrent, getHourly } from '../lib/weatherKit';
 
 const expo = new Expo();
-
-async function getCityKey(city: string): Promise<string | null> {
-  if (!city) return null;
-  try {
-    const result = (await lookupCity(city)) as { Key?: string } | null;
-    return result?.Key ?? null;
-  } catch {
-    return null;
-  }
-}
 
 interface WeatherSnapshot {
   tempF: number;
@@ -52,28 +38,30 @@ interface ForecastHour {
   hasPrecipitation: boolean;
 }
 
-async function getCurrentWeather(cityKey: string): Promise<WeatherSnapshot | null> {
+async function getCurrentWeather(lat: number, lon: number): Promise<WeatherSnapshot | null> {
   try {
-    const data = (await accuGetCurrent(cityKey, true)) as any[];
-    const w = data?.[0];
+    const w = await getCurrent(lat, lon);
     if (!w) return null;
     return {
-      tempF:            w.RealFeelTemperature?.Imperial?.Value ?? w.Temperature?.Imperial?.Value,
-      hasPrecipitation: Boolean(w.HasPrecipitation),
-      weatherText:      w.WeatherText ?? '',
-      windMph:          w.Wind?.Speed?.Imperial?.Value ?? 0,
+      tempF:            w.RealFeelTemperature.Imperial.Value,
+      hasPrecipitation: w.HasPrecipitation,
+      weatherText:      w.WeatherText,
+      windMph:          w.Wind.Speed.Imperial.Value,
     };
   } catch {
     return null;
   }
 }
 
-async function getHourlyForecast(cityKey: string): Promise<ForecastHour[]> {
+async function getHourlyForecast(lat: number, lon: number): Promise<ForecastHour[]> {
   try {
-    const data = (await accuGetForecast(cityKey)) as any[];
-    return (data ?? []).map((h: any) => ({
-      tempF:            h.Temperature?.Value ?? 0,
-      hasPrecipitation: Boolean(h.HasPrecipitation),
+    const hours = await getHourly(lat, lon);
+    // Hourly Temperature.Value is °F (already converted upstream). Precipitation
+    // chance lives on the raw WeatherKit payload — we approximate it via the
+    // condition code instead, treating Rain/Snow/* codes as "has precip".
+    return hours.map((h) => ({
+      tempF:            h.Temperature.Value,
+      hasPrecipitation: /rain|snow|drizzle|sleet|hail|storm|shower|flurr/i.test(h.IconPhrase),
     }));
   } catch {
     return [];
@@ -221,14 +209,16 @@ async function runMorningCheck(): Promise<void> {
 
   for (const user of users) {
     const city = user.settings?.location;
-    if (!city) continue;
-
-    const cityKey = await getCityKey(city);
-    if (!cityKey) continue;
+    const lat  = user.settings?.lat;
+    const lon  = user.settings?.lon;
+    // Without coords we can't call WeatherKit. The client is responsible for
+    // geocoding `location` and PATCHing lat/lon up; users on old clients (no
+    // coords yet) get skipped until they re-save their location.
+    if (!city || typeof lat !== 'number' || typeof lon !== 'number') continue;
 
     const [weather, forecast] = await Promise.all([
-      getCurrentWeather(cityKey),
-      getHourlyForecast(cityKey),
+      getCurrentWeather(lat, lon),
+      getHourlyForecast(lat, lon),
     ]);
     if (!weather) continue;
 
@@ -273,12 +263,11 @@ async function runAfternoonCheck(): Promise<void> {
 
   for (const user of users) {
     const city = user.settings?.location;
-    if (!city) continue;
+    const lat  = user.settings?.lat;
+    const lon  = user.settings?.lon;
+    if (!city || typeof lat !== 'number' || typeof lon !== 'number') continue;
 
-    const cityKey = await getCityKey(city);
-    if (!cityKey) continue;
-
-    const weather = await getCurrentWeather(cityKey);
+    const weather = await getCurrentWeather(lat, lon);
     if (!weather) continue;
 
     const snap  = user.lastMorningSnapshot;
