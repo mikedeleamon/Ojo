@@ -151,3 +151,37 @@ export interface Closet {
   isPreferred: boolean;
   createdAt?:  string;
 }
+
+// ─── TripFit saved plans ────────────────────────────────────────────────────────
+// Derived, never stored: 'completed' once the end date has passed, 'pending'
+// while no outfits exist yet (saved beyond the 10-day forecast window),
+// otherwise 'planned'. See src/views/TripFit/shared.ts → tripFitStatus().
+export type TripFitStatus = 'pending' | 'planned' | 'completed';
+
+/** Compact per-day snapshot: forecast + the chosen outfit's article IDs. */
+export interface TripFitDaySnapshot {
+  date:             string;   // ISO yyyy-mm-dd
+  minTempF:         number;
+  maxTempF:         number;
+  dayPhrase:        string;   // WeatherKit conditionCode
+  hasPrecipitation: boolean;
+  articleIds:       string[];
+}
+
+export interface SavedTripFitPlan {
+  id:                   string;   // client-generated
+  name?:                string;   // optional nickname
+  destination:          string;
+  lat:                  number;
+  lon:                  number;
+  startDate:            string;   // ISO yyyy-mm-dd
+  endDate:              string;   // ISO yyyy-mm-dd
+  occasion:             OutfitOccasion;
+  closetId:             string;
+  days:                 TripFitDaySnapshot[];  // empty while status === 'pending'
+  checkedIds:           string[];              // packed article IDs
+  forecastFetchedAt?:   string;   // ISO timestamp of the forecast snapshot
+  sourceAirlineTripId?: string;   // links to a Gmail/airline Trip if seeded from one
+  createdAt:            string;
+  updatedAt:            string;
+}

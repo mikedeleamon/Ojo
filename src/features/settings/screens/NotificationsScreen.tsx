@@ -413,7 +413,7 @@ export default function NotificationsScreen() {
             <Row st={st}>
               <RowLabel st={st}
                 title="Trip Packing Reminder"
-                subtitle="Reminds you to check your TripFit packing list 2 days before your trip starts."
+                subtitle="Reminds you to check your TripFit packing list a week out and again 2 days before each trip."
               />
               <Switch
                 value={ns.tripPackingEnabled}

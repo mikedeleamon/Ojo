@@ -125,45 +125,116 @@ export const utcHourToLocal = (utcHour: number): number => {
   return ((utcHour - offsetMinutes / 60) % 24 + 24) % 24;
 };
 
-// ─── Trip packing reminder ────────────────────────────────────────────────────
-// Scheduled locally when the user plans a trip in TripFit.
-// Fires 2 days before departure at 9am local time.
+// ─── Trip packing reminders ───────────────────────────────────────────────────
+// Scheduled locally, per saved TripFit plan, when a plan is created or updated.
+// Two stages fire at 9am local time: one a week out, one two days before.
+// A registry of plan ids is kept so the master toggle can cancel them all
+// without needing to import the trip store (which would be circular).
 
-const TRIP_PACKING_ID        = 'ojo_trip_packing';
 export const TRIP_PACKING_PREF_KEY = 'ojo_trip_packing_enabled';
+const TRIP_REGISTRY_KEY = 'ojo_trip_reminder_plan_ids';
 
-export const scheduleTripPackingReminder = async (
-  destination: string,
-  tripStart: Date,
-): Promise<void> => {
+const weekReminderId    = (planId: string) => `ojo_trip_${planId}_wk`;
+const twoDayReminderId  = (planId: string) => `ojo_trip_${planId}_2d`;
+
+interface TripReminderInput {
+  id:          string;          // plan id
+  destination: string;
+  startDate:   string;          // ISO yyyy-mm-dd
+  days?:       { articleIds: string[] }[];
+  checkedIds?: string[];
+}
+
+const loadRegistry = async (): Promise<string[]> => {
+  try {
+    const raw = await storage.getItem(TRIP_REGISTRY_KEY);
+    return raw ? (JSON.parse(raw) as string[]) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveRegistry = (ids: string[]) =>
+  storage.setItem(TRIP_REGISTRY_KEY, JSON.stringify([...new Set(ids)]));
+
+/** Builds a 9am-local Date `daysBefore` ahead of the trip start, or null if past. */
+const reminderDate = (startISO: string, daysBefore: number): Date | null => {
+  const start = new Date(startISO + 'T09:00:00');
+  if (isNaN(start.getTime())) return null;
+  const d = new Date(start);
+  d.setDate(d.getDate() - daysBefore);
+  return d > new Date() ? d : null;
+};
+
+/** Schedule (or reschedule) the week-out + two-day reminders for one plan. */
+export const scheduleTripReminders = async (plan: TripReminderInput): Promise<void> => {
+  // Always clear the plan's existing reminders first so updates don't duplicate.
+  await cancelTripReminders(plan.id);
+
   const enabled = await storage.getItem(TRIP_PACKING_PREF_KEY);
   if (enabled !== 'true') return;
 
   const { status } = await Notifications.getPermissionsAsync();
   if (status !== 'granted') return;
 
-  // Cancel any existing trip reminder before scheduling a new one
-  await Notifications.cancelScheduledNotificationAsync(TRIP_PACKING_ID).catch(() => {});
+  // Count items still to pack (unique articles across all days, minus packed).
+  const packed = new Set(plan.checkedIds ?? []);
+  const toPack = new Set<string>();
+  for (const d of plan.days ?? [])
+    for (const id of d.articleIds) if (!packed.has(id)) toPack.add(id);
+  const remaining = toPack.size;
 
-  const reminderDate = new Date(tripStart);
-  reminderDate.setDate(reminderDate.getDate() - 2);
-  reminderDate.setHours(9, 0, 0, 0);
+  const weekDate  = reminderDate(plan.startDate, 7);
+  const twoDayDate = reminderDate(plan.startDate, 2);
 
-  if (reminderDate <= new Date()) return; // departure too soon to remind
+  if (weekDate) {
+    await Notifications.scheduleNotificationAsync({
+      identifier: weekReminderId(plan.id),
+      content: {
+        title: `${plan.destination} is a week away ✈️`,
+        body: remaining > 0
+          ? `${remaining} item${remaining === 1 ? '' : 's'} still to pack — open your TripFit list.`
+          : 'Review your TripFit packing list before you go.',
+      },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: weekDate },
+    }).catch(() => {});
+  }
 
-  await Notifications.scheduleNotificationAsync({
-    identifier: TRIP_PACKING_ID,
-    content: {
-      title: `Pack for ${destination}!`,
-      body: 'Your trip starts in 2 days. Check your TripFit packing list.',
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DATE,
-      date: reminderDate,
-    },
-  });
+  if (twoDayDate) {
+    await Notifications.scheduleNotificationAsync({
+      identifier: twoDayReminderId(plan.id),
+      content: {
+        title: `Pack for ${plan.destination}!`,
+        body: 'Your trip starts in 2 days. Check off your TripFit packing list.',
+      },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: twoDayDate },
+    }).catch(() => {});
+  }
+
+  if (weekDate || twoDayDate) {
+    const reg = await loadRegistry();
+    await saveRegistry([...reg, plan.id]);
+  }
 };
 
-export const cancelTripPackingReminder = async (): Promise<void> => {
-  await Notifications.cancelScheduledNotificationAsync(TRIP_PACKING_ID).catch(() => {});
+/** Cancel both reminders for a single plan and drop it from the registry. */
+export const cancelTripReminders = async (planId: string): Promise<void> => {
+  await Notifications.cancelScheduledNotificationAsync(weekReminderId(planId)).catch(() => {});
+  await Notifications.cancelScheduledNotificationAsync(twoDayReminderId(planId)).catch(() => {});
+  const reg = await loadRegistry();
+  await saveRegistry(reg.filter(id => id !== planId));
 };
+
+/** Cancel every scheduled trip reminder (used when the master toggle is turned off). */
+export const cancelAllTripReminders = async (): Promise<void> => {
+  const reg = await loadRegistry();
+  await Promise.all(reg.map(id => Promise.all([
+    Notifications.cancelScheduledNotificationAsync(weekReminderId(id)).catch(() => {}),
+    Notifications.cancelScheduledNotificationAsync(twoDayReminderId(id)).catch(() => {}),
+  ])));
+  await storage.removeItem(TRIP_REGISTRY_KEY);
+};
+
+// Back-compat alias — NotificationsScreen imports this to clear reminders when
+// the user disables the trip-packing toggle.
+export const cancelTripPackingReminder = cancelAllTripReminders;

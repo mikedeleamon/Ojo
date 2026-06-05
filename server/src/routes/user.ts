@@ -5,6 +5,7 @@ import Closet from '../models/Closet';
 import OutfitHistory from '../models/OutfitHistory';
 import UserPreferences from '../models/UserPreferences';
 import Trip from '../models/Trip';
+import TripFitPlan from '../models/TripFitPlan';
 import { signToken } from '../lib/jwt';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 
@@ -73,6 +74,7 @@ router.delete('/me', async (req: AuthRequest, res: Response): Promise<void> => {
       OutfitHistory.deleteMany({ userId: req.userId }),
       UserPreferences.deleteOne({ userId: req.userId }),
       Trip.deleteMany({ userId: req.userId }),
+      TripFitPlan.deleteMany({ userId: req.userId }),
     ]);
     res.sendStatus(204);
   } catch (err) {
