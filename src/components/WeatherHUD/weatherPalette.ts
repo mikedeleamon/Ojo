@@ -12,7 +12,7 @@ export const gradientFor = (condition: string, isDay: boolean): readonly string[
         return weatherGradients.clearNight;
 
     if (c.includes('fog') || c.includes('mist')) return weatherGradients.foggy;
-    if (c.includes('haz') || c.includes('haze') || c.includes('smoke') || c.includes('dust'))
+    if (c.includes('haz') || c.includes('haze') || c.includes('smoky') || c.includes('dust'))
         return weatherGradients.hazy;
 
     if (c.includes('hot')) return weatherGradients.hot;
