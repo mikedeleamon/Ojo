@@ -190,7 +190,7 @@ export default function SettingsScreen({ onLogout }: Props) {
             </View>
 
             <ScrollView contentContainerStyle={styles.content}>
-                <GlassGroup spacing={spacing.lg}>
+                <View style={{ gap: spacing.md }}>
                     {SETTINGS_CONFIG.map((section) => (
                         <SettingsSection
                             key={section.title}
@@ -199,7 +199,7 @@ export default function SettingsScreen({ onLogout }: Props) {
                             onAction={dispatch}
                         />
                     ))}
-                </GlassGroup>
+                </View>
 
                 <GlassCard glassStyle="clear" style={styles.logoutBtn}>
                     <Pressable

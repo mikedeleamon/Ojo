@@ -10,9 +10,10 @@ interface Props {
   onPress:   () => void;
   right?:    React.ReactNode;
   disabled?: boolean;
+  isFirst?:  boolean;
 }
 
-const SettingsItem = ({ label, sublabel, onPress, right, disabled = false }: Props) => {
+const SettingsItem = ({ label, sublabel, onPress, right, disabled = false, isFirst = false }: Props) => {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
@@ -32,6 +33,7 @@ const SettingsItem = ({ label, sublabel, onPress, right, disabled = false }: Pro
       disabled={disabled}
       style={({ pressed }) => [
         styles.row,
+        isFirst && styles.rowFirst,
         disabled && styles.disabled,
         pressed && !disabled && { opacity: 0.7 },
       ]}

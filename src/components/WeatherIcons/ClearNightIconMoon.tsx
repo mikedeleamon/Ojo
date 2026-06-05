@@ -3,10 +3,52 @@ import { Animated, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Svg, { Path, G } from 'react-native-svg';
 import { useReduceMotion } from '../../hooks/useReduceMotion';
 
-// ─── Path data ───────────────────────────────────────────────────────────────
+// ─── Moon geometry ────────────────────────────────────────────────────────────
 
-const MOON_D =
+/** Original full-disc path — used when no moonPhase prop is supplied. */
+const MOON_D_FULL =
     'M662.97,832.52h-36.75c-118-8.77-212.63-102.78-221.74-220.8l-.08-36.01c8.47-118.89,103.45-213.68,222.32-222.29l36.06.04c118.04,8.82,212.63,102.8,221.75,220.82l.08,36.02c-8.45,118.51-102.93,213.28-221.64,222.22Z';
+
+/** Center and radius of the moon disc in the 1280×1280 viewBox. */
+const MOON_CX = 644;
+const MOON_CY = 593;
+const MOON_R  = 240;
+
+/**
+ * Geometric SVG path for the illuminated portion of the moon.
+ *
+ * phase: 0 = new moon, 0.25 = first quarter (right side lit),
+ *        0.5 = full moon, 0.75 = last quarter (left side lit).
+ *
+ * Uses two arcs: the lit limb (outer semicircle) and the terminator
+ * (a half-ellipse whose x-radius is r·|cos(2π·phase)|). The sweep
+ * direction flips between crescent and gibbous at the quarter boundary.
+ */
+function moonPhasePath(cx: number, cy: number, r: number, phase: number): string {
+    const p = ((phase % 1) + 1) % 1; // normalise to [0, 1)
+    if (p < 0.02 || p > 0.98) return ''; // new moon — nothing visible
+
+    if (Math.abs(p - 0.5) < 0.01) {
+        // Full moon — two semicircular arcs forming a complete disc
+        return `M ${cx - r},${cy} A ${r},${r} 0 1,1 ${cx + r},${cy} A ${r},${r} 0 1,1 ${cx - r},${cy} Z`;
+    }
+
+    const top    = `${cx},${cy - r}`;
+    const bottom = `${cx},${cy + r}`;
+    const rx     = r * Math.abs(Math.cos(2 * Math.PI * p));
+
+    if (p < 0.5) {
+        // Waxing: right side lit.
+        // Outer: clockwise right-semicircle (top→bottom). Terminator: CCW for crescent, CW for gibbous.
+        const termSweep = p < 0.25 ? 0 : 1;
+        return `M ${top} A ${r},${r} 0 0,1 ${bottom} A ${rx},${r} 0 0,${termSweep} ${top} Z`;
+    } else {
+        // Waning: left side lit.
+        // Outer: CCW left-semicircle (top→bottom). Terminator: CW for gibbous, CCW for crescent.
+        const termSweep = p < 0.75 ? 1 : 0;
+        return `M ${top} A ${r},${r} 0 0,0 ${bottom} A ${rx},${r} 0 0,${termSweep} ${top} Z`;
+    }
+}
 
 // ─── Generated sparkle geometry ─────────────────────────────────────────────
 
@@ -186,6 +228,12 @@ interface ClearNightIconProps {
     /** Render the moon disc. Pass false on the background star layer so only
      *  one moon appears (the hero instance). */
     showMoon?: boolean;
+    /**
+     * Fractional moon phase: 0 = new moon, 0.25 = first quarter (right side lit),
+     * 0.5 = full moon, 0.75 = last quarter (left side lit). Omit for full-moon
+     * appearance (existing default behaviour).
+     */
+    moonPhase?: number;
 }
 
 export default function ClearNightIcon({
@@ -196,6 +244,7 @@ export default function ClearNightIcon({
     animate = true,
     showStars = true,
     showMoon = true,
+    moonPhase,
 }: ClearNightIconProps) {
     const reduceMotion = useReduceMotion();
     const animateStars = animate && showStars && !reduceMotion;
@@ -208,6 +257,11 @@ export default function ClearNightIcon({
 
     const width = fullWidth ? screenWidth : size;
     const height = fullHeight ? screenHeight : size;
+
+    const moonD = useMemo(
+        () => moonPhase !== undefined ? moonPhasePath(MOON_CX, MOON_CY, MOON_R, moonPhase) : MOON_D_FULL,
+        [moonPhase],
+    );
 
     const allStars = useMemo(
         () => (showStars ? getGeneratedStars(vbW, vbH, 100) : []),
@@ -229,7 +283,7 @@ export default function ClearNightIcon({
             style={{ width, height }}
             accessibilityLabel='Clear night'
         >
-            {showMoon && (
+            {showMoon && moonD.length > 0 && (
                 <Svg
                     viewBox={`0 0 ${vbW} ${vbH}`}
                     width={width}
@@ -238,7 +292,7 @@ export default function ClearNightIcon({
                     <G transform={`translate(${offsetX}, ${offsetY})`}>
                         <Path
                             fill={color}
-                            d={MOON_D}
+                            d={moonD}
                         />
                     </G>
                 </Svg>

@@ -16,7 +16,7 @@ import { ColorTokens, spacing, radius, fonts, fontSizes, fontWeights } from '../
 export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   section: {
     flexDirection: 'column' as const,
-    gap:           6,
+    gap:           spacing.sm,
   },
 
   title: {

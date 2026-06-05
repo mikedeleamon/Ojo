@@ -29,12 +29,13 @@ const SettingsSection = ({ section, settings, onAction }: Props) => {
     <View style={styles.section}>
       <Text style={styles.title}>{section.title}</Text>
       <GlassCard style={styles.group}>
-        {section.items.map(item => (
+        {section.items.map((item, i) => (
           <SettingsItem
             key={item.key}
             label={item.label}
             sublabel={item.sublabelKey ? getSublabel(item.sublabelKey, settings) : undefined}
             onPress={() => onAction(item.action)}
+            isFirst={i === 0}
           />
         ))}
       </GlassCard>

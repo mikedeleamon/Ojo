@@ -9,6 +9,10 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         zIndex: 10,
         alignItems: 'center',
         justifyContent: 'center',
+        // Opaque background so the weather content mounting behind it is
+        // hidden until the fade-out completes. Matches the gradient's start
+        // colour so the transition looks seamless.
+        backgroundColor: colors.bgDefault,
     },
     loadingIcon: { width: 80, height: 80 },
     scroll: { flexGrow: 1, paddingBottom: spacing.xl },
