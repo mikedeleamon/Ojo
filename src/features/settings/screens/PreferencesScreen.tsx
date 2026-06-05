@@ -644,24 +644,26 @@ export default function PreferencesScreen() {
         hiTempThreshold: hiTemp,
         lowTempThreshold: lowTemp,
         humidityPreference: humidity,
-        sensitivities: { allergies, asthma },
+        // disabling sensitivities for now since they're blocked until AQI and pollen data is available
+        //sensitivities: { allergies, asthma },
         ...overrides,
     });
 
-    const handleSensitivityChange = (
-        key: 'allergies' | 'asthma',
-        value: boolean,
-    ) => {
-        if (key === 'allergies') setAllergies(value);
-        else setAsthma(value);
-        const newSens =
-            key === 'allergies'
-                ? { allergies: value, asthma }
-                : { allergies, asthma: value };
-        saveSettings(currentSettings({ sensitivities: newSens })).catch(
-            () => {},
-        );
-    };
+    // disableing handleSensitivityChange for now since sensitivities are blocked until AQI and pollen data is available
+    // const handleSensitivityChange = (
+    //     key: 'allergies' | 'asthma',
+    //     value: boolean,
+    // ) => {
+    //     if (key === 'allergies') setAllergies(value);
+    //     else setAsthma(value);
+    //     const newSens =
+    //         key === 'allergies'
+    //             ? { allergies: value, asthma }
+    //             : { allergies, asthma: value };
+    //     saveSettings(currentSettings({ sensitivities: newSens })).catch(
+    //         () => {},
+    //     );
+    // };
 
     const handleStyleChange = (s: string) => {
         setClothingStyle(s);
