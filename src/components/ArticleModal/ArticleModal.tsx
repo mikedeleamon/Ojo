@@ -240,6 +240,7 @@ const ArticleModal = ({ closetId, onClose, onSubmit, initialData, onDelete, init
   const [identifying,    setIdentifying]   = useState(false);
   const [previewError,   setPreviewError]  = useState(false);
   const [topLabelText,   setTopLabelText]  = useState<string>('');
+  const uploadIgnoredRef = useRef(false);
 
   const headerRef = useRef<RNView>(null);
   useEffect(() => {
@@ -261,6 +262,7 @@ const ArticleModal = ({ closetId, onClose, onSubmit, initialData, onDelete, init
       runIdentification(localUri, width, height);
     }
     uploadImageToR2(uri, closetId).then(r2Url => {
+      if (uploadIgnoredRef.current) return;
       if (r2Url) {
         set('imageUrl', r2Url);
       } else {
@@ -487,7 +489,7 @@ const ArticleModal = ({ closetId, onClose, onSubmit, initialData, onDelete, init
                   resizeMode='cover'
                   onError={() => setPreviewError(true)}
                 />
-                <Pressable style={st.clearImg} onPress={() => set('imageUrl', '')} accessibilityRole="button">
+                <Pressable style={st.clearImg} onPress={() => { uploadIgnoredRef.current = true; set('imageUrl', ''); }} accessibilityRole="button">
                   <Text style={st.clearImgText}>Remove</Text>
                 </Pressable>
               </View>

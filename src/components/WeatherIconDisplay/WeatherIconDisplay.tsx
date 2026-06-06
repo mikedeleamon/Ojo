@@ -162,7 +162,7 @@ const WeatherIconDisplay = ({
                     />
                 )
             ) : isRainy ? (
-                <RainyIcon size={iconSize} />
+                <RainyIcon size={iconSize} animate={isLarge} />
             ) : isStorm ? (
                 isLarge ? (
                     <StormIconLightning size={iconSize} />

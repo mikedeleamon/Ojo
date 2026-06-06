@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { View, Text } from '../../components/primitives';
 import ClosetView from '../../components/ClosetView/ClosetView';
 import Loading from '../../components/Loading/Loading';
@@ -34,10 +35,14 @@ export default function ClosetPage() {
   }), [colors]);
 
   const {
-    closets, loading, error,
+    closets, loading, error, refresh,
     createCloset, renameCloset, deleteCloset,
     addArticle, editArticle, removeArticle, setPreferred,
   } = useClosets();
+
+  useFocusEffect(useCallback(() => {
+    refresh();
+  }, [refresh]));
 
   if (loading) return <Loading />;
 

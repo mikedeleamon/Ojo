@@ -33,6 +33,7 @@ import {
     UserPreferenceProfile,
 } from '../../lib/userPreferences';
 import { recordGapsFromNotes, getGapSuggestions, GapSuggestion, GapType } from '../../lib/wardrobeGaps';
+import { humanizeCondition } from '../../lib/weather/humanizeCondition';
 import {
     ClothingArticle,
     CurrentWeather,
@@ -514,7 +515,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
         const articles = activeSlots.map((s) => s.article);
         const lines = articles.map(a => `• ${a.name || a.clothingType}${a.color ? ` (${a.color})` : ''}`).join('\n');
         const tempF = Math.round(weather.Temperature.Imperial.Value);
-        const msg = `👔 My Ojo Outfit — Score: ${activeOutfit.score}${activeOutfit.isPersonalized ? ' ★' : ''}\n${'─'.repeat(22)}\n${lines}\n\n🌤️ ${tempF}°F · ${weather.WeatherText}\n\nStyled with Ojo`;
+        const msg = `👔 My Ojo Outfit — Score: ${activeOutfit.score}${activeOutfit.isPersonalized ? ' ★' : ''}\n${'─'.repeat(22)}\n${lines}\n\n🌤️ ${tempF}°F · ${humanizeCondition(weather.WeatherText)}\n\nStyled with Ojo`;
         Share.share({ message: msg }).catch(() => {});
     };
 

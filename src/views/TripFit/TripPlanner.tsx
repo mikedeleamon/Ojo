@@ -30,6 +30,7 @@ import { generateOutfits } from '../../lib/outfitEngine';
 import type { OutfitResult } from '../../lib/outfitEngine';
 import { recordGapsFromNotes } from '../../lib/wardrobeGaps';
 import { gradientFor } from '../../components/WeatherHUD/weatherPalette';
+import { humanizeCondition } from '../../lib/weather/humanizeCondition';
 import api from '../../api/client';
 import { authHeaders } from '../../lib/auth';
 import { geocodeCity } from '../../lib/geocoding';
@@ -152,7 +153,7 @@ const DayCard = ({
                 </Text>
                 <Text style={[dayCardSt.tempRow, { color: colors.textMuted }]}>
                     {Math.round(plan.day.minTempF)}° – {Math.round(plan.day.maxTempF)}°F ·{' '}
-                    {plan.day.dayPhrase}
+                    {humanizeCondition(plan.day.dayPhrase)}
                 </Text>
 
                 <RNView style={dayCardSt.thumbGrid}>

@@ -50,6 +50,7 @@ import { flattenHsl, hslToHex, lerpHslFlat } from './colorMath';
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 import { gradientFor, footerBgFor, formatLastUpdated } from './weatherPalette';
 import { fToC } from '../../lib/units';
+import { humanizeCondition } from '../../lib/weather/humanizeCondition';
 import { makeStyles } from './WeatherHUD.styles';
 
 // ─── Sun-event helpers ────────────────────────────────────────────────────────
@@ -583,7 +584,7 @@ const WeatherHUD = ({
                             </GlassCard>
                             <Text style={st.city}>{place?.name}</Text>
                             <Text style={st.condition}>
-                                {weather.WeatherText}
+                                {humanizeCondition(weather.WeatherText)}
                             </Text>
                             {lastUpdated && (
                                 <Text style={st.lastUpdated}>
