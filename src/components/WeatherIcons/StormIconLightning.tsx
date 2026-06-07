@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import {
     Animated,
+    Easing,
     StyleSheet,
     useWindowDimensions,
     View,
@@ -165,10 +166,15 @@ function RainLayer({
         }
         progress.setValue(0);
         const loop = Animated.loop(
-            Animated.sequence([
-                Animated.timing(progress, { toValue: 1, duration,        useNativeDriver: true }),
-                Animated.timing(progress, { toValue: 0, duration: 0,     useNativeDriver: true }),
-            ]),
+            // Linear easing keeps the fall at constant velocity. The default
+            // ease-in-out makes each one-segment cycle accelerate then decelerate,
+            // which reads as a stutter/pulse rather than continuous rainfall.
+            Animated.timing(progress, {
+                toValue: 1,
+                duration,
+                easing: Easing.linear,
+                useNativeDriver: true,
+            }),
         );
         const timer = setTimeout(() => loop.start(), startDelay);
         return () => {
@@ -211,6 +217,12 @@ function RainLayer({
         <Animated.View
             style={[StyleSheet.absoluteFill, { transform: [{ translateY }, { translateX }] }]}
             pointerEvents="none"
+            // The streak SVG never changes — only this wrapper's transform moves.
+            // Caching the layer as a GPU texture lets scroll/animation frames just
+            // re-position a bitmap instead of re-rasterizing the full-screen SVG,
+            // which is what was dropping frames while scrolling over the backdrop.
+            shouldRasterizeIOS
+            renderToHardwareTextureAndroid
         >
             <Svg viewBox={`0 0 ${vbW} ${vbH}`} width={width} height={height}>
                 {streaks.map((s) => (
