@@ -86,6 +86,25 @@ export interface DailyForecast {
 
 export type OutfitOccasion = 'everyday' | 'work' | 'weekend' | 'date' | 'outdoor' | 'athletic';
 
+/** A city the user has saved to switch the weather HUD between. */
+export interface SavedLocation {
+  id:        string;   // newLocationId()
+  name:      string;   // display label, e.g. "London"
+  query:     string;   // geocode input: city name or "lat,lon"
+  lat:       number;
+  lon:       number;
+  createdAt: string;   // ISO timestamp
+  updatedAt: string;   // ISO timestamp
+}
+
+/** A cached weather payload for one location, for instant/offline display. */
+export interface WeatherSnapshot {
+  weather:   CurrentWeather;
+  forecasts: Forecast[];        // hourly
+  daily:     DailyForecast[];
+  fetchedAt: string;            // ISO timestamp
+}
+
 export interface Settings {
   clothingStyle: string;
   location: string;
@@ -99,6 +118,8 @@ export interface Settings {
   gender?:         string;
   occasion?:       OutfitOccasion;  // optional — defaults to 'everyday' if not set
   sensitivities?:  { allergies?: boolean; asthma?: boolean };
+  /** Extra cities the user switches the weather HUD between (synced across devices). */
+  savedLocations?: SavedLocation[];
 }
 
 export interface ClothingArticle {

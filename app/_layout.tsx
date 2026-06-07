@@ -8,6 +8,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import * as Font from 'expo-font';
 import { ThemeProvider, useTheme } from '../src/theme/ThemeContext';
 import { SettingsProvider } from '../src/context/SettingsContext';
+import { ActiveLocationProvider } from '../src/context/ActiveLocationContext';
 import { WeatherProvider } from '../src/context/WeatherContext';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
@@ -114,6 +115,7 @@ export default function RootLayout() {
           <SafeAreaProvider>
             <AuthProvider>
               <SettingsProvider>
+                <ActiveLocationProvider>
                 <WeatherProvider>
                   <AuthGate>
                     <ThemedStatusBar />
@@ -132,6 +134,7 @@ export default function RootLayout() {
                     </Stack>
                   </AuthGate>
                 </WeatherProvider>
+                </ActiveLocationProvider>
               </SettingsProvider>
             </AuthProvider>
           </SafeAreaProvider>

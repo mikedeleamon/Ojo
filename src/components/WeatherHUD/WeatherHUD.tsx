@@ -20,6 +20,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Svg, Circle, Path } from 'react-native-svg';
 import { View, Text, GlassCard, GlassGroup } from '../primitives';
 import GearIcon from '../icons/GearIcon';
+import LocationsIcon from '../icons/LocationsIcon';
 import api from '../../api/client';
 import weatherConstants from '../../constants/weatherConstants';
 import WeatherIconDisplay from '../WeatherIconDisplay/WeatherIconDisplay';
@@ -38,6 +39,7 @@ import {
     Forecast,
     LocationCoords,
     Settings,
+    WeatherSnapshot,
 } from '../../types';
 import { geocodeCity } from '../../lib/geocoding';
 import { spacing } from '../../theme/tokens';
@@ -116,6 +118,16 @@ interface Props {
      * showing its own loading screen. Defaults to true (standalone use).
      */
     showInlineLoader?: boolean;
+    /**
+     * Cached weather for this location, used to paint instantly (and offline)
+     * while a fresh fetch happens in the background. Keyed by the caller per
+     * active city, so it changes when the user switches cities.
+     */
+    seedSnapshot?: WeatherSnapshot | null;
+    /** Fired with a fresh payload after each successful fetch, for caching. */
+    onSnapshot?: (snap: WeatherSnapshot) => void;
+    /** Opens the Locations switcher screen. */
+    onOpenLocations?: () => void;
 }
 
 const WeatherHUD = ({
@@ -125,6 +137,9 @@ const WeatherHUD = ({
     onRefresh,
     onReady,
     showInlineLoader = true,
+    seedSnapshot,
+    onSnapshot,
+    onOpenLocations,
 }: Props) => {
     const { colors } = useTheme();
     const st = useMemo(() => makeStyles(colors), [colors]);
@@ -133,13 +148,22 @@ const WeatherHUD = ({
     const tabPad = useTabBarPadding();
     const nav = useAppNavigation();
     const [place, setPlace] = useState<LocationCoords | null>(null);
-    const [weather, setWeather] = useState<CurrentWeather | null>(null);
-    const [forecasts, setForecasts] = useState<Forecast[]>([]);
-    const [sunEvents, setSunEvents] = useState<SunEvent[]>([]);
-    const [loading, setLoading] = useState(true);
+    // Seed from the cached snapshot (if any) so a city switch paints instantly.
+    const [weather, setWeather] = useState<CurrentWeather | null>(
+        seedSnapshot?.weather ?? null,
+    );
+    const [forecasts, setForecasts] = useState<Forecast[]>(
+        seedSnapshot?.forecasts ?? [],
+    );
+    const [sunEvents, setSunEvents] = useState<SunEvent[]>(
+        seedSnapshot ? extractSunEvents(seedSnapshot.daily) : [],
+    );
+    const [loading, setLoading] = useState(!seedSnapshot);
     const [error, setError] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
-    const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+    const [lastUpdated, setLastUpdated] = useState<Date | null>(
+        seedSnapshot ? new Date(seedSnapshot.fetchedAt) : null,
+    );
     const [, setTick] = useState(0);
 
     // ── Pull-to-refresh buffering ───────────────────────────────────────────────
@@ -175,6 +199,25 @@ const WeatherHUD = ({
         return () => clearInterval(id);
     }, [lastUpdated]);
 
+    // ── Re-seed on city switch ─────────────────────────────────────────────────
+    // When the active city changes, its cached snapshot (if any) replaces the
+    // current view immediately; the background fetch below then refreshes it.
+    useEffect(() => {
+        if (!seedSnapshot) return;
+        setWeather(seedSnapshot.weather);
+        setForecasts(seedSnapshot.forecasts);
+        setSunEvents(extractSunEvents(seedSnapshot.daily));
+        setFooterBg(
+            footerBgFor(
+                seedSnapshot.weather.WeatherText,
+                seedSnapshot.weather.IsDayTime,
+            ),
+        );
+        setLastUpdated(new Date(seedSnapshot.fetchedAt));
+        setLoading(false);
+        setError(null);
+    }, [seedSnapshot]);
+
     // ── Resolve location → coordinates (expo-location geocoder) ────────────────
     useEffect(() => {
         if (!location) {
@@ -185,7 +228,9 @@ const WeatherHUD = ({
             setRefreshing(false);
             return;
         }
-        setLoading(true);
+        // Keep showing the cached snapshot (if any) while we re-geocode + fetch;
+        // only show the spinner on a cold load with nothing cached.
+        if (!seedSnapshot) setLoading(true);
         setError(null);
         let cancelled = false;
         geocodeCity(location).then((coords) => {
@@ -217,6 +262,14 @@ const WeatherHUD = ({
                 if (!w) throw new Error('Empty response');
 
                 const events = extractSunEvents(dRes.data ?? []);
+
+                // Hand the fresh payload to the parent for per-city caching.
+                onSnapshot?.({
+                    weather: w,
+                    forecasts: fRes.data ?? [],
+                    daily: dRes.data ?? [],
+                    fetchedAt: new Date().toISOString(),
+                });
 
                 if (isRefreshRef.current) {
                     // Pull-to-refresh in flight — buffer until finally() flushes atomically
@@ -567,6 +620,26 @@ const WeatherHUD = ({
                                 { paddingTop: spacing.lg + topInset },
                             ]}
                         >
+                            {onOpenLocations && (
+                                <GlassCard
+                                    glassStyle='clear'
+                                    style={[
+                                        st.locationsBtn,
+                                        { top: topInset + 8 },
+                                    ]}
+                                >
+                                    <Pressable
+                                        onPress={onOpenLocations}
+                                        accessibilityLabel='Switch location'
+                                        style={({ pressed }) => [
+                                            st.locationsBtnInner,
+                                            { opacity: pressed ? 0.6 : 1 },
+                                        ]}
+                                    >
+                                        <LocationsIcon />
+                                    </Pressable>
+                                </GlassCard>
+                            )}
                             <GlassCard
                                 glassStyle='clear'
                                 style={[st.gearBtn, { top: topInset + 8 }]}

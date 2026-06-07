@@ -16,13 +16,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { View, Text, GlassCard, GlassGroup } from '../../components/primitives';
 import { HangerIcon } from '../../components/shared';
-import { useTheme } from '../../theme/ThemeContext';
+import { useTheme, ForceDarkPalette } from '../../theme/ThemeContext';
 import {
     fonts,
     fontSizes,
     fontWeights,
     radius,
     spacing,
+    darkColors,
 } from '../../theme/tokens';
 import type { ColorTokens } from '../../theme/tokens';
 import { useReduceMotion } from '../../hooks/useReduceMotion';
@@ -266,14 +267,15 @@ const skSt = StyleSheet.create({
 
 // ─── HeroBanner ───────────────────────────────────────────────────────────────
 
+// Vibrant weather-gradient banner designed for the dark palette (light text on
+// dark glass). Forced dark so it looks the same in light and dark mode, matching
+// the trip tiles in TripLibrary.
 const HeroBanner = ({
     plans,
     destination,
-    colors,
 }: {
     plans: DayPlan[];
     destination: string;
-    colors: ColorTokens;
 }) => {
     const allMin = plans.map((p) => p.day.minTempF);
     const allMax = plans.map((p) => p.day.maxTempF);
@@ -293,26 +295,28 @@ const HeroBanner = ({
     const gradColors = gradientFor(dominantPhrase, true) as string[];
 
     return (
-        <RNView style={{ borderRadius: radius.lg, overflow: 'hidden' }}>
-            <LinearGradient
-                colors={gradColors as [string, string, ...string[]]}
-                style={StyleSheet.absoluteFill}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-            />
-            <GlassCard glassStyle='regular' style={heroBannerSt.card}>
-                <Text style={heroBannerSt.emoji}>{phraseEmoji(dominantPhrase)}</Text>
-                <Text style={[heroBannerSt.destination, { color: colors.textPrimary }]}>
-                    {destination}
-                </Text>
-                <Text style={[heroBannerSt.dateRange, { color: colors.textSecondary }]}>
-                    {startStr} – {endStr}
-                </Text>
-                <Text style={[heroBannerSt.tempRange, { color: colors.textPrimary }]}>
-                    {minTemp}° – {maxTemp}°F
-                </Text>
-            </GlassCard>
-        </RNView>
+        <ForceDarkPalette>
+            <RNView style={{ borderRadius: radius.lg, overflow: 'hidden' }}>
+                <LinearGradient
+                    colors={gradColors as [string, string, ...string[]]}
+                    style={StyleSheet.absoluteFill}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                />
+                <GlassCard glassStyle='regular' style={heroBannerSt.card}>
+                    <Text style={heroBannerSt.emoji}>{phraseEmoji(dominantPhrase)}</Text>
+                    <Text style={[heroBannerSt.destination, { color: darkColors.textPrimary }]}>
+                        {destination}
+                    </Text>
+                    <Text style={[heroBannerSt.dateRange, { color: darkColors.textSecondary }]}>
+                        {startStr} – {endStr}
+                    </Text>
+                    <Text style={[heroBannerSt.tempRange, { color: darkColors.textPrimary }]}>
+                        {minTemp}° – {maxTemp}°F
+                    </Text>
+                </GlassCard>
+            </RNView>
+        </ForceDarkPalette>
     );
 };
 
@@ -1187,7 +1191,7 @@ export default function TripPlanner({
                 {/* Results */}
                 {!loading && plans.length > 0 && (
                     <>
-                        <HeroBanner plans={plans} destination={destination} colors={colors} />
+                        <HeroBanner plans={plans} destination={destination} />
 
                         {/* Save CTA for a freshly planned, not-yet-saved trip */}
                         {!isSaved && (

@@ -104,6 +104,7 @@ const SETTINGS_EDITABLE_FIELDS = [
   'lowTempThreshold',
   'humidityPreference',
   'gender',
+  'savedLocations',
 ] as const;
 
 router.put('/settings', async (req: AuthRequest, res: Response): Promise<void> => {

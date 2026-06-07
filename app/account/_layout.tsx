@@ -40,6 +40,7 @@ export default function AccountLayout() {
       <Stack.Screen name="history" options={{ ...subScreen, title: 'History' }} />
       <Stack.Screen name="preferences" options={{ ...subScreen, title: 'Style Preferences' }} />
       <Stack.Screen name="location" options={{ ...subScreen, title: 'Location' }} />
+      <Stack.Screen name="locations" options={{ ...subScreen, title: 'Locations' }} />
       <Stack.Screen name="units" options={{ ...subScreen, title: 'Units' }} />
       <Stack.Screen name="notifications" options={{ ...subScreen, title: 'Notifications' }} />
       <Stack.Screen name="permissions" options={{ ...subScreen, title: 'Permissions' }} />

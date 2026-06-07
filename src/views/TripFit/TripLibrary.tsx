@@ -10,9 +10,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { View, Text, GlassCard } from '../../components/primitives';
-import { useTheme } from '../../theme/ThemeContext';
-import type { ColorTokens } from '../../theme/tokens';
-import { fonts, fontSizes, radius, spacing } from '../../theme/tokens';
+import { useTheme, ForceDarkPalette } from '../../theme/ThemeContext';
+import { fonts, fontSizes, radius, spacing, darkColors } from '../../theme/tokens';
 import { gradientFor } from '../../components/WeatherHUD/weatherPalette';
 import api from '../../api/client';
 import { authHeaders } from '../../lib/auth';
@@ -64,15 +63,17 @@ interface TripLibraryProps {
 
 // ─── TripCard ────────────────────────────────────────────────────────────────────
 
+// The trip tile is a vibrant weather-gradient card designed for the dark
+// palette (light text on a dark glass material). It renders identically in
+// light and dark mode: ForceDarkPalette flips the nested glass to dark, and
+// darkColors keeps the text light for contrast against the gradient.
 const TripCard = ({
     plan,
-    colors,
     onOpen,
     onDelete,
     st,
 }: {
     plan: SavedTripFitPlan;
-    colors: ColorTokens;
     onOpen: () => void;
     onDelete: () => void;
     st: ReturnType<typeof makeStyles>;
@@ -108,58 +109,60 @@ const TripCard = ({
               : 'Planned';
 
     return (
-        <Pressable
-            onPress={onOpen}
-            onLongPress={onDelete}
-            accessibilityRole='button'
-            accessibilityLabel={`Open trip to ${plan.destination}`}
-            style={[status === 'completed' && st.cardCompleted]}
-        >
-            <RNView style={st.cardWrap}>
-                <LinearGradient
-                    colors={grad}
-                    style={StyleSheet.absoluteFill}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                />
-                <GlassCard glassStyle='regular' style={st.card}>
-                    <RNView style={st.cardTopRow}>
-                        <Text style={st.cardEmoji}>{phraseEmoji(dominantPhrase)}</Text>
-                        <GlassCard glassStyle='clear' style={st.badge}>
-                            <Text style={[st.badgeText, { color: colors.textSecondary }]}>
-                                {badgeLabel}
+        <ForceDarkPalette>
+            <Pressable
+                onPress={onOpen}
+                onLongPress={onDelete}
+                accessibilityRole='button'
+                accessibilityLabel={`Open trip to ${plan.destination}`}
+                style={[status === 'completed' && st.cardCompleted]}
+            >
+                <RNView style={st.cardWrap}>
+                    <LinearGradient
+                        colors={grad}
+                        style={StyleSheet.absoluteFill}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                    />
+                    <GlassCard glassStyle='regular' style={st.card}>
+                        <RNView style={st.cardTopRow}>
+                            <Text style={st.cardEmoji}>{phraseEmoji(dominantPhrase)}</Text>
+                            <GlassCard glassStyle='clear' style={st.badge}>
+                                <Text style={[st.badgeText, { color: darkColors.textSecondary }]}>
+                                    {badgeLabel}
+                                </Text>
+                            </GlassCard>
+                        </RNView>
+
+                        <Text style={[st.cardTitle, { color: darkColors.textPrimary }]} numberOfLines={1}>
+                            {plan.name || plan.destination}
+                        </Text>
+                        {!!plan.name && (
+                            <Text style={[st.cardSub, { color: darkColors.textSecondary }]} numberOfLines={1}>
+                                {plan.destination}
                             </Text>
-                        </GlassCard>
-                    </RNView>
+                        )}
 
-                    <Text style={[st.cardTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-                        {plan.name || plan.destination}
-                    </Text>
-                    {!!plan.name && (
-                        <Text style={[st.cardSub, { color: colors.textSecondary }]} numberOfLines={1}>
-                            {plan.destination}
+                        <Text style={[st.cardDates, { color: darkColors.textSecondary }]}>
+                            {fmtShortISO(plan.startDate)} – {fmtShortISO(plan.endDate)}
+                            {minTemp !== null ? ` · ${minTemp}°–${maxTemp}°F` : ''}
                         </Text>
-                    )}
 
-                    <Text style={[st.cardDates, { color: colors.textSecondary }]}>
-                        {fmtShortISO(plan.startDate)} – {fmtShortISO(plan.endDate)}
-                        {minTemp !== null ? ` · ${minTemp}°–${maxTemp}°F` : ''}
-                    </Text>
-
-                    {status === 'pending' ? (
-                        <Text style={[st.cardMeta, { color: colors.textMuted }]}>
-                            Outfits unlock when within 10 days
-                        </Text>
-                    ) : (
-                        <Text style={[st.cardMeta, { color: colors.textMuted }]}>
-                            {totalItems > 0
-                                ? `${packed}/${totalItems} packed`
-                                : 'No items yet'}
-                        </Text>
-                    )}
-                </GlassCard>
-            </RNView>
-        </Pressable>
+                        {status === 'pending' ? (
+                            <Text style={[st.cardMeta, { color: darkColors.textMuted }]}>
+                                Outfits unlock when within 10 days
+                            </Text>
+                        ) : (
+                            <Text style={[st.cardMeta, { color: darkColors.textMuted }]}>
+                                {totalItems > 0
+                                    ? `${packed}/${totalItems} packed`
+                                    : 'No items yet'}
+                            </Text>
+                        )}
+                    </GlassCard>
+                </RNView>
+            </Pressable>
+        </ForceDarkPalette>
     );
 };
 
@@ -343,7 +346,6 @@ export default function TripLibrary({
                             <TripCard
                                 key={p.id}
                                 plan={p}
-                                colors={colors}
                                 st={st}
                                 onOpen={() => onOpen(p)}
                                 onDelete={() => confirmDelete(p, onDelete)}
@@ -360,7 +362,6 @@ export default function TripLibrary({
                             <TripCard
                                 key={p.id}
                                 plan={p}
-                                colors={colors}
                                 st={st}
                                 onOpen={() => onOpen(p)}
                                 onDelete={() => confirmDelete(p, onDelete)}

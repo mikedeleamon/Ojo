@@ -13,6 +13,19 @@ export interface ISettings {
   lowTempThreshold: number;
   humidityPreference: number;
   gender?: string;
+  // Extra cities the user switches the weather HUD between. Synced so the list
+  // follows them across devices; weather payloads themselves stay client-side.
+  savedLocations?: ISavedLocation[];
+}
+
+export interface ISavedLocation {
+  id: string;
+  name: string;
+  query: string;
+  lat: number;
+  lon: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface INotificationSettings {
@@ -56,6 +69,16 @@ export interface IUser extends Document {
   appleSub?: string;
 }
 
+const savedLocationSchema = new Schema<ISavedLocation>({
+  id:        { type: String, required: true },
+  name:      { type: String, required: true },
+  query:     { type: String, required: true },
+  lat:       { type: Number, required: true },
+  lon:       { type: Number, required: true },
+  createdAt: { type: String, required: true },
+  updatedAt: { type: String, required: true },
+}, { _id: false });
+
 const settingsSchema = new Schema<ISettings>({
   clothingStyle:      { type: String, default: '' },
   location:           { type: String, default: '' },
@@ -66,6 +89,7 @@ const settingsSchema = new Schema<ISettings>({
   lowTempThreshold:   { type: Number, default: 50 },
   humidityPreference: { type: Number, default: 60 },
   gender:             { type: String, enum: ["Men's", "Women's", "All"], default: 'All' },
+  savedLocations:     { type: [savedLocationSchema], default: [] },
 }, { _id: false });
 
 const notificationSettingsSchema = new Schema<INotificationSettings>({
