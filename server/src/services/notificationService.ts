@@ -230,12 +230,13 @@ async function runMorningCheck(): Promise<void> {
     const scale = user.settings?.temperatureScale ?? 'Imperial';
 
     // Morning brief (always when morningBriefEnabled)
-    const briefMsg = buildMorningMessage(
-      city, weather, forecast, scale,
-      ns?.tempSwingEnabled ?? false,
-      ns?.tempSwingThresholdF ?? 20,
-    );
-    await sendPush(user.pushToken!, briefMsg);
+    // TODO: temporarily disabled
+    // const briefMsg = buildMorningMessage(
+    //   city, weather, forecast, scale,
+    //   ns?.tempSwingEnabled ?? false,
+    //   ns?.tempSwingThresholdF ?? 20,
+    // );
+    // await sendPush(user.pushToken!, briefMsg);
 
     // Closet gap nudge (optional, same morning window)
     if (ns?.closetGapEnabled) {
