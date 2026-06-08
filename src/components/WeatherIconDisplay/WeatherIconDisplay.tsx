@@ -4,6 +4,7 @@ import { View, Text } from '../primitives';
 import { ColorTokens, fonts, fontSizes } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 import { useSpinAnimation } from '../../hooks/useSpinAnimation';
+import { getMoonPhase } from '../../lib/moonPhase';
 import ClearNightIcon from '../WeatherIcons/ClearNightIcon';
 import ClearNightIconMoon from '../WeatherIcons/ClearNightIconMoon';
 import RainyIcon from '../WeatherIcons/RainyIcon';
@@ -91,6 +92,10 @@ interface Props {
     size?: 'large' | 'small';
     temperature?: number | string;
     feelsLike?: number | string;
+    /** Observer latitude in decimal degrees. Negative = Southern Hemisphere.
+     *  When supplied, the moon disc is mirrored horizontally for SH viewers
+     *  so the crescent lit limb appears on the correct side. */
+    latitude?: number;
 }
 
 const makeStyles = (colors: ColorTokens) =>
@@ -125,6 +130,7 @@ const WeatherIconDisplay = ({
     size = 'small',
     temperature,
     feelsLike,
+    latitude,
 }: Props) => {
     const { colors } = useTheme();
     const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -146,6 +152,16 @@ const WeatherIconDisplay = ({
     const iconSize = isLarge ? 180 : 36;
     const iconStyle = isLarge ? styles.iconLarge : styles.iconSmall;
 
+    // Tonight's lunar phase, derived from the date. Recomputed once per mount —
+    // the phase moves far too slowly to need per-render updates.
+    const moonPhase = useMemo(() => getMoonPhase(), []);
+
+    // In the Southern Hemisphere the lit limb is on the opposite side to NH.
+    // scaleX(-1) on the disc achieves this with zero extra SVG geometry.
+    // We only mirror when a latitude is actually supplied; no lat = no flip,
+    // which keeps all existing call sites (no lat prop) unchanged.
+    const southernHemisphere = latitude !== undefined && latitude < 0;
+
     return (
         <View style={[styles.root, isLarge ? styles.large : styles.small]}>
             {isClearNight ? (
@@ -153,6 +169,8 @@ const WeatherIconDisplay = ({
                     <ClearNightIconMoon
                         size={iconSize}
                         showStars={false}
+                        moonPhase={moonPhase}
+                        mirrorDisc={southernHemisphere}
                     />
                 ) : (
                     <ClearNightIcon

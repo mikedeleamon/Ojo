@@ -674,6 +674,7 @@ const WeatherHUD = ({
                                 size='large'
                                 temperature={tempVal}
                                 feelsLike={feelsVal}
+                                latitude={place?.lat}
                             />
                             {hiTemp !== null && loTemp !== null && (
                                 <Text style={st.hiLo}>

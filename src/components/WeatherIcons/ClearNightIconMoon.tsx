@@ -43,9 +43,10 @@ function moonPhasePath(cx: number, cy: number, r: number, phase: number): string
         const termSweep = p < 0.25 ? 0 : 1;
         return `M ${top} A ${r},${r} 0 0,1 ${bottom} A ${rx},${r} 0 0,${termSweep} ${top} Z`;
     } else {
-        // Waning: left side lit.
-        // Outer: CCW left-semicircle (top→bottom). Terminator: CW for gibbous, CCW for crescent.
-        const termSweep = p < 0.75 ? 1 : 0;
+        // Waning: left side lit. Mirror image of the waxing half, so the
+        // terminator sweep is the opposite of the waxing branch above:
+        // gibbous (0.5–0.75) bulges right (sweep 0), crescent (0.75–1) bulges left (sweep 1).
+        const termSweep = p < 0.75 ? 0 : 1;
         return `M ${top} A ${r},${r} 0 0,0 ${bottom} A ${rx},${r} 0 0,${termSweep} ${top} Z`;
     }
 }
@@ -234,6 +235,12 @@ interface ClearNightIconProps {
      * appearance (existing default behaviour).
      */
     moonPhase?: number;
+    /**
+     * Flip the moon disc horizontally. Pass true for Southern Hemisphere observers
+     * so the lit limb appears on the correct side (opposite to NH).
+     * Does not affect stars. Default false.
+     */
+    mirrorDisc?: boolean;
 }
 
 export default function ClearNightIcon({
@@ -245,6 +252,7 @@ export default function ClearNightIcon({
     showStars = true,
     showMoon = true,
     moonPhase,
+    mirrorDisc = false,
 }: ClearNightIconProps) {
     const reduceMotion = useReduceMotion();
     const animateStars = animate && showStars && !reduceMotion;
@@ -284,12 +292,21 @@ export default function ClearNightIcon({
             accessibilityLabel='Clear night'
         >
             {showMoon && moonD.length > 0 && (
+                // mirrorDisc flips the disc for Southern Hemisphere observers.
+                // scaleX(-1) around the disc centre mirrors the lit limb without
+                // affecting the star layers above.
                 <Svg
                     viewBox={`0 0 ${vbW} ${vbH}`}
                     width={width}
                     height={height}
                 >
-                    <G transform={`translate(${offsetX}, ${offsetY})`}>
+                    <G
+                        transform={
+                            mirrorDisc
+                                ? `translate(${offsetX}, ${offsetY}) translate(${MOON_CX}, ${MOON_CY}) scale(-1, 1) translate(${-MOON_CX}, ${-MOON_CY})`
+                                : `translate(${offsetX}, ${offsetY})`
+                        }
+                    >
                         <Path
                             fill={color}
                             d={moonD}
