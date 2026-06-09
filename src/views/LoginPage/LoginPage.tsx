@@ -7,14 +7,26 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as AppleAuthentication from 'expo-apple-authentication';
-import { View, Text, TextInput, Pressable, GlassCard } from '../../components/primitives';
+import {
+    View,
+    Text,
+    TextInput,
+    Pressable,
+    GlassCard,
+} from '../../components/primitives';
 import OjoLogoIcon from '../../components/icons/OjoLogoIcon';
 import axios from '../../api/client';
 import { AuthState, Settings } from '../../types';
 import { getAuthErrorMessage, saveAuth } from '../../lib/auth';
 import { isAppleSignInAvailable, signInWithApple } from '../../lib/appleSignIn';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
-import { spacing, radius, fonts, fontSizes, fontWeights } from '../../theme/tokens';
+import {
+    spacing,
+    radius,
+    fonts,
+    fontSizes,
+    fontWeights,
+} from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 import LegalConsentNotice from '../../components/LegalConsentNotice';
 
@@ -24,129 +36,141 @@ interface Props {
 
 export default function LoginPage({ onLogin }: Props) {
     const { colors, isDark } = useTheme();
-    const styles = useMemo(() => StyleSheet.create({
-        root: { flex: 1, backgroundColor: colors.bgDefault },
-        content: { flexGrow: 1, justifyContent: 'center', padding: spacing.md },
-        card: {
-            backgroundColor: colors.glassBg,
-            borderRadius: radius.lg,
-            borderWidth: 1,
-            borderColor: colors.glassBorder,
-            padding: spacing.lg,
-            gap: spacing.md,
-            alignItems: 'center',
-        },
-        logo: { width: 120, height: 48, marginBottom: spacing.sm },
-        tagline: {
-            fontFamily: fonts.body,
-            fontSize: fontSizes.base,
-            color: colors.textSecondary,
-            marginBottom: spacing.sm,
-        },
-        errorBox: {
-            width: '100%',
-            padding: spacing.sm,
-            backgroundColor: colors.errorBg,
-            borderRadius: radius.sm,
-            borderWidth: 1,
-            borderColor: colors.errorBorder,
-        },
-        errorText: {
-            fontFamily: fonts.body,
-            fontSize: fontSizes.sm,
-            color: colors.errorText,
-        },
-        fields: { width: '100%', gap: spacing.sm },
-        field: { gap: 6 },
-        label: {
-            fontFamily: fonts.body,
-            fontSize: fontSizes.xs,
-            fontWeight: fontWeights.medium,
-            letterSpacing: 0.1 * fontSizes.xs,
-            textTransform: 'uppercase',
-            color: colors.textMuted,
-        },
-        inputRow: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            backgroundColor: colors.glassBg,
-            borderWidth: 1,
-            borderColor: colors.glassBorder,
-            borderRadius: radius.sm,
-        },
-        input: {
-            flex: 1,
-            paddingVertical: 12,
-            paddingHorizontal: spacing.md,
-            color: colors.textPrimary,
-            fontFamily: fonts.body,
-            fontSize: fontSizes.base,
-        },
-        inputSuffix: {
-            paddingHorizontal: spacing.sm,
-            paddingVertical: 12,
-        },
-        inputSuffixText: {
-            fontFamily: fonts.body,
-            fontSize: fontSizes.sm,
-            color: colors.textMuted,
-        },
-        btn: {
-            width: '100%',
-            paddingVertical: 14,
-            backgroundColor: colors.saveBtnBg,
-            borderRadius: radius.sm,
-            alignItems: 'center',
-        },
-        btnText: {
-            fontFamily: fonts.body,
-            fontSize: fontSizes.base,
-            fontWeight: fontWeights.semibold,
-            color: colors.saveBtnText,
-        },
-        footer: { flexDirection: 'row', alignItems: 'center' },
-        footerText: {
-            fontFamily: fonts.body,
-            fontSize: fontSizes.sm,
-            color: colors.textSecondary,
-        },
-        link: {
-            fontFamily: fonts.body,
-            fontSize: fontSizes.sm,
-            color: colors.textPrimary,
-            textDecorationLine: 'underline',
-        },
-        forgotRow: { width: '100%', alignItems: 'flex-end', marginTop: -spacing.xs },
-        forgotLink: {
-            fontFamily: fonts.body,
-            fontSize: fontSizes.sm,
-            color: colors.textSecondary,
-            textDecorationLine: 'underline',
-        },
-        dividerRow: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            width: '100%',
-            gap: spacing.sm,
-            marginVertical: spacing.xs,
-        },
-        dividerLine: {
-            flex: 1,
-            height: StyleSheet.hairlineWidth,
-            backgroundColor: colors.glassBorder,
-        },
-        dividerText: {
-            fontFamily: fonts.body,
-            fontSize: fontSizes.xs,
-            color: colors.textMuted,
-            textTransform: 'uppercase',
-            letterSpacing: 1,
-        },
-        appleBtn: {
-            width: '100%',
-            height: 48,
-        },
-    }), [colors]);
+    const styles = useMemo(
+        () =>
+            StyleSheet.create({
+                root: { flex: 1, backgroundColor: colors.bgDefault },
+                content: {
+                    flexGrow: 1,
+                    justifyContent: 'center',
+                    padding: spacing.md,
+                },
+                card: {
+                    backgroundColor: colors.glassBg,
+                    borderRadius: radius.lg,
+                    borderWidth: 1,
+                    borderColor: colors.glassBorder,
+                    padding: spacing.lg,
+                    gap: spacing.md,
+                    alignItems: 'center',
+                },
+                logo: { width: 120, height: 48, marginBottom: spacing.sm },
+                tagline: {
+                    fontFamily: fonts.body,
+                    fontSize: fontSizes.base,
+                    color: colors.textSecondary,
+                    marginBottom: spacing.sm,
+                },
+                errorBox: {
+                    width: '100%',
+                    padding: spacing.sm,
+                    backgroundColor: colors.errorBg,
+                    borderRadius: radius.sm,
+                    borderWidth: 1,
+                    borderColor: colors.errorBorder,
+                },
+                errorText: {
+                    fontFamily: fonts.body,
+                    fontSize: fontSizes.sm,
+                    color: colors.errorText,
+                },
+                fields: { width: '100%', gap: spacing.sm },
+                field: { gap: 6 },
+                label: {
+                    fontFamily: fonts.body,
+                    fontSize: fontSizes.xs,
+                    fontWeight: fontWeights.medium,
+                    letterSpacing: 0.1 * fontSizes.xs,
+                    textTransform: 'uppercase',
+                    color: colors.textMuted,
+                },
+                inputRow: {
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: colors.glassBg,
+                    borderWidth: 1,
+                    borderColor: colors.glassBorder,
+                    borderRadius: radius.sm,
+                },
+                input: {
+                    flex: 1,
+                    paddingVertical: 12,
+                    paddingHorizontal: spacing.md,
+                    color: colors.textPrimary,
+                    fontFamily: fonts.body,
+                    fontSize: fontSizes.base,
+                },
+                inputSuffix: {
+                    paddingHorizontal: spacing.sm,
+                    paddingVertical: 12,
+                },
+                inputSuffixText: {
+                    fontFamily: fonts.body,
+                    fontSize: fontSizes.sm,
+                    color: colors.textMuted,
+                },
+                btn: {
+                    width: '100%',
+                    paddingVertical: 14,
+                    backgroundColor: colors.saveBtnBg,
+                    borderRadius: radius.sm,
+                    alignItems: 'center',
+                },
+                btnText: {
+                    fontFamily: fonts.body,
+                    fontSize: fontSizes.base,
+                    fontWeight: fontWeights.semibold,
+                    color: colors.saveBtnText,
+                },
+                footer: { flexDirection: 'row', alignItems: 'center' },
+                footerText: {
+                    fontFamily: fonts.body,
+                    fontSize: fontSizes.sm,
+                    color: colors.textSecondary,
+                },
+                link: {
+                    fontFamily: fonts.body,
+                    fontSize: fontSizes.sm,
+                    color: colors.textPrimary,
+                    textDecorationLine: 'underline',
+                },
+                forgotRow: {
+                    width: '100%',
+                    alignItems: 'flex-end',
+                    marginTop: -spacing.xs,
+                },
+                forgotLink: {
+                    fontFamily: fonts.body,
+                    fontSize: fontSizes.sm,
+                    color: colors.textSecondary,
+                    textDecorationLine: 'underline',
+                },
+                dividerRow: {
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    width: '100%',
+                    gap: spacing.sm,
+                    marginVertical: spacing.xs,
+                },
+                dividerLine: {
+                    flex: 1,
+                    height: StyleSheet.hairlineWidth,
+                    backgroundColor: colors.glassBorder,
+                },
+                dividerText: {
+                    fontFamily: fonts.body,
+                    fontSize: fontSizes.xs,
+                    color: colors.textMuted,
+                    textTransform: 'uppercase',
+                    letterSpacing: 1,
+                },
+                appleBtn: {
+                    width: '100%',
+                    height: 48,
+                },
+            }),
+        [colors],
+    );
 
     const nav = useAppNavigation();
     const [identifier, setIdentifier] = useState('');
@@ -162,7 +186,9 @@ export default function LoginPage({ onLogin }: Props) {
         isAppleSignInAvailable().then((ok) => {
             if (mounted) setAppleAvailable(ok);
         });
-        return () => { mounted = false; };
+        return () => {
+            mounted = false;
+        };
     }, []);
 
     const handleApple = async () => {
@@ -210,7 +236,10 @@ export default function LoginPage({ onLogin }: Props) {
                     keyboardShouldPersistTaps='handled'
                 >
                     <GlassCard style={styles.card}>
-                        <OjoLogoIcon width={styles.logo.width} height={styles.logo.height} />
+                        <OjoLogoIcon
+                            width={styles.logo.width}
+                            height={styles.logo.height}
+                        />
                         <Text style={styles.tagline}>
                             Dress for the weather.
                         </Text>
@@ -218,7 +247,7 @@ export default function LoginPage({ onLogin }: Props) {
                         {error ? (
                             <View
                                 style={styles.errorBox}
-                                accessibilityLiveRegion="assertive"
+                                accessibilityLiveRegion='assertive'
                                 accessible={true}
                                 accessibilityLabel={error}
                             >
@@ -231,18 +260,20 @@ export default function LoginPage({ onLogin }: Props) {
                                 <Text style={styles.label}>
                                     Email or username
                                 </Text>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder='you@example.com or @janedoe'
-                                    placeholderTextColor={colors.textMuted}
-                                    value={identifier}
-                                    onChangeText={setIdentifier}
-                                    keyboardType='email-address'
-                                    autoCapitalize='none'
-                                    textContentType='emailAddress'
-                                    returnKeyType='next'
-                                    accessibilityLabel="Email or username"
-                                />
+                                <View style={styles.inputRow}>
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder='you@example.com or @janedoe'
+                                        placeholderTextColor={colors.textMuted}
+                                        value={identifier}
+                                        onChangeText={setIdentifier}
+                                        keyboardType='email-address'
+                                        autoCapitalize='none'
+                                        textContentType='emailAddress'
+                                        returnKeyType='next'
+                                        accessibilityLabel='Email or username'
+                                    />
+                                </View>
                             </View>
                             <View style={styles.field}>
                                 <Text style={styles.label}>Password</Text>
@@ -257,13 +288,19 @@ export default function LoginPage({ onLogin }: Props) {
                                         onChangeText={setPassword}
                                         returnKeyType='done'
                                         onSubmitEditing={handleSubmit}
-                                        accessibilityLabel="Password"
+                                        accessibilityLabel='Password'
                                     />
                                     <Pressable
                                         style={styles.inputSuffix}
-                                        onPress={() => setShowPassword(s => !s)}
-                                        accessibilityRole="button"
-                                        accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                                        onPress={() =>
+                                            setShowPassword((s) => !s)
+                                        }
+                                        accessibilityRole='button'
+                                        accessibilityLabel={
+                                            showPassword
+                                                ? 'Hide password'
+                                                : 'Show password'
+                                        }
                                     >
                                         <Text style={styles.inputSuffixText}>
                                             {showPassword ? 'Hide' : 'Show'}
@@ -275,11 +312,15 @@ export default function LoginPage({ onLogin }: Props) {
 
                         <View style={styles.forgotRow}>
                             <Pressable
-                                onPress={() => nav.push('/(auth)/forgot-password')}
-                                accessibilityRole="link"
-                                accessibilityLabel="Forgot password"
+                                onPress={() =>
+                                    nav.push('/(auth)/forgot-password')
+                                }
+                                accessibilityRole='link'
+                                accessibilityLabel='Forgot password'
                             >
-                                <Text style={styles.forgotLink}>Forgot password?</Text>
+                                <Text style={styles.forgotLink}>
+                                    Forgot password?
+                                </Text>
                             </Pressable>
                         </View>
 
@@ -287,9 +328,14 @@ export default function LoginPage({ onLogin }: Props) {
                             style={[styles.btn, loading && { opacity: 0.5 }]}
                             onPress={handleSubmit}
                             disabled={loading}
-                            accessibilityRole="button"
-                            accessibilityLabel={loading ? 'Signing in' : 'Sign in'}
-                            accessibilityState={{ busy: loading, disabled: loading }}
+                            accessibilityRole='button'
+                            accessibilityLabel={
+                                loading ? 'Signing in' : 'Sign in'
+                            }
+                            accessibilityState={{
+                                busy: loading,
+                                disabled: loading,
+                            }}
                         >
                             <Text style={styles.btnText}>
                                 {loading ? 'Signing in…' : 'Sign in'}
@@ -304,14 +350,25 @@ export default function LoginPage({ onLogin }: Props) {
                                     <View style={styles.dividerLine} />
                                 </View>
                                 <AppleAuthentication.AppleAuthenticationButton
-                                    buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                                    buttonType={
+                                        AppleAuthentication
+                                            .AppleAuthenticationButtonType
+                                            .SIGN_IN
+                                    }
                                     buttonStyle={
                                         isDark
-                                            ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
-                                            : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                                            ? AppleAuthentication
+                                                  .AppleAuthenticationButtonStyle
+                                                  .WHITE
+                                            : AppleAuthentication
+                                                  .AppleAuthenticationButtonStyle
+                                                  .BLACK
                                     }
                                     cornerRadius={radius.sm}
-                                    style={[styles.appleBtn, appleLoading && { opacity: 0.5 }]}
+                                    style={[
+                                        styles.appleBtn,
+                                        appleLoading && { opacity: 0.5 },
+                                    ]}
                                     onPress={handleApple}
                                 />
                             </>
@@ -323,13 +380,13 @@ export default function LoginPage({ onLogin }: Props) {
                             </Text>
                             <Pressable
                                 onPress={() => nav.push('/(auth)/signup')}
-                                accessibilityRole="link"
+                                accessibilityRole='link'
                             >
                                 <Text style={styles.link}>Sign up</Text>
                             </Pressable>
                         </View>
 
-                        <LegalConsentNotice prefix="By continuing" />
+                        <LegalConsentNotice prefix='By continuing' />
                     </GlassCard>
                 </ScrollView>
             </KeyboardAvoidingView>
