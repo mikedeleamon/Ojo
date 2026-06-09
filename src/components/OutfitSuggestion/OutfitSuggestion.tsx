@@ -33,7 +33,12 @@ import {
     loadPreferences,
     UserPreferenceProfile,
 } from '../../lib/userPreferences';
-import { recordGapsFromNotes, getGapSuggestions, GapSuggestion, GapType } from '../../lib/wardrobeGaps';
+import {
+    recordGapsFromNotes,
+    getGapSuggestions,
+    GapSuggestion,
+    GapType,
+} from '../../lib/wardrobeGaps';
 import { humanizeCondition } from '../../lib/weather/humanizeCondition';
 import {
     ClothingArticle,
@@ -44,7 +49,12 @@ import {
 } from '../../types';
 import { spacing } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
-import { CSS_COLORS, ROLE_LABELS, BREAKDOWN_LABELS, REMOVABLE_ROLES } from './constants';
+import {
+    CSS_COLORS,
+    ROLE_LABELS,
+    BREAKDOWN_LABELS,
+    REMOVABLE_ROLES,
+} from './constants';
 import {
     outfitTabSubtitle,
     whyThisOutfit,
@@ -146,11 +156,11 @@ const ScoreBadge = ({
                 {label}: {score}
                 {isPersonalized ? ' ★' : ''}
             </Text>
-            {isLearning && !isPersonalized && (
+            {/* {isLearning && !isPersonalized && (
                 <Text style={[styles.scoreBadgeText, { color, fontSize: 10, opacity: 0.7 }]}>
                     personalizing…
                 </Text>
-            )}
+            )} */}
         </View>
     );
 };
@@ -158,12 +168,12 @@ const ScoreBadge = ({
 // ─── Gap card ────────────────────────────────────────────────────────────────
 
 const GAP_SEARCH_TERMS: Record<GapType, string> = {
-    missing_coat:       'winter coat',
-    missing_jacket:     'light jacket',
-    missing_boots:      'boots',
-    missing_mid_layer:  'hoodie sweater',
+    missing_coat: 'winter coat',
+    missing_jacket: 'light jacket',
+    missing_boots: 'boots',
+    missing_mid_layer: 'hoodie sweater',
     missing_rain_layer: 'waterproof jacket',
-    missing_footwear:   'shoes',
+    missing_footwear: 'shoes',
 };
 
 const GapCard = ({
@@ -178,7 +188,11 @@ const GapCard = ({
     const searchTerm = GAP_SEARCH_TERMS[suggestion.type] ?? 'clothing';
     return (
         <View style={styles.gapCard}>
-            <Pressable style={styles.gapDismiss} onPress={onDismiss} hitSlop={8}>
+            <Pressable
+                style={styles.gapDismiss}
+                onPress={onDismiss}
+                hitSlop={8}
+            >
                 <Text style={styles.gapDismissText}>✕</Text>
             </Pressable>
             <Text style={styles.gapMessage}>{suggestion.message}</Text>
@@ -200,10 +214,10 @@ const GapCard = ({
 
 const OCCASION_CHIPS: { value: OutfitOccasion; label: string }[] = [
     { value: 'everyday', label: 'Everyday' },
-    { value: 'work',     label: 'Work' },
-    { value: 'weekend',  label: 'Weekend' },
-    { value: 'date',     label: 'Date' },
-    { value: 'outdoor',  label: 'Outdoor' },
+    { value: 'work', label: 'Work' },
+    { value: 'weekend', label: 'Weekend' },
+    { value: 'date', label: 'Date' },
+    { value: 'outdoor', label: 'Outdoor' },
     { value: 'athletic', label: 'Athletic' },
 ];
 
@@ -264,19 +278,33 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
     // Re-fetch closets each time this screen gains focus so outfit suggestions
     // stay current after the user adds clothes or sets a preferred closet in
     // the Closet tab without needing to fully restart the app.
-    useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
+    useFocusEffect(
+        useCallback(() => {
+            refresh();
+        }, [refresh]),
+    );
     const [settingPref, setSettingPref] = useState(false);
     const [activeIdx, setActiveIdx] = useState(0);
     const [showBreakdown, setShowBreakdown] = useState(false);
     const [wornLogged, setWornLogged] = useState(false);
     const [worn, setWorn] = useState<Map<string, number>>(new Map());
-    const [removedByOutfit, setRemovedByOutfit] = useState<Map<number, Set<string>>>(new Map());
+    const [removedByOutfit, setRemovedByOutfit] = useState<
+        Map<number, Set<string>>
+    >(new Map());
     const [occasionOverride, setOccasionOverride] = useState<OutfitOccasion>(
         settings.occasion ?? 'everyday',
     );
-    const [gapSuggestion, setGapSuggestion] = useState<GapSuggestion | null>(null);
+    const [gapSuggestion, setGapSuggestion] = useState<GapSuggestion | null>(
+        null,
+    );
     const [gapDismissed, setGapDismissed] = useState(false);
-    const [profile, setProfile] = useState<UserPreferenceProfile>({ colors: {}, fabrics: {}, categories: {}, colorPairs: {}, totalOutfits: 0 });
+    const [profile, setProfile] = useState<UserPreferenceProfile>({
+        colors: {},
+        fabrics: {},
+        categories: {},
+        colorPairs: {},
+        totalOutfits: 0,
+    });
     const nav = useAppNavigation();
 
     // ─── #5: Swipe hint bounce (first render only) ──────────────────────────
@@ -293,7 +321,9 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
 
     useEffect(() => {
         recentlyWornWithAge(7).then(setWorn);
-        loadPreferences().then(setProfile).catch(() => {});
+        loadPreferences()
+            .then(setProfile)
+            .catch(() => {});
     }, []);
 
     useEffect(() => {
@@ -340,7 +370,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
             .then(() => getGapSuggestions())
             .then((suggestions) => setGapSuggestion(suggestions[0] ?? null))
             .catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [safeIdx, outfits]);
 
     const handleRemoveSlot = (outfitIdx: number, articleId: string) => {
@@ -356,9 +386,8 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
 
     const removedIds = removedByOutfit.get(safeIdx) ?? new Set<string>();
 
-    const activeSlots = activeOutfit?.slots.filter(
-        (s) => !removedIds.has(s.article._id),
-    ) ?? [];
+    const activeSlots =
+        activeOutfit?.slots.filter((s) => !removedIds.has(s.article._id)) ?? [];
 
     const filteredLayering = activeOutfit?.layering
         ? {
@@ -394,17 +423,29 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
             closetId: preferred._id,
             closetName: preferred.name,
             articleIds: articles.map((a) => a._id),
-            articleSummary: articles.map((a) => a.name || a.clothingType).join(', '),
+            articleSummary: articles
+                .map((a) => a.name || a.clothingType)
+                .join(', '),
         });
         await updatePreferences(articles);
-        loadPreferences().then(setProfile).catch(() => {});
+        loadPreferences()
+            .then(setProfile)
+            .catch(() => {});
         setWornLogged(true);
         // #8 — green glow animation (skipped under Reduce Motion)
         if (!reduceMotion) {
             glowAnim.setValue(0);
             RNAnimated.sequence([
-                RNAnimated.timing(glowAnim, { toValue: 1, duration: 300, useNativeDriver: false }),
-                RNAnimated.timing(glowAnim, { toValue: 0, duration: 800, useNativeDriver: false }),
+                RNAnimated.timing(glowAnim, {
+                    toValue: 1,
+                    duration: 300,
+                    useNativeDriver: false,
+                }),
+                RNAnimated.timing(glowAnim, {
+                    toValue: 0,
+                    duration: 800,
+                    useNativeDriver: false,
+                }),
             ]).start();
         }
         setTimeout(() => setWornLogged(false), 3000);
@@ -421,8 +462,18 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
         hintFired.current = true;
         const timer = setTimeout(() => {
             RNAnimated.sequence([
-                RNAnimated.timing(hintAnim, { toValue: 1, duration: 350, easing: RNEasing.out(RNEasing.cubic), useNativeDriver: true }),
-                RNAnimated.timing(hintAnim, { toValue: 0, duration: 450, easing: RNEasing.inOut(RNEasing.cubic), useNativeDriver: true }),
+                RNAnimated.timing(hintAnim, {
+                    toValue: 1,
+                    duration: 350,
+                    easing: RNEasing.out(RNEasing.cubic),
+                    useNativeDriver: true,
+                }),
+                RNAnimated.timing(hintAnim, {
+                    toValue: 0,
+                    duration: 450,
+                    easing: RNEasing.inOut(RNEasing.cubic),
+                    useNativeDriver: true,
+                }),
             ]).start();
         }, 800);
         return () => clearTimeout(timer);
@@ -517,7 +568,12 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
     // ── Share handler (Feature 10) ────────────────────────────────────────────
     const handleShare = async () => {
         const articles = activeSlots.map((s) => s.article);
-        const lines = articles.map(a => `• ${a.name || a.clothingType}${a.color ? ` (${a.color})` : ''}`).join('\n');
+        const lines = articles
+            .map(
+                (a) =>
+                    `• ${a.name || a.clothingType}${a.color ? ` (${a.color})` : ''}`,
+            )
+            .join('\n');
         const tempF = Math.round(weather.Temperature.Imperial.Value);
         const msg = `👔 My Ojo Outfit — Score: ${activeOutfit.score}${activeOutfit.isPersonalized ? ' ★' : ''}\n${'─'.repeat(22)}\n${lines}\n\n🌤️ ${tempF}°F · ${humanizeCondition(weather.WeatherText)}\n\nStyled with Ojo`;
         Share.share({ message: msg }).catch(() => {});
@@ -540,7 +596,9 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
     });
 
     // #10 — Why this outfit explanation
-    const whyExplanation = activeOutfit ? whyThisOutfit(activeOutfit.scoreBreakdown) : null;
+    const whyExplanation = activeOutfit
+        ? whyThisOutfit(activeOutfit.scoreBreakdown)
+        : null;
 
     // #4 — Reset outfit undo
     const handleResetOutfit = () => {
@@ -568,13 +626,16 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
                     <Pressable
                         onPress={() =>
                             Alert.alert('Outfit', undefined, [
-                                { text: '↑  Share outfit', onPress: handleShare },
+                                {
+                                    text: '↑  Share outfit',
+                                    onPress: handleShare,
+                                },
                                 { text: 'Cancel', style: 'cancel' },
                             ])
                         }
                         style={styles.overflowBtn}
-                        accessibilityLabel="More outfit options"
-                        accessibilityRole="button"
+                        accessibilityLabel='More outfit options'
+                        accessibilityRole='button'
                         hitSlop={8}
                     >
                         <Text style={styles.overflowBtnText}>···</Text>
@@ -603,7 +664,9 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
             )}
 
             {/* ── Outfit pager with #5 swipe hint bounce ── */}
-            <RNAnimated.View style={{ transform: [{ translateX: hintTranslateX }] }}>
+            <RNAnimated.View
+                style={{ transform: [{ translateX: hintTranslateX }] }}
+            >
                 <ScrollView
                     ref={pagerRef}
                     horizontal
@@ -623,23 +686,39 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
                     }}
                 >
                     {outfits.map((outfit, i) => {
-                        const cardRemovedIds = removedByOutfit.get(i) ?? new Set<string>();
+                        const cardRemovedIds =
+                            removedByOutfit.get(i) ?? new Set<string>();
                         return (
                             <View
                                 key={i}
                                 style={[styles.pagerCard, { width: cardWidth }]}
                             >
-                                <GlassGroup spacing={12} style={styles.pagerCardArticles}>
+                                <GlassGroup
+                                    spacing={12}
+                                    style={styles.pagerCardArticles}
+                                >
                                     {outfit.slots
-                                        .filter((s) => !cardRemovedIds.has(s.article._id))
+                                        .filter(
+                                            (s) =>
+                                                !cardRemovedIds.has(
+                                                    s.article._id,
+                                                ),
+                                        )
                                         .map((slot, j) => (
                                             <ArticleThumb
                                                 key={j}
                                                 article={slot.article}
                                                 role={slot.role}
                                                 onRemove={
-                                                    REMOVABLE_ROLES.includes(slot.role)
-                                                        ? () => handleRemoveSlot(i, slot.article._id)
+                                                    REMOVABLE_ROLES.includes(
+                                                        slot.role,
+                                                    )
+                                                        ? () =>
+                                                              handleRemoveSlot(
+                                                                  i,
+                                                                  slot.article
+                                                                      ._id,
+                                                              )
                                                         : undefined
                                                 }
                                             />
@@ -678,7 +757,10 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
                     </View>
                 )}
                 {removedIds.size > 0 && (
-                    <Pressable onPress={handleResetOutfit} style={styles.resetLink}>
+                    <Pressable
+                        onPress={handleResetOutfit}
+                        style={styles.resetLink}
+                    >
                         <Text style={styles.resetLinkText}>Reset outfit</Text>
                     </Pressable>
                 )}
@@ -748,14 +830,16 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
             )}
 
             {/* ── #8: Wore this today with haptic + green glow ── */}
-            <RNAnimated.View style={[
-                styles.woreThisGlow,
-                {
-                    borderColor: glowBorderColor,
-                    shadowColor: 'rgba(52,211,153,1)',
-                    shadowOpacity: glowShadowOpacity as any,
-                },
-            ]}>
+            <RNAnimated.View
+                style={[
+                    styles.woreThisGlow,
+                    {
+                        borderColor: glowBorderColor,
+                        shadowColor: 'rgba(52,211,153,1)',
+                        shadowOpacity: glowShadowOpacity as any,
+                    },
+                ]}
+            >
                 <Pressable
                     style={[
                         styles.woreThisBtn,
