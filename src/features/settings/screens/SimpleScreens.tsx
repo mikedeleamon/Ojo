@@ -1,7 +1,8 @@
 import { useState, useCallback, useMemo } from 'react';
-import { StyleSheet, ScrollView, Alert } from 'react-native';
+import { StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { View, Text, Pressable } from '../../../components/primitives';
+import { useConfirm } from '../../../components/ConfirmDialog';
 import { loadHistory, deleteHistoryEntry, clearHistory } from '../../../lib/outfitHistory';
 import { useFocusEffect } from 'expo-router';
 import { OutfitHistoryEntry } from '../../../types';
@@ -75,6 +76,7 @@ export const HistoryScreen = () => {
   const { colors } = useTheme();
   const s  = useMemo(() => makeStyles(colors), [colors]);
   const st = useMemo(() => makeLocalStyles(colors), [colors]);
+  const confirm = useConfirm();
   const [entries, setEntries] = useState<OutfitHistoryEntry[]>([]);
 
   useFocusEffect(
@@ -86,13 +88,16 @@ export const HistoryScreen = () => {
     setEntries(prev => prev.filter(e => e.id !== id));
   };
 
-  const handleClearAll = () => {
-    Alert.alert(`Clear all ${entries.length} entries?`, undefined, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Yes, clear', style: 'destructive', onPress: async () => {
-        await clearHistory(); setEntries([]);
-      }},
-    ]);
+  const handleClearAll = async () => {
+    const ok = await confirm({
+      title: `Clear all ${entries.length} entries?`,
+      message: 'Your outfit history will be permanently removed.',
+      confirmLabel: 'Clear all',
+      destructive: true,
+    });
+    if (!ok) return;
+    await clearHistory();
+    setEntries([]);
   };
 
   const formatDate = (iso: string) => {

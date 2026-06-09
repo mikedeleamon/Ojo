@@ -3,7 +3,6 @@ import {
   ScrollView,
   Image,
   Pressable,
-  Alert,
   Share,
   Linking,
   Animated,
@@ -17,6 +16,10 @@ import { View, Text, GlassCard, GlassGroup } from '../../components/primitives';
 import Loading from '../../components/Loading/Loading';
 import { useClosets } from '../../hooks/useClosets';
 import { useTabBarPadding } from '../../hooks/useTabBarPadding';
+import { useReduceMotion } from '../../hooks/useReduceMotion';
+import { useAppNavigation } from '../../hooks/useAppNavigation';
+import { useConfirm } from '../../components/ConfirmDialog';
+import { hapticSelection, hapticSuccess } from '../../lib/haptics';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, fonts, fontSizes, weatherGradients } from '../../theme/tokens';
 import { loadHistory } from '../../lib/outfitHistory';
@@ -101,28 +104,43 @@ const PlaceholderThumb = ({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
+const WINDOW_OPTIONS = [30, 90, 365] as const;
+const windowLabel = (d: number): string =>
+  d === 30 ? 'Last 30 days' : d === 90 ? 'Last 90 days' : 'Last year';
+const activeStatLabel = (d: number): string =>
+  d === 30 ? 'worn this month' : d === 90 ? 'worn this quarter' : 'worn this year';
+
 export default function InsightsPage() {
   const { colors, isDark } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { closets, loading: closetsLoading } = useClosets();
+  const { closets, loading: closetsLoading, removeArticle } = useClosets();
   const tabPad = useTabBarPadding();
+  const reduceMotion = useReduceMotion();
+  const nav = useAppNavigation();
+  const confirm = useConfirm();
 
   const [data,          setData]          = useState<InsightsData | null>(null);
   const [loading,       setLoading]       = useState(true);
   const [donationQueue, setDonationQueue] = useState<string[]>([]);
   const [sleepExpanded, setSleepExpanded] = useState(false);
   const [donateExpanded, setDonateExpanded] = useState(false);
+  const [windowDays,    setWindowDays]    = useState<number>(90);
 
   // Animated ring value (0 → utilizationRate)
   const ringAnim = useRef(new Animated.Value(0)).current;
+  // Tracks whether we've painted at least once, so refreshes stay silent.
+  const hasLoaded = useRef(false);
 
   const load = useCallback(async () => {
     if (closetsLoading) return;
-    setLoading(true);
+    // Only show the blocking spinner on the very first load; refreshes (focus,
+    // donating an item, changing the time range) recompute silently in place.
+    if (!hasLoaded.current) setLoading(true);
     try {
       // Empty wardrobe: skip the heavy compute and surface an empty state.
       if (closets.length === 0) {
         setData(null);
+        hasLoaded.current = true;
         return;
       }
       const [history, prefs, queue] = await Promise.all([
@@ -130,26 +148,40 @@ export default function InsightsPage() {
         loadPreferences(),
         loadDonationQueue(),
       ]);
-      const insights = await computeInsights(closets, history, prefs);
+      const insights = await computeInsights(closets, history, prefs, windowDays);
       setData(insights);
       setDonationQueue(queue);
+      hasLoaded.current = true;
 
-      // Animate the ring in
-      ringAnim.setValue(0);
-      Animated.timing(ringAnim, {
-        toValue: insights.health.utilizationRate,
-        duration: 900,
-        useNativeDriver: false,
-      }).start();
+      // Animate the ring in — snap straight to the value under Reduce Motion.
+      if (reduceMotion) {
+        ringAnim.setValue(insights.health.utilizationRate);
+      } else {
+        ringAnim.setValue(0);
+        Animated.timing(ringAnim, {
+          toValue: insights.health.utilizationRate,
+          duration: 900,
+          useNativeDriver: false,
+        }).start();
+      }
     } finally {
       setLoading(false);
     }
-  }, [closets, closetsLoading]);
+  }, [closets, closetsLoading, windowDays, reduceMotion]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
+  const cycleWindow = () => {
+    hapticSelection();
+    setWindowDays(d => {
+      const idx = WINDOW_OPTIONS.indexOf(d as typeof WINDOW_OPTIONS[number]);
+      return WINDOW_OPTIONS[(idx + 1) % WINDOW_OPTIONS.length];
+    });
+  };
+
   // ── Donation helpers ──
   const handleAddDonation = async (articleId: string) => {
+    hapticSelection();
     await addToDonationQueue(articleId);
     setDonationQueue(q => q.includes(articleId) ? q : [...q, articleId]);
   };
@@ -159,29 +191,25 @@ export default function InsightsPage() {
     setDonationQueue(q => q.filter(id => id !== articleId));
   };
 
-  const handleMarkDonated = (insight: ArticleInsight) => {
-    Alert.alert(
-      'Mark as donated?',
-      `This will remove "${articleLabel(insight)}" from your closet permanently.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove from closet',
-          style: 'destructive',
-          onPress: async () => {
-            await removeFromDonationQueue(insight.article._id);
-            setDonationQueue(q => q.filter(id => id !== insight.article._id));
-            // Note: removeArticle is called from the closet hook —
-            // navigate to Closet to complete, or wire useClosets here.
-            // For now: notify user to remove from Closet tab.
-            Alert.alert(
-              'Removed from queue',
-              'Open the Closet tab to delete the item from your wardrobe.',
-            );
-          },
-        },
-      ],
-    );
+  const handleMarkDonated = async (insight: ArticleInsight) => {
+    const ok = await confirm({
+      title: 'Mark as donated?',
+      message: `This permanently removes "${articleLabel(insight)}" from your closet.`,
+      confirmLabel: 'Remove from closet',
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      // Actually delete the garment from its closet, then clear the queue entry.
+      // Mutating closets re-runs load() via the focus effect, so the item drops
+      // out of every Insights list and the health counts update — no dead end.
+      await removeArticle(insight.closetId, insight.article._id);
+      await removeFromDonationQueue(insight.article._id);
+      setDonationQueue(q => q.filter(id => id !== insight.article._id));
+      hapticSuccess();
+    } catch {
+      // Leave the queue entry in place so the user can retry.
+    }
   };
 
   const handleShareDonationList = async () => {
@@ -277,10 +305,32 @@ export default function InsightsPage() {
         {/* ── Header ── */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Insights</Text>
-          <View style={styles.rangeChip}>
-            <Text style={styles.rangeChipText}>Last 90 days</Text>
-          </View>
+          <Pressable
+            style={styles.rangeChip}
+            onPress={cycleWindow}
+            accessibilityRole="button"
+            accessibilityLabel={`Time range: ${windowLabel(windowDays)}. Tap to change.`}
+          >
+            <Text style={styles.rangeChipText}>{windowLabel(windowDays)}  ⌄</Text>
+          </Pressable>
         </View>
+
+        {/* ── Price backfill nudge — turns the silent CPW gate into an action ── */}
+        {health.pricedCount < health.totalArticles && (
+          <Pressable
+            style={styles.priceNudge}
+            onPress={() => nav.push('/account/price-backfill')}
+            accessibilityRole="button"
+            accessibilityLabel="Add prices to unlock cost-per-wear"
+          >
+            <Text style={styles.priceNudgeText}>
+              {health.pricedCount === 0
+                ? 'Add prices to unlock cost-per-wear analytics'
+                : `${health.pricedCount} of ${health.totalArticles} items priced — add more`}
+            </Text>
+            <Text style={styles.priceNudgeCta}>Add →</Text>
+          </Pressable>
+        )}
 
         {/* ── Wardrobe Health ── */}
         <GlassCard style={styles.healthCard}>
@@ -323,7 +373,7 @@ export default function InsightsPage() {
             <View style={styles.statDivider} />
             <View style={styles.statRow}>
               <Text style={styles.statValue}>{health.activeArticles}</Text>
-              <Text style={styles.statLabel}>worn this quarter</Text>
+              <Text style={styles.statLabel}>{activeStatLabel(windowDays)}</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statRow}>
@@ -540,12 +590,6 @@ export default function InsightsPage() {
                 </View>
               )}
 
-            {health.pricedCount < health.totalArticles && (
-              <Text style={styles.cpwNudge}>
-                {health.pricedCount} of {health.totalArticles} items have prices.
-                Add prices when editing items to unlock more.
-              </Text>
-            )}
           </GlassCard>
         )}
 

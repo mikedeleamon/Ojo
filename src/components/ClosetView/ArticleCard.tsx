@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Pressable, Image, Animated, StyleSheet, Alert } from 'react-native';
+import { Pressable, Image, Animated, StyleSheet } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
 import { View, Text } from '../primitives';
 import { HangerIcon } from '../shared/HangerIcon';
+import { useConfirm } from '../ConfirmDialog';
 import { useTheme } from '../../theme/ThemeContext';
 import { fonts, fontSizes, fontWeights, radius } from '../../theme/tokens';
 import type { ClothingArticle } from '../../types';
@@ -162,12 +163,17 @@ export const TileArticleCard = ({
         !COLOR_NEUTRALS.has(article.color);
     const [erroredUrl, setErroredUrl] = useState<string | null>(null);
     const imgError = !!article.imageUrl && erroredUrl === article.imageUrl;
+    const confirm = useConfirm();
 
-    const confirmDelete = () =>
-        Alert.alert('Remove article?', article.name || article.clothingType, [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Remove', style: 'destructive', onPress: onRemove },
-        ]);
+    const confirmDelete = async () => {
+        const ok = await confirm({
+            title: 'Remove article?',
+            message: article.name || article.clothingType,
+            confirmLabel: 'Remove',
+            destructive: true,
+        });
+        if (ok) onRemove();
+    };
 
     const ageOverlayColor = wornAgeOverlay(wornAge);
 

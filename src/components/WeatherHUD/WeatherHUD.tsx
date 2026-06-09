@@ -14,6 +14,7 @@ import Animated, {
     Easing as REasing,
 } from 'react-native-reanimated';
 import { useSpinAnimation } from '../../hooks/useSpinAnimation';
+import { useReduceMotion } from '../../hooks/useReduceMotion';
 import { useTabBarPadding } from '../../hooks/useTabBarPadding';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -143,6 +144,7 @@ const WeatherHUD = ({
 }: Props) => {
     const { colors } = useTheme();
     const st = useMemo(() => makeStyles(colors), [colors]);
+    const reduceMotion = useReduceMotion();
     const { setFooterBg } = useWeatherTheme();
     const { top: topInset } = useSafeAreaInsets();
     const tabPad = useTabBarPadding();
@@ -392,11 +394,16 @@ const WeatherHUD = ({
         fromHsl.value = snapshot;
         toHsl.value = flattenHsl(targetGradient);
         progress.value = 0;
-        progress.value = withTiming(1, {
-            duration: isFirstPaint ? 2500 : 2000,
-            easing: REasing.inOut(REasing.cubic),
-        });
-    }, [targetGradient]);
+        if (reduceMotion) {
+            // Snap straight to the destination gradient — no animated hue sweep.
+            progress.value = 1;
+        } else {
+            progress.value = withTiming(1, {
+                duration: isFirstPaint ? 2500 : 2000,
+                easing: REasing.inOut(REasing.cubic),
+            });
+        }
+    }, [targetGradient, reduceMotion]);
 
     // Spinner fades out once weather data arrives; the content layer renders at
     // full opacity from the start so GlassView can sample the background

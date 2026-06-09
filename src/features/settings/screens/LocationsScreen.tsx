@@ -28,6 +28,7 @@ import {
 } from '../../../theme/tokens';
 import { useTheme, ForceDarkPalette } from '../../../theme/ThemeContext';
 import { geocodeCity } from '../../../lib/geocoding';
+import { hapticSuccess } from '../../../lib/haptics';
 import {
   CURRENT_LOCATION_ID,
   addLocation,
@@ -196,6 +197,7 @@ export default function LocationsScreen() {
       await saveSettings({ ...settings, savedLocations: next });
       setCity('');
       setStatus({ type: 'success', msg: 'City added.' });
+      hapticSuccess();
     } catch {
       setStatus({ type: 'error', msg: 'Could not add that city.' });
     } finally {

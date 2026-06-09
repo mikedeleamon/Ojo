@@ -651,6 +651,18 @@ const ArticleModal = ({ closetId, onClose, onSubmit, initialData, onDelete, init
               }}
               accessibilityLabel="Purchase price in dollars (optional)"
             />
+            {form.purchasePrice == null && (
+              <Text
+                style={{
+                  fontFamily: fonts.body,
+                  fontSize: fontSizes.xs,
+                  color: colors.textMuted,
+                  marginTop: 2,
+                }}
+              >
+                💡 Add a price to unlock cost-per-wear in Insights.
+              </Text>
+            )}
           </View>
 
           {/* Accessory toggle — only for 'Other' / unset type.

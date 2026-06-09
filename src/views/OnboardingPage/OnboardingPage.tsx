@@ -8,7 +8,9 @@ import { Svg, Path, Circle } from 'react-native-svg';
 import { View, Text, Pressable, GlassCard, GlassGroup, AppSlider } from '../../components/primitives';
 import OjoLogoIcon from '../../components/icons/OjoLogoIcon';
 import { useSettings } from '../../hooks/useSettings';
+import { useReduceMotion } from '../../hooks/useReduceMotion';
 import { markOnboardingComplete } from '../../lib/onboarding';
+import { requestPermission, registerPushToken } from '../../lib/notifications';
 import { auth } from '../../lib/auth';
 import axios from '../../api/client';
 import { spacing, radius, fonts, fontSizes, fontWeights, shadows } from '../../theme/tokens';
@@ -20,7 +22,15 @@ import { GENDERS } from '../../lib/colors/palettes';
 
 const STYLES_LIST = ['Casual', 'Business Casual', 'Formal', 'Athletic', 'Streetwear', 'Minimalist'];
 const TEMP_UNITS  = ['Imperial', 'Metric'] as const;
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 5;
+
+// Notification types surfaced on the enable step, so users see the value
+// before the OS permission prompt appears.
+const NOTIF_HIGHLIGHTS: { emoji: string; title: string; desc: string }[] = [
+  { emoji: '🌅', title: 'Morning Outfit Brief', desc: 'Your weather and outfit, ready when you wake up.' },
+  { emoji: '🌧️', title: 'Weather Change Alert', desc: 'A heads-up when rain or a cold front moves in.' },
+  { emoji: '🌡️', title: 'Temperature Swing Warning', desc: 'Know when to layer up before you head out.' },
+];
 
 interface Props { onComplete?: () => void; }
 
@@ -62,7 +72,7 @@ const ArrowRight = ({ color }: { color: string }) => (
   </Svg>
 );
 
-// ── Animated loading dots (step 4) ────────────────────────────────────────────
+// ── Animated loading dots (final step) ────────────────────────────────────────
 const LoadingDots = ({ colors }: { colors: ColorTokens }) => {
   const anims = useRef([
     new Animated.Value(0.4),
@@ -103,6 +113,7 @@ export default function OnboardingPage({ onComplete }: Props) {
   const { colors } = useTheme();
   const st = useMemo(() => makeStyles(colors), [colors]);
   const { settings, saveSettings } = useSettings();
+  const reduceMotion = useReduceMotion();
 
   const [step, setStep] = useState(1);
 
@@ -125,10 +136,19 @@ export default function OnboardingPage({ onComplete }: Props) {
   );
   const [humidity, setHumidity] = useState(settings.humidityPreference ?? 50);
 
+  const [notifLoading, setNotifLoading] = useState(false);
+
   const slideAnim   = useRef(new Animated.Value(0)).current;
   const opacityAnim = useRef(new Animated.Value(1)).current;
 
   const transition = (toStep: number, dir: 'forward' | 'back') => {
+    // Reduce Motion: jump straight to the step with no slide/fade.
+    if (reduceMotion) {
+      setStep(toStep);
+      slideAnim.setValue(0);
+      opacityAnim.setValue(1);
+      return;
+    }
     const outX = dir === 'forward' ? -36 : 36;
     const inX  = dir === 'forward' ?  36 : -36;
     Animated.parallel([
@@ -161,6 +181,9 @@ export default function OnboardingPage({ onComplete }: Props) {
     }
   };
 
+  // Step 3 → 4: persist preferences, then move on to the notifications step.
+  // Completion is marked later (when leaving the notifications step) so a user
+  // can still back out to tweak preferences.
   const handleFinish = async () => {
     const hiTempF  = isMetric ? cToF(hotTemp)  : hotTemp;
     const lowTempF = isMetric ? cToF(coldTemp) : coldTemp;
@@ -175,8 +198,25 @@ export default function OnboardingPage({ onComplete }: Props) {
         humidityPreference: humidity,
       });
     } catch { /* non-fatal */ }
-    await markOnboardingComplete();
     advance(4);
+  };
+
+  // Step 4 → 5: mark onboarding done and slide to the "all set" screen.
+  const finishOnboarding = async () => {
+    await markOnboardingComplete();
+    advance(5);
+  };
+
+  const handleEnableNotifications = async () => {
+    setNotifLoading(true);
+    try {
+      const status = await requestPermission();
+      if (status === 'granted') await registerPushToken();
+    } catch { /* non-fatal — proceed regardless of the permission outcome */ }
+    finally {
+      setNotifLoading(false);
+      finishOnboarding();
+    }
   };
 
   const handleSkip = async () => {
@@ -185,7 +225,7 @@ export default function OnboardingPage({ onComplete }: Props) {
   };
 
   useEffect(() => {
-    if (step === 4) {
+    if (step === 5) {
       const t = setTimeout(() => onComplete?.(), 1800);
       return () => clearTimeout(t);
     }
@@ -501,10 +541,81 @@ export default function OnboardingPage({ onComplete }: Props) {
                 </View>
               )}
 
-              {/* ── Step 4: Done ─────────────────────────────────────────────── */}
+              {/* ── Step 4: Notifications ────────────────────────────────────── */}
               {step === 4 && (
                 <View style={st.stepShell}>
                   <Dots step={4} colors={colors} />
+                  <StepIcon colors={colors}>
+                    <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
+                      <Path
+                        d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"
+                        stroke={colors.textSecondary} strokeWidth={1.5}
+                        strokeLinecap="round" strokeLinejoin="round"
+                      />
+                      <Path
+                        d="M13.73 21a2 2 0 0 1-3.46 0"
+                        stroke={colors.textSecondary} strokeWidth={1.5}
+                        strokeLinecap="round" strokeLinejoin="round"
+                      />
+                    </Svg>
+                  </StepIcon>
+                  <Text style={st.stepHeading}>Stay one step ahead</Text>
+                  <Text style={st.stepDesc}>
+                    Let Ojo send timely nudges so you're always dressed for what's
+                    outside. You're in control — fine-tune everything in Settings.
+                  </Text>
+
+                  <View style={st.notifList}>
+                    {NOTIF_HIGHLIGHTS.map(n => (
+                      <View key={n.title} style={st.notifRow}>
+                        <Text style={st.notifEmoji}>{n.emoji}</Text>
+                        <View style={st.notifTextWrap}>
+                          <Text style={st.notifRowTitle}>{n.title}</Text>
+                          <Text style={st.notifRowDesc}>{n.desc}</Text>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+
+                  <View style={st.navRow}>
+                    <Pressable
+                      style={st.ghostBtn}
+                      onPress={() => goBack(3)}
+                      disabled={notifLoading}
+                      accessibilityRole="button"
+                      accessibilityLabel="Back"
+                    >
+                      <Text style={st.ghostBtnText}>Back</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[st.primaryBtn, notifLoading && st.primaryBtnDisabled]}
+                      onPress={handleEnableNotifications}
+                      disabled={notifLoading}
+                      accessibilityRole="button"
+                      accessibilityLabel={notifLoading ? 'Enabling notifications' : 'Enable notifications'}
+                      accessibilityState={{ busy: notifLoading, disabled: notifLoading }}
+                    >
+                      <Text style={st.primaryBtnText}>
+                        {notifLoading ? 'Enabling…' : 'Enable notifications'}
+                      </Text>
+                      <ArrowRight color={colors.saveBtnText} />
+                    </Pressable>
+                  </View>
+                  <Pressable
+                    onPress={finishOnboarding}
+                    disabled={notifLoading}
+                    accessibilityRole="button"
+                    accessibilityLabel="Maybe later"
+                  >
+                    <Text style={st.skipLink}>Maybe later</Text>
+                  </Pressable>
+                </View>
+              )}
+
+              {/* ── Step 5: Done ─────────────────────────────────────────────── */}
+              {step === 5 && (
+                <View style={st.stepShell}>
+                  <Dots step={5} colors={colors} />
                   <Svg width={56} height={56} viewBox="0 0 24 24" fill="none">
                     <Circle cx={12} cy={12} r={10} stroke="rgba(52,211,153,0.8)" strokeWidth={1.5} />
                     <Path

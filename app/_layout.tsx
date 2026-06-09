@@ -11,6 +11,7 @@ import { SettingsProvider } from '../src/context/SettingsContext';
 import { ActiveLocationProvider } from '../src/context/ActiveLocationContext';
 import { WeatherProvider } from '../src/context/WeatherContext';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
+import { ConfirmProvider } from '../src/components/ConfirmDialog';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { isOnboardingComplete, isOnboardingPending } from '../src/lib/onboarding';
 
@@ -117,22 +118,24 @@ export default function RootLayout() {
               <SettingsProvider>
                 <ActiveLocationProvider>
                 <WeatherProvider>
-                  <AuthGate>
-                    <ThemedStatusBar />
-                    {/* Stack so the camera screen can present as a fullScreenModal
-                        that covers the native tab bar. All other routes are
-                        auto-discovered and inherit default options. */}
-                    <Stack screenOptions={{ headerShown: false }}>
-                      <Stack.Screen
-                        name="capture"
-                        options={{
-                          presentation: 'fullScreenModal',
-                          animation: 'slide_from_bottom',
-                          gestureEnabled: false,
-                        }}
-                      />
-                    </Stack>
-                  </AuthGate>
+                  <ConfirmProvider>
+                    <AuthGate>
+                      <ThemedStatusBar />
+                      {/* Stack so the camera screen can present as a fullScreenModal
+                          that covers the native tab bar. All other routes are
+                          auto-discovered and inherit default options. */}
+                      <Stack screenOptions={{ headerShown: false }}>
+                        <Stack.Screen
+                          name="capture"
+                          options={{
+                            presentation: 'fullScreenModal',
+                            animation: 'slide_from_bottom',
+                            gestureEnabled: false,
+                          }}
+                        />
+                      </Stack>
+                    </AuthGate>
+                  </ConfirmProvider>
                 </WeatherProvider>
                 </ActiveLocationProvider>
               </SettingsProvider>

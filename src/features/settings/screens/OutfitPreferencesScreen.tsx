@@ -1,10 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { View, Text, Pressable } from '../../../components/primitives';
-import { StatusMessage } from '../../../components/shared';
 import { useSettings } from '../../../hooks/useSettings';
-import { useFormSubmit } from '../../../hooks/useFormSubmit';
+import { hapticSelection } from '../../../lib/haptics';
 import { spacing, radius, fonts, fontSizes, fontWeights } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/ThemeContext';
 
@@ -25,6 +24,7 @@ export default function OutfitPreferencesScreen() {
     const st = useMemo(() => StyleSheet.create({
         root: { flex: 1, backgroundColor: colors.bgDefault },
         content: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xl },
+        labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
         sectionLabel: {
             fontFamily: fonts.body,
             fontSize: fontSizes.xs,
@@ -33,6 +33,7 @@ export default function OutfitPreferencesScreen() {
             textTransform: 'uppercase',
             letterSpacing: 0.5,
         },
+        savedTag: { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.successText },
         chipGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
         chip: {
             paddingVertical: 8,
@@ -55,37 +56,42 @@ export default function OutfitPreferencesScreen() {
             color: colors.saveBtnText,
             fontWeight: fontWeights.semibold,
         },
-        saveBtn: {
-            paddingVertical: 14,
-            backgroundColor: colors.saveBtnBg,
-            borderRadius: radius.sm,
-            alignItems: 'center',
-        },
-        saveBtnText: {
-            fontFamily: fonts.body,
-            fontSize: fontSizes.base,
-            fontWeight: fontWeights.semibold,
-            color: colors.saveBtnText,
-        },
+        hint: { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.textMuted, lineHeight: fontSizes.sm * 1.5 },
     }), [colors]);
 
     const { settings, saveSettings } = useSettings();
     const [style, setStyle] = useState(settings.clothingStyle);
-    const { status, loading, submit } = useFormSubmit('Saved.', 2000);
+    const [justSaved, setJustSaved] = useState(false);
+    const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const save = () =>
-        submit(() => saveSettings({ ...settings, clothingStyle: style }));
+    useEffect(() => () => {
+        if (savedTimer.current) clearTimeout(savedTimer.current);
+    }, []);
+
+    // Auto-save on tap — consistent with the Style tab and Units screen.
+    const select = (next: string) => {
+        if (next === style) return;
+        setStyle(next);
+        hapticSelection();
+        saveSettings({ ...settings, clothingStyle: next }).catch(() => {});
+        setJustSaved(true);
+        if (savedTimer.current) clearTimeout(savedTimer.current);
+        savedTimer.current = setTimeout(() => setJustSaved(false), 1500);
+    };
 
     return (
         <SafeAreaView style={st.root} edges={['bottom']}>
             <ScrollView contentContainerStyle={st.content}>
-                <Text style={st.sectionLabel}>Style preference</Text>
+                <View style={st.labelRow}>
+                    <Text style={st.sectionLabel}>Style preference</Text>
+                    {justSaved && <Text style={st.savedTag}>✓ Saved</Text>}
+                </View>
                 <View style={st.chipGrid}>
                     {STYLES.map((s) => (
                         <Pressable
                             key={s}
                             style={[st.chip, style === s && st.chipActive]}
-                            onPress={() => setStyle(s)}
+                            onPress={() => select(s)}
                             accessibilityRole="radio"
                             accessibilityLabel={s}
                             accessibilityState={{ selected: style === s }}
@@ -94,17 +100,7 @@ export default function OutfitPreferencesScreen() {
                         </Pressable>
                     ))}
                 </View>
-                <StatusMessage status={status} />
-                <Pressable
-                    style={[st.saveBtn, loading && { opacity: 0.5 }]}
-                    onPress={save}
-                    disabled={loading}
-                    accessibilityRole="button"
-                    accessibilityLabel={loading ? 'Saving' : 'Save'}
-                    accessibilityState={{ busy: loading, disabled: loading }}
-                >
-                    <Text style={st.saveBtnText}>{loading ? 'Saving…' : 'Save'}</Text>
-                </Pressable>
+                <Text style={st.hint}>Changes save automatically.</Text>
             </ScrollView>
         </SafeAreaView>
     );

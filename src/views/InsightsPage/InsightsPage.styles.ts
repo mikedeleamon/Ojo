@@ -327,6 +327,33 @@ export const makeStyles = (colors: ColorTokens) =>
       marginTop: spacing.xs,
     },
 
+    // ── Price backfill nudge (unlocks cost-per-wear) ──────────────────────────
+    priceNudge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.sm,
+      paddingVertical: 12,
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.md,
+      backgroundColor: colors.glassBg,
+      borderWidth: 1,
+      borderColor: colors.glassBorder,
+    },
+    priceNudgeText: {
+      flex: 1,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      color: colors.textSecondary,
+      lineHeight: fontSizes.sm * 1.5,
+    },
+    priceNudgeCta: {
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      fontWeight: fontWeights.semibold,
+      color: colors.textPrimary,
+    },
+
     // ── Sleeping / Donation shared list ───────────────────────────────────────
     itemCard: {
       borderRadius: radius.lg,

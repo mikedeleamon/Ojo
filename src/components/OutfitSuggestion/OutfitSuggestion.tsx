@@ -11,11 +11,12 @@ import {
     Animated as RNAnimated,
     Easing as RNEasing,
 } from 'react-native';
-import * as Haptics from 'expo-haptics';
 import { Svg, Circle } from 'react-native-svg';
 import { View, Text, GlassCard, GlassGroup } from '../primitives';
 import { EmptyState } from '../shared';
 import { useClosets } from '../../hooks/useClosets';
+import { useReduceMotion } from '../../hooks/useReduceMotion';
+import { hapticSuccess } from '../../lib/haptics';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import {
     generateOutfits,
@@ -258,6 +259,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
     const styles = useMemo(() => makeStyles(colors), [colors]);
     const { closets, loading, preferred, setPreferred, setClosets, refresh } =
         useClosets();
+    const reduceMotion = useReduceMotion();
 
     // Re-fetch closets each time this screen gains focus so outfit suggestions
     // stay current after the user adds clothes or sets a preferred closet in
@@ -385,8 +387,8 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
 
     const handleWoreThis = async () => {
         if (!preferred || !activeOutfit || activeOutfit.status !== 'ok') return;
-        // #8 — haptic pulse
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+        // Success haptic — logging an outfit is a completed, consequential action.
+        hapticSuccess();
         const articles = activeSlots.map((s) => s.article);
         await addHistoryEntry({
             closetId: preferred._id,
@@ -397,12 +399,14 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
         await updatePreferences(articles);
         loadPreferences().then(setProfile).catch(() => {});
         setWornLogged(true);
-        // #8 — green glow animation
-        glowAnim.setValue(0);
-        RNAnimated.sequence([
-            RNAnimated.timing(glowAnim, { toValue: 1, duration: 300, useNativeDriver: false }),
-            RNAnimated.timing(glowAnim, { toValue: 0, duration: 800, useNativeDriver: false }),
-        ]).start();
+        // #8 — green glow animation (skipped under Reduce Motion)
+        if (!reduceMotion) {
+            glowAnim.setValue(0);
+            RNAnimated.sequence([
+                RNAnimated.timing(glowAnim, { toValue: 1, duration: 300, useNativeDriver: false }),
+                RNAnimated.timing(glowAnim, { toValue: 0, duration: 800, useNativeDriver: false }),
+            ]).start();
+        }
         setTimeout(() => setWornLogged(false), 3000);
     };
 
@@ -413,7 +417,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
 
     // #5 — Fire a subtle swipe-hint bounce once after outfits appear
     useEffect(() => {
-        if (hintFired.current || outfits.length <= 1) return;
+        if (reduceMotion || hintFired.current || outfits.length <= 1) return;
         hintFired.current = true;
         const timer = setTimeout(() => {
             RNAnimated.sequence([
@@ -422,7 +426,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
             ]).start();
         }, 800);
         return () => clearTimeout(timer);
-    }, [outfits.length]);
+    }, [outfits.length, reduceMotion]);
 
     if (loading) return null;
 

@@ -9,6 +9,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { View, Text, GlassGroup } from '../primitives';
 import { HangerIcon } from '../shared/HangerIcon';
+import { useConfirm } from '../ConfirmDialog';
 import ArticleModal from '../ArticleModal/ArticleModal';
 import { Closet, ClothingArticle, ArticleFormData } from '../../types';
 import { QuickAddData } from '../../views/ClosetPage/ClosetPage';
@@ -63,6 +64,7 @@ const ClosetView = ({
 }: Props) => {
     const { colors } = useTheme();
     const router = useRouter();
+    const confirm = useConfirm();
     const styles = useMemo(() => makeStyles(colors), [colors]);
     const { width: windowWidth } = useWindowDimensions();
     const tileWidth = Math.floor(
@@ -195,27 +197,21 @@ const ClosetView = ({
         }
     };
 
-    const handleDelete = (id: string) => {
-        Alert.alert(
-            'Delete closet?',
-            'This will also delete all articles inside.',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Delete',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            await onDeleteCloset(id);
-                            if (selectedId === id)
-                                setSelectedId(closets.find((c) => c._id !== id)?._id ?? '');
-                        } catch {
-                            Alert.alert('Error', 'Failed to delete closet.');
-                        }
-                    },
-                },
-            ],
-        );
+    const handleDelete = async (id: string) => {
+        const ok = await confirm({
+            title: 'Delete closet?',
+            message: 'This will also delete all articles inside.',
+            confirmLabel: 'Delete',
+            destructive: true,
+        });
+        if (!ok) return;
+        try {
+            await onDeleteCloset(id);
+            if (selectedId === id)
+                setSelectedId(closets.find((c) => c._id !== id)?._id ?? '');
+        } catch {
+            Alert.alert('Error', 'Failed to delete closet.');
+        }
     };
 
     const openTabMenu = (c: Closet) => {

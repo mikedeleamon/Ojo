@@ -27,6 +27,7 @@ import {
   PermissionStatus,
 } from '../../../lib/notifications';
 import { storage } from '../../../lib/storage';
+import { hapticSuccess } from '../../../lib/haptics';
 import axios from '../../../api/client';
 import { authHeaders, getErrorMessage } from '../../../lib/auth';
 import { spacing, radius, fonts, fontSizes, fontWeights } from '../../../theme/tokens';
@@ -270,6 +271,7 @@ export default function NotificationsScreen() {
       }
 
       setSaved(true);
+      hapticSuccess();
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to save notification settings.'));
@@ -318,7 +320,7 @@ export default function NotificationsScreen() {
               <Switch
                 value={ns.morningBriefEnabled}
                 onValueChange={v => set('morningBriefEnabled', v)}
-                trackColor={{ false: colors.glassBorder, true: 'rgba(135,222,90,0.6)' }}
+                trackColor={{ false: colors.glassBorder, true: colors.toggleTrackActive }}
                 thumbColor={ns.morningBriefEnabled ? colors.toggleThumbActive : colors.textMuted}
               />
             </Row>
@@ -345,7 +347,7 @@ export default function NotificationsScreen() {
               <Switch
                 value={ns.tempSwingEnabled}
                 onValueChange={v => set('tempSwingEnabled', v)}
-                trackColor={{ false: colors.glassBorder, true: 'rgba(135,222,90,0.6)' }}
+                trackColor={{ false: colors.glassBorder, true: colors.toggleTrackActive }}
                 thumbColor={ns.tempSwingEnabled ? colors.toggleThumbActive : colors.textMuted}
               />
             </Row>
@@ -384,7 +386,7 @@ export default function NotificationsScreen() {
               <Switch
                 value={ns.weatherChangeEnabled}
                 onValueChange={v => set('weatherChangeEnabled', v)}
-                trackColor={{ false: colors.glassBorder, true: 'rgba(135,222,90,0.6)' }}
+                trackColor={{ false: colors.glassBorder, true: colors.toggleTrackActive }}
                 thumbColor={ns.weatherChangeEnabled ? colors.toggleThumbActive : colors.textMuted}
               />
             </Row>
@@ -399,7 +401,7 @@ export default function NotificationsScreen() {
               <Switch
                 value={ns.closetGapEnabled}
                 onValueChange={v => set('closetGapEnabled', v)}
-                trackColor={{ false: colors.glassBorder, true: 'rgba(135,222,90,0.6)' }}
+                trackColor={{ false: colors.glassBorder, true: colors.toggleTrackActive }}
                 thumbColor={ns.closetGapEnabled ? colors.toggleThumbActive : colors.textMuted}
               />
             </Row>
@@ -418,7 +420,7 @@ export default function NotificationsScreen() {
               <Switch
                 value={ns.tripPackingEnabled}
                 onValueChange={v => set('tripPackingEnabled', v)}
-                trackColor={{ false: colors.glassBorder, true: 'rgba(135,222,90,0.6)' }}
+                trackColor={{ false: colors.glassBorder, true: colors.toggleTrackActive }}
                 thumbColor={ns.tripPackingEnabled ? colors.toggleThumbActive : colors.textMuted}
               />
             </Row>
@@ -437,7 +439,7 @@ export default function NotificationsScreen() {
               <Switch
                 value={ns.weeklyRecapEnabled}
                 onValueChange={v => set('weeklyRecapEnabled', v)}
-                trackColor={{ false: colors.glassBorder, true: 'rgba(135,222,90,0.6)' }}
+                trackColor={{ false: colors.glassBorder, true: colors.toggleTrackActive }}
                 thumbColor={ns.weeklyRecapEnabled ? colors.toggleThumbActive : colors.textMuted}
               />
             </Row>

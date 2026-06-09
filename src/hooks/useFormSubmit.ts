@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { hapticSuccess, hapticError } from '../lib/haptics';
 
 export type SubmitStatus = { type: 'success' | 'error'; msg: string } | null;
 
@@ -29,6 +30,7 @@ export const useFormSubmit = (successMsg: string, autoResetMs = 0): UseFormSubmi
     try {
       await fn();
       setStatus({ type: 'success', msg: successMsg });
+      hapticSuccess();
       if (autoResetMs > 0) {
         setTimeout(() => setStatus(null), autoResetMs);
       }
@@ -36,6 +38,7 @@ export const useFormSubmit = (successMsg: string, autoResetMs = 0): UseFormSubmi
       const msg = (err as { response?: { data?: { error?: string } } })
         ?.response?.data?.error ?? 'Something went wrong. Please try again.';
       setStatus({ type: 'error', msg });
+      hapticError();
     } finally {
       setLoading(false);
     }

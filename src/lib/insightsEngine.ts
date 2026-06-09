@@ -139,14 +139,17 @@ const enrichArticle = (
 };
 
 /** Build health stats from a flat list of enriched articles. */
-const buildHealth = (insights: ArticleInsight[]): WardrobeHealth => {
+const buildHealth = (
+  insights: ArticleInsight[],
+  activeWindowDays: number = ACTIVE_WINDOW_DAYS,
+): WardrobeHealth => {
   const now = new Date();
   const total = insights.length;
 
   const active = insights.filter(
     i =>
       i.lastWornAt !== null &&
-      daysBetween(i.lastWornAt, now) < ACTIVE_WINDOW_DAYS,
+      daysBetween(i.lastWornAt, now) < activeWindowDays,
   );
 
   const sleeping   = insights.filter(i => i.isSleeping);
@@ -203,6 +206,8 @@ export const computeInsights = async (
   closets:     Closet[],
   history:     OutfitHistoryEntry[],
   preferences: UserPreferenceProfile,
+  /** Window (days) used for the utilization ring + "active" count. */
+  activeWindowDays: number = ACTIVE_WINDOW_DAYS,
 ): Promise<InsightsData> => {
   const now     = new Date();
   const wearMap = buildWearMap(history);
@@ -217,7 +222,7 @@ export const computeInsights = async (
     }
   }
 
-  const health  = buildHealth(allInsights);
+  const health  = buildHealth(allInsights, activeWindowDays);
   const styleDNA = computeStyleDNA(preferences);
 
   // Top worn — descending by totalWears, take 10

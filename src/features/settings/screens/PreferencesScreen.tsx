@@ -26,6 +26,7 @@ import {
 } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/ThemeContext';
 import { fToC, cToF } from '../../../lib/units';
+import { hapticSelection } from '../../../lib/haptics';
 import { loadHistory } from '../../../lib/outfitHistory';
 import {
     loadPreferences,
@@ -661,19 +662,23 @@ export default function PreferencesScreen() {
 
     const handleStyleChange = (s: string) => {
         setClothingStyle(s);
+        hapticSelection();
         saveSettings(currentSettings({ clothingStyle: s })).catch(() => {});
     };
 
     const handleGenderChange = (g: string) => {
         setGender(g);
+        hapticSelection();
         saveSettings(currentSettings({ gender: g })).catch(() => {});
     };
 
     const handleScaleChange = (scale: 'Imperial' | 'Metric') => {
+        if (scale === tempScale) return;
         const toC = scale === 'Metric';
         setHiTempDisp(toC ? fToC(hiTemp) : hiTemp);
         setLowTempDisp(toC ? fToC(lowTemp) : lowTemp);
         setTempScale(scale);
+        hapticSelection();
         saveSettings(currentSettings({ temperatureScale: scale })).catch(
             () => {},
         );

@@ -189,6 +189,41 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     fontWeight: fontWeights.medium,
     color: colors.textPrimary,
   },
+
+  notifList: {
+    width: '100%',
+    gap: spacing.sm,
+  },
+  notifRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.glassBg,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    borderRadius: radius.md,
+  },
+  notifEmoji: {
+    fontSize: 22,
+  },
+  notifTextWrap: {
+    flex: 1,
+    gap: 1,
+  },
+  notifRowTitle: {
+    fontFamily: fonts.body,
+    fontSize: fontSizes.sm,
+    fontWeight: fontWeights.semibold,
+    color: colors.textPrimary,
+  },
+  notifRowDesc: {
+    fontFamily: fonts.body,
+    fontSize: fontSizes.xs,
+    color: colors.textMuted,
+    lineHeight: fontSizes.xs * 1.4,
+  },
   chipGrid: {
     flexDirection: 'row',
     flexWrap:      'wrap',

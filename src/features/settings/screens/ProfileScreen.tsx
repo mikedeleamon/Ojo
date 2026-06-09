@@ -6,6 +6,7 @@ import { View, Text, TextInput, Pressable, GlassCard } from '../../../components
 import axios from '../../../api/client';
 import { auth, getToken, getErrorMessage, updateAuthUser, clearAuth } from '../../../lib/auth';
 import { storage } from '../../../lib/storage';
+import { hapticWarning } from '../../../lib/haptics';
 import { useFormSubmit } from '../../../hooks/useFormSubmit';
 import { StatusMessage } from '../../../components/shared';
 import { makeStyles } from '../screens/screens.styles';
@@ -120,7 +121,7 @@ export default function ProfileScreen({ onLogout }: Props) {
             <Text style={s.dangerBody}>
               Permanently removes your account, closets, clothing articles, and outfit history. Cannot be undone.
             </Text>
-            <Pressable style={s.dangerBtn} onPress={() => setDeleteStep(true)}>
+            <Pressable style={s.dangerBtn} onPress={() => { hapticWarning(); setDeleteStep(true); }}>
               <Text style={s.dangerBtnText}>Delete my account</Text>
             </Pressable>
           </View>

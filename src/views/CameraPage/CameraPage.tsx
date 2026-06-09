@@ -44,6 +44,7 @@ import { Svg, Path, Circle } from 'react-native-svg';
 import * as ImageManipulator from 'expo-image-manipulator';
 import ArticleModal from '../../components/ArticleModal/ArticleModal';
 import { useClosets } from '../../hooks/useClosets';
+import { hapticImpact } from '../../lib/haptics';
 import axios from '../../api/client';
 import { auth } from '../../lib/auth';
 import { useTheme } from '../../theme/ThemeContext';
@@ -599,6 +600,7 @@ export default function CameraPage() {
         exif: false,
       });
       if (!photo?.uri) return;
+      hapticImpact();   // tactile "thunk" confirming the shutter fired
       setRaw({
         uri:      photo.uri,          // local URI is enough for the crop step
         localUri: photo.uri,
