@@ -17,13 +17,15 @@
         "resourceClass": "m-medium"
       },
       "env": {
-        "APP_ENV": "preview"
+        "APP_ENV": "preview",
+        "EXPO_PUBLIC_API_URL": "https://ojo-production-0f30.up.railway.app"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "APP_ENV": "production"
+        "APP_ENV": "production",
+        "EXPO_PUBLIC_API_URL": "https://ojo-production-0f30.up.railway.app"
       }
     }
   },

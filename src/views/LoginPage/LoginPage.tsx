@@ -11,7 +11,7 @@ import { View, Text, TextInput, Pressable, GlassCard } from '../../components/pr
 import OjoLogoIcon from '../../components/icons/OjoLogoIcon';
 import axios from '../../api/client';
 import { AuthState, Settings } from '../../types';
-import { getErrorMessage, saveAuth } from '../../lib/auth';
+import { getAuthErrorMessage, saveAuth } from '../../lib/auth';
 import { isAppleSignInAvailable, signInWithApple } from '../../lib/appleSignIn';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { spacing, radius, fonts, fontSizes, fontWeights } from '../../theme/tokens';
@@ -178,7 +178,7 @@ export default function LoginPage({ onLogin }: Props) {
             await saveAuth(data.token, data.user);
             onLogin?.();
         } catch (err: unknown) {
-            setError(getErrorMessage(err, 'Login failed. Please try again.'));
+            setError(getAuthErrorMessage(err));
         } finally {
             setLoading(false);
         }

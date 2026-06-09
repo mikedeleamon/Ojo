@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { geocodeCity } from '../../../lib/geocoding';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     StyleSheet,
     ScrollView,
@@ -11,7 +10,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
     View,
     Text,
-    TextInput,
     Pressable,
     AppSlider,
     GlassCard,
@@ -581,7 +579,6 @@ export default function PreferencesScreen() {
     const { settings, saveSettings, settingsReady } = useSettings();
     const [clothingStyle, setClothingStyle] = useState(settings.clothingStyle);
     const [gender, setGender] = useState(settings.gender || 'All');
-    const [location, setLocation] = useState(settings.location);
     const [tempScale, setTempScale] = useState<'Imperial' | 'Metric'>(
         settings.temperatureScale as 'Imperial' | 'Metric',
     );
@@ -608,14 +605,11 @@ export default function PreferencesScreen() {
     //     settings.sensitivities?.asthma ?? false,
     // );
 
-    const locationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
     useEffect(() => {
         if (!settingsReady) return;
         const isCelsius = settings.temperatureScale === 'Metric';
         setClothingStyle(settings.clothingStyle);
         setGender(settings.gender || 'All');
-        setLocation(settings.location);
         setTempScale(settings.temperatureScale as 'Imperial' | 'Metric');
         setHiTemp(settings.hiTempThreshold);
         setLowTemp(settings.lowTempThreshold);
@@ -637,15 +631,13 @@ export default function PreferencesScreen() {
     }, [settings, settingsReady]);
 
     const currentSettings = (overrides: Partial<typeof settings>) => ({
+        ...settings,
         clothingStyle,
         gender,
-        location,
         temperatureScale: tempScale,
         hiTempThreshold: hiTemp,
         lowTempThreshold: lowTemp,
         humidityPreference: humidity,
-        // disabling sensitivities for now since they're blocked until AQI and pollen data is available
-        //sensitivities: { allergies, asthma },
         ...overrides,
     });
 
@@ -683,24 +675,6 @@ export default function PreferencesScreen() {
         saveSettings(currentSettings({ temperatureScale: scale })).catch(
             () => {},
         );
-    };
-
-    const handleLocationChange = (text: string) => {
-        setLocation(text);
-        if (locationTimer.current) clearTimeout(locationTimer.current);
-        locationTimer.current = setTimeout(async () => {
-            // Geocode client-side so the server can hit WeatherKit directly
-            // (no city-key round-trip). On failure we still save the text so the
-            // user's typed city sticks; coords just stay undefined.
-            const coords = await geocodeCity(text);
-            saveSettings(
-                currentSettings({
-                    location: text,
-                    lat: coords?.lat,
-                    lon: coords?.lon,
-                }),
-            ).catch(() => {});
-        }, 800);
     };
 
     return (
@@ -818,22 +792,6 @@ export default function PreferencesScreen() {
                                 </Pressable>
                             ))}
                         </View>
-                    </View>
-
-                    {/* Location */}
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>
-                            Default location
-                        </Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder='City name'
-                            placeholderTextColor={colors.textMuted}
-                            value={location}
-                            onChangeText={handleLocationChange}
-                            returnKeyType='done'
-                            accessibilityLabel='Default location'
-                        />
                     </View>
 
                     {/* Temperature unit */}

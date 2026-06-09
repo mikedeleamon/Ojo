@@ -41,6 +41,7 @@ app.get('/health', (_req: Request, res: Response) => {
     status: 'ok',
     uptimeSeconds: Math.round(process.uptime()),
     db: DB_STATE[mongoose.connection.readyState] ?? 'unknown',
+    dbName: mongoose.connection.name ?? 'unknown',
     memory: {
       rssMb: Math.round(mem.rss / 1024 / 1024),
       heapUsedMb: Math.round(mem.heapUsed / 1024 / 1024),

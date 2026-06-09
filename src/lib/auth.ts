@@ -109,8 +109,41 @@ export const refreshToken = async (): Promise<string | null> => {
   }
 };
 
-type ApiError = { response?: { data?: { error?: string } }; message?: string };
+type ApiError = { response?: { status?: number; data?: { error?: string } }; message?: string; code?: string };
 export const getErrorMessage = (err: unknown, fallback = 'Something went wrong.'): string => {
   const e = err as ApiError;
   return e?.response?.data?.error ?? e?.message ?? fallback;
+};
+
+/**
+ * Status-aware error message for auth flows (login/signup).
+ * Distinguishes between:
+ *   - no response (server unreachable / network) — actionable for the user
+ *   - 401 invalid credentials — a user mistake, not a system failure
+ *   - 4xx validation (400/409) — surface the server's specific message
+ *   - 5xx server faults — our problem, reassure + suggest retry
+ */
+export const getAuthErrorMessage = (err: unknown): string => {
+  const e = err as ApiError;
+  const status = e?.response?.status;
+
+  // No HTTP response at all → couldn't reach the server (offline, wrong URL, timeout, DNS)
+  if (!e?.response) {
+    return "Can't reach the server. Check your connection and try again.";
+  }
+
+  if (status === 401) {
+    return 'Incorrect email/username or password.';
+  }
+
+  // Validation / conflict errors carry a useful server-supplied message
+  if (status === 400 || status === 409) {
+    return e.response.data?.error ?? 'Please check your details and try again.';
+  }
+
+  if (status && status >= 500) {
+    return 'Something went wrong on our end. Please try again in a moment.';
+  }
+
+  return e.response.data?.error ?? 'Login failed. Please try again.';
 };
