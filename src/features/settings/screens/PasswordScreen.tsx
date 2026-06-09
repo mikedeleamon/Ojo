@@ -7,21 +7,28 @@ import { auth, updateToken } from '../../../lib/auth';
 import { useFormSubmit } from '../../../hooks/useFormSubmit';
 import { StatusMessage } from '../../../components/shared';
 import { makeStyles } from './screens.styles';
-import { spacing, fonts, fontSizes } from '../../../theme/tokens';
+import { spacing, radius, fonts, fontSizes } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/ThemeContext';
 
 export default function PasswordScreen() {
   const { colors } = useTheme();
   const s = useMemo(() => makeStyles(colors), [colors]);
   const styles = useMemo(() => StyleSheet.create({
-    root:    { flex: 1, backgroundColor: colors.bgDefault },
-    content: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xl },
-    btnText: { fontFamily: fonts.body, fontSize: fontSizes.base, fontWeight: '600', color: colors.saveBtnText },
+    root:       { flex: 1, backgroundColor: colors.bgDefault },
+    content:    { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xl },
+    btnText:    { fontFamily: fonts.body, fontSize: fontSizes.base, fontWeight: '600', color: colors.saveBtnText },
+    inputRow:   { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.glassBg, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radius.sm },
+    inputInner: { flex: 1, paddingVertical: 12, paddingHorizontal: spacing.md, color: colors.textPrimary, fontFamily: fonts.body, fontSize: fontSizes.base },
+    toggle:     { paddingHorizontal: spacing.sm, paddingVertical: 12 },
+    toggleText: { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.textMuted },
   }), [colors]);
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword,     setNewPassword]     = useState('');
   const [confirm,         setConfirm]         = useState('');
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew,     setShowNew]     = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const { status, loading, submit, clearStatus } = useFormSubmit('Password updated.');
 
   const validationMsg =
@@ -50,18 +57,33 @@ export default function PasswordScreen() {
             <StatusMessage status={status} />
           )}
 
-          {[
-            { label: 'Current password', value: currentPassword, set: setCurrentPassword, type: 'current' },
-            { label: 'New password',     value: newPassword,     set: setNewPassword,     type: 'new' },
-            { label: 'Confirm password', value: confirm,         set: setConfirm,         type: 'confirm' },
-          ].map(f => (
+          {([
+            { label: 'Current password', value: currentPassword, set: setCurrentPassword, show: showCurrent, toggle: () => setShowCurrent(v => !v), type: 'current' },
+            { label: 'New password',     value: newPassword,     set: setNewPassword,     show: showNew,     toggle: () => setShowNew(v => !v),     type: 'new' },
+            { label: 'Confirm password', value: confirm,         set: setConfirm,         show: showConfirm, toggle: () => setShowConfirm(v => !v), type: 'confirm' },
+          ] as const).map(f => (
             <View key={f.type} style={s.formGroup}>
               <Text style={s.label}>{f.label}</Text>
-              <TextInput style={s.input} secureTextEntry
-                placeholder="••••••••" placeholderTextColor={colors.textMuted}
-                textContentType={f.type === 'new' ? 'newPassword' : 'password'}
-                value={f.value} onChangeText={f.set}
-                accessibilityLabel={f.label} />
+              <View style={styles.inputRow}>
+                <TextInput
+                  style={styles.inputInner}
+                  secureTextEntry={!f.show}
+                  placeholder="••••••••"
+                  placeholderTextColor={colors.textMuted}
+                  textContentType={f.type === 'new' ? 'newPassword' : 'password'}
+                  value={f.value}
+                  onChangeText={f.set}
+                  accessibilityLabel={f.label}
+                />
+                <Pressable
+                  style={styles.toggle}
+                  onPress={f.toggle}
+                  accessibilityRole="button"
+                  accessibilityLabel={f.show ? `Hide ${f.label.toLowerCase()}` : `Show ${f.label.toLowerCase()}`}
+                >
+                  <Text style={styles.toggleText}>{f.show ? 'Hide' : 'Show'}</Text>
+                </Pressable>
+              </View>
             </View>
           ))}
 

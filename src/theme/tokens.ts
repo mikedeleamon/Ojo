@@ -48,7 +48,7 @@ export const darkColors = {
   white:        '#FFFFFF',
   saveBtnBg:    'rgba(255, 255, 255, 0.92)',
   saveBtnText:  '#0D1B2A',
-  toggleThumbActive: '#87DE5A',
+  toggleThumbActive: '#34D399',
 } as const;
 
 export const lightColors = {
@@ -72,7 +72,7 @@ export const lightColors = {
   white:          '#FFFFFF',
   saveBtnBg:      '#111113',
   saveBtnText:    '#FAFAFA',
-  toggleThumbActive: '#16A34A',
+  toggleThumbActive: '#059669',
 } as const;
 
 // Backward-compat alias — files not yet updated still compile fine

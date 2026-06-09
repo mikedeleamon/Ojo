@@ -56,16 +56,49 @@ export default function ResetPasswordPage({ token, onLogin }: Props) {
           textTransform: 'uppercase',
           color: colors.textMuted,
         },
-        input: {
-          paddingVertical: 12,
-          paddingHorizontal: spacing.md,
+        inputRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
           backgroundColor: colors.glassBg,
           borderWidth: 1,
           borderColor: colors.glassBorder,
           borderRadius: radius.sm,
+        },
+        input: {
+          flex: 1,
+          paddingVertical: 12,
+          paddingHorizontal: spacing.md,
           color: colors.textPrimary,
           fontFamily: fonts.body,
           fontSize: fontSizes.base,
+        },
+        inputSuffix: {
+          paddingHorizontal: spacing.sm,
+          paddingVertical: 12,
+        },
+        inputSuffixText: {
+          fontFamily: fonts.body,
+          fontSize: fontSizes.sm,
+          color: colors.textMuted,
+        },
+        expiredBox: {
+          padding: spacing.sm,
+          backgroundColor: colors.errorBg,
+          borderRadius: radius.sm,
+          borderWidth: 1,
+          borderColor: colors.errorBorder,
+          gap: 8,
+        },
+        expiredText: {
+          fontFamily: fonts.body,
+          fontSize: fontSizes.sm,
+          color: colors.errorText,
+        },
+        expiredLink: {
+          fontFamily: fonts.body,
+          fontSize: fontSizes.sm,
+          color: colors.textPrimary,
+          textDecorationLine: 'underline' as const,
         },
         btn: {
           paddingVertical: 14,
@@ -104,7 +137,10 @@ export default function ResetPasswordPage({ token, onLogin }: Props) {
 
   const [password, setPassword]               = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword]       = useState(false);
+  const [showConfirm, setShowConfirm]         = useState(false);
   const [error, setError]                     = useState<string | null>(null);
+  const [tokenExpired, setTokenExpired]       = useState(false);
   const [loading, setLoading]                 = useState(false);
 
   const handleSubmit = async () => {
@@ -130,7 +166,13 @@ export default function ResetPasswordPage({ token, onLogin }: Props) {
       await saveAuth(data.token, data.user);
       onLogin?.();
     } catch (err: unknown) {
-      setError(getErrorMessage(err, 'Could not reset password. Try again.'));
+      const status = (err as any)?.response?.status;
+      if (status === 401 || status === 410) {
+        setTokenExpired(true);
+        setError(null);
+      } else {
+        setError(getErrorMessage(err, 'Could not reset password. Try again.'));
+      }
     } finally {
       setLoading(false);
     }
@@ -153,7 +195,20 @@ export default function ResetPasswordPage({ token, onLogin }: Props) {
               least 8 characters.
             </Text>
 
-            {error ? (
+            {tokenExpired ? (
+              <View style={styles.expiredBox} accessibilityLiveRegion="assertive">
+                <Text style={styles.expiredText}>
+                  This reset link has expired.
+                </Text>
+                <Pressable
+                  onPress={() => nav.replace('/(auth)/forgot-password')}
+                  accessibilityRole="link"
+                  accessibilityLabel="Request a new link"
+                >
+                  <Text style={styles.expiredLink}>Request a new link →</Text>
+                </Pressable>
+              </View>
+            ) : error ? (
               <View
                 style={styles.errorBox}
                 accessibilityLiveRegion="assertive"
@@ -166,39 +221,59 @@ export default function ResetPasswordPage({ token, onLogin }: Props) {
 
             <View style={{ gap: 6 }}>
               <Text style={styles.label}>New password</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="8+ characters"
-                placeholderTextColor={colors.textMuted}
-                secureTextEntry
-                textContentType="newPassword"
-                value={password}
-                onChangeText={setPassword}
-                returnKeyType="next"
-                accessibilityLabel="New password"
-              />
+              <View style={styles.inputRow}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="8+ characters"
+                  placeholderTextColor={colors.textMuted}
+                  secureTextEntry={!showPassword}
+                  textContentType="newPassword"
+                  value={password}
+                  onChangeText={setPassword}
+                  returnKeyType="next"
+                  accessibilityLabel="New password"
+                />
+                <Pressable
+                  style={styles.inputSuffix}
+                  onPress={() => setShowPassword(s => !s)}
+                  accessibilityRole="button"
+                  accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  <Text style={styles.inputSuffixText}>{showPassword ? 'Hide' : 'Show'}</Text>
+                </Pressable>
+              </View>
             </View>
 
             <View style={{ gap: 6 }}>
               <Text style={styles.label}>Confirm new password</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Re-enter password"
-                placeholderTextColor={colors.textMuted}
-                secureTextEntry
-                textContentType="newPassword"
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                returnKeyType="done"
-                onSubmitEditing={handleSubmit}
-                accessibilityLabel="Confirm new password"
-              />
+              <View style={styles.inputRow}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Re-enter password"
+                  placeholderTextColor={colors.textMuted}
+                  secureTextEntry={!showConfirm}
+                  textContentType="newPassword"
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  returnKeyType="done"
+                  onSubmitEditing={handleSubmit}
+                  accessibilityLabel="Confirm new password"
+                />
+                <Pressable
+                  style={styles.inputSuffix}
+                  onPress={() => setShowConfirm(s => !s)}
+                  accessibilityRole="button"
+                  accessibilityLabel={showConfirm ? 'Hide confirm password' : 'Show confirm password'}
+                >
+                  <Text style={styles.inputSuffixText}>{showConfirm ? 'Hide' : 'Show'}</Text>
+                </Pressable>
+              </View>
             </View>
 
             <Pressable
-              style={[styles.btn, loading && { opacity: 0.5 }]}
+              style={[styles.btn, (loading || tokenExpired) && { opacity: 0.5 }]}
               onPress={handleSubmit}
-              disabled={loading}
+              disabled={loading || tokenExpired}
               accessibilityRole="button"
               accessibilityLabel={loading ? 'Updating password' : 'Update password'}
               accessibilityState={{ busy: loading, disabled: loading }}

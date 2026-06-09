@@ -443,7 +443,9 @@ const StyleDNACard = ({
                     ? 'Score badge now shows "Your Score"'
                     : dna.level === 'learning'
                       ? `${30 - dna.totalOutfits} more to fully personalize`
-                      : `${10 - dna.totalOutfits} outfits until the ranker starts learning`}
+                      : dna.totalOutfits >= 3 && dna.topColors.length > 0
+                        ? `Early signal: leaning toward ${dna.topColors[0]} · ${10 - dna.totalOutfits} to go`
+                        : `${10 - dna.totalOutfits} outfits until the ranker starts learning`}
             </Text>
             {dna.topColors.length > 0 && (
                 <Text
@@ -452,7 +454,7 @@ const StyleDNACard = ({
                         { color: colors.textSecondary, marginTop: 2 },
                     ]}
                 >
-                    Signature colors: {dna.topColors.join(', ')}
+                    {dna.level === 'none' ? 'Emerging ' : 'Signature '}colors: {dna.topColors.join(', ')}
                     {dna.topFabric ? ` · Fabric: ${dna.topFabric}` : ''}
                 </Text>
             )}

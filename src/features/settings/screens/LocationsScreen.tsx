@@ -1,10 +1,11 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   TextInput,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
@@ -34,6 +35,31 @@ import {
 } from '../../../lib/savedLocations';
 import { getAllSnapshots } from '../../../lib/weatherCache';
 import type { SavedLocation, WeatherSnapshot } from '../../../types';
+
+function LocationSubText({ summary, style }: { summary: string | null; style: object }) {
+  const opacity = useRef(new Animated.Value(summary ? 1 : 0.5)).current;
+
+  useEffect(() => {
+    if (summary) {
+      opacity.setValue(1);
+      return;
+    }
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 0.25, duration: 750, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.75, duration: 750, useNativeDriver: true }),
+      ]),
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [summary]);
+
+  return (
+    <Animated.Text style={[style, { opacity }]}>
+      {summary ?? '· · ·'}
+    </Animated.Text>
+  );
+}
 
 export default function LocationsScreen() {
   const { colors } = useTheme();
@@ -220,9 +246,10 @@ export default function LocationsScreen() {
                 <Text style={[st.rowName, { color: darkColors.textPrimary }]}>
                   {name}
                 </Text>
-                <Text style={[st.rowSub, { color: darkColors.textMuted }]}>
-                  {summary ?? 'Tap to load weather'}
-                </Text>
+                <LocationSubText
+                  summary={summary}
+                  style={[st.rowSub, { color: darkColors.textMuted }]}
+                />
               </View>
               {id === activeId && (
                 <Text style={[st.activeTag, { color: darkColors.textSecondary }]}>

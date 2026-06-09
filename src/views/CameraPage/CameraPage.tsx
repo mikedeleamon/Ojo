@@ -20,6 +20,7 @@ import {
   Alert,
   View,
   Text,
+  TextInput,
   Image,
   ActivityIndicator,
   useWindowDimensions,
@@ -43,6 +44,8 @@ import { Svg, Path, Circle } from 'react-native-svg';
 import * as ImageManipulator from 'expo-image-manipulator';
 import ArticleModal from '../../components/ArticleModal/ArticleModal';
 import { useClosets } from '../../hooks/useClosets';
+import axios from '../../api/client';
+import { auth } from '../../lib/auth';
 import { useTheme } from '../../theme/ThemeContext';
 import { pickImage, MAX_FILE_BYTES } from '../../lib/imageService';
 import { ArticleFormData } from '../../types';
@@ -126,21 +129,79 @@ function NoClosetScreen({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const { colors } = useTheme();
   const st = useMemo(() => makePStyles(colors), [colors]);
+  const inputStyle = useMemo(() => StyleSheet.create({
+    input: {
+      width: '100%',
+      paddingVertical: 12,
+      paddingHorizontal: spacing.md,
+      backgroundColor: colors.glassBg,
+      borderWidth: 1,
+      borderColor: colors.glassBorder,
+      borderRadius: radius.sm,
+      color: colors.textPrimary,
+      fontFamily: fonts.body,
+      fontSize: fontSizes.base,
+      textAlign: 'center',
+    },
+    errorText: {
+      fontFamily: fonts.body,
+      fontSize: fontSizes.xs,
+      color: 'rgba(252,165,165,0.9)',
+      textAlign: 'center',
+    },
+  }), [colors]);
+
+  const [name, setName] = useState('My Wardrobe');
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  const create = async () => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setCreating(true);
+    setCreateError(null);
+    try {
+      await axios.post('/api/closets', { name: trimmed }, auth());
+      router.replace('/(tabs)/closet');
+    } catch {
+      setCreateError('Could not create closet. Try again.');
+    } finally {
+      setCreating(false);
+    }
+  };
+
   return (
     <View style={st.root}>
       <Text style={st.title}>No closet yet</Text>
       <Text style={st.body}>
-        Create a closet first, then you can add garments to it.
+        Name your first closet to start adding garments.
       </Text>
+      <TextInput
+        style={inputStyle.input}
+        value={name}
+        onChangeText={setName}
+        placeholder="My Wardrobe"
+        placeholderTextColor={colors.textMuted}
+        returnKeyType="done"
+        onSubmitEditing={create}
+        accessibilityLabel="Closet name"
+      />
+      {createError ? <Text style={inputStyle.errorText}>{createError}</Text> : null}
       <Pressable
-        style={st.btn}
-        onPress={() => {
-          onClose();
-          router.replace('/(tabs)/closet');
-        }}
+        style={[st.btn, (creating || !name.trim()) && { opacity: 0.5 }]}
+        onPress={create}
+        disabled={creating || !name.trim()}
+        accessibilityRole="button"
+        accessibilityLabel={creating ? 'Creating closet' : 'Create closet'}
+      >
+        <Text style={st.btnText}>{creating ? 'Creating…' : 'Create & open closet'}</Text>
+      </Pressable>
+      <Pressable
+        style={st.linkBtn}
+        onPress={onClose}
         accessibilityRole="button"
       >
-        <Text style={st.btnText}>Go to Closet</Text>
+        <Text style={st.linkText}>Cancel</Text>
       </Pressable>
     </View>
   );

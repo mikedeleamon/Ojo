@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { StyleSheet } from 'react-native';
-import { View } from '../../components/primitives';
+import { View, Text, Pressable, GlassCard } from '../../components/primitives';
 import WeatherHUD from '../../components/WeatherHUD/WeatherHUD';
+import { getPermissionStatus, requestPermission } from '../../lib/notifications';
 import { useSettings } from '../../hooks/useSettings';
 import { useActiveLocation } from '../../context/ActiveLocationContext';
 import { getCurrentLocation, formatCoords } from '../../lib/location';
@@ -9,8 +10,49 @@ import { CURRENT_LOCATION_ID } from '../../lib/savedLocations';
 import { getAllSnapshots, setSnapshot } from '../../lib/weatherCache';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { ForceDarkPalette } from '../../theme/ThemeContext';
-import { darkColors } from '../../theme/tokens';
+import { darkColors, spacing, radius, fonts, fontSizes } from '../../theme/tokens';
 import type { WeatherSnapshot } from '../../types';
+
+const notifBannerStyles = StyleSheet.create({
+  wrap: {
+    position: 'absolute',
+    bottom: 100,
+    left: spacing.md,
+    right: spacing.md,
+    zIndex: 10,
+  },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.sm,
+  },
+  body: {
+    flex: 1,
+    fontFamily: fonts.body,
+    fontSize: fontSizes.sm,
+    color: darkColors.textSecondary,
+    lineHeight: fontSizes.sm * 1.5,
+  },
+  enableBtn: {
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    backgroundColor: darkColors.saveBtnBg,
+    borderRadius: radius.pill,
+  },
+  enableText: {
+    fontFamily: fonts.body,
+    fontSize: fontSizes.xs,
+    fontWeight: '600' as const,
+    color: darkColors.saveBtnText,
+  },
+  dismissBtn: { padding: 6 },
+  dismissText: {
+    fontFamily: fonts.body,
+    fontSize: fontSizes.xs,
+    color: darkColors.textMuted,
+  },
+});
 
 export default function MainPage() {
   const st = useMemo(() => StyleSheet.create({
@@ -23,6 +65,9 @@ export default function MainPage() {
 
   const [gpsLocation, setGpsLocation] = useState('');
   const [refreshKey,  setRefreshKey]  = useState(0);
+  const [weatherReady,         setWeatherReady]         = useState(false);
+  const [notifStatus,          setNotifStatus]          = useState<'undetermined' | 'granted' | 'denied' | null>(null);
+  const [notifBannerDismissed, setNotifBannerDismissed] = useState(false);
   // In-memory mirror of the per-city snapshot cache, so the seed for the active
   // city is available synchronously when switching (no async flash).
   const [snapshots, setSnapshots] = useState<Record<string, WeatherSnapshot>>({});
@@ -66,11 +111,30 @@ export default function MainPage() {
 
   const openLocations = useCallback(() => nav.push('/account/locations'), [nav]);
 
+  // After weather loads for the first time, check notification permission. If
+  // still undetermined, show a contextual nudge instead of asking on cold open.
+  useEffect(() => {
+    if (!weatherReady) return;
+    let cancelled = false;
+    getPermissionStatus().then(status => {
+      if (!cancelled) setNotifStatus(status);
+    });
+    return () => { cancelled = true; };
+  }, [weatherReady]);
+
+  const handleNotifEnable = useCallback(async () => {
+    const status = await requestPermission();
+    setNotifStatus(status);
+    setNotifBannerDismissed(true);
+  }, []);
+
   // WeatherHUD owns its loading state via showInlineLoader (default true):
   // a spinning sun sits on the dark gradient while GPS + weather fetch,
   // then fades out (400 ms) as the gradient transitions to the weather colour.
   // The settings gate is kept so WeatherHUD never mounts without a location.
   if (!settingsReady) return <ForceDarkPalette><View style={st.root} /></ForceDarkPalette>;
+
+  const showNotifBanner = weatherReady && notifStatus === 'undetermined' && !notifBannerDismissed;
 
   return (
     <ForceDarkPalette>
@@ -83,10 +147,38 @@ export default function MainPage() {
           settings={settings}
           refreshKey={refreshKey}
           onRefresh={handleRefresh}
+          onReady={() => setWeatherReady(true)}
           seedSnapshot={seed}
           onSnapshot={handleSnapshot}
           onOpenLocations={openLocations}
         />
+
+        {/* Contextual notification nudge — shown only after weather loads */}
+        {showNotifBanner && (
+          <View style={notifBannerStyles.wrap} pointerEvents="box-none">
+            <GlassCard style={notifBannerStyles.card}>
+              <Text style={notifBannerStyles.body}>
+                Get your morning outfit brief delivered daily.
+              </Text>
+              <Pressable
+                style={notifBannerStyles.enableBtn}
+                onPress={handleNotifEnable}
+                accessibilityRole="button"
+                accessibilityLabel="Enable notifications"
+              >
+                <Text style={notifBannerStyles.enableText}>Enable</Text>
+              </Pressable>
+              <Pressable
+                style={notifBannerStyles.dismissBtn}
+                onPress={() => setNotifBannerDismissed(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Dismiss notification prompt"
+              >
+                <Text style={notifBannerStyles.dismissText}>✕</Text>
+              </Pressable>
+            </GlassCard>
+          </View>
+        )}
       </View>
     </ForceDarkPalette>
   );

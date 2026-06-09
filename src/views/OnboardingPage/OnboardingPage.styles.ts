@@ -170,6 +170,25 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     textTransform:   'uppercase',
     color:           colors.textMuted,
   },
+  sliderRow: {
+    width: '100%',
+    gap: 4,
+  },
+  sliderMeta: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+  },
+  sliderLabel: {
+    fontFamily: fonts.body,
+    fontSize: fontSizes.sm,
+    color: colors.textSecondary,
+  },
+  sliderValue: {
+    fontFamily: fonts.body,
+    fontSize: fontSizes.sm,
+    fontWeight: fontWeights.medium,
+    color: colors.textPrimary,
+  },
   chipGrid: {
     flexDirection: 'row',
     flexWrap:      'wrap',

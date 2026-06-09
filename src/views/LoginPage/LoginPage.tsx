@@ -66,16 +66,30 @@ export default function LoginPage({ onLogin }: Props) {
             textTransform: 'uppercase',
             color: colors.textMuted,
         },
-        input: {
-            paddingVertical: 12,
-            paddingHorizontal: spacing.md,
+        inputRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
             backgroundColor: colors.glassBg,
             borderWidth: 1,
             borderColor: colors.glassBorder,
             borderRadius: radius.sm,
+        },
+        input: {
+            flex: 1,
+            paddingVertical: 12,
+            paddingHorizontal: spacing.md,
             color: colors.textPrimary,
             fontFamily: fonts.body,
             fontSize: fontSizes.base,
+        },
+        inputSuffix: {
+            paddingHorizontal: spacing.sm,
+            paddingVertical: 12,
+        },
+        inputSuffixText: {
+            fontFamily: fonts.body,
+            fontSize: fontSizes.sm,
+            color: colors.textMuted,
         },
         btn: {
             width: '100%',
@@ -137,6 +151,7 @@ export default function LoginPage({ onLogin }: Props) {
     const nav = useAppNavigation();
     const [identifier, setIdentifier] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [appleAvailable, setAppleAvailable] = useState(false);
@@ -231,18 +246,30 @@ export default function LoginPage({ onLogin }: Props) {
                             </View>
                             <View style={styles.field}>
                                 <Text style={styles.label}>Password</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder='••••••••'
-                                    placeholderTextColor={colors.textMuted}
-                                    secureTextEntry
-                                    textContentType='password'
-                                    value={password}
-                                    onChangeText={setPassword}
-                                    returnKeyType='done'
-                                    onSubmitEditing={handleSubmit}
-                                    accessibilityLabel="Password"
-                                />
+                                <View style={styles.inputRow}>
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder='••••••••'
+                                        placeholderTextColor={colors.textMuted}
+                                        secureTextEntry={!showPassword}
+                                        textContentType='password'
+                                        value={password}
+                                        onChangeText={setPassword}
+                                        returnKeyType='done'
+                                        onSubmitEditing={handleSubmit}
+                                        accessibilityLabel="Password"
+                                    />
+                                    <Pressable
+                                        style={styles.inputSuffix}
+                                        onPress={() => setShowPassword(s => !s)}
+                                        accessibilityRole="button"
+                                        accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                                    >
+                                        <Text style={styles.inputSuffixText}>
+                                            {showPassword ? 'Hide' : 'Show'}
+                                        </Text>
+                                    </Pressable>
+                                </View>
                             </View>
                         </View>
 

@@ -5,13 +5,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Svg, Path, Circle } from 'react-native-svg';
-import { View, Text, Pressable, GlassCard, GlassGroup } from '../../components/primitives';
+import { View, Text, Pressable, GlassCard, GlassGroup, AppSlider } from '../../components/primitives';
 import OjoLogoIcon from '../../components/icons/OjoLogoIcon';
 import { useSettings } from '../../hooks/useSettings';
 import { markOnboardingComplete } from '../../lib/onboarding';
 import { auth } from '../../lib/auth';
 import axios from '../../api/client';
 import { spacing, radius, fonts, fontSizes, fontWeights, shadows } from '../../theme/tokens';
+import { fToC, cToF } from '../../lib/units';
 import { useTheme } from '../../theme/ThemeContext';
 import { ColorTokens } from '../../theme/tokens';
 import { makeStyles } from './OnboardingPage.styles';
@@ -115,6 +116,14 @@ export default function OnboardingPage({ onComplete }: Props) {
   const [tempUnit,     setTempUnit]     = useState<'Imperial' | 'Metric'>(
     (settings.temperatureScale as 'Imperial' | 'Metric') || 'Imperial',
   );
+  const isMetric = tempUnit === 'Metric';
+  const [hotTemp,  setHotTemp]  = useState(
+    isMetric ? Math.round(fToC(settings.hiTempThreshold ?? 85)) : (settings.hiTempThreshold ?? 85),
+  );
+  const [coldTemp, setColdTemp] = useState(
+    isMetric ? Math.round(fToC(settings.lowTempThreshold ?? 55)) : (settings.lowTempThreshold ?? 55),
+  );
+  const [humidity, setHumidity] = useState(settings.humidityPreference ?? 50);
 
   const slideAnim   = useRef(new Animated.Value(0)).current;
   const opacityAnim = useRef(new Animated.Value(1)).current;
@@ -153,8 +162,18 @@ export default function OnboardingPage({ onComplete }: Props) {
   };
 
   const handleFinish = async () => {
+    const hiTempF  = isMetric ? cToF(hotTemp)  : hotTemp;
+    const lowTempF = isMetric ? cToF(coldTemp) : coldTemp;
     try {
-      await saveSettings({ ...settings, clothingStyle: styleChoice, temperatureScale: tempUnit, gender: genderChoice });
+      await saveSettings({
+        ...settings,
+        clothingStyle:      styleChoice,
+        temperatureScale:   tempUnit,
+        gender:             genderChoice,
+        hiTempThreshold:    hiTempF,
+        lowTempThreshold:   lowTempF,
+        humidityPreference: humidity,
+      });
     } catch { /* non-fatal */ }
     await markOnboardingComplete();
     advance(4);
@@ -384,7 +403,17 @@ export default function OnboardingPage({ onComplete }: Props) {
                             tempUnit === u && st.segActive,
                             i < TEMP_UNITS.length - 1 && st.segDivider,
                           ]}
-                          onPress={() => setTempUnit(u)}
+                          onPress={() => {
+                            if (u === tempUnit) return;
+                            if (u === 'Metric') {
+                              setHotTemp(Math.round(fToC(hotTemp)));
+                              setColdTemp(Math.round(fToC(coldTemp)));
+                            } else {
+                              setHotTemp(Math.round(cToF(hotTemp)));
+                              setColdTemp(Math.round(cToF(coldTemp)));
+                            }
+                            setTempUnit(u);
+                          }}
                           accessibilityRole="radio"
                           accessibilityLabel={u === 'Imperial' ? 'Fahrenheit, Imperial' : 'Celsius, Metric'}
                           accessibilityState={{ selected: tempUnit === u }}
@@ -394,6 +423,59 @@ export default function OnboardingPage({ onComplete }: Props) {
                           </Text>
                         </Pressable>
                       ))}
+                    </View>
+                  </View>
+
+                  <View style={st.prefSection}>
+                    <Text style={st.prefLabel}>Temperature feel</Text>
+                    <View style={st.sliderRow}>
+                      <View style={st.sliderMeta}>
+                        <Text style={st.sliderLabel}>Hot above</Text>
+                        <Text style={st.sliderValue}>{Math.round(hotTemp)}°{isMetric ? 'C' : 'F'}</Text>
+                      </View>
+                      <AppSlider
+                        minimumValue={isMetric ? 10 : 50}
+                        maximumValue={isMetric ? 49 : 120}
+                        value={hotTemp}
+                        step={1}
+                        onValueChange={setHotTemp}
+                        style={{ width: '100%' }}
+                        accessibilityLabel="Hot above temperature"
+                      />
+                    </View>
+                    <View style={st.sliderRow}>
+                      <View style={st.sliderMeta}>
+                        <Text style={st.sliderLabel}>Cold below</Text>
+                        <Text style={st.sliderValue}>{Math.round(coldTemp)}°{isMetric ? 'C' : 'F'}</Text>
+                      </View>
+                      <AppSlider
+                        minimumValue={isMetric ? -18 : 0}
+                        maximumValue={isMetric ? 21 : 70}
+                        value={coldTemp}
+                        step={1}
+                        onValueChange={setColdTemp}
+                        style={{ width: '100%' }}
+                        accessibilityLabel="Cold below temperature"
+                      />
+                    </View>
+                  </View>
+
+                  <View style={st.prefSection}>
+                    <Text style={st.prefLabel}>Humidity sensitivity</Text>
+                    <View style={st.sliderRow}>
+                      <View style={st.sliderMeta}>
+                        <Text style={st.sliderLabel}>Threshold</Text>
+                        <Text style={st.sliderValue}>{humidity}%</Text>
+                      </View>
+                      <AppSlider
+                        minimumValue={0}
+                        maximumValue={100}
+                        value={humidity}
+                        step={1}
+                        onValueChange={setHumidity}
+                        style={{ width: '100%' }}
+                        accessibilityLabel="Humidity sensitivity threshold"
+                      />
                     </View>
                   </View>
 
