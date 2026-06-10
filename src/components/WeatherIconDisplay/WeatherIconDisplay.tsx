@@ -96,6 +96,10 @@ interface Props {
      *  When supplied, the moon disc is mirrored horizontally for SH viewers
      *  so the crescent lit limb appears on the correct side. */
     latitude?: number;
+    /** Enable in-icon animation (sun spin, rain fall, storm bolts, star twinkle).
+     *  Defaults to `size === 'large'` so existing callers are unchanged. The
+     *  sticky mini header opts in explicitly with `animate` to mirror the hero. */
+    animate?: boolean;
 }
 
 const makeStyles = (colors: ColorTokens) =>
@@ -131,6 +135,7 @@ const WeatherIconDisplay = ({
     temperature,
     feelsLike,
     latitude,
+    animate = size === 'large',
 }: Props) => {
     const { colors } = useTheme();
     const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -144,10 +149,10 @@ const WeatherIconDisplay = ({
     const isPartlyCloudy = icon === ICONS.PartlyCloudy;
     const isCloudy = icon === ICONS.Cloudy;
     const isSnow = icon === ICONS.Snow;
-    // Spin only matters at the hero size. At 36px the rotation is imperceptible
-    // and the per-frame transform updates pile up across ~12 forecast cells,
-    // adding noticeable scroll cost. Skip the hook entirely when small.
-    const rotate = useSpinAnimation(isLarge && isSunny ? 12_000 : 0);
+    // Spin/twinkle/rain are opt-in via `animate`. Default mirrors size==='large',
+    // so the 12-cell forecast strip stays cheap (no per-frame transforms there),
+    // while the sticky mini header can opt in explicitly.
+    const rotate = useSpinAnimation(animate && isSunny ? 12_000 : 0);
 
     const iconSize = isLarge ? 180 : 36;
     const iconStyle = isLarge ? styles.iconLarge : styles.iconSmall;
@@ -166,6 +171,7 @@ const WeatherIconDisplay = ({
         <View style={[styles.root, isLarge ? styles.large : styles.small]}>
             {isClearNight ? (
                 isLarge ? (
+                    // Hero: moon phase disc only — stars are in the full-screen backdrop.
                     <ClearNightIconMoon
                         size={iconSize}
                         showStars={false}
@@ -173,16 +179,21 @@ const WeatherIconDisplay = ({
                         mirrorDisc={southernHemisphere}
                     />
                 ) : (
+                    // Small (forecast strip + sticky mini): stars + moon phase.
+                    // animate=true on the sticky mini enables twinkling; the
+                    // forecast strip gets animate=false (cheap, no per-frame cost).
                     <ClearNightIcon
                         size={iconSize}
                         starCount={10}
-                        animate={false}
+                        animate={animate}
+                        moonPhase={moonPhase}
+                        mirrorDisc={southernHemisphere}
                     />
                 )
             ) : isRainy ? (
-                <RainyIcon size={iconSize} animate={isLarge} />
+                <RainyIcon size={iconSize} animate={animate} />
             ) : isStorm ? (
-                isLarge ? (
+                animate ? (
                     <StormIconLightning size={iconSize} />
                 ) : (
                     <StormIcon size={iconSize} />
@@ -194,7 +205,7 @@ const WeatherIconDisplay = ({
             ) : isCloudy ? (
                 <CloudyIcon size={iconSize} />
             ) : isSunny ? (
-                isLarge ? (
+                animate ? (
                     <Animated.View
                         style={[iconStyle, { transform: [{ rotate }] }]}
                     >

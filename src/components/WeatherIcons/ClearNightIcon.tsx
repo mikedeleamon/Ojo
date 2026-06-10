@@ -16,6 +16,33 @@ const AnimatedPath = Animated.createAnimatedComponent(Path);
 const MOON_D =
     'M662.97,832.52h-36.75c-118-8.77-212.63-102.78-221.74-220.8l-.08-36.01c8.47-118.89,103.45-213.68,222.32-222.29l36.06.04c118.04,8.82,212.63,102.8,221.75,220.82l.08,36.02c-8.45,118.51-102.93,213.28-221.64,222.22Z';
 
+/** Center and radius of the moon disc in the 1280×1280 viewBox. */
+const MOON_CX = 644;
+const MOON_CY = 593;
+const MOON_R  = 240;
+
+/**
+ * Geometric SVG path for the illuminated portion of the moon.
+ * phase: 0 = new moon, 0.25 = first quarter (right lit), 0.5 = full, 0.75 = last quarter.
+ */
+function moonPhasePath(cx: number, cy: number, r: number, phase: number): string {
+    const p = ((phase % 1) + 1) % 1;
+    if (p < 0.02 || p > 0.98) return '';
+    if (Math.abs(p - 0.5) < 0.01) {
+        return `M ${cx - r},${cy} A ${r},${r} 0 1,1 ${cx + r},${cy} A ${r},${r} 0 1,1 ${cx - r},${cy} Z`;
+    }
+    const top    = `${cx},${cy - r}`;
+    const bottom = `${cx},${cy + r}`;
+    const rx     = r * Math.abs(Math.cos(2 * Math.PI * p));
+    if (p < 0.5) {
+        const termSweep = p < 0.25 ? 0 : 1;
+        return `M ${top} A ${r},${r} 0 0,1 ${bottom} A ${rx},${r} 0 0,${termSweep} ${top} Z`;
+    } else {
+        const termSweep = p < 0.75 ? 0 : 1;
+        return `M ${top} A ${r},${r} 0 0,0 ${bottom} A ${rx},${r} 0 0,${termSweep} ${top} Z`;
+    }
+}
+
 const STARS: { id: string; delay: number; duration: number; d: string }[] = [
     {
         id: 'star-1',
@@ -220,6 +247,16 @@ interface ClearNightIconProps {
      * where the animation isn't perceptible but its per-frame cost stacks
      * across many instances (e.g. the hourly forecast strip). */
     animate?: boolean;
+    /**
+     * Fractional moon phase: 0 = new moon, 0.25 = first quarter, 0.5 = full,
+     * 0.75 = last quarter. Omit for the full-moon disc (existing default).
+     */
+    moonPhase?: number;
+    /**
+     * Mirror the moon disc horizontally for Southern Hemisphere observers so
+     * the lit limb appears on the correct side. Does not affect stars.
+     */
+    mirrorDisc?: boolean;
 }
 
 export default function ClearNightIcon({
@@ -229,6 +266,8 @@ export default function ClearNightIcon({
     fullWidth = false,
     fullHeight = false,
     animate = true,
+    moonPhase,
+    mirrorDisc = false,
 }: ClearNightIconProps) {
     const reduceMotion = useReduceMotion();
     const animateStars = animate && !reduceMotion;
@@ -242,6 +281,13 @@ export default function ClearNightIcon({
     // Translate the moon + Illustrator stars so they remain visually centred.
     const offsetX = (vbW - 1280) / 2;
     const offsetY = (vbH - 1280) / 2;
+
+    const moonD = useMemo(
+        () => moonPhase !== undefined
+            ? moonPhasePath(MOON_CX, MOON_CY, MOON_R, moonPhase)
+            : MOON_D,
+        [moonPhase],
+    );
 
     const illustratorStars = STARS.slice(0, Math.min(starCount, STARS.length));
     const extraCount = Math.max(0, starCount - STARS.length);
@@ -267,12 +313,21 @@ export default function ClearNightIcon({
             height={fullHeight ? screenHeight : size}
             accessibilityLabel='Clear night'
         >
-            {/* Moon and Illustrator stars stay centred in the canvas */}
+            {/* Moon disc — mirrored independently so Southern Hemisphere
+                observers see the correct lit limb without flipping the stars. */}
+            {moonD.length > 0 && (
+                <G
+                    transform={
+                        mirrorDisc
+                            ? `translate(${offsetX}, ${offsetY}) translate(${MOON_CX}, ${MOON_CY}) scale(-1, 1) translate(${-MOON_CX}, ${-MOON_CY})`
+                            : `translate(${offsetX}, ${offsetY})`
+                    }
+                >
+                    <Path fill={color} d={moonD} />
+                </G>
+            )}
+            {/* Illustrator stars — always in original positions, not mirrored */}
             <G transform={`translate(${offsetX}, ${offsetY})`}>
-                <Path
-                    fill={color}
-                    d={MOON_D}
-                />
                 {illustratorStars.map((star) => (
                     <TwinklingStar
                         key={star.id}

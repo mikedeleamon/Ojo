@@ -10,6 +10,10 @@ import {
 import Animated, {
     useSharedValue,
     useAnimatedProps,
+    useAnimatedScrollHandler,
+    useAnimatedStyle,
+    interpolate,
+    Extrapolation,
     withTiming,
     Easing as REasing,
 } from 'react-native-reanimated';
@@ -434,6 +438,55 @@ const WeatherHUD = ({
     // Spinner rotation for the inline loading indicator
     const spinRotate = useSpinAnimation(2_000);
 
+    // ── Sticky mini header (drives the fade/slide as the hero scrolls away) ───
+    // scrollY is updated on the UI thread by useAnimatedScrollHandler. The mini
+    // header's style is computed inside a worklet that reads scrollY directly,
+    // so the fade tracks the finger with no JS-thread involvement.
+    const scrollY = useSharedValue(0);
+    const [heroBottomY, setHeroBottomY] = useState(0);
+
+    const scrollHandler = useAnimatedScrollHandler({
+        onScroll: (e) => {
+            scrollY.value = e.contentOffset.y;
+        },
+    });
+
+    const miniAnimatedStyle = useAnimatedStyle(() => {
+        // Before onLayout fires, heroBottomY is 0 — the interpolate range would
+        // collapse and any small scrollY would read as fully visible, flashing
+        // the mini on first paint. Bail to fully hidden until we have a real
+        // threshold.
+        if (heroBottomY === 0) {
+            return { opacity: 0, transform: [{ translateY: -8 }] };
+        }
+        const start = heroBottomY - 40;
+        const end = heroBottomY + 20;
+        if (reduceMotion) {
+            return {
+                opacity: scrollY.value > heroBottomY ? 1 : 0,
+                transform: [{ translateY: 0 }],
+            };
+        }
+        return {
+            opacity: interpolate(
+                scrollY.value,
+                [start, end],
+                [0, 1],
+                Extrapolation.CLAMP,
+            ),
+            transform: [
+                {
+                    translateY: interpolate(
+                        scrollY.value,
+                        [start, end],
+                        [-8, 0],
+                        Extrapolation.CLAMP,
+                    ),
+                },
+            ],
+        };
+    });
+
     const isMetric = settings.temperatureScale === 'Metric';
     const tempVal = weather
         ? isMetric
@@ -602,12 +655,14 @@ const WeatherHUD = ({
                     style={st.contentLayer}
                     pointerEvents={loading ? 'none' : 'auto'}
                 >
-                    <ScrollView
+                    <Animated.ScrollView
                         contentContainerStyle={[
                             st.scroll,
                             { paddingBottom: tabPad },
                         ]}
                         showsVerticalScrollIndicator={false}
+                        onScroll={scrollHandler}
+                        scrollEventThrottle={16}
                         refreshControl={
                             <RefreshControl
                                 refreshing={refreshing}
@@ -620,48 +675,16 @@ const WeatherHUD = ({
                             />
                         }
                     >
-                        {/* Header */}
+                        {/* Header — only city/condition/lastUpdated live in the
+                            scroll surface now. The Locations/Gear buttons + a
+                            scroll-driven mini summary moved to the sticky bar
+                            below. */}
                         <View
                             style={[
                                 st.header,
                                 { paddingTop: spacing.lg + topInset },
                             ]}
                         >
-                            {onOpenLocations && (
-                                <GlassCard
-                                    glassStyle='clear'
-                                    style={[
-                                        st.locationsBtn,
-                                        { top: topInset + 8 },
-                                    ]}
-                                >
-                                    <Pressable
-                                        onPress={onOpenLocations}
-                                        accessibilityLabel='Switch location'
-                                        style={({ pressed }) => [
-                                            st.locationsBtnInner,
-                                            { opacity: pressed ? 0.6 : 1 },
-                                        ]}
-                                    >
-                                        <LocationsIcon />
-                                    </Pressable>
-                                </GlassCard>
-                            )}
-                            <GlassCard
-                                glassStyle='clear'
-                                style={[st.gearBtn, { top: topInset + 8 }]}
-                            >
-                                <Pressable
-                                    onPress={() => nav.push('/account')}
-                                    accessibilityLabel='Account settings'
-                                    style={({ pressed }) => [
-                                        st.gearBtnInner,
-                                        { opacity: pressed ? 0.6 : 1 },
-                                    ]}
-                                >
-                                    <GearIcon />
-                                </Pressable>
-                            </GlassCard>
                             <Text style={st.city}>{place?.name}</Text>
                             <Text style={st.condition}>
                                 {humanizeCondition(weather.WeatherText)}
@@ -673,8 +696,15 @@ const WeatherHUD = ({
                             )}
                         </View>
 
-                        {/* Hero icon + temperature */}
-                        <View style={st.hero}>
+                        {/* Hero icon + temperature. onLayout reports the bottom
+                            edge so the sticky mini knows when to fade in. */}
+                        <View
+                            style={st.hero}
+                            onLayout={(e) => {
+                                const { y, height } = e.nativeEvent.layout;
+                                setHeroBottomY(y + height);
+                            }}
+                        >
                             <WeatherIconDisplay
                                 condition={weather.WeatherText}
                                 isDay={weather.IsDayTime}
@@ -762,7 +792,78 @@ const WeatherHUD = ({
                                 </Text>
                             </Pressable>
                         </View>
-                    </ScrollView>
+                    </Animated.ScrollView>
+
+                    {/* Top scrim — ensures both the pinned buttons and the
+                        mini summary always read against anything that scrolls
+                        underneath them. Invisible at rest (content hasn't
+                        reached the top yet); becomes useful as soon as the
+                        first card enters the sticky zone. */}
+                    <LinearGradient
+                        colors={['rgba(0,0,0,0.45)', 'rgba(0,0,0,0)']}
+                        style={st.topScrim}
+                        pointerEvents='none'
+                    />
+
+                    {/* Sticky top bar — pinned buttons + scroll-driven mini
+                        summary. Sits as a sibling of (and above) the scroll
+                        view. pointerEvents="box-none" lets pulls/scrolls fall
+                        through everywhere except the button hit areas. */}
+                    <View
+                        style={[st.stickyBar, { top: topInset + 8 }]}
+                        pointerEvents='box-none'
+                    >
+                        {onOpenLocations ? (
+                            <GlassCard
+                                glassStyle='clear'
+                                style={st.locationsBtn}
+                            >
+                                <Pressable
+                                    onPress={onOpenLocations}
+                                    accessibilityLabel='Switch location'
+                                    style={({ pressed }) => [
+                                        st.locationsBtnInner,
+                                        { opacity: pressed ? 0.6 : 1 },
+                                    ]}
+                                >
+                                    <LocationsIcon />
+                                </Pressable>
+                            </GlassCard>
+                        ) : (
+                            <View style={st.locationsBtnPlaceholder} />
+                        )}
+                        <Animated.View
+                            style={[st.miniWrap, miniAnimatedStyle]}
+                            pointerEvents='none'
+                        >
+                            <WeatherIconDisplay
+                                condition={weather.WeatherText}
+                                isDay={weather.IsDayTime}
+                                size='small'
+                                animate
+                                latitude={place?.lat}
+                            />
+                            <Text
+                                style={st.miniCity}
+                                numberOfLines={1}
+                            >
+                                {place?.name}
+                            </Text>
+                            <Text style={st.miniTemp}>{tempVal}°</Text>
+                        </Animated.View>
+                        <GlassCard glassStyle='clear' style={st.gearBtn}>
+                            <Pressable
+                                onPress={() => nav.push('/account')}
+                                accessibilityLabel='Account settings'
+                                style={({ pressed }) => [
+                                    st.gearBtnInner,
+                                    { opacity: pressed ? 0.6 : 1 },
+                                ]}
+                            >
+                                <GearIcon />
+                            </Pressable>
+                        </GlassCard>
+                    </View>
                 </View>
             )}
         </AnimatedLinearGradient>
