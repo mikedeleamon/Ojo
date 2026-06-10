@@ -201,7 +201,7 @@ const WeatherIconDisplay = ({
             ) : isPartlyCloudyNight ? (
                 <PartlyCloudyNightIcon size={iconSize} />
             ) : isPartlyCloudy ? (
-                <PartlyCloudyIcon size={iconSize} />
+                <PartlyCloudyIcon size={iconSize} animate={animate} />
             ) : isCloudy ? (
                 <CloudyIcon size={iconSize} />
             ) : isSunny ? (

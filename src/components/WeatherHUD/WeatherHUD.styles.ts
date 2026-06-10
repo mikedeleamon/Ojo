@@ -31,15 +31,6 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         lineHeight: fontSizes.base * 1.5,
     },
     header: { alignItems: 'center', paddingTop: spacing.lg, gap: 4 },
-    topScrim: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        height: 100,
-        zIndex: 19,
-        pointerEvents: 'none' as any,
-    },
     stickyBar: {
         position: 'absolute',
         top: 0,
@@ -57,10 +48,16 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     locationsBtnInner: { padding: 8 },
     locationsBtnPlaceholder: { width: 44, height: 44 },
     miniWrap: {
+        maxWidth: '60%',
+    },
+    miniPill: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 8,
-        maxWidth: '60%',
+        borderRadius: 20,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        overflow: 'hidden',
     },
     miniCity: {
         fontFamily: fonts.display,

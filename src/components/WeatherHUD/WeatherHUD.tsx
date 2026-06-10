@@ -11,9 +11,11 @@ import Animated, {
     useSharedValue,
     useAnimatedProps,
     useAnimatedScrollHandler,
-    useAnimatedStyle,
-    interpolate,
-    Extrapolation,
+    useAnimatedReaction,
+    useAnimatedRef,
+    runOnJS,
+    FadeIn,
+    FadeOut,
     withTiming,
     Easing as REasing,
 } from 'react-native-reanimated';
@@ -451,41 +453,25 @@ const WeatherHUD = ({
         },
     });
 
-    const miniAnimatedStyle = useAnimatedStyle(() => {
-        // Before onLayout fires, heroBottomY is 0 — the interpolate range would
-        // collapse and any small scrollY would read as fully visible, flashing
-        // the mini on first paint. Bail to fully hidden until we have a real
-        // threshold.
-        if (heroBottomY === 0) {
-            return { opacity: 0, transform: [{ translateY: -8 }] };
-        }
-        const start = heroBottomY - 40;
-        const end = heroBottomY + 20;
-        if (reduceMotion) {
-            return {
-                opacity: scrollY.value > heroBottomY ? 1 : 0,
-                transform: [{ translateY: 0 }],
-            };
-        }
-        return {
-            opacity: interpolate(
-                scrollY.value,
-                [start, end],
-                [0, 1],
-                Extrapolation.CLAMP,
-            ),
-            transform: [
-                {
-                    translateY: interpolate(
-                        scrollY.value,
-                        [start, end],
-                        [-8, 0],
-                        Extrapolation.CLAMP,
-                    ),
-                },
-            ],
-        };
-    });
+    const scrollRef = useAnimatedRef<Animated.ScrollView>();
+
+    const scrollToTop = useCallback(() => {
+        scrollRef.current?.scrollTo({ x: 0, y: 0, animated: true });
+    }, [scrollRef]);
+
+    // Bridges scroll position → JS-side visibility flag so the GlassCard pill
+    // can be conditionally mounted/unmounted. Mounting fresh at opacity:1 lets
+    // iOS UIVisualEffectView initialise its blur correctly every time — the
+    // entering/exiting Reanimated animations handle the fade.
+    const [miniVisible, setMiniVisible] = useState(false);
+
+    useAnimatedReaction(
+        () => heroBottomY > 0 && scrollY.value > heroBottomY - 40,
+        (current, previous) => {
+            if (current !== previous) runOnJS(setMiniVisible)(current);
+        },
+        [heroBottomY],
+    );
 
     const isMetric = settings.temperatureScale === 'Metric';
     const tempVal = weather
@@ -656,6 +642,7 @@ const WeatherHUD = ({
                     pointerEvents={loading ? 'none' : 'auto'}
                 >
                     <Animated.ScrollView
+                        ref={scrollRef}
                         contentContainerStyle={[
                             st.scroll,
                             { paddingBottom: tabPad },
@@ -794,17 +781,6 @@ const WeatherHUD = ({
                         </View>
                     </Animated.ScrollView>
 
-                    {/* Top scrim — ensures both the pinned buttons and the
-                        mini summary always read against anything that scrolls
-                        underneath them. Invisible at rest (content hasn't
-                        reached the top yet); becomes useful as soon as the
-                        first card enters the sticky zone. */}
-                    <LinearGradient
-                        colors={['rgba(0,0,0,0.45)', 'rgba(0,0,0,0)']}
-                        style={st.topScrim}
-                        pointerEvents='none'
-                    />
-
                     {/* Sticky top bar — pinned buttons + scroll-driven mini
                         summary. Sits as a sibling of (and above) the scroll
                         view. pointerEvents="box-none" lets pulls/scrolls fall
@@ -832,25 +808,41 @@ const WeatherHUD = ({
                         ) : (
                             <View style={st.locationsBtnPlaceholder} />
                         )}
-                        <Animated.View
-                            style={[st.miniWrap, miniAnimatedStyle]}
-                            pointerEvents='none'
-                        >
-                            <WeatherIconDisplay
-                                condition={weather.WeatherText}
-                                isDay={weather.IsDayTime}
-                                size='small'
-                                animate
-                                latitude={place?.lat}
-                            />
-                            <Text
-                                style={st.miniCity}
-                                numberOfLines={1}
+                        {miniVisible && (
+                            <Animated.View
+                                entering={FadeIn.duration(200)}
+                                exiting={FadeOut.duration(150)}
+                                style={st.miniWrap}
+                                pointerEvents='box-none'
                             >
-                                {place?.name}
-                            </Text>
-                            <Text style={st.miniTemp}>{tempVal}°</Text>
-                        </Animated.View>
+                                <Pressable
+                                    onPress={scrollToTop}
+                                    accessibilityLabel='Scroll to top'
+                                    accessibilityRole='button'
+                                    style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+                                >
+                                    <GlassCard
+                                        glassStyle='regular'
+                                        style={st.miniPill}
+                                    >
+                                        <WeatherIconDisplay
+                                            condition={weather.WeatherText}
+                                            isDay={weather.IsDayTime}
+                                            size='small'
+                                            animate
+                                            latitude={place?.lat}
+                                        />
+                                        <Text
+                                            style={st.miniCity}
+                                            numberOfLines={1}
+                                        >
+                                            {place?.name}
+                                        </Text>
+                                        <Text style={st.miniTemp}>{tempVal}°</Text>
+                                    </GlassCard>
+                                </Pressable>
+                            </Animated.View>
+                        )}
                         <GlassCard glassStyle='clear' style={st.gearBtn}>
                             <Pressable
                                 onPress={() => nav.push('/account')}

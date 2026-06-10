@@ -1,4 +1,7 @@
+import { useEffect, useRef } from 'react';
+import { Animated, StyleSheet, View, Easing } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import { useReduceMotion } from '../../hooks/useReduceMotion';
 
 // ─── Path data ───────────────────────────────────────────────────────────────
 
@@ -20,21 +23,132 @@ const SPARKLE_3_D =
 const SPARKLE_4_D =
     'M1019.16,342.77l-50.03,10.5c-.96.2-2.92-.14-3.56-.39-.85-.33-.92-2.5-.58-3.87l12.4-49.92c-15.68-34.15-9.43-75.49,16.68-102.03l5.47-5.56c36-32.33,90.77-31.6,125.51,1.58l8.44,9.17c31.55,39.14,26.26,95.81-11.92,128.57-27.86,23.92-68.23,29.79-102.41,11.94ZM1120.02,255.85c-2.29-33.75-32.55-58.24-66.82-53.58-27.75,3.78-48.29,26.09-50.28,53.56-2.62,36.12,26.23,65.04,62.16,63.28l9.61-1.33c28.24-6.59,47.37-31.89,45.33-61.92Z';
 
+// ─── Sparkle animation configs ───────────────────────────────────────────────
+// tx/ty are screen-pixel amplitudes along each sparkle's radial direction away
+// from the sun centre (~860, 395 in the 1280² viewBox). Directions are derived
+// from the unit vector (sparkle_centre − sun_centre) so each ray pushes outward
+// along its own axis, matching how the rain drops fall straight down.
+//
+// Sparkle centres (approximate):  1=(760,145)  2=(470,265)  3=(1150,570)  4=(1060,275)
+// Sun centre (approximate):        860, 395
+//
+//   sparkle 1: (-100,-250) → norm (-0.37,-0.93) × 11px  ≈ (-4, -10)  — top
+//   sparkle 2: (-390,-130) → norm (-0.95,-0.32) × 10px  ≈ (-9, -3)   — left
+//   sparkle 3:  (290, 175) → norm ( 0.86, 0.52) × 12px  ≈ (10,  6)   — right
+//   sparkle 4:  (200,-120) → norm ( 0.86,-0.51) × 10px  ≈  (9, -5)   — upper-right
+
+const SPARKLE_CONFIGS = [
+    { d: SPARKLE_1_D, tx: -4,  ty: -10, duration: 2800, delay: 0 },
+    { d: SPARKLE_2_D, tx: -9,  ty: -3,  duration: 3200, delay: 0 },
+    { d: SPARKLE_3_D, tx:  10, ty:  6,  duration: 2800, delay: 0 },
+    { d: SPARKLE_4_D, tx:  9,  ty: -5,  duration: 3200, delay: 0 },
+] as const;
+
+// ─── SparkleLayer ─────────────────────────────────────────────────────────────
+// Each sparkle lives in its own Animated.View so both translateX and translateY
+// run on the native thread (useNativeDriver: true) — zero JS work per frame.
+// A single progress value (0 → 1 → 0) is interpolated into tx/ty so the two
+// axes always stay in phase with each other.
+
+interface SparkleLayerProps {
+    d: string;
+    size: number;
+    color: string;
+    tx: number;
+    ty: number;
+    duration: number;
+    delay: number;
+    animate: boolean;
+}
+
+function SparkleLayer({ d, size, color, tx, ty, duration, delay, animate }: SparkleLayerProps) {
+    const progress = useRef(new Animated.Value(0)).current;
+    // Scale amplitude proportionally so the travel distance stays visually
+    // consistent across icon sizes (tx/ty are tuned for the 180px hero).
+    const scale = size / 180;
+
+    useEffect(() => {
+        if (!animate) {
+            progress.setValue(0);
+            return;
+        }
+        const half = duration / 2;
+        const loop = Animated.loop(
+            Animated.sequence([
+                Animated.timing(progress, {
+                    toValue: 1,
+                    duration: half,
+                    easing: Easing.inOut(Easing.sin),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(progress, {
+                    toValue: 0,
+                    duration: half,
+                    easing: Easing.inOut(Easing.sin),
+                    useNativeDriver: true,
+                }),
+            ]),
+        );
+        const timer = setTimeout(() => loop.start(), delay);
+        return () => {
+            clearTimeout(timer);
+            loop.stop();
+        };
+    }, [animate, tx, ty, duration, delay, progress]);
+
+    const translateX = progress.interpolate({ inputRange: [0, 1], outputRange: [0, tx * scale] });
+    const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [0, ty * scale] });
+
+    return (
+        <Animated.View
+            style={[StyleSheet.absoluteFill, { transform: [{ translateX }, { translateY }] }]}
+            pointerEvents='none'
+        >
+            <Svg viewBox='0 0 1280 1280' width={size} height={size}>
+                <Path fill={color} fillRule='evenodd' d={d} />
+            </Svg>
+        </Animated.View>
+    );
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 interface PartlyCloudyIconProps {
     size?: number;
     color?: string;
+    animate?: boolean;
 }
 
-export default function PartlyCloudyIcon({ size = 180, color = '#fefefe' }: PartlyCloudyIconProps) {
+export default function PartlyCloudyIcon({ size = 180, color = '#fefefe', animate = false }: PartlyCloudyIconProps) {
+    const reduceMotion = useReduceMotion();
+    const shouldAnimate = animate && !reduceMotion;
+
     return (
-        <Svg viewBox="0 0 1280 1280" width={size} height={size} accessibilityLabel="Partly cloudy">
-            <Path id="cloud"     fill={color} d={CLOUD_D} />
-            <Path id="sparkle-1" fill={color} fillRule="evenodd" d={SPARKLE_1_D} />
-            <Path id="sparkle-2" fill={color} fillRule="evenodd" d={SPARKLE_2_D} />
-            <Path id="sparkle-3" fill={color} fillRule="evenodd" d={SPARKLE_3_D} />
-            <Path id="sparkle-4" fill={color} fillRule="evenodd" d={SPARKLE_4_D} />
-        </Svg>
+        <View style={{ width: size, height: size }} accessibilityLabel='Partly cloudy'>
+            {/* Cloud + sun silhouette — static base layer */}
+            <Svg
+                viewBox='0 0 1280 1280'
+                width={size}
+                height={size}
+                style={StyleSheet.absoluteFill}
+            >
+                <Path fill={color} d={CLOUD_D} />
+            </Svg>
+
+            {/* Sparkles — each in its own native-animated layer */}
+            {SPARKLE_CONFIGS.map((cfg, i) => (
+                <SparkleLayer
+                    key={i}
+                    d={cfg.d}
+                    size={size}
+                    color={color}
+                    tx={cfg.tx}
+                    ty={cfg.ty}
+                    duration={cfg.duration}
+                    delay={cfg.delay}
+                    animate={shouldAnimate}
+                />
+            ))}
+        </View>
     );
 }
