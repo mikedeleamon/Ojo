@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useFocusEffect } from 'expo-router';
 import {
     ScrollView,
     RefreshControl,
@@ -15,7 +16,6 @@ import Animated, {
     useAnimatedRef,
     runOnJS,
     FadeIn,
-    FadeOut,
     withTiming,
     Easing as REasing,
 } from 'react-native-reanimated';
@@ -459,6 +459,17 @@ const WeatherHUD = ({
         scrollRef.current?.scrollTo({ x: 0, y: 0, animated: true });
     }, [scrollRef]);
 
+    // NativeTabs resets scroll automatically on tab switches (UITabBarController
+    // detaches the view). For push-route returns (e.g. Settings), the component
+    // stays mounted so we need an explicit reset. We zero out the shared value
+    // first so useAnimatedReaction hides the pill before the view moves —
+    // no FadeOut fires because we also removed the exiting animation on the pill.
+    useFocusEffect(useCallback(() => {
+        scrollY.value = 0;
+        scrollRef.current?.scrollTo({ x: 0, y: 0, animated: false });
+    }, [scrollRef, scrollY]));
+
+
     // Bridges scroll position → JS-side visibility flag so the GlassCard pill
     // can be conditionally mounted/unmounted. Mounting fresh at opacity:1 lets
     // iOS UIVisualEffectView initialise its blur correctly every time — the
@@ -811,7 +822,6 @@ const WeatherHUD = ({
                         {miniVisible && (
                             <Animated.View
                                 entering={FadeIn.duration(200)}
-                                exiting={FadeOut.duration(150)}
                                 style={st.miniWrap}
                                 pointerEvents='box-none'
                             >
