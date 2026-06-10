@@ -234,6 +234,9 @@ const ArticleModal = ({ closetId, onClose, onSubmit, initialData, onDelete, init
   const st = useMemo(() => makeSt(colors), [colors]);
   const isEditing = !!initialData;
   const [form,       setForm]      = useState<ArticleFormData>(initialData ? toForm(initialData) : EMPTY);
+  const [priceText,  setPriceText]  = useState(
+    initialData?.purchasePrice != null ? String(initialData.purchasePrice) : '',
+  );
   const [error,      setError]     = useState<string | null>(null);
   const [saving,     setSaving]    = useState(false);
   const [deleting,   setDeleting]  = useState(false);
@@ -644,10 +647,15 @@ const ArticleModal = ({ closetId, onClose, onSubmit, initialData, onDelete, init
               placeholder='e.g. 79.99'
               placeholderTextColor={colors.textMuted}
               keyboardType='decimal-pad'
-              value={form.purchasePrice != null ? String(form.purchasePrice) : ''}
+              value={priceText}
               onChangeText={v => {
-                const parsed = parseFloat(v);
-                set('purchasePrice', v === '' ? undefined : isNaN(parsed) ? undefined : parsed);
+                setPriceText(v);
+                if (v === '') {
+                  set('purchasePrice', undefined);
+                } else {
+                  const parsed = parseFloat(v);
+                  if (!isNaN(parsed)) set('purchasePrice', parsed);
+                }
               }}
               accessibilityLabel="Purchase price in dollars (optional)"
             />

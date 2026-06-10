@@ -564,6 +564,10 @@ const ClosetView = ({
                     <Text style={styles.legendText}>Low wear</Text>
                 </View>
                 <View style={styles.legendItem}>
+                    <Text style={[styles.legendText, { color: '#34d399', fontSize: 9 }]}>◆</Text>
+                    <Text style={styles.legendText}>In season</Text>
+                </View>
+                <View style={styles.legendItem}>
                     <View style={[styles.legendWarmth, { backgroundColor: '#ef4444' }]} />
                     <Text style={styles.legendText}>Warm</Text>
                 </View>

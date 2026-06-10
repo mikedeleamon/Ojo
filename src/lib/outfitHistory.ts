@@ -96,12 +96,12 @@ export const addHistoryEntry = async (
 export const deleteHistoryEntry = async (id: string): Promise<void> => {
   const entries = (await loadLocalHistory()).filter(e => e.id !== id);
   await saveHistory(entries);
-  syncDelete(id);
+  await syncDelete(id);
 };
 
 export const clearHistory = async (): Promise<void> => {
   await storage.removeItem(historyKey());
-  syncClear();
+  await syncClear();
 };
 
 // ─── Query helpers (unchanged, operate on local for speed) ───────────────────

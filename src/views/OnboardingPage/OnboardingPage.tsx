@@ -11,6 +11,7 @@ import { useSettings } from '../../hooks/useSettings';
 import { useReduceMotion } from '../../hooks/useReduceMotion';
 import { markOnboardingComplete } from '../../lib/onboarding';
 import { requestPermission, registerPushToken } from '../../lib/notifications';
+import { hapticSuccess } from '../../lib/haptics';
 import { auth } from '../../lib/auth';
 import axios from '../../api/client';
 import { spacing, radius, fonts, fontSizes, fontWeights, shadows } from '../../theme/tokens';
@@ -174,6 +175,7 @@ export default function OnboardingPage({ onComplete }: Props) {
     try {
       await axios.post('/api/closets', { name: closetName.trim() }, auth());
       setClosetDone(true);
+      hapticSuccess();
     } catch {
       setClosetErr('Could not create closet — you can create one later in My Closet.');
     } finally {
@@ -505,7 +507,7 @@ export default function OnboardingPage({ onComplete }: Props) {
                     <View style={st.sliderRow}>
                       <View style={st.sliderMeta}>
                         <Text style={st.sliderLabel}>Threshold</Text>
-                        <Text style={st.sliderValue}>{humidity}%</Text>
+                        <Text style={st.sliderValue}>{Math.round(humidity)}%</Text>
                       </View>
                       <AppSlider
                         minimumValue={0}
