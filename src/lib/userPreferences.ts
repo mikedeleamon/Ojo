@@ -1,16 +1,18 @@
 /**
  * userPreferences.ts
  * ------------------
- * Persistent user preference learning.
- * Tracks colour, fabric, and category frequency across logged outfits.
- * Structured so frequency counts can later feed an ML-based ranker.
+ * User preference learning — colour, fabric, and category frequency across the
+ * outfits the user has logged.
+ *
+ * The profile is NOT persisted on its own. Outfit history (`outfitHistory.ts`,
+ * synced to the server) is the single source of truth; the profile is a pure
+ * *derived view* of it via `derivePreferenceProfile`. This removes a whole class
+ * of bugs the old standalone store had — stale Style DNA after a reinstall,
+ * cross-device divergence from a last-writer-wins push, and a write-only server
+ * copy that was never read back.
  */
 
-import { ClothingArticle } from '../types';
-import { storage, storageGetJSON } from './storage';
-import { getUserId } from './auth';
-
-const prefsKey = () => `ojo_user_prefs_${getUserId() ?? 'anon'}`;
+import { ClothingArticle, Closet, OutfitHistoryEntry } from '../types';
 
 export interface UserPreferenceProfile {
   colors:       Record<string, number>;
@@ -24,85 +26,58 @@ const empty = (): UserPreferenceProfile => ({
   colors: {}, fabrics: {}, categories: {}, colorPairs: {}, totalOutfits: 0,
 });
 
-// ─── Persistence ──────────────────────────────────────────────────────────────
-
-export const loadPreferences = async (): Promise<UserPreferenceProfile> => {
-  const data = await storageGetJSON<Partial<UserPreferenceProfile>>(storage, prefsKey(), {});
-  return { ...empty(), ...data };
-};
-
-export const savePreferences = async (profile: UserPreferenceProfile): Promise<void> => {
-  await storage.setItem(prefsKey(), JSON.stringify(profile));
-  pushPreferencesToServer(profile);
-};
-
-export const clearPreferences = async (): Promise<void> => {
-  await storage.removeItem(prefsKey());
-};
-
-// ─── Server sync ──────────────────────────────────────────────────────────────
-
-async function pushPreferencesToServer(profile: UserPreferenceProfile): Promise<void> {
-  try {
-    const { default: client } = await import('../api/client');
-    const { authHeaders } = await import('./auth');
-    const config = authHeaders();
-    if (!config.headers) return;
-    await client.put('/api/preferences', profile, config);
-  } catch {
-    // fire-and-forget — local copy is the source of truth until server responds
-  }
-}
-
-/**
- * Pull the server's preference profile and hydrate local storage.
- * Call once at app startup after the user is confirmed logged in.
- * Server wins on conflict — it holds the aggregate across all devices.
- */
-export const syncPreferencesFromServer = async (): Promise<void> => {
-  try {
-    const { default: client } = await import('../api/client');
-    const { authHeaders } = await import('./auth');
-    const config = authHeaders();
-    if (!config.headers) return;
-    const { data } = await client.get<UserPreferenceProfile>('/api/preferences', config);
-    if (data && typeof data.totalOutfits === 'number') {
-      await storage.setItem(prefsKey(), JSON.stringify({ ...empty(), ...data }));
-    }
-  } catch {
-    // Network failure — keep local data
-  }
-};
-
-// ─── Mutation ─────────────────────────────────────────────────────────────────
-
 /** Canonical key for a color pair (alphabetical order so A|B == B|A). */
 const colorPairKey = (a: string, b: string): string =>
   a < b ? `${a}|${b}` : `${b}|${a}`;
 
-export const updatePreferences = async (articles: ClothingArticle[]): Promise<void> => {
-  const profile = await loadPreferences();
-  profile.totalOutfits += 1;
+// ─── Derivation ─────────────────────────────────────────────────────────────
 
-  // Ensure colorPairs exists (migration for existing profiles)
-  if (!profile.colorPairs) profile.colorPairs = {};
+/**
+ * Rebuild the preference profile from outfit history, joining each entry's
+ * article IDs against the current closets to recover colour/fabric/category.
+ *
+ * `totalOutfits` counts every history entry (one per logged outfit) regardless
+ * of whether its articles still exist, so the "outfits logged" progression is
+ * stable even after items are deleted. Attribute counts (colors/fabrics/…) only
+ * include articles still present in a closet — a deleted garment can't
+ * contribute a colour we no longer know. Because history is capped at the most
+ * recent 60 entries, the profile is naturally recency-weighted.
+ */
+export const derivePreferenceProfile = (
+  closets: Closet[],
+  history: OutfitHistoryEntry[],
+): UserPreferenceProfile => {
+  const profile = empty();
 
-  for (const a of articles) {
-    if (a.color)            profile.colors[a.color]               = (profile.colors[a.color]               ?? 0) + 1;
-    if (a.fabricType)       profile.fabrics[a.fabricType]         = (profile.fabrics[a.fabricType]         ?? 0) + 1;
-    if (a.clothingCategory) profile.categories[a.clothingCategory]= (profile.categories[a.clothingCategory]?? 0) + 1;
+  // articleId → article, across every closet
+  const byId = new Map<string, ClothingArticle>();
+  for (const closet of closets) {
+    for (const article of closet.articles) byId.set(article._id, article);
   }
 
-  // Track color pairings from this outfit
-  const outfitColors = articles.map(a => a.color).filter(Boolean) as string[];
-  for (let i = 0; i < outfitColors.length; i++) {
-    for (let j = i + 1; j < outfitColors.length; j++) {
-      const key = colorPairKey(outfitColors[i], outfitColors[j]);
-      profile.colorPairs[key] = (profile.colorPairs[key] ?? 0) + 1;
+  for (const entry of history) {
+    profile.totalOutfits += 1;
+
+    const outfitColors: string[] = [];
+    for (const id of entry.articleIds) {
+      const a = byId.get(id);
+      if (!a) continue;
+      if (a.color)            profile.colors[a.color]                = (profile.colors[a.color]                ?? 0) + 1;
+      if (a.fabricType)       profile.fabrics[a.fabricType]          = (profile.fabrics[a.fabricType]          ?? 0) + 1;
+      if (a.clothingCategory) profile.categories[a.clothingCategory] = (profile.categories[a.clothingCategory] ?? 0) + 1;
+      if (a.color) outfitColors.push(a.color);
+    }
+
+    // Color pairings within this outfit
+    for (let i = 0; i < outfitColors.length; i++) {
+      for (let j = i + 1; j < outfitColors.length; j++) {
+        const key = colorPairKey(outfitColors[i], outfitColors[j]);
+        profile.colorPairs[key] = (profile.colorPairs[key] ?? 0) + 1;
+      }
     }
   }
 
-  await savePreferences(profile);
+  return profile;
 };
 
 // ─── Query helpers ────────────────────────────────────────────────────────────

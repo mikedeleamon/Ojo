@@ -197,34 +197,16 @@ export const makeStyles = (colors: ColorTokens) =>
       fontSize: fontSizes.sm,
       color: colors.textSecondary,
     },
-    pairRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
+    chordSection: {
       gap: spacing.sm,
+      alignItems: 'stretch',
     },
-    pairSwatches: {
-      flexDirection: 'row',
-    },
-    pairSwatch: {
-      width: 22,
-      height: 22,
-      borderRadius: 11,
-      borderWidth: 1,
-      borderColor: colors.glassBorder,
-    },
-    pairSwatchRight: {
-      marginLeft: -7,
-    },
-    pairLabel: {
-      flex: 1,
-      fontFamily: fonts.body,
-      fontSize: fontSizes.sm,
-      color: colors.textSecondary,
-    },
-    pairCount: {
-      fontFamily: fonts.body,
-      fontSize: fontSizes.xs,
-      color: colors.textMuted,
+
+    // ── Color Palette card ────────────────────────────────────────────────────
+    paletteCard: {
+      borderRadius: radius.lg,
+      padding: spacing.md,
+      gap: spacing.sm,
     },
 
     // ── Top Performers horizontal list ────────────────────────────────────────

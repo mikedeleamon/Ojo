@@ -28,8 +28,9 @@ import { useTheme } from '../../../theme/ThemeContext';
 import { fToC, cToF } from '../../../lib/units';
 import { hapticSelection } from '../../../lib/haptics';
 import { loadHistory } from '../../../lib/outfitHistory';
+import { useClosets } from '../../../hooks/useClosets';
 import {
-    loadPreferences,
+    derivePreferenceProfile,
     UserPreferenceProfile,
     computeStyleDNA,
     StyleDNA,
@@ -559,22 +560,19 @@ export default function PreferencesScreen() {
     // tab bar still occludes the last scroll item — pad explicitly.
     const tabPad = useTabBarPadding();
 
+    const { closets } = useClosets();
     const [history, setHistory] = useState<OutfitHistoryEntry[]>([]);
-    const [prefs, setPrefs] = useState<UserPreferenceProfile>({
-        colors: {},
-        fabrics: {},
-        categories: {},
-        colorPairs: {},
-        totalOutfits: 0,
-    });
+    // Style DNA + patterns are derived from outfit history joined against the
+    // closets — history is the single source of truth, no separate prefs store.
+    const prefs: UserPreferenceProfile = useMemo(
+        () => derivePreferenceProfile(closets, history),
+        [closets, history],
+    );
 
     useFocusEffect(
         useCallback(() => {
             loadHistory()
                 .then(setHistory)
-                .catch(() => {});
-            loadPreferences()
-                .then(setPrefs)
                 .catch(() => {});
         }, []),
     );

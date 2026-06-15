@@ -3,7 +3,11 @@ import { storage, storageGetJSON } from './storage';
 import api from '../api/client';
 import { authHeaders, getUserId } from './auth';
 
-const MAX_ENTRIES = 60;
+// Safety bound, not a functional limit: full history feeds Style DNA + insights,
+// but we cap persisted/merged entries so a very heavy multi-year user can't grow
+// the local AsyncStorage blob or the /api/history payload without limit. High
+// enough that it never affects analytics in practice.
+const MAX_ENTRIES = 2000;
 
 // Storage keys scoped to the authenticated user to prevent history bleed between accounts.
 const historyKey  = () => `ojo_outfit_history_${getUserId() ?? 'anon'}`;

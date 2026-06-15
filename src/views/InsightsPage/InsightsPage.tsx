@@ -23,7 +23,6 @@ import { hapticSelection, hapticSuccess } from '../../lib/haptics';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, fonts, fontSizes, weatherGradients } from '../../theme/tokens';
 import { loadHistory } from '../../lib/outfitHistory';
-import { loadPreferences } from '../../lib/userPreferences';
 import {
   computeInsights,
   InsightsData,
@@ -31,7 +30,6 @@ import {
   formatCPW,
   formatValue,
   dormantLabel,
-  SLEEPING_THRESHOLD,
 } from '../../lib/insightsEngine';
 import {
   loadDonationQueue,
@@ -45,22 +43,11 @@ import {
   METALLIC_START,
   METALLIC_END,
 } from '../../lib/colors/metallicGradients';
+import { SWATCH } from './swatches';
+import { ColorChord } from './ColorChord';
+import { ColorPalette } from './ColorPalette';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-
-const SWATCH: Record<string, string> = {
-  Black: '#1a1a1a', White: '#f0f0f0', Grey: '#9ca3af', Brown: '#92400e',
-  Beige: '#d4b896', Cream: '#fef3c7', Silver: '#c0c0c0', Gold: '#d4af37',
-  'Rose Gold': '#c9776a', Champagne: '#f4e4c1', Navy: '#1e3a5f',
-  Indigo: '#4338ca', Cobalt: '#2563eb', Blue: '#3b82f6', Teal: '#0d9488',
-  Cyan: '#06b6d4', Green: '#22c55e', Mint: '#34d399', Lime: '#a3e635',
-  Sage: '#86efac', Olive: '#65a30d', Khaki: '#a16207', Red: '#ef4444',
-  Scarlet: '#f43f5e', Crimson: '#dc2626', Burgundy: '#9b1c1c',
-  Orange: '#f97316', Coral: '#fb923c', Peach: '#fdba74', Rust: '#c2410c',
-  Yellow: '#fbbf24', Purple: '#a855f7', Plum: '#7c3aed', Lilac: '#d8b4fe',
-  Lavender: '#c4b5fd', Pink: '#f9a8d4', Rose: '#fb7185', Blush: '#fecdd3',
-  Magenta: '#e879f9', 'Hot Pink': '#ec4899', Fuchsia: '#d946ef', Multi: '#888',
-};
 
 const RING_R  = 58;
 const RING_CIRC = 2 * Math.PI * RING_R;
@@ -143,12 +130,11 @@ export default function InsightsPage() {
         hasLoaded.current = true;
         return;
       }
-      const [history, prefs, queue] = await Promise.all([
+      const [history, queue] = await Promise.all([
         loadHistory(),
-        loadPreferences(),
         loadDonationQueue(),
       ]);
-      const insights = await computeInsights(closets, history, prefs, windowDays);
+      const insights = await computeInsights(closets, history, windowDays);
       setData(insights);
       setDonationQueue(queue);
       hasLoaded.current = true;
@@ -468,33 +454,29 @@ export default function InsightsPage() {
               )}
             </View>
 
-            {/* Top color pairs */}
-            {colorPairs.slice(0, 3).map(({ pair, count }) => {
-              const [a, b] = pair.split('|');
-              return (
-                <View key={pair} style={styles.pairRow}>
-                  <View style={styles.pairSwatches}>
-                    <View
-                      style={[
-                        styles.pairSwatch,
-                        { backgroundColor: SWATCH[a] ?? colors.glassBg },
-                      ]}
-                    />
-                    <View
-                      style={[
-                        styles.pairSwatch,
-                        styles.pairSwatchRight,
-                        { backgroundColor: SWATCH[b] ?? colors.glassBg },
-                      ]}
-                    />
-                  </View>
-                  <Text style={styles.pairLabel}>
-                    {a} + {b}
-                  </Text>
-                  <Text style={styles.pairCount}>×{count}</Text>
-                </View>
-              );
-            })}
+            {/* Color pairings — chord diagram of most-worn combinations */}
+            {colorPairs.length > 0 && (
+              <View style={styles.chordSection}>
+                <Text style={styles.sectionLabel}>Color Pairings</Text>
+                <ColorChord
+                  pairs={colorPairs}
+                  colors={colors}
+                  reduceMotion={reduceMotion}
+                />
+              </View>
+            )}
+          </GlassCard>
+        )}
+
+        {/* ── Color Palette — circle-pack of wardrobe colours ── */}
+        {data.articles.length > 0 && (
+          <GlassCard style={styles.paletteCard}>
+            <Text style={styles.sectionLabel}>Color Palette</Text>
+            <ColorPalette
+              articles={data.articles}
+              colors={colors}
+              reduceMotion={reduceMotion}
+            />
           </GlassCard>
         )}
 

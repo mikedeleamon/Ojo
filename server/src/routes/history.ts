@@ -5,9 +5,11 @@ import { requireAuth, AuthRequest } from '../middleware/auth';
 const router = Router();
 router.use(requireAuth);
 
-const MAX_ENTRIES = 60;
+// Safety bound, not a functional limit — caps the payload for very heavy users.
+// Mirrors MAX_ENTRIES in the client's outfitHistory.ts.
+const MAX_ENTRIES = 2000;
 
-/** GET /api/history — last 60 entries for the authenticated user, newest first */
+/** GET /api/history — entries for the authenticated user, newest first (capped) */
 router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const entries = await OutfitHistory

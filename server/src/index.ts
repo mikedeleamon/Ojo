@@ -13,7 +13,6 @@ import closetRoutes from './routes/closets';
 import weatherRoutes from './routes/weather';
 import notificationRoutes from './routes/notifications';
 import historyRoutes from './routes/history';
-import preferencesRoutes from './routes/preferences';
 import tripsRoutes from './routes/trips';
 import tripFitRoutes from './routes/tripfit';
 import { startNotificationService } from './services/notificationService';
@@ -126,7 +125,6 @@ app.use('/api/user',          generalLimiter, userRoutes);
 app.use('/api/closets',       generalLimiter, closetRoutes);
 app.use('/api/notifications', generalLimiter, notificationRoutes);
 app.use('/api/history',       generalLimiter, historyRoutes);
-app.use('/api/preferences',   generalLimiter, preferencesRoutes);
 app.use('/api/trips',         generalLimiter, tripsRoutes);
 app.use('/api/tripfit',       generalLimiter, tripFitRoutes);
 

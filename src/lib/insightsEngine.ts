@@ -2,7 +2,8 @@
  * insightsEngine.ts
  * -----------------
  * Pure computation layer for the Insights tab.
- * No UI — accepts closets + history + preferences, returns InsightsData.
+ * No UI — accepts closets + history, returns InsightsData. The style-preference
+ * profile (Style DNA, color pairs) is derived from history internally.
  *
  * Designed to go deeper over time:
  *   - purchasePrice  → CPW, total wardrobe value
@@ -12,8 +13,8 @@
 
 import { Closet, ClothingArticle, OutfitHistoryEntry } from '../types';
 import {
-  UserPreferenceProfile,
   computeStyleDNA,
+  derivePreferenceProfile,
   StyleDNA,
 } from './userPreferences';
 import { getGapSuggestions, GapSuggestion } from './wardrobeGaps';
@@ -110,6 +111,12 @@ const enrichArticle = (
   closetName: string,
   wearMap: Map<string, { count: number; lastWornAt: string }>,
   now: Date,
+  // "Sleeping" must be the exact complement of "active" so the two counts always
+  // sum to the wardrobe total. Both sides therefore key off the SAME window — the
+  // user-selected range (30/90/365). Using a fixed threshold here while `active`
+  // tracked the window left items in the gap between the two (or double-counted
+  // them), which is what made the health stats look wrong when the range changed.
+  sleepingThresholdDays: number = SLEEPING_THRESHOLD,
 ): ArticleInsight => {
   const stats = wearMap.get(article._id);
 
@@ -119,7 +126,7 @@ const enrichArticle = (
 
   const isSleeping =
     totalWears === 0 ||
-    (daysSinceWorn !== null && daysSinceWorn >= SLEEPING_THRESHOLD);
+    (daysSinceWorn !== null && daysSinceWorn >= sleepingThresholdDays);
 
   const costPerWear =
     article.purchasePrice != null && totalWears > 0
@@ -205,19 +212,25 @@ const buildHealth = (
 export const computeInsights = async (
   closets:     Closet[],
   history:     OutfitHistoryEntry[],
-  preferences: UserPreferenceProfile,
   /** Window (days) used for the utilization ring + "active" count. */
   activeWindowDays: number = ACTIVE_WINDOW_DAYS,
 ): Promise<InsightsData> => {
   const now     = new Date();
   const wearMap = buildWearMap(history);
 
-  // Flatten all articles across all closets, preserving closet context
+  // Style DNA + color pairs are a derived view of outfit history (joined against
+  // current closets) — history is the single source of truth, so there's no
+  // separate preference store to read or fall out of sync.
+  const preferences = derivePreferenceProfile(closets, history);
+
+  // Flatten all articles across all closets, preserving closet context.
+  // Pass the selected window as the sleeping threshold so active + sleeping
+  // partition the wardrobe exactly (no gaps, no double-counting) at any range.
   const allInsights: ArticleInsight[] = [];
   for (const closet of closets) {
     for (const article of closet.articles) {
       allInsights.push(
-        enrichArticle(article, closet._id, closet.name, wearMap, now),
+        enrichArticle(article, closet._id, closet.name, wearMap, now, activeWindowDays),
       );
     }
   }

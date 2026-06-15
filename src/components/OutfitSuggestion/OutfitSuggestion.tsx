@@ -27,12 +27,8 @@ import {
     ScoreBreakdown,
     articleZoneLabel,
 } from '../../lib/outfitEngine';
-import { addHistoryEntry, recentlyWornWithAge } from '../../lib/outfitHistory';
-import {
-    updatePreferences,
-    loadPreferences,
-    UserPreferenceProfile,
-} from '../../lib/userPreferences';
+import { addHistoryEntry, recentlyWornWithAge, loadHistory } from '../../lib/outfitHistory';
+import { derivePreferenceProfile } from '../../lib/userPreferences';
 import {
     recordGapsFromNotes,
     getGapSuggestions,
@@ -46,6 +42,7 @@ import {
     Forecast,
     Settings,
     OutfitOccasion,
+    OutfitHistoryEntry,
 } from '../../types';
 import { spacing } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
@@ -298,13 +295,13 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
         null,
     );
     const [gapDismissed, setGapDismissed] = useState(false);
-    const [profile, setProfile] = useState<UserPreferenceProfile>({
-        colors: {},
-        fabrics: {},
-        categories: {},
-        colorPairs: {},
-        totalOutfits: 0,
-    });
+    // Outfit history drives the preference profile (the ranker's personalization
+    // signal). The profile is derived from it + closets, never stored separately.
+    const [history, setHistory] = useState<OutfitHistoryEntry[]>([]);
+    const profile = useMemo(
+        () => derivePreferenceProfile(closets, history),
+        [closets, history],
+    );
     const nav = useAppNavigation();
 
     // ─── #5: Swipe hint bounce (first render only) ──────────────────────────
@@ -321,8 +318,8 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
 
     useEffect(() => {
         recentlyWornWithAge(7).then(setWorn);
-        loadPreferences()
-            .then(setProfile)
+        loadHistory()
+            .then(setHistory)
             .catch(() => {});
     }, []);
 
@@ -419,7 +416,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
         // Success haptic — logging an outfit is a completed, consequential action.
         hapticSuccess();
         const articles = activeSlots.map((s) => s.article);
-        await addHistoryEntry({
+        const entry = await addHistoryEntry({
             closetId: preferred._id,
             closetName: preferred.name,
             articleIds: articles.map((a) => a._id),
@@ -427,10 +424,9 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
                 .map((a) => a.name || a.clothingType)
                 .join(', '),
         });
-        await updatePreferences(articles);
-        loadPreferences()
-            .then(setProfile)
-            .catch(() => {});
+        // Append the new entry so the derived preference profile (and the ranker)
+        // reflect this outfit immediately, without a round-trip to reload history.
+        setHistory((prev) => [entry, ...prev]);
         setWornLogged(true);
         // #8 — green glow animation (skipped under Reduce Motion)
         if (!reduceMotion) {
