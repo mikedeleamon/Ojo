@@ -6,7 +6,9 @@ import {
     Alert,
     View as RNView,
     ActivityIndicator,
+    Animated,
 } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { View, Text, GlassCard } from '../../components/primitives';
@@ -108,61 +110,93 @@ const TripCard = ({
               ? `In ${Math.max(0, daysUntil(plan.startDate))}d`
               : 'Planned';
 
+    const renderRightActions = (
+        _progress: ReturnType<Animated.Value['interpolate']>,
+        dragX: ReturnType<Animated.Value['interpolate']>,
+        swipeable: Swipeable,
+    ) => {
+        const translateX = dragX.interpolate({
+            inputRange: [-110, 0],
+            outputRange: [0, 110],
+            extrapolate: 'clamp',
+        });
+        return (
+            <Animated.View style={[st.deleteActionWrap, { transform: [{ translateX }] }]}>
+                <Pressable
+                    style={st.deleteAction}
+                    onPress={() => {
+                        swipeable.close();
+                        onDelete();
+                    }}
+                    accessibilityRole='button'
+                    accessibilityLabel='Delete trip'
+                >
+                    <Text style={st.deleteText}>Delete trip</Text>
+                </Pressable>
+            </Animated.View>
+        );
+    };
+
     return (
-        <ForceDarkPalette>
-            <Pressable
-                onPress={onOpen}
-                onLongPress={onDelete}
-                accessibilityRole='button'
-                accessibilityLabel={`Open trip to ${plan.destination}`}
-                style={[status === 'completed' && st.cardCompleted]}
-            >
-                <RNView style={st.cardWrap}>
-                    <LinearGradient
-                        colors={grad}
-                        style={StyleSheet.absoluteFill}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                    />
-                    <GlassCard glassStyle='regular' style={st.card}>
-                        <RNView style={st.cardTopRow}>
-                            <Text style={st.cardEmoji}>{phraseEmoji(dominantPhrase)}</Text>
-                            <GlassCard glassStyle='clear' style={st.badge}>
-                                <Text style={[st.badgeText, { color: darkColors.textSecondary }]}>
-                                    {badgeLabel}
+        <Swipeable
+            renderRightActions={renderRightActions}
+            rightThreshold={55}
+            overshootRight={false}
+        >
+            <ForceDarkPalette>
+                <Pressable
+                    onPress={onOpen}
+                    accessibilityRole='button'
+                    accessibilityLabel={`Open trip to ${plan.destination}`}
+                    style={[status === 'completed' && st.cardCompleted]}
+                >
+                    <RNView style={st.cardWrap}>
+                        <LinearGradient
+                            colors={grad}
+                            style={StyleSheet.absoluteFill}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                        />
+                        <GlassCard glassStyle='regular' style={st.card}>
+                            <RNView style={st.cardTopRow}>
+                                <Text style={st.cardEmoji}>{phraseEmoji(dominantPhrase)}</Text>
+                                <GlassCard glassStyle='clear' style={st.badge}>
+                                    <Text style={[st.badgeText, { color: darkColors.textSecondary }]}>
+                                        {badgeLabel}
+                                    </Text>
+                                </GlassCard>
+                            </RNView>
+
+                            <Text style={[st.cardTitle, { color: darkColors.textPrimary }]} numberOfLines={1}>
+                                {plan.name || plan.destination}
+                            </Text>
+                            {!!plan.name && (
+                                <Text style={[st.cardSub, { color: darkColors.textSecondary }]} numberOfLines={1}>
+                                    {plan.destination}
                                 </Text>
-                            </GlassCard>
-                        </RNView>
+                            )}
 
-                        <Text style={[st.cardTitle, { color: darkColors.textPrimary }]} numberOfLines={1}>
-                            {plan.name || plan.destination}
-                        </Text>
-                        {!!plan.name && (
-                            <Text style={[st.cardSub, { color: darkColors.textSecondary }]} numberOfLines={1}>
-                                {plan.destination}
+                            <Text style={[st.cardDates, { color: darkColors.textSecondary }]}>
+                                {fmtShortISO(plan.startDate)} – {fmtShortISO(plan.endDate)}
+                                {minTemp !== null ? ` · ${minTemp}°–${maxTemp}°F` : ''}
                             </Text>
-                        )}
 
-                        <Text style={[st.cardDates, { color: darkColors.textSecondary }]}>
-                            {fmtShortISO(plan.startDate)} – {fmtShortISO(plan.endDate)}
-                            {minTemp !== null ? ` · ${minTemp}°–${maxTemp}°F` : ''}
-                        </Text>
-
-                        {status === 'pending' ? (
-                            <Text style={[st.cardMeta, { color: darkColors.textMuted }]}>
-                                Outfits unlock when within 10 days
-                            </Text>
-                        ) : (
-                            <Text style={[st.cardMeta, { color: darkColors.textMuted }]}>
-                                {totalItems > 0
-                                    ? `${packed}/${totalItems} packed`
-                                    : 'No items yet'}
-                            </Text>
-                        )}
-                    </GlassCard>
-                </RNView>
-            </Pressable>
-        </ForceDarkPalette>
+                            {status === 'pending' ? (
+                                <Text style={[st.cardMeta, { color: darkColors.textMuted }]}>
+                                    Outfits unlock when within 10 days
+                                </Text>
+                            ) : (
+                                <Text style={[st.cardMeta, { color: darkColors.textMuted }]}>
+                                    {totalItems > 0
+                                        ? `${packed}/${totalItems} packed`
+                                        : 'No items yet'}
+                                </Text>
+                            )}
+                        </GlassCard>
+                    </RNView>
+                </Pressable>
+            </ForceDarkPalette>
+        </Swipeable>
     );
 };
 
@@ -446,6 +480,22 @@ function makeStyles(colors: ReturnType<typeof useTheme>['colors']) {
         cardSub: { fontFamily: fonts.body, fontSize: fontSizes.xs },
         cardDates: { fontFamily: fonts.bodySemiBold, fontSize: fontSizes.sm },
         cardMeta: { fontFamily: fonts.body, fontSize: fontSizes.xs },
+        deleteActionWrap: {
+            width: 110,
+            alignSelf: 'stretch',
+        },
+        deleteAction: {
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: '#FF3B30',
+            borderRadius: radius.lg,
+        },
+        deleteText: {
+            fontFamily: fonts.bodySemiBold,
+            fontSize: fontSizes.sm,
+            color: '#ffffff',
+        },
         centerBox: { paddingVertical: spacing.xl, alignItems: 'center' },
         emptyCard: { padding: spacing.lg, borderRadius: radius.md, alignItems: 'center', gap: 6 },
         emptyEmoji: { fontSize: 44, lineHeight: 50 },

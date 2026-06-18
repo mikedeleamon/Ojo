@@ -19,20 +19,23 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         paddingVertical: spacing.sm,
         alignItems: 'center',
     },
+    // Tab surface (GlassCard for inactive / solid pill for active); layout lives
+    // on closetTabInner so the native glass material isn't tinted.
     closetTab: {
+        borderRadius: radius.pill,
+        overflow: 'hidden',
+        flexShrink: 0,   // never compress — scroll instead
+    },
+    closetTabInner: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 5,
         paddingVertical: 8,
         paddingHorizontal: 14,
-        borderRadius: radius.pill,
-        borderWidth: 1,
-        borderColor: colors.glassBorder,
-        backgroundColor: colors.glassBg,
-        flexShrink: 0,   // never compress — scroll instead
     },
     closetTabActive: {
         backgroundColor: colors.saveBtnBg,
+        borderWidth: 1,
         borderColor: colors.saveBtnBg,
     },
     closetTabText: {
@@ -64,16 +67,14 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         width: 36,
         height: 36,
         borderRadius: 18,
-        borderWidth: 1,
-        borderColor: colors.glassBorder,
-        backgroundColor: colors.glassBg,
+        overflow: 'hidden',
+    },
+    // Fill style for a Pressable that lives inside a GlassCard icon button.
+    iconBtnFill: {
+        flex: 1,
+        width: '100%',
         alignItems: 'center',
         justifyContent: 'center',
-    },
-    newClosetBtnText: {
-        color: colors.textSecondary,
-        fontSize: 20,
-        lineHeight: 22,
     },
 
     // ── Inline forms (rename / create) ─────────────────────────────────────────
@@ -103,11 +104,6 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         fontWeight: fontWeights.semibold,
     },
     inlineCancel: { paddingVertical: 8, paddingHorizontal: 10 },
-    inlineCancelText: {
-        fontFamily: fonts.body,
-        fontSize: fontSizes.sm,
-        color: colors.textMuted,
-    },
 
     // ── Content header row (title + controls) ──────────────────────────────────
     mainHead: {
@@ -133,32 +129,14 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         width: 30,
         height: 30,
         borderRadius: radius.sm,
-        backgroundColor: colors.glassBg,
-        borderWidth: 1,
-        borderColor: colors.glassBorder,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    overflowBtnText: {
-        fontSize: 13,
-        color: colors.textSecondary,
-        letterSpacing: 1.5,
-        lineHeight: 16,
+        overflow: 'hidden',
     },
     // Single cycling view-mode button
     viewCycleBtn: {
         width: 30,
         height: 30,
-        alignItems: 'center',
-        justifyContent: 'center',
         borderRadius: radius.sm,
-        borderWidth: 1,
-        borderColor: colors.glassBorder,
-        backgroundColor: colors.glassBg,
-    },
-    viewCycleBtnText: {
-        fontSize: 14,
-        color: colors.textSecondary,
+        overflow: 'hidden',
     },
 
     // ── Search + sort + filter row ──────────────────────────────────────────────
@@ -172,16 +150,10 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: colors.glassBg,
-        borderWidth: 1,
-        borderColor: colors.glassBorder,
         borderRadius: radius.sm,
+        overflow: 'hidden',
         paddingHorizontal: 10,
         gap: 6,
-    },
-    searchIcon: {
-        fontSize: 15,
-        color: colors.textMuted,
     },
     searchInput: {
         flex: 1,
@@ -190,42 +162,44 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         color: colors.textPrimary,
         paddingVertical: 10,
     },
-    clearSearch: { color: colors.textMuted, fontSize: 13 },
     sortBtn: {
         width: 40,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: colors.glassBg,
-        borderWidth: 1,
-        borderColor: colors.glassBorder,
         borderRadius: radius.sm,
+        overflow: 'hidden',
     },
     sortBtnActive: {
+        borderWidth: 1,
         borderColor: colors.textSecondary,
         backgroundColor: colors.glassBgStrong,
     },
-    sortBtnText: {
-        fontSize: 16,
-        color: colors.textSecondary,
-    },
-    sortBtnTextActive: {
-        color: colors.textPrimary,
-    },
     filterBtn: {
+        borderRadius: radius.sm,
+        overflow: 'hidden',
+    },
+    filterBtnInner: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
         paddingVertical: 10,
         paddingHorizontal: 12,
-        backgroundColor: colors.glassBg,
-        borderWidth: 1,
-        borderColor: colors.glassBorder,
-        borderRadius: radius.sm,
+    },
+    filterBtnActive: { borderWidth: 1, borderColor: colors.textSecondary, backgroundColor: colors.glassBgStrong },
+    filterCountBadge: {
+        minWidth: 16,
+        height: 16,
+        borderRadius: 8,
+        paddingHorizontal: 4,
+        backgroundColor: colors.saveBtnBg,
         alignItems: 'center',
         justifyContent: 'center',
     },
-    filterBtnActive: { borderColor: colors.textSecondary, backgroundColor: colors.glassBgStrong },
-    filterBtnText: {
+    filterCountText: {
         fontFamily: fonts.body,
-        fontSize: fontSizes.xs,
-        color: colors.textSecondary,
+        fontSize: 10,
+        fontWeight: fontWeights.semibold,
+        color: colors.saveBtnText,
     },
     filterPanel: {
         maxHeight: 240,
@@ -239,17 +213,17 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         textTransform: 'uppercase',
         letterSpacing: 0.5,
     },
-    chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+    chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
     chip: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 5,
-        paddingVertical: 5,
-        paddingHorizontal: 12,
+        gap: 6,
+        paddingVertical: 7,
+        paddingHorizontal: 13,
         borderRadius: radius.pill,
-        borderWidth: 1,
+        borderWidth: StyleSheet.hairlineWidth,
         borderColor: colors.glassBorder,
-        backgroundColor: colors.glassBg,
+        backgroundColor: 'transparent',
     },
     chipActive: {
         backgroundColor: colors.saveBtnBg,
@@ -259,9 +233,10 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         fontFamily: fonts.body,
         fontSize: fontSizes.xs,
         color: colors.textSecondary,
+        letterSpacing: 0.2,
     },
-    chipTextActive: { color: colors.saveBtnText },
-    chipColor: { width: 8, height: 8, borderRadius: 4 },
+    chipTextActive: { color: colors.saveBtnText, fontWeight: fontWeights.semibold },
+    chipColor: { width: 9, height: 9, borderRadius: 5 },
     clearFiltersText: {
         fontFamily: fonts.body,
         fontSize: fontSizes.sm,
@@ -275,38 +250,19 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         gap: spacing.sm,
         paddingBottom: 96,
     },
+    // Surface = GlassCard (native iOS glass / flat-glass fallback); the inner
+    // Pressable owns the row layout so the material stays clean.
     articleCard: {
+        borderRadius: radius.sm,
+        overflow: 'hidden',
+    },
+    articleCardInner: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 10,
-        backgroundColor: colors.glassBg,
-        borderRadius: radius.sm,
-        borderWidth: 1,
-        borderColor: colors.glassBorder,
         padding: 10,
-        overflow: 'hidden',
     },
     articleCardOOS: { opacity: 0.42 },
-    wornAgeBorderRecent: {
-        position: 'absolute',
-        left: 0,
-        top: 0,
-        bottom: 0,
-        width: 3,
-        backgroundColor: '#fbbf24',
-        borderTopLeftRadius: radius.sm,
-        borderBottomLeftRadius: radius.sm,
-    },
-    wornAgeBorderStale: {
-        position: 'absolute',
-        left: 0,
-        top: 0,
-        bottom: 0,
-        width: 3,
-        backgroundColor: 'rgba(99,102,241,0.6)',
-        borderTopLeftRadius: radius.sm,
-        borderBottomLeftRadius: radius.sm,
-    },
     articleImg: {
         width: 52,
         height: 52,
@@ -317,18 +273,7 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         overflow: 'hidden',
     },
     articleImgFill: { width: 52, height: 52 },
-    warmthDot: {
-        position: 'absolute',
-        bottom: 3,
-        right: 3,
-        width: 7,
-        height: 7,
-        borderRadius: 4,
-        borderWidth: 1,
-        borderColor: 'rgba(0,0,0,0.25)',
-    },
     articleInfo: { flex: 1, gap: 2 },
-    nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     articleName: {
         fontFamily: fonts.body,
         fontSize: fontSizes.sm,
@@ -336,13 +281,11 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         fontWeight: fontWeights.medium,
         flexShrink: 1,
     },
-    seasonBadge: { fontSize: 8, color: '#34d399' },
     articleMeta: {
         fontFamily: fonts.body,
         fontSize: fontSizes.xs,
         color: colors.textMuted,
     },
-    articleMetaClash: { color: '#f59e0b' },
     categoryTag: {
         fontFamily: fonts.body,
         fontSize: 10,
@@ -398,11 +341,9 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     },
     tileCard: {
         borderRadius: radius.md,
-        backgroundColor: colors.glassBg,
-        borderWidth: 1,
-        borderColor: colors.glassBorder,
         overflow: 'hidden',
     },
+    tileCardInner: { width: '100%' },
     tileCardOOS: { opacity: 0.42 },
     tileImg: {
         width: '100%',
@@ -412,18 +353,7 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         justifyContent: 'center',
     },
     tileImgFill: { width: '100%', height: '100%' },
-    tileWarmthDot: {
-        position: 'absolute',
-        bottom: 6,
-        right: 6,
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        borderWidth: 1,
-        borderColor: 'rgba(0,0,0,0.25)',
-    },
     tileInfo: { padding: 8, gap: 3 },
-    tileNameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     tileName: {
         fontFamily: fonts.body,
         fontSize: fontSizes.xs,
@@ -431,86 +361,49 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         color: colors.textPrimary,
         flexShrink: 1,
     },
+    tileMetaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 6,
+    },
     tileMeta: {
         fontFamily: fonts.body,
         fontSize: 10,
         color: colors.textMuted,
+        flexShrink: 1,
     },
-    tileMetaClash: { color: '#f59e0b' },
     tileColorDot: {
         width: 10,
         height: 10,
         borderRadius: 5,
         borderWidth: 1,
         borderColor: 'rgba(0,0,0,0.2)',
-        marginTop: 2,
     },
 
     // ── TripFit discovery banner ────────────────────────────────────────────────
     tripBanner: {
+        marginTop: spacing.md,
+        borderRadius: radius.md,
+        overflow: 'hidden',
+        width: '100%',
+    },
+    tripBannerInner: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
-        marginTop: spacing.md,
         padding: 14,
-        backgroundColor: colors.glassBg,
-        borderRadius: radius.md,
-        borderWidth: 1,
-        borderColor: colors.glassBorder,
-        // Span full width in both list (column) and tile (row-wrap) layouts
-        width: '100%',
     },
-    tripBannerIcon: { fontSize: 22 },
     tripBannerInfo: { flex: 1, gap: 2 },
     tripBannerTitle: {
         fontFamily: fonts.bodySemiBold,
-        fontSize: fontSizes.sm,
+        fontSize: fontSizes.base,
         color: colors.textPrimary,
+        letterSpacing: 0.2,
     },
     tripBannerDesc: {
         fontFamily: fonts.body,
         fontSize: fontSizes.xs,
-        color: colors.textMuted,
-    },
-    tripBannerChevron: {
-        fontSize: 20,
-        color: colors.textMuted,
-    },
-
-    // ── Legend ─────────────────────────────────────────────────────────────────
-    legendRow: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: 10,
-        paddingHorizontal: spacing.md,
-        paddingVertical: 6,
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: colors.glassBorder,
-    },
-    legendItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-    },
-    legendDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-    },
-    legendWarmth: {
-        width: 8,
-        height: 8,
-        borderRadius: 2,
-    },
-    legendClash: {
-        fontFamily: fonts.body,
-        fontSize: 9,
-        color: '#f87171',
-        fontStyle: 'italic',
-    },
-    legendText: {
-        fontFamily: fonts.body,
-        fontSize: fontSizes.xs - 1,
         color: colors.textMuted,
     },
 
@@ -530,11 +423,5 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         shadowOpacity: 0.3,
         shadowRadius: 8,
         elevation: 8,
-    },
-    fabText: {
-        fontSize: 28,
-        color: colors.saveBtnText,
-        lineHeight: 32,
-        marginTop: -1,
     },
 });

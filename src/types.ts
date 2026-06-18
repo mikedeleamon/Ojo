@@ -103,6 +103,9 @@ export interface WeatherSnapshot {
   forecasts: Forecast[];        // hourly
   daily:     DailyForecast[];
   fetchedAt: string;            // ISO timestamp
+  place?:    LocationCoords;    // resolved coords + display name, so the city
+                                // label paints from cache instead of lagging
+                                // behind the async geocode on a warm load.
 }
 
 export interface Settings {

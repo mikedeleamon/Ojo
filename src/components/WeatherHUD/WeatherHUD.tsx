@@ -155,7 +155,12 @@ const WeatherHUD = ({
     const { top: topInset } = useSafeAreaInsets();
     const tabPad = useTabBarPadding();
     const nav = useAppNavigation();
-    const [place, setPlace] = useState<LocationCoords | null>(null);
+    // Seed the resolved place (coords + city name) from the cached snapshot so
+    // the city label paints immediately on a warm load, in lockstep with the
+    // rest of the HUD — instead of lagging behind the async geocode below.
+    const [place, setPlace] = useState<LocationCoords | null>(
+        seedSnapshot?.place ?? null,
+    );
     // Seed from the cached snapshot (if any) so a city switch paints instantly.
     const [weather, setWeather] = useState<CurrentWeather | null>(
         seedSnapshot?.weather ?? null,
@@ -215,6 +220,7 @@ const WeatherHUD = ({
         setWeather(seedSnapshot.weather);
         setForecasts(seedSnapshot.forecasts);
         setSunEvents(extractSunEvents(seedSnapshot.daily));
+        if (seedSnapshot.place) setPlace(seedSnapshot.place);
         setFooterBg(
             footerBgFor(
                 seedSnapshot.weather.WeatherText,
@@ -277,6 +283,7 @@ const WeatherHUD = ({
                     forecasts: fRes.data ?? [],
                     daily: dRes.data ?? [],
                     fetchedAt: new Date().toISOString(),
+                    place,
                 });
 
                 if (isRefreshRef.current) {

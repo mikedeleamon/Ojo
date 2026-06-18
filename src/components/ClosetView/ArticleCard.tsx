@@ -2,18 +2,12 @@ import { useMemo, useState } from 'react';
 import { Pressable, Image, Animated, StyleSheet } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
-import { View, Text } from '../primitives';
+import { View, Text, GlassCard } from '../primitives';
 import { HangerIcon } from '../shared/HangerIcon';
 import { useConfirm } from '../ConfirmDialog';
 import { useTheme } from '../../theme/ThemeContext';
 import { fonts, fontSizes, fontWeights, radius } from '../../theme/tokens';
 import type { ClothingArticle } from '../../types';
-import {
-    COLOR_NEUTRALS,
-    SEASONAL_COLORS,
-    currentSeason,
-    garmentWarmth,
-} from '../../lib/outfitEngine';
 import { CSS_COLORS } from '../../lib/colors/cssColors';
 import {
     METALLIC_GRADIENTS,
@@ -22,103 +16,76 @@ import {
 } from '../../lib/colors/metallicGradients';
 import { makeStyles } from './ClosetView.styles';
 
-const WARMTH_DOT_COLOR = (w: number) =>
-    w < 0.25 ? '#38bdf8' : w < 0.55 ? '#fbbf24' : '#f97316';
-
 interface ArticleCardProps {
     article: ClothingArticle;
-    harmonyScore?: number;
-    wornAge?: number;
     outOfSeason?: boolean;
     onEdit: () => void;
     onRemove: () => void;
 }
 
+/** Small color swatch — metallic gradient or flat CSS color, or nothing. */
+const ColorSwatch = ({ color, style }: { color?: string; style: object }) => {
+    if (!color) return null;
+    if (METALLIC_GRADIENTS[color])
+        return (
+            <LinearGradient
+                colors={METALLIC_GRADIENTS[color]}
+                start={METALLIC_START}
+                end={METALLIC_END}
+                style={style}
+            />
+        );
+    if (CSS_COLORS[color])
+        return <View style={[style, { backgroundColor: CSS_COLORS[color] }]} />;
+    return null;
+};
+
 export const ArticleCard = ({
     article,
-    harmonyScore,
-    wornAge,
     outOfSeason,
     onEdit,
 }: ArticleCardProps) => {
     const { colors } = useTheme();
     const styles = useMemo(() => makeStyles(colors), [colors]);
-    const warmth = garmentWarmth(article);
-    const warmthColor = WARMTH_DOT_COLOR(warmth);
-    const season = currentSeason();
-    const isInSeason =
-        !!article.color && SEASONAL_COLORS[season].has(article.color);
-    const lowHarmony =
-        harmonyScore !== undefined &&
-        harmonyScore < 0.55 &&
-        !!article.color &&
-        !COLOR_NEUTRALS.has(article.color);
     const [erroredUrl, setErroredUrl] = useState<string | null>(null);
     const imgError = !!article.imageUrl && erroredUrl === article.imageUrl;
 
-    const showRecentBorder = wornAge !== undefined && wornAge <= 3;
-    const showStaleBorder = wornAge === undefined || wornAge > 14;
-
     return (
-        <Pressable
-            style={[styles.articleCard, outOfSeason && styles.articleCardOOS]}
-            onPress={onEdit}
-            accessibilityLabel='Edit article'
-            accessibilityRole='button'
-        >
-            {showRecentBorder && <View style={styles.wornAgeBorderRecent} />}
-            {!showRecentBorder && showStaleBorder && <View style={styles.wornAgeBorderStale} />}
-            <View style={styles.articleImg}>
-                {article.imageUrl && !imgError ? (
-                    <Image
-                        source={{ uri: article.imageUrl }}
-                        style={styles.articleImgFill}
-                        resizeMode='cover'
-                        onError={() => setErroredUrl(article.imageUrl ?? null)}
-                    />
-                ) : (
-                    <HangerIcon size={18} color={colors.textMuted} decorative />
-                )}
-                <View style={[styles.warmthDot, { backgroundColor: warmthColor }]} />
-            </View>
-            <View style={styles.articleInfo}>
-                <View style={styles.nameRow}>
+        <GlassCard style={[styles.articleCard, outOfSeason && styles.articleCardOOS]}>
+            <Pressable
+                style={styles.articleCardInner}
+                onPress={onEdit}
+                accessibilityLabel='Edit article'
+                accessibilityRole='button'
+            >
+                <View style={styles.articleImg}>
+                    {article.imageUrl && !imgError ? (
+                        <Image
+                            source={{ uri: article.imageUrl }}
+                            style={styles.articleImgFill}
+                            resizeMode='cover'
+                            onError={() => setErroredUrl(article.imageUrl ?? null)}
+                        />
+                    ) : (
+                        <HangerIcon size={18} color={colors.textMuted} decorative />
+                    )}
+                </View>
+                <View style={styles.articleInfo}>
                     <Text style={styles.articleName} numberOfLines={1}>
                         {article.name || article.clothingType}
                     </Text>
-                    {isInSeason && <Text style={styles.seasonBadge}>◆</Text>}
+                    <Text style={styles.articleMeta} numberOfLines={1}>
+                        {[article.clothingType, article.color, article.fabricType]
+                            .filter(Boolean)
+                            .join(' · ')}
+                    </Text>
+                    {article.clothingCategory ? (
+                        <Text style={styles.categoryTag}>{article.clothingCategory}</Text>
+                    ) : null}
                 </View>
-                <Text
-                    style={[styles.articleMeta, lowHarmony && styles.articleMetaClash]}
-                    numberOfLines={1}
-                >
-                    {[article.clothingType, article.color, article.fabricType]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    {lowHarmony ? ' · may clash' : ''}
-                </Text>
-                {article.clothingCategory ? (
-                    <Text style={styles.categoryTag}>{article.clothingCategory}</Text>
-                ) : null}
-            </View>
-            {article.color &&
-                (METALLIC_GRADIENTS[article.color] || CSS_COLORS[article.color]) &&
-                (METALLIC_GRADIENTS[article.color] ? (
-                    <LinearGradient
-                        colors={METALLIC_GRADIENTS[article.color]}
-                        start={METALLIC_START}
-                        end={METALLIC_END}
-                        style={styles.colorDot}
-                    />
-                ) : (
-                    <View
-                        style={[
-                            styles.colorDot,
-                            { backgroundColor: CSS_COLORS[article.color] },
-                        ]}
-                    />
-                ))}
-        </Pressable>
+                <ColorSwatch color={article.color} style={styles.colorDot} />
+            </Pressable>
+        </GlassCard>
     );
 };
 
@@ -126,41 +93,19 @@ export const ArticleCard = ({
 
 interface TileArticleCardProps {
     article: ClothingArticle;
-    harmonyScore?: number;
-    wornAge?: number;       // days since last worn (from recentlyWornWithAge); undefined = never logged
     tileWidth: number;
     onEdit: () => void;
     onRemove: () => void;
 }
 
-/** Returns the heat-map tint color and opacity for the wear-age overlay. */
-const wornAgeOverlay = (wornAge: number | undefined): string | null => {
-    if (wornAge === undefined)  return 'rgba(99,102,241,0.13)';  // never logged — indigo
-    if (wornAge > 14)           return 'rgba(99,102,241,0.22)';  // stale — stronger indigo
-    if (wornAge <= 3)           return 'rgba(251,191,36,0.13)';  // recently worn — amber
-    return null;                                                   // 3–14 days — neutral
-};
-
 export const TileArticleCard = ({
     article,
-    harmonyScore,
-    wornAge,
     tileWidth,
     onEdit,
     onRemove,
 }: TileArticleCardProps) => {
     const { colors } = useTheme();
     const styles = useMemo(() => makeStyles(colors), [colors]);
-    const warmth = garmentWarmth(article);
-    const warmthColor = WARMTH_DOT_COLOR(warmth);
-    const season = currentSeason();
-    const isInSeason =
-        !!article.color && SEASONAL_COLORS[season].has(article.color);
-    const lowHarmony =
-        harmonyScore !== undefined &&
-        harmonyScore < 0.55 &&
-        !!article.color &&
-        !COLOR_NEUTRALS.has(article.color);
     const [erroredUrl, setErroredUrl] = useState<string | null>(null);
     const imgError = !!article.imageUrl && erroredUrl === article.imageUrl;
     const confirm = useConfirm();
@@ -175,80 +120,42 @@ export const TileArticleCard = ({
         if (ok) onRemove();
     };
 
-    const ageOverlayColor = wornAgeOverlay(wornAge);
-
     return (
-        <Pressable
-            style={[styles.tileCard, { width: tileWidth }]}
-            onPress={onEdit}
-            onLongPress={confirmDelete}
-            accessibilityLabel={`Edit ${article.name || article.clothingType}. Long press to delete.`}
-            accessibilityRole='button'
-        >
-            <View style={styles.tileImg}>
-                {article.imageUrl && !imgError ? (
-                    <Image
-                        source={{ uri: article.imageUrl }}
-                        style={styles.tileImgFill}
-                        resizeMode='cover'
-                        onError={() => setErroredUrl(article.imageUrl ?? null)}
-                    />
-                ) : (
-                    <HangerIcon size={24} color={colors.textMuted} decorative />
-                )}
-                {/* Wear-age heat map overlay */}
-                {ageOverlayColor && (
-                    <View
-                        style={[
-                            styles.tileImgFill,
-                            {
-                                position: 'absolute',
-                                top: 0, left: 0,
-                                backgroundColor: ageOverlayColor,
-                                borderRadius: 4,
-                            },
-                        ]}
-                    />
-                )}
-                <View style={[styles.tileWarmthDot, { backgroundColor: warmthColor }]} />
-            </View>
-            <View style={styles.tileInfo}>
-                <View style={styles.tileNameRow}>
+        <GlassCard style={[styles.tileCard, { width: tileWidth }]}>
+            <Pressable
+                style={styles.tileCardInner}
+                onPress={onEdit}
+                onLongPress={confirmDelete}
+                accessibilityLabel={`Edit ${article.name || article.clothingType}. Long press to delete.`}
+                accessibilityRole='button'
+            >
+                <View style={styles.tileImg}>
+                    {article.imageUrl && !imgError ? (
+                        <Image
+                            source={{ uri: article.imageUrl }}
+                            style={styles.tileImgFill}
+                            resizeMode='cover'
+                            onError={() => setErroredUrl(article.imageUrl ?? null)}
+                        />
+                    ) : (
+                        <HangerIcon size={24} color={colors.textMuted} decorative />
+                    )}
+                </View>
+                <View style={styles.tileInfo}>
                     <Text style={styles.tileName} numberOfLines={1}>
                         {article.name || article.clothingType}
                     </Text>
-                    {isInSeason && (
-                        <Text style={styles.seasonBadge}>◆</Text>
-                    )}
+                    <View style={styles.tileMetaRow}>
+                        <Text style={styles.tileMeta} numberOfLines={1}>
+                            {[article.clothingType, article.color]
+                                .filter(Boolean)
+                                .join(' · ')}
+                        </Text>
+                        <ColorSwatch color={article.color} style={styles.tileColorDot} />
+                    </View>
                 </View>
-                <Text
-                    style={[styles.tileMeta, lowHarmony && styles.tileMetaClash]}
-                    numberOfLines={1}
-                >
-                    {[article.clothingType, article.color]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    {lowHarmony ? ' · ~' : ''}
-                </Text>
-                {article.color &&
-                    (METALLIC_GRADIENTS[article.color] || CSS_COLORS[article.color]) &&
-                    (METALLIC_GRADIENTS[article.color] ? (
-                        <LinearGradient
-                            colors={METALLIC_GRADIENTS[article.color]}
-                            start={METALLIC_START}
-                            end={METALLIC_END}
-                            style={styles.tileColorDot}
-                        />
-                    ) : (
-                        <View
-                            style={[
-                                styles.tileColorDot,
-                                { backgroundColor: CSS_COLORS[article.color] },
-                            ]}
-                        />
-                    ))}
-            </View>
-        </Pressable>
+            </Pressable>
+        </GlassCard>
     );
 };
 

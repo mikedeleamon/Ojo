@@ -7,7 +7,7 @@ import {
     useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { View, Text, GlassGroup } from '../primitives';
+import { View, Text, GlassGroup, GlassCard } from '../primitives';
 import { HangerIcon } from '../shared/HangerIcon';
 import { useConfirm } from '../ConfirmDialog';
 import ArticleModal from '../ArticleModal/ArticleModal';
@@ -15,8 +15,20 @@ import { Closet, ClothingArticle, ArticleFormData } from '../../types';
 import { QuickAddData } from '../../views/ClosetPage/ClosetPage';
 import { spacing } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
-import { pairHarmony, COLOR_NEUTRALS } from '../../lib/outfitEngine';
 import { makeStyles } from './ClosetView.styles';
+import {
+    SearchIcon,
+    SortIcon,
+    FilterIcon,
+    GridIcon,
+    ListIcon,
+    MoreIcon,
+    PlusIcon,
+    CheckIcon,
+    CloseIcon,
+    TripFitIcon,
+    ChevronRightIcon,
+} from '../icons/ClosetIcons';
 import { CSS_COLORS } from '../../lib/colors/cssColors';
 import { recentlyWornWithAge } from '../../lib/outfitHistory';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -29,6 +41,7 @@ import { CATEGORIES, COLORS, FABRICS, ARTICLE_GENDERS } from '../../lib/colors/p
 import { SwipeableArticleCard, TileArticleCard } from './ArticleCard';
 
 type SortMode = 'default' | 'type' | 'color' | 'wornRecent' | 'wornStale';
+
 
 interface Props {
     closets: Closet[];
@@ -111,29 +124,6 @@ const ClosetView = ({
 
     const toggle = (arr: string[], set: (v: string[]) => void, val: string) =>
         set(arr.includes(val) ? arr.filter((x) => x !== val) : [...arr, val]);
-
-    const harmonyMap = useMemo(() => {
-        const map = new Map<string, number>();
-        if (!selected) return map;
-        for (const art of selected.articles) {
-            if (!art.color || COLOR_NEUTRALS.has(art.color)) {
-                map.set(art._id, 1.0);
-                continue;
-            }
-            const others = selected.articles.filter(
-                (a) => a._id !== art._id && a.color && !COLOR_NEUTRALS.has(a.color),
-            );
-            if (others.length === 0) {
-                map.set(art._id, 1.0);
-                continue;
-            }
-            const avg =
-                others.reduce((sum, o) => sum + pairHarmony(art.color!, o.color!), 0) /
-                others.length;
-            map.set(art._id, avg);
-        }
-        return map;
-    }, [selected]);
 
     const filteredArticles = useMemo(() => {
         if (!selected) return [];
@@ -287,58 +277,77 @@ const ClosetView = ({
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.closetBar}
             >
-                {closets.map((c) => (
+                {closets.map((c) => {
+                    const active = selectedId === c._id;
+                    const onPress = () => {
+                        setSelectedId(c._id);
+                        setEditingId(null);
+                        clearFilters();
+                    };
+                    const content = (
+                        <>
+                            <HangerIcon
+                                size={12}
+                                color={active ? colors.saveBtnText : colors.textSecondary}
+                            />
+                            <Text
+                                style={[
+                                    styles.closetTabText,
+                                    active && styles.closetTabTextActive,
+                                ]}
+                                numberOfLines={1}
+                            >
+                                {c.name}
+                            </Text>
+                            {c.isPreferred && <Text style={styles.starBadge}>★</Text>}
+                            <Text
+                                style={[
+                                    styles.countBadge,
+                                    active && styles.countBadgeActive,
+                                ]}
+                            >
+                                {c.articles.length}
+                            </Text>
+                        </>
+                    );
+                    const a11y = `${c.name} closet, ${c.articles.length} items. Hold for options.`;
+                    // Active tab is a solid accent pill; inactive tabs are native
+                    // glass (GlassCard) so the GlassGroup merges them on iOS 26.
+                    return active ? (
+                        <Pressable
+                            key={c._id}
+                            style={[styles.closetTab, styles.closetTabInner, styles.closetTabActive]}
+                            onPress={onPress}
+                            onLongPress={() => openTabMenu(c)}
+                            delayLongPress={400}
+                            accessibilityLabel={a11y}
+                        >
+                            {content}
+                        </Pressable>
+                    ) : (
+                        <GlassCard key={c._id} glassStyle='clear' style={styles.closetTab}>
+                            <Pressable
+                                style={styles.closetTabInner}
+                                onPress={onPress}
+                                onLongPress={() => openTabMenu(c)}
+                                delayLongPress={400}
+                                accessibilityLabel={a11y}
+                            >
+                                {content}
+                            </Pressable>
+                        </GlassCard>
+                    );
+                })}
+                <GlassCard glassStyle='clear' style={styles.newClosetBtn}>
                     <Pressable
-                        key={c._id}
-                        style={[
-                            styles.closetTab,
-                            selectedId === c._id && styles.closetTabActive,
-                        ]}
-                        onPress={() => {
-                            setSelectedId(c._id);
-                            setEditingId(null);
-                            clearFilters();
-                        }}
-                        onLongPress={() => openTabMenu(c)}
-                        delayLongPress={400}
-                        accessibilityLabel={`${c.name} closet, ${c.articles.length} items. Hold for options.`}
+                        style={styles.iconBtnFill}
+                        onPress={() => setCreating(true)}
+                        accessibilityLabel='New closet'
+                        accessibilityRole='button'
                     >
-                        <HangerIcon
-                            size={12}
-                            color={
-                                selectedId === c._id
-                                    ? colors.saveBtnText
-                                    : colors.textSecondary
-                            }
-                        />
-                        <Text
-                            style={[
-                                styles.closetTabText,
-                                selectedId === c._id && styles.closetTabTextActive,
-                            ]}
-                            numberOfLines={1}
-                        >
-                            {c.name}
-                        </Text>
-                        {c.isPreferred && <Text style={styles.starBadge}>★</Text>}
-                        <Text
-                            style={[
-                                styles.countBadge,
-                                selectedId === c._id && styles.countBadgeActive,
-                            ]}
-                        >
-                            {c.articles.length}
-                        </Text>
+                        <PlusIcon size={18} color={colors.textSecondary} />
                     </Pressable>
-                ))}
-                <Pressable
-                    style={styles.newClosetBtn}
-                    onPress={() => setCreating(true)}
-                    accessibilityLabel='New closet'
-                    accessibilityRole='button'
-                >
-                    <Text style={styles.newClosetBtnText}>+</Text>
-                </Pressable>
+                </GlassCard>
             </ScrollView>
             </GlassGroup>
 
@@ -361,7 +370,7 @@ const ClosetView = ({
                         accessibilityRole="button"
                         accessibilityLabel="Confirm rename"
                     >
-                        <Text style={styles.inlineOkText}>✓</Text>
+                        <CheckIcon size={16} color={colors.saveBtnText} />
                     </Pressable>
                     <Pressable
                         style={styles.inlineCancel}
@@ -369,7 +378,7 @@ const ClosetView = ({
                         accessibilityRole="button"
                         accessibilityLabel="Cancel rename"
                     >
-                        <Text style={styles.inlineCancelText}>✕</Text>
+                        <CloseIcon size={16} color={colors.textMuted} />
                     </Pressable>
                 </View>
             )}
@@ -401,7 +410,7 @@ const ClosetView = ({
                         accessibilityRole="button"
                         accessibilityLabel="Cancel"
                     >
-                        <Text style={styles.inlineCancelText}>✕</Text>
+                        <CloseIcon size={16} color={colors.textMuted} />
                     </Pressable>
                 </View>
             )}
@@ -413,33 +422,39 @@ const ClosetView = ({
                 </Text>
                 <View style={styles.headerRight}>
                     {/* Single cycling view-mode button — shows the mode you'll switch TO */}
-                    <Pressable
-                        style={styles.viewCycleBtn}
-                        onPress={() => setViewMode(viewMode === 'list' ? 'tile' : 'list')}
-                        accessibilityLabel={viewMode === 'list' ? 'Switch to tile view' : 'Switch to list view'}
-                        accessibilityRole='button'
-                    >
-                        <Text style={styles.viewCycleBtnText}>
-                            {viewMode === 'list' ? '⊞' : '☰'}
-                        </Text>
-                    </Pressable>
-                    {selected && (
+                    <GlassCard glassStyle='clear' style={styles.viewCycleBtn}>
                         <Pressable
-                            style={styles.overflowBtn}
-                            onPress={() => openTabMenu(selected)}
-                            accessibilityLabel='Closet options'
+                            style={styles.iconBtnFill}
+                            onPress={() => setViewMode(viewMode === 'list' ? 'tile' : 'list')}
+                            accessibilityLabel={viewMode === 'list' ? 'Switch to tile view' : 'Switch to list view'}
                             accessibilityRole='button'
                         >
-                            <Text style={styles.overflowBtnText}>···</Text>
+                            {viewMode === 'list' ? (
+                                <GridIcon size={17} color={colors.textSecondary} />
+                            ) : (
+                                <ListIcon size={17} color={colors.textSecondary} />
+                            )}
                         </Pressable>
+                    </GlassCard>
+                    {selected && (
+                        <GlassCard glassStyle='clear' style={styles.overflowBtn}>
+                            <Pressable
+                                style={styles.iconBtnFill}
+                                onPress={() => openTabMenu(selected)}
+                                accessibilityLabel='Closet options'
+                                accessibilityRole='button'
+                            >
+                                <MoreIcon size={17} color={colors.textSecondary} />
+                            </Pressable>
+                        </GlassCard>
                     )}
                 </View>
             </View>
 
             {/* ── Search + sort + filter row ── */}
             <View style={styles.searchBar}>
-                <View style={styles.searchInputWrap}>
-                    <Text style={styles.searchIcon}>🔍</Text>
+                <GlassCard glassStyle='clear' style={styles.searchInputWrap}>
+                    <SearchIcon size={15} color={colors.textMuted} />
                     <TextInput
                         style={styles.searchInput}
                         placeholder='Search articles…'
@@ -449,31 +464,45 @@ const ClosetView = ({
                         accessibilityLabel="Search articles"
                     />
                     {query ? (
-                        <Pressable onPress={() => setQuery('')}>
-                            <Text style={styles.clearSearch}>✕</Text>
+                        <Pressable onPress={() => setQuery('')} hitSlop={8}>
+                            <CloseIcon size={14} color={colors.textMuted} />
                         </Pressable>
                     ) : null}
-                </View>
-                <Pressable
+                </GlassCard>
+                <GlassCard
+                    glassStyle='clear'
                     style={[styles.sortBtn, sortBy !== 'default' && styles.sortBtnActive]}
-                    onPress={openSortMenu}
-                    accessibilityLabel='Sort articles'
-                    accessibilityRole='button'
                 >
-                    <Text style={[styles.sortBtnText, sortBy !== 'default' && styles.sortBtnTextActive]}>
-                        ↕
-                    </Text>
-                </Pressable>
-                <Pressable
-                    style={[styles.filterBtn, showFilters && styles.filterBtnActive]}
-                    onPress={() => setShowFilters((v) => !v)}
-                    accessibilityLabel={filterCount > 0 ? `Filters, ${filterCount} active` : 'Filters'}
-                    accessibilityRole='button'
+                    <Pressable
+                        style={styles.iconBtnFill}
+                        onPress={openSortMenu}
+                        accessibilityLabel='Sort articles'
+                        accessibilityRole='button'
+                    >
+                        <SortIcon
+                            size={17}
+                            color={sortBy !== 'default' ? colors.textPrimary : colors.textSecondary}
+                        />
+                    </Pressable>
+                </GlassCard>
+                <GlassCard
+                    glassStyle='clear'
+                    style={[styles.filterBtn, (showFilters || filterCount > 0) && styles.filterBtnActive]}
                 >
-                    <Text style={styles.filterBtnText}>
-                        Filters{filterCount > 0 ? ` (${filterCount})` : ''}
-                    </Text>
-                </Pressable>
+                    <Pressable
+                        style={styles.filterBtnInner}
+                        onPress={() => setShowFilters((v) => !v)}
+                        accessibilityLabel={filterCount > 0 ? `Filters, ${filterCount} active` : 'Filters'}
+                        accessibilityRole='button'
+                    >
+                        <FilterIcon size={15} color={filterCount > 0 ? colors.textPrimary : colors.textSecondary} />
+                        {filterCount > 0 && (
+                            <View style={styles.filterCountBadge}>
+                                <Text style={styles.filterCountText}>{filterCount}</Text>
+                            </View>
+                        )}
+                    </Pressable>
+                </GlassCard>
             </View>
 
             {showFilters && (
@@ -536,50 +565,24 @@ const ClosetView = ({
 
             {/* ── TripFit discovery banner (above article list so it's always reachable) ── */}
             {onTripFit && selected && selected.articles.length > 0 && (
-                <Pressable
-                    style={styles.tripBanner}
-                    onPress={onTripFit}
-                    accessibilityRole='button'
-                    accessibilityLabel='Open TripFit packing planner'
-                >
-                    <Text style={styles.tripBannerIcon}>✈️</Text>
-                    <View style={styles.tripBannerInfo}>
-                        <Text style={styles.tripBannerTitle}>TripFit</Text>
-                        <Text style={styles.tripBannerDesc}>
-                            Pack smarter for your next trip
-                        </Text>
-                    </View>
-                    <Text style={styles.tripBannerChevron}>›</Text>
-                </Pressable>
+                <GlassCard style={styles.tripBanner}>
+                    <Pressable
+                        style={styles.tripBannerInner}
+                        onPress={onTripFit}
+                        accessibilityRole='button'
+                        accessibilityLabel='Open TripFit packing planner'
+                    >
+                        <TripFitIcon size={42} />
+                        <View style={styles.tripBannerInfo}>
+                            <Text style={styles.tripBannerTitle}>TripFit</Text>
+                            <Text style={styles.tripBannerDesc}>
+                                Pack smarter for your next trip
+                            </Text>
+                        </View>
+                        <ChevronRightIcon size={18} color={colors.textMuted} />
+                    </Pressable>
+                </GlassCard>
             )}
-
-            {/* ── Legend ── */}
-            <View style={styles.legendRow}>
-                <View style={styles.legendItem}>
-                    <View style={[styles.legendDot, { backgroundColor: 'rgba(251,191,36,0.85)' }]} />
-                    <Text style={styles.legendText}>Recent</Text>
-                </View>
-                <View style={styles.legendItem}>
-                    <View style={[styles.legendDot, { backgroundColor: 'rgba(99,102,241,0.75)' }]} />
-                    <Text style={styles.legendText}>Low wear</Text>
-                </View>
-                <View style={styles.legendItem}>
-                    <Text style={[styles.legendText, { color: '#34d399', fontSize: 9 }]}>◆</Text>
-                    <Text style={styles.legendText}>In season</Text>
-                </View>
-                <View style={styles.legendItem}>
-                    <View style={[styles.legendWarmth, { backgroundColor: '#ef4444' }]} />
-                    <Text style={styles.legendText}>Warm</Text>
-                </View>
-                <View style={styles.legendItem}>
-                    <View style={[styles.legendWarmth, { backgroundColor: '#3b82f6' }]} />
-                    <Text style={styles.legendText}>Cool</Text>
-                </View>
-                <View style={styles.legendItem}>
-                    <Text style={styles.legendClash}>clash</Text>
-                    <Text style={styles.legendText}>Low harmony</Text>
-                </View>
-            </View>
 
             {/* ── Article list / tile grid ── */}
             <ScrollView
@@ -611,8 +614,6 @@ const ClosetView = ({
                         <TileArticleCard
                             key={a._id}
                             article={a}
-                            harmonyScore={harmonyMap.get(a._id)}
-                            wornAge={wornAgeMap.get(a._id)}
                             tileWidth={tileWidth}
                             onEdit={() => setEditingArticle(a)}
                             onRemove={() => onRemoveArticle(selected._id, a._id)}
@@ -623,8 +624,6 @@ const ClosetView = ({
                         <SwipeableArticleCard
                             key={a._id}
                             article={a}
-                            harmonyScore={harmonyMap.get(a._id)}
-                            wornAge={wornAgeMap.get(a._id)}
                             onEdit={() => setEditingArticle(a)}
                             onRemove={() => onRemoveArticle(selected._id, a._id)}
                         />
@@ -641,7 +640,7 @@ const ClosetView = ({
                     accessibilityLabel='Add article — open camera'
                     accessibilityRole='button'
                 >
-                    <Text style={styles.fabText}>+</Text>
+                    <PlusIcon size={24} color={colors.saveBtnText} />
                 </Pressable>
             )}
 
