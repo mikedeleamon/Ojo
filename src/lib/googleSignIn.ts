@@ -32,12 +32,12 @@ export type GoogleSignInOutcome =
 // ─── STUB (native module not linked) ─────────────────────────────────────────
 // Remove this block and uncomment ACTIVE once you have rebuilt the dev client.
 
-export const isGoogleSignInAvailable = (): boolean => false;
+export const isGoogleSignInAvailable = (): boolean => true;
 
 export const signInWithGoogle = async (): Promise<GoogleSignInOutcome> => ({
   ok: false,
   cancelled: false,
-  error: 'Google sign-in requires a dev-client rebuild. See instructions above.',
+  error: 'Google sign-in is not available on this build yet.',
 });
 
 // ─── ACTIVE (uncomment after npm install + dev-client rebuild) ────────────────

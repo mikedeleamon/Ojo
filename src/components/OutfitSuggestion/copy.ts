@@ -26,28 +26,30 @@ export const whyThisOutfit = (breakdown: ScoreBreakdown): string | null => {
     return FACTOR_EXPLANATIONS[weakest];
 };
 
+const CAMERA_HINT = ' Use the camera tab to photograph your clothes.';
+
 export const weatherAwareAddClothesBody = (weather: CurrentWeather): string => {
     const tempF = weather.Temperature.Imperial.Value;
     const cond = weather.WeatherText.toLowerCase();
     if (cond.includes('rain') || cond.includes('shower') || cond.includes('drizzle'))
-        return 'Add a rain jacket or waterproof layer to get started.';
+        return `It's raining — a rain jacket or waterproof layer would be a great first addition.${CAMERA_HINT}`;
     if (cond.includes('snow') || cond.includes('blizzard') || cond.includes('flurr'))
-        return 'Add a winter coat or warm layers to get started.';
+        return `It's snowing — start with a winter coat or warm layers.${CAMERA_HINT}`;
     if (cond.includes('thunder') || cond.includes('storm'))
-        return 'Add a sturdy outer layer to get started.';
-    if (tempF <= 40) return 'Add a coat or sweater to get started.';
-    if (tempF >= 85) return 'Add some light, breathable pieces to get started.';
-    return 'Add clothing articles to get outfit suggestions.';
+        return `Stormy out — add a sturdy outer layer to get started.${CAMERA_HINT}`;
+    if (tempF <= 40) return `Cold out — add a coat or sweater first.${CAMERA_HINT}`;
+    if (tempF >= 85) return `It's warm — light, breathable pieces are perfect to start with.${CAMERA_HINT}`;
+    return `Add your clothes to see personalised outfit suggestions.${CAMERA_HINT}`;
 };
 
 export const weatherAwareInsufficientBody = (weather: CurrentWeather): string => {
     const tempF = weather.Temperature.Imperial.Value;
     const cond = weather.WeatherText.toLowerCase();
     if (cond.includes('rain') || cond.includes('shower') || cond.includes('drizzle'))
-        return 'Add a top, bottom, and a rain jacket to build an outfit.';
+        return `Add a top, a bottom, and a rain jacket to get a wet-weather outfit.${CAMERA_HINT}`;
     if (cond.includes('snow') || cond.includes('blizzard'))
-        return 'Add a top, bottom, and a warm coat to build a cold-weather outfit.';
+        return `Add a top, a bottom, and a warm coat to get a cold-weather outfit.${CAMERA_HINT}`;
     if (tempF <= 40)
-        return 'Add a top and a bottom — a warm outer layer would help too.';
-    return 'Add a top and a bottom (or a full-body piece) to get a suggestion.';
+        return `Add a top and a bottom — a warm outer layer would help too.${CAMERA_HINT}`;
+    return `Add at least a top and a bottom (or a full-body piece) to generate an outfit.${CAMERA_HINT}`;
 };

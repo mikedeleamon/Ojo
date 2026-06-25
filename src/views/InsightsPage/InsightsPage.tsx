@@ -230,19 +230,30 @@ export default function InsightsPage() {
             <Text style={styles.headerTitle}>Insights</Text>
           </View>
           <GlassCard style={styles.healthCard}>
-            <View style={{ alignItems: 'center', padding: spacing.lg, gap: spacing.sm }}>
-              <Text style={{ fontSize: 36 }}>👕</Text>
-              <Text style={[styles.ringPct, { fontSize: 18 }]}>Your insights are waiting</Text>
+            <View style={{ alignItems: 'center', padding: spacing.lg, gap: spacing.md }}>
+              <Text style={{ fontSize: 40 }}>📊</Text>
+              <Text style={[styles.ringPct, { fontSize: 18, textAlign: 'center' }]}>
+                Your insights are waiting
+              </Text>
               <Text style={{
                 fontFamily: fonts.body,
-                fontSize: fontSizes.sm,
+                fontSize: fontSizes.base,
                 color: colors.textSecondary,
                 textAlign: 'center',
+                lineHeight: fontSizes.base * 1.6,
               }}>
                 {closets.length === 0
-                  ? 'Create a closet and add a few items to start seeing wardrobe utilization, cost-per-wear, and style patterns.'
-                  : 'Add a few items to your closet to start seeing wardrobe utilization, cost-per-wear, and style patterns.'}
+                  ? 'Create a closet and photograph your clothes to unlock wardrobe utilization, cost-per-wear, sleeping items, and colour palette analysis.'
+                  : 'Add items to your closet to unlock wardrobe utilization, cost-per-wear, sleeping items, and colour palette analysis.'}
               </Text>
+              <Pressable
+                style={styles.ctaBtn}
+                onPress={() => nav.push('/(tabs)/closet')}
+              >
+                <Text style={styles.ctaBtnText}>
+                  {closets.length === 0 ? 'Create a closet' : 'Go to Closet'}
+                </Text>
+              </Pressable>
             </View>
           </GlassCard>
         </ScrollView>

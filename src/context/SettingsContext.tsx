@@ -15,6 +15,7 @@ const CACHE_KEY = 'ojo_settings_cache';
 
 export const defaults: Settings = {
     clothingStyle: 'Casual',
+    clothingStyles: ['Casual'],
     location: '',
     temperatureScale: 'Imperial',
     hiTempThreshold: 85,

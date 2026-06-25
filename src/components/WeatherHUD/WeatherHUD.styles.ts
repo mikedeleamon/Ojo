@@ -77,12 +77,12 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     },
     condition: {
         fontFamily: fonts.body,
-        fontSize: fontSizes.base,
+        fontSize: fontSizes.lg,
         color: 'rgba(255,255,255,0.75)',
     },
     lastUpdated: {
         fontFamily: fonts.body,
-        fontSize: fontSizes.xs,
+        fontSize: fontSizes.sm,
         color: 'rgba(255,255,255,0.35)',
         marginTop: 2,
     },
@@ -110,7 +110,7 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
 
     hiLo: {
         fontFamily: fonts.body,
-        fontSize: fontSizes.sm,
+        fontSize: fontSizes.base,
         color: 'rgba(255,255,255,0.55)',
         marginTop: 4,
         letterSpacing: 0.5,

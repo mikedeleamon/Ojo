@@ -5,6 +5,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { View, Text } from '../../components/primitives';
 import ClosetView from '../../components/ClosetView/ClosetView';
 import Loading from '../../components/Loading/Loading';
+import { HangerIcon } from '../../components/shared/HangerIcon';
 import { useClosets } from '../../hooks/useClosets';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { useTabBarPadding } from '../../hooks/useTabBarPadding';
@@ -29,9 +30,10 @@ export default function ClosetPage() {
     root:        { flex: 1, backgroundColor: colors.bgDefault },
     errorBanner: { margin: spacing.md, padding: spacing.sm, backgroundColor: colors.errorBg, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.errorBorder },
     errorText:   { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.errorText },
-    emptyState:  { alignItems: 'center', padding: spacing.xl, gap: spacing.sm },
-    emptyTitle:  { fontFamily: fonts.body, fontSize: fontSizes.lg, color: colors.textPrimary },
-    emptyDesc:   { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.textSecondary, textAlign: 'center' },
+    emptyState:  { alignItems: 'center', paddingHorizontal: spacing.xl, paddingTop: spacing.xl, gap: spacing.sm },
+    emptyTitle:  { fontFamily: fonts.display, fontSize: fontSizes.xl, color: colors.textPrimary, textAlign: 'center' },
+    emptyDesc:   { fontFamily: fonts.body, fontSize: fontSizes.base, color: colors.textSecondary, textAlign: 'center', lineHeight: fontSizes.base * 1.6 },
+    emptyHint:   { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.textMuted, textAlign: 'center', marginTop: spacing.xs },
   }), [colors]);
 
   const {
@@ -56,10 +58,14 @@ export default function ClosetPage() {
 
       {closets.length === 0 ? (
         <View style={st.emptyState}>
-          <Text style={st.emptyTitle}>Your closet is empty</Text>
+          <HangerIcon size={36} color={colors.textMuted} />
+          <Text style={st.emptyTitle}>Your wardrobe is empty</Text>
           <Text style={st.emptyDesc}>
-            Create your first closet to start organising your wardrobe.
+            Tap the{' '}
+            <Text style={{ color: colors.textPrimary }}>+</Text>
+            {' '}button below to create your first closet, then use the camera to photograph your clothes.
           </Text>
+          <Text style={st.emptyHint}>Outfit suggestions unlock once you add a top and a bottom.</Text>
         </View>
       ) : null}
 

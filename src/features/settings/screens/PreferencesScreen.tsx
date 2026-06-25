@@ -578,7 +578,9 @@ export default function PreferencesScreen() {
     );
 
     const { settings, saveSettings, settingsReady } = useSettings();
-    const [clothingStyle, setClothingStyle] = useState(settings.clothingStyle);
+    const [clothingStyles, setClothingStyles] = useState<string[]>(
+        settings.clothingStyles ?? [settings.clothingStyle],
+    );
     const [gender, setGender] = useState(settings.gender || 'All');
     const [tempScale, setTempScale] = useState<'Imperial' | 'Metric'>(
         settings.temperatureScale as 'Imperial' | 'Metric',
@@ -609,7 +611,7 @@ export default function PreferencesScreen() {
     useEffect(() => {
         if (!settingsReady) return;
         const isCelsius = settings.temperatureScale === 'Metric';
-        setClothingStyle(settings.clothingStyle);
+        setClothingStyles(settings.clothingStyles ?? [settings.clothingStyle]);
         setGender(settings.gender || 'All');
         setTempScale(settings.temperatureScale as 'Imperial' | 'Metric');
         setHiTemp(settings.hiTempThreshold);
@@ -633,7 +635,8 @@ export default function PreferencesScreen() {
 
     const currentSettings = (overrides: Partial<typeof settings>) => ({
         ...settings,
-        clothingStyle,
+        clothingStyle: clothingStyles[0] ?? settings.clothingStyle,
+        clothingStyles,
         gender,
         temperatureScale: tempScale,
         hiTempThreshold: hiTemp,
@@ -659,9 +662,17 @@ export default function PreferencesScreen() {
     // };
 
     const handleStyleChange = (s: string) => {
-        setClothingStyle(s);
         hapticSelection();
-        saveSettings(currentSettings({ clothingStyle: s })).catch(() => {});
+        const next = clothingStyles.includes(s)
+            ? clothingStyles.length > 1
+                ? clothingStyles.filter((x) => x !== s)
+                : clothingStyles // keep at least one selected
+            : [...clothingStyles, s];
+        setClothingStyles(next);
+        saveSettings(currentSettings({
+            clothingStyle: next[0] ?? s,
+            clothingStyles: next,
+        })).catch(() => {});
     };
 
     const handleGenderChange = (g: string) => {
@@ -738,32 +749,31 @@ export default function PreferencesScreen() {
                             Style preference
                         </Text>
                         <View style={styles.chipGrid}>
-                            {STYLES.map((s) => (
-                                <Pressable
-                                    key={s}
-                                    style={[
-                                        styles.chip,
-                                        clothingStyle === s &&
-                                            styles.chipActive,
-                                    ]}
-                                    onPress={() => handleStyleChange(s)}
-                                    accessibilityRole='radio'
-                                    accessibilityLabel={s}
-                                    accessibilityState={{
-                                        selected: clothingStyle === s,
-                                    }}
-                                >
-                                    <Text
+                            {STYLES.map((s) => {
+                                const active = clothingStyles.includes(s);
+                                return (
+                                    <Pressable
+                                        key={s}
                                         style={[
-                                            styles.chipText,
-                                            clothingStyle === s &&
-                                                styles.chipTextActive,
+                                            styles.chip,
+                                            active && styles.chipActive,
                                         ]}
+                                        onPress={() => handleStyleChange(s)}
+                                        accessibilityRole='checkbox'
+                                        accessibilityLabel={s}
+                                        accessibilityState={{ checked: active }}
                                     >
-                                        {s}
-                                    </Text>
-                                </Pressable>
-                            ))}
+                                        <Text
+                                            style={[
+                                                styles.chipText,
+                                                active && styles.chipTextActive,
+                                            ]}
+                                        >
+                                            {s}
+                                        </Text>
+                                    </Pressable>
+                                );
+                            })}
                         </View>
                     </View>
 

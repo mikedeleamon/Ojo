@@ -110,6 +110,8 @@ export interface WeatherSnapshot {
 
 export interface Settings {
   clothingStyle: string;
+  /** Multi-select extension of clothingStyle. First entry is used as the primary style for outfit scoring. */
+  clothingStyles?: string[];
   location: string;
   /** Coordinates resolved from `location`; sent up so the server cron can call WeatherKit. */
   lat?: number;

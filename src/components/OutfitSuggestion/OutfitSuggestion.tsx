@@ -482,13 +482,13 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
             <EmptyState
                 icon={<HangerIcon size={32} />}
                 title='No closet yet'
-                body='Create a closet and add your clothes to get outfit suggestions.'
+                body="Create a closet, photograph your clothes with the camera, and Ojo will suggest the best outfits for today's weather."
                 action={
                     <Pressable
                         style={styles.ctaBtn}
                         onPress={() => nav.push('/(tabs)/closet')}
                     >
-                        <Text style={styles.ctaBtnText}>Create closet</Text>
+                        <Text style={styles.ctaBtnText}>Set up closet</Text>
                     </Pressable>
                 }
             />

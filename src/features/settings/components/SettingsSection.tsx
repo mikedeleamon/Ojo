@@ -18,6 +18,11 @@ const getSublabel = (
 ): string => {
   if (!key) return '';
   if (key === 'temperatureScale') return settings.temperatureScale === 'Imperial' ? '°F' : '°C';
+  if (key === 'clothingStyle') {
+    const arr = settings.clothingStyles;
+    if (arr && arr.length > 0) return arr.join(', ');
+    return settings.clothingStyle || '';
+  }
   const v = settings[key];
   return typeof v === 'string' && v.trim() ? v : '';
 };

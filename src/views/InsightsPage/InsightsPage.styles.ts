@@ -500,4 +500,17 @@ export const makeStyles = (colors: ColorTokens) =>
       color: colors.textSecondary,
       fontWeight: fontWeights.medium,
     },
+    ctaBtn: {
+      paddingVertical: 12,
+      paddingHorizontal: 28,
+      backgroundColor: colors.saveBtnBg,
+      borderRadius: radius.sm,
+      alignItems: 'center' as const,
+      marginTop: spacing.xs,
+    },
+    ctaBtnText: {
+      fontFamily: fonts.bodySemiBold,
+      fontSize: fontSizes.base,
+      color: colors.saveBtnText,
+    },
   });
