@@ -58,7 +58,7 @@ import {
     weatherAwareAddClothesBody,
     weatherAwareInsufficientBody,
 } from './copy';
-import { HangerIcon } from './HangerIcon';
+import { HangerIcon } from '../shared/HangerIcon';
 import { LayeringSection } from './LayeringSection';
 import { makeStyles } from './OutfitSuggestion.styles';
 

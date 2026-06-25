@@ -4,8 +4,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  TextInput,
   Animated,
+  PanResponder,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
@@ -27,8 +27,9 @@ import {
   darkColors,
 } from '../../../theme/tokens';
 import { useTheme, ForceDarkPalette } from '../../../theme/ThemeContext';
-import { geocodeCity } from '../../../lib/geocoding';
-import { hapticSuccess } from '../../../lib/haptics';
+import CityAutocomplete from '../components/CityAutocomplete';
+import type { CitySuggestion } from '../../../lib/citySearch';
+import { hapticSuccess, hapticSelection, hapticWarning } from '../../../lib/haptics';
 import {
   CURRENT_LOCATION_ID,
   addLocation,
@@ -36,6 +37,123 @@ import {
 } from '../../../lib/savedLocations';
 import { getAllSnapshots } from '../../../lib/weatherCache';
 import type { SavedLocation, WeatherSnapshot } from '../../../types';
+
+const SWIPE_ACTION_WIDTH = 80;
+const SWIPE_THRESHOLD    = 65; // px left to trigger delete on release
+
+function SwipeableLocationRow({
+  children,
+  onDelete,
+}: {
+  children: React.ReactNode;
+  onDelete: () => void;
+}) {
+  const translateX        = useRef(new Animated.Value(0)).current;
+  const didPassThreshold  = useRef(false);
+  const onDeleteRef       = useRef(onDelete);
+  onDeleteRef.current     = onDelete;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      // Only steal the gesture when movement is clearly horizontal-left.
+      onMoveShouldSetPanResponder: (_, gs) =>
+        gs.dx < -6 && Math.abs(gs.dx) > Math.abs(gs.dy) * 2,
+
+      onPanResponderGrant: () => {
+        translateX.stopAnimation();
+        translateX.setValue(0);
+        didPassThreshold.current = false;
+      },
+
+      onPanResponderMove: (_, gs) => {
+        const next = Math.min(Math.max(gs.dx, -SWIPE_ACTION_WIDTH * 1.6), 0);
+        translateX.setValue(next);
+        // Haptic tick the moment the full action is revealed.
+        if (gs.dx < -SWIPE_THRESHOLD && !didPassThreshold.current) {
+          didPassThreshold.current = true;
+          hapticSelection();
+        }
+      },
+
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dx < -SWIPE_THRESHOLD) {
+          // Fly the row off to the left then remove.
+          hapticWarning();
+          Animated.timing(translateX, {
+            toValue: -600,
+            duration: 180,
+            useNativeDriver: true,
+          }).start(() => onDeleteRef.current());
+        } else {
+          // Not far enough — snap back.
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: true,
+            bounciness: 8,
+          }).start();
+        }
+      },
+
+      onPanResponderTerminate: () => {
+        Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
+      },
+    }),
+  ).current;
+
+  // Delete-action opacity fades in as the row slides left.
+  const actionOpacity = translateX.interpolate({
+    inputRange: [-SWIPE_ACTION_WIDTH, -20, 0],
+    outputRange: [1, 0.4, 0],
+    extrapolate: 'clamp',
+  });
+  // Subtle scale-up on the label as it becomes fully revealed.
+  const actionScale = translateX.interpolate({
+    inputRange: [-SWIPE_ACTION_WIDTH, -SWIPE_THRESHOLD, 0],
+    outputRange: [1, 0.85, 0.7],
+    extrapolate: 'clamp',
+  });
+
+  return (
+    <View style={{ position: 'relative' }}>
+      {/* Red delete strip — sits behind the row, revealed as it slides left */}
+      <Animated.View
+        style={{
+          position: 'absolute',
+          right: 0, top: 0, bottom: 0,
+          width: SWIPE_ACTION_WIDTH,
+          borderRadius: radius.sm,
+          backgroundColor: 'rgba(239, 68, 68, 0.92)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          opacity: actionOpacity,
+        }}
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+      >
+        <Animated.Text
+          style={{
+            color: '#fff',
+            fontFamily: fonts.body,
+            fontSize: fontSizes.sm,
+            fontWeight: fontWeights.semibold,
+            transform: [{ scale: actionScale }],
+          }}
+        >
+          Delete
+        </Animated.Text>
+      </Animated.View>
+
+      {/* Row content — translates left on swipe */}
+      <Animated.View
+        {...panResponder.panHandlers}
+        style={{ transform: [{ translateX }] }}
+      >
+        {children}
+      </Animated.View>
+    </View>
+  );
+}
 
 function LocationSubText({ summary, style }: { summary: string | null; style: object }) {
   const opacity = useRef(new Animated.Value(summary ? 1 : 0.5)).current;
@@ -113,8 +231,6 @@ export default function LocationsScreen() {
           textTransform: 'uppercase',
           letterSpacing: 0.5,
         },
-        deleteBtn: { padding: 8, marginRight: -8 },
-        deleteText: { fontFamily: fonts.body, fontSize: fontSizes.sm },
         input: {
           fontFamily: fonts.body,
           fontSize: fontSizes.base,
@@ -150,7 +266,8 @@ export default function LocationsScreen() {
   const isMetric = settings.temperatureScale === 'Metric';
 
   const [snapshots, setSnapshots] = useState<Record<string, WeatherSnapshot>>({});
-  const [city, setCity] = useState('');
+  const [selectedCity, setSelectedCity] = useState<CitySuggestion | null>(null);
+  const [resetSignal, setResetSignal] = useState(0);
   const [status, setStatus] = useState<SubmitStatus>(null);
   const [loading, setLoading] = useState(false);
 
@@ -179,23 +296,25 @@ export default function LocationsScreen() {
   };
 
   const add = async () => {
-    const q = city.trim();
-    if (!q) { setStatus({ type: 'error', msg: 'Enter a city name.' }); return; }
+    if (!selectedCity) {
+      setStatus({ type: 'error', msg: 'Pick a city from the dropdown.' });
+      return;
+    }
     setStatus(null);
     setLoading(true);
     try {
-      const coords = await geocodeCity(q);
-      if (!coords) {
-        setStatus({ type: 'error', msg: 'City not found. Check the name.' });
-        return;
-      }
-      const next = addLocation(savedLocations, coords, q);
+      const next = addLocation(
+        savedLocations,
+        { lat: selectedCity.lat, lon: selectedCity.lon, name: selectedCity.name },
+        selectedCity.name,
+      );
       if (next.length === savedLocations.length) {
         setStatus({ type: 'error', msg: 'That city is already saved.' });
         return;
       }
       await saveSettings({ ...settings, savedLocations: next });
-      setCity('');
+      setSelectedCity(null);
+      setResetSignal(n => n + 1);
       setStatus({ type: 'success', msg: 'City added.' });
       hapticSuccess();
     } catch {
@@ -226,61 +345,58 @@ export default function LocationsScreen() {
         : [darkColors.bgDefault, darkColors.bgDefault, darkColors.bgDefault]
     ) as [string, string, ...string[]];
 
+    const rowContent = (
+      <Pressable
+        onPress={() => select(id)}
+        accessibilityRole="button"
+        accessibilityLabel={`Show weather for ${name}`}
+        style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+      >
+        <View style={[st.rowWrap, id === activeId && st.rowActive]}>
+          <LinearGradient
+            colors={grad}
+            style={StyleSheet.absoluteFill}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          />
+          <GlassCard glassStyle="regular" style={st.row}>
+            <View style={st.rowMain}>
+              <Text style={[st.rowName, { color: darkColors.textPrimary }]}>
+                {name}
+              </Text>
+              <LocationSubText
+                summary={summary}
+                style={[st.rowSub, { color: darkColors.textMuted }]}
+              />
+            </View>
+            {id === activeId && (
+              <Text style={[st.activeTag, { color: darkColors.textSecondary }]}>
+                Active
+              </Text>
+            )}
+            {snap && (
+              <WeatherIconDisplay
+                condition={snap.weather.WeatherText}
+                isDay={snap.weather.IsDayTime}
+                size="small"
+              />
+            )}
+          </GlassCard>
+        </View>
+      </Pressable>
+    );
+
     return (
       // Forced dark (like the TripFit HeroBanner) so the glass material and text
       // match dark mode regardless of the app theme.
       <ForceDarkPalette key={id}>
-        <Pressable
-          onPress={() => select(id)}
-          accessibilityRole="button"
-          accessibilityLabel={`Show weather for ${name}`}
-          style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
-        >
-          <View style={[st.rowWrap, id === activeId && st.rowActive]}>
-            <LinearGradient
-              colors={grad}
-              style={StyleSheet.absoluteFill}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            />
-            <GlassCard glassStyle="regular" style={st.row}>
-              <View style={st.rowMain}>
-                <Text style={[st.rowName, { color: darkColors.textPrimary }]}>
-                  {name}
-                </Text>
-                <LocationSubText
-                  summary={summary}
-                  style={[st.rowSub, { color: darkColors.textMuted }]}
-                />
-              </View>
-              {id === activeId && (
-                <Text style={[st.activeTag, { color: darkColors.textSecondary }]}>
-                  Active
-                </Text>
-              )}
-              {snap && (
-                <WeatherIconDisplay
-                  condition={snap.weather.WeatherText}
-                  isDay={snap.weather.IsDayTime}
-                  size="small"
-                />
-              )}
-              {loc && (
-                <Pressable
-                  onPress={() => remove(loc.id)}
-                  hitSlop={8}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Remove ${name}`}
-                  style={st.deleteBtn}
-                >
-                  <Text style={[st.deleteText, { color: darkColors.textMuted }]}>
-                    Remove
-                  </Text>
-                </Pressable>
-              )}
-            </GlassCard>
-          </View>
-        </Pressable>
+        {loc ? (
+          <SwipeableLocationRow onDelete={() => remove(loc.id)}>
+            {rowContent}
+          </SwipeableLocationRow>
+        ) : (
+          rowContent
+        )}
       </ForceDarkPalette>
     );
   };
@@ -304,24 +420,23 @@ export default function LocationsScreen() {
 
           <View style={st.section}>
             <Text style={st.sectionLabel}>Add a city</Text>
-            <TextInput
-              style={st.input}
-              placeholder="City name (e.g. London)"
-              placeholderTextColor={colors.textMuted}
-              value={city}
-              onChangeText={setCity}
-              returnKeyType="done"
-              onSubmitEditing={add}
+            <Text style={st.hint}>
+              Start typing and pick a city from the list.
+            </Text>
+            <CityAutocomplete
+              onSelect={setSelectedCity}
+              resetSignal={resetSignal}
+              placeholder="Search for a city (e.g. London)"
               accessibilityLabel="City to add"
             />
             <StatusMessage status={status} />
             <Pressable
-              style={[st.addBtn, loading && { opacity: 0.5 }]}
+              style={[st.addBtn, (loading || !selectedCity) && { opacity: 0.5 }]}
               onPress={add}
-              disabled={loading}
+              disabled={loading || !selectedCity}
               accessibilityRole="button"
               accessibilityLabel={loading ? 'Adding' : 'Add city'}
-              accessibilityState={{ busy: loading, disabled: loading }}
+              accessibilityState={{ busy: loading, disabled: loading || !selectedCity }}
             >
               <Text style={st.addBtnText}>{loading ? 'Adding…' : 'Add city'}</Text>
             </Pressable>

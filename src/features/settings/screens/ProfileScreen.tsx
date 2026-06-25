@@ -35,14 +35,57 @@ export default function ProfileScreen({ onLogout }: Props) {
       backgroundColor: 'rgba(239,68,68,0.10)',
       alignItems: 'center', justifyContent: 'center',
     },
+    fieldHint: {
+      fontFamily: fonts.body, fontSize: fontSizes.xs,
+      color: colors.textMuted, lineHeight: fontSizes.xs * 1.5,
+    },
+    // "Underline" validation line that sits directly under the username field.
+    usernameNote: {
+      fontFamily: fonts.body, fontSize: fontSizes.xs,
+      lineHeight: fontSizes.xs * 1.5,
+    },
   }), [colors]);
 
   const [username,     setUsername]     = useState('');
   const [email,        setEmail]        = useState('');
+  const [usernameStatus, setUsernameStatus] =
+    useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle');
+  const originalUsername = useRef('');
   const [deleteStep,   setDeleteStep]   = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError,  setDeleteError]  = useState<string | null>(null);
   const { status, loading, submit } = useFormSubmit('Profile updated.');
+
+  // 3–20 chars, letters/numbers/underscore/period. Mirrors what the server stores.
+  const USERNAME_RE = /^[a-zA-Z0-9_.]{3,20}$/;
+
+  // Runs when the username field loses focus. Skips the network call when the
+  // name is unchanged or malformed; otherwise asks the server if it's taken.
+  const checkUsername = async () => {
+    const name = username.trim();
+    if (!name || name === originalUsername.current) { setUsernameStatus('idle'); return; }
+    if (!USERNAME_RE.test(name)) { setUsernameStatus('invalid'); return; }
+    setUsernameStatus('checking');
+    try {
+      const { data } = await axios.get<{ available: boolean }>(
+        '/api/user/check-username',
+        { ...auth(), params: { username: name } },
+      );
+      setUsernameStatus(data.available ? 'available' : 'taken');
+    } catch {
+      setUsernameStatus('idle');
+    }
+  };
+
+  const usernameNote = (() => {
+    switch (usernameStatus) {
+      case 'checking':  return { text: 'Checking availability…',           color: colors.textMuted };
+      case 'available': return { text: '✓ Username available',             color: colors.successText };
+      case 'taken':     return { text: '✗ That username is already taken', color: colors.errorText };
+      case 'invalid':   return { text: 'Use 3–20 letters, numbers, “_” or “.”', color: colors.errorText };
+      default:          return null;
+    }
+  })();
 
   const deleteModalTitleRef = useRef<RNView>(null);
   useEffect(() => {
@@ -59,7 +102,11 @@ export default function ProfileScreen({ onLogout }: Props) {
   useEffect(() => {
     if (!getToken()) return;
     axios.get('/api/user/me', auth())
-      .then(({ data }) => { setUsername(data.username ?? ''); setEmail(data.email ?? ''); })
+      .then(({ data }) => {
+        setUsername(data.username ?? '');
+        originalUsername.current = data.username ?? '';
+        setEmail(data.email ?? '');
+      })
       .catch(() => {});
   }, []);
 
@@ -92,9 +139,22 @@ export default function ProfileScreen({ onLogout }: Props) {
             <Text style={s.label}>Username</Text>
             <TextInput style={s.input} placeholder="@yourname"
               placeholderTextColor={colors.textMuted}
-              value={username} onChangeText={setUsername}
+              value={username}
+              onChangeText={(t) => { setUsername(t); setUsernameStatus('idle'); }}
+              onBlur={checkUsername}
               autoCapitalize="none"
+              autoCorrect={false}
               accessibilityLabel="Username" />
+            {usernameNote ? (
+              <Text style={[styles.usernameNote, { color: usernameNote.color }]}
+                accessibilityLiveRegion="polite">
+                {usernameNote.text}
+              </Text>
+            ) : (
+              <Text style={styles.fieldHint}>
+                You can change your username anytime — it must be unique.
+              </Text>
+            )}
           </View>
 
           <View style={s.formGroup}>

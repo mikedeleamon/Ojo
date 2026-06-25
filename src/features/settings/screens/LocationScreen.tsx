@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { StyleSheet, KeyboardAvoidingView, Platform, ScrollView, TextInput } from 'react-native';
+import { StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { View, Text, Pressable } from '../../../components/primitives';
 import { StatusMessage } from '../../../components/shared';
@@ -7,7 +7,8 @@ import { useSettings } from '../../../hooks/useSettings';
 import { useFormSubmit } from '../../../hooks/useFormSubmit';
 import { spacing, radius, fonts, fontSizes, fontWeights } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/ThemeContext';
-import { geocodeCity } from '../../../lib/geocoding';
+import CityAutocomplete from '../components/CityAutocomplete';
+import type { CitySuggestion } from '../../../lib/citySearch';
 
 export default function LocationScreen() {
   const { colors } = useTheme();
@@ -23,18 +24,18 @@ export default function LocationScreen() {
   }), [colors]);
 
   const { settings, saveSettings }  = useSettings();
-  const [city, setCity]             = useState(settings.location);
+  const [selectedCity, setSelectedCity] = useState<CitySuggestion | null>(null);
   const { status, loading, submit } = useFormSubmit('Location saved.', 2000);
 
   const save = () => submit(async () => {
-    const trimmed = city.trim();
-    // Resolve coords client-side so the server cron can call WeatherKit directly.
-    const coords = await geocodeCity(trimmed);
+    if (!selectedCity) return;
+    // Coords come from the picked suggestion, so the server cron can call
+    // WeatherKit directly without re-geocoding.
     await saveSettings({
       ...settings,
-      location: trimmed,
-      lat: coords?.lat,
-      lon: coords?.lon,
+      location: selectedCity.name,
+      lat: selectedCity.lat,
+      lon: selectedCity.lon,
     });
   });
 
@@ -45,18 +46,21 @@ export default function LocationScreen() {
           <View style={st.section}>
             <Text style={st.sectionLabel}>Default city</Text>
             <Text style={st.hint}>
-              Used for weather fetching. Enter a city name (e.g. "New York" or "London").
+              Used for weather fetching. Current: {settings.location || 'not set'}.
+              Start typing and pick a city from the list.
             </Text>
-            <TextInput style={st.input} placeholder="City name"
-              placeholderTextColor={colors.textMuted}
-              value={city} onChangeText={setCity} returnKeyType="done" onSubmitEditing={save}
-              accessibilityLabel="Default city" />
+            <CityAutocomplete
+              onSelect={setSelectedCity}
+              placeholder="Search for a city (e.g. London)"
+              accessibilityLabel="Default city"
+            />
           </View>
           <StatusMessage status={status} />
-          <Pressable style={[st.saveBtn, loading && { opacity: 0.5 }]} onPress={save} disabled={loading}
+          <Pressable style={[st.saveBtn, (loading || !selectedCity) && { opacity: 0.5 }]}
+            onPress={save} disabled={loading || !selectedCity}
             accessibilityRole="button"
             accessibilityLabel={loading ? 'Saving' : 'Save'}
-            accessibilityState={{ busy: loading, disabled: loading }}>
+            accessibilityState={{ busy: loading, disabled: loading || !selectedCity }}>
             <Text style={st.saveBtnText}>{loading ? 'Saving…' : 'Save'}</Text>
           </Pressable>
         </ScrollView>

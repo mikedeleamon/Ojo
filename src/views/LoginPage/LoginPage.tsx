@@ -19,6 +19,8 @@ import axios from '../../api/client';
 import { AuthState, Settings } from '../../types';
 import { getAuthErrorMessage, saveAuth } from '../../lib/auth';
 import { isAppleSignInAvailable, signInWithApple } from '../../lib/appleSignIn';
+import { isGoogleSignInAvailable, signInWithGoogle } from '../../lib/googleSignIn';
+import GoogleGlyph from '../../components/icons/GoogleGlyph';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import {
     spacing,
@@ -168,6 +170,24 @@ export default function LoginPage({ onLogin }: Props) {
                     width: '100%',
                     height: 48,
                 },
+                googleBtn: {
+                    width: '100%',
+                    height: 48,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: spacing.sm,
+                    backgroundColor: isDark ? '#FFFFFF' : '#FFFFFF',
+                    borderRadius: radius.sm,
+                    borderWidth: 1,
+                    borderColor: 'rgba(0,0,0,0.12)',
+                },
+                googleBtnText: {
+                    fontFamily: fonts.body,
+                    fontSize: fontSizes.base,
+                    fontWeight: fontWeights.semibold,
+                    color: '#1F1F1F',
+                },
             }),
         [colors],
     );
@@ -180,6 +200,8 @@ export default function LoginPage({ onLogin }: Props) {
     const [loading, setLoading] = useState(false);
     const [appleAvailable, setAppleAvailable] = useState(false);
     const [appleLoading, setAppleLoading] = useState(false);
+    const [googleAvailable] = useState(isGoogleSignInAvailable);
+    const [googleLoading, setGoogleLoading] = useState(false);
 
     useEffect(() => {
         let mounted = true;
@@ -190,6 +212,20 @@ export default function LoginPage({ onLogin }: Props) {
             mounted = false;
         };
     }, []);
+
+    const handleGoogle = async () => {
+        if (googleLoading) return;
+        setError(null);
+        setGoogleLoading(true);
+        const result = await signInWithGoogle();
+        setGoogleLoading(false);
+        if (result.ok) {
+            onLogin?.();
+            return;
+        }
+        if (result.cancelled) return; // silent — user dismissed the sheet
+        setError(result.error);
+    };
 
     const handleApple = async () => {
         if (appleLoading) return;
@@ -342,36 +378,65 @@ export default function LoginPage({ onLogin }: Props) {
                             </Text>
                         </Pressable>
 
+                        {(appleAvailable || googleAvailable) && (
+                            <View style={styles.dividerRow}>
+                                <View style={styles.dividerLine} />
+                                <Text style={styles.dividerText}>or</Text>
+                                <View style={styles.dividerLine} />
+                            </View>
+                        )}
+
                         {appleAvailable && (
-                            <>
-                                <View style={styles.dividerRow}>
-                                    <View style={styles.dividerLine} />
-                                    <Text style={styles.dividerText}>or</Text>
-                                    <View style={styles.dividerLine} />
-                                </View>
-                                <AppleAuthentication.AppleAuthenticationButton
-                                    buttonType={
-                                        AppleAuthentication
-                                            .AppleAuthenticationButtonType
-                                            .SIGN_IN
-                                    }
-                                    buttonStyle={
-                                        isDark
-                                            ? AppleAuthentication
-                                                  .AppleAuthenticationButtonStyle
-                                                  .WHITE
-                                            : AppleAuthentication
-                                                  .AppleAuthenticationButtonStyle
-                                                  .BLACK
-                                    }
-                                    cornerRadius={radius.sm}
-                                    style={[
-                                        styles.appleBtn,
-                                        appleLoading && { opacity: 0.5 },
-                                    ]}
-                                    onPress={handleApple}
-                                />
-                            </>
+                            <AppleAuthentication.AppleAuthenticationButton
+                                buttonType={
+                                    AppleAuthentication
+                                        .AppleAuthenticationButtonType
+                                        .SIGN_IN
+                                }
+                                buttonStyle={
+                                    isDark
+                                        ? AppleAuthentication
+                                              .AppleAuthenticationButtonStyle
+                                              .WHITE
+                                        : AppleAuthentication
+                                              .AppleAuthenticationButtonStyle
+                                              .BLACK
+                                }
+                                cornerRadius={radius.sm}
+                                style={[
+                                    styles.appleBtn,
+                                    appleLoading && { opacity: 0.5 },
+                                ]}
+                                onPress={handleApple}
+                            />
+                        )}
+
+                        {googleAvailable && (
+                            <Pressable
+                                style={[
+                                    styles.googleBtn,
+                                    googleLoading && { opacity: 0.5 },
+                                ]}
+                                onPress={handleGoogle}
+                                disabled={googleLoading}
+                                accessibilityRole="button"
+                                accessibilityLabel={
+                                    googleLoading
+                                        ? 'Signing in with Google'
+                                        : 'Sign in with Google'
+                                }
+                                accessibilityState={{
+                                    busy: googleLoading,
+                                    disabled: googleLoading,
+                                }}
+                            >
+                                <GoogleGlyph size={18} />
+                                <Text style={styles.googleBtnText}>
+                                    {googleLoading
+                                        ? 'Signing in…'
+                                        : 'Sign in with Google'}
+                                </Text>
+                            </Pressable>
                         )}
 
                         <View style={styles.footer}>

@@ -14,11 +14,6 @@ import type { LocationCoords } from '../types';
 // "37.7749,-122.4194" — accepts an optional sign, decimals, and whitespace.
 const LATLNG_RE = /^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/;
 
-/** Returns true if `query` already looks like a "lat,lng" pair. */
-export function isLatLngString(query: string): boolean {
-  return LATLNG_RE.test(query);
-}
-
 /** Parses a "lat,lng" string, or returns null if it isn't one. */
 export function parseLatLng(query: string): { lat: number; lon: number } | null {
   const m = query.match(LATLNG_RE);

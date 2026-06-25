@@ -10,8 +10,18 @@ import {
   sendResetEmail,
 } from '../lib/passwordReset';
 import { verifyAppleIdentityToken } from '../lib/appleAuth';
+import { verifyGoogleIdToken } from '../lib/googleAuth';
 
 const router = Router();
+
+/** Every OAuth client ID a Google ID token may legitimately be issued for. */
+function googleAllowedAudiences(): string[] {
+  return [
+    process.env.GOOGLE_IOS_CLIENT_ID,
+    process.env.GOOGLE_ANDROID_CLIENT_ID,
+    process.env.GOOGLE_WEB_CLIENT_ID,
+  ].filter((v): v is string => !!v);
+}
 
 router.post('/login', async (req: Request, res: Response): Promise<void> => {
   try {
@@ -244,6 +254,91 @@ router.post('/apple', async (req: Request, res: Response): Promise<void> => {
     });
   } catch (err) {
     console.error('[auth] apple sign-in error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/auth/google
+ * Body: { idToken }
+ *
+ * Verifies the Google ID token, then (mirroring /apple):
+ *  - looks up an existing user by `googleSub`
+ *  - falls back to lookup by `email` (links Google to an email/password account)
+ *  - otherwise creates a new account
+ *
+ * Returns the same shape as /login and /signup: { token, user, settings }.
+ */
+router.post('/google', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { idToken } = req.body ?? {};
+    if (!idToken || typeof idToken !== 'string') {
+      res.status(400).json({ error: 'idToken is required' });
+      return;
+    }
+    const audiences = googleAllowedAudiences();
+    if (audiences.length === 0) {
+      console.error('[auth] No GOOGLE_*_CLIENT_ID configured');
+      res.status(500).json({ error: 'Server not configured for Sign in with Google' });
+      return;
+    }
+
+    let claims;
+    try {
+      claims = await verifyGoogleIdToken(idToken, audiences);
+    } catch (err) {
+      console.warn('[auth] Google ID token verification failed:', err);
+      res.status(401).json({ error: 'Invalid Google identity token' });
+      return;
+    }
+
+    // 1) Look up by Google sub
+    let user = await User.findOne({ googleSub: claims.sub });
+
+    // 2) Fallback: link to existing email/password account by email
+    if (!user && claims.email) {
+      const byEmail = await User.findOne({ email: claims.email.toLowerCase() });
+      if (byEmail) {
+        byEmail.googleSub = claims.sub;
+        await byEmail.save();
+        user = byEmail;
+      }
+    }
+
+    // 3) Otherwise create a new user
+    if (!user) {
+      const firstName = claims.given_name  ?? '';
+      const lastName  = claims.family_name ?? '';
+      const usernameSeed = claims.email
+        ? claims.email.split('@')[0]
+        : `google_${claims.sub.slice(0, 10)}`;
+      // Make username unique by suffixing a short random tag on collision
+      let username = usernameSeed;
+      if (await User.exists({ username })) {
+        username = `${usernameSeed}_${Math.random().toString(36).slice(2, 6)}`;
+      }
+
+      // Throw-away password — the user authenticates via Google, not bcrypt.
+      const randomPwd = (await import('crypto')).randomBytes(32).toString('base64url');
+      const bcrypt    = (await import('bcrypt')).default;
+
+      user = await User.create({
+        firstName,
+        lastName,
+        username,
+        email:    claims.email ? claims.email.toLowerCase() : `${claims.sub}@users.noreply.google.com`,
+        password: await bcrypt.hash(randomPwd, 12),
+        googleSub: claims.sub,
+      });
+    }
+
+    res.json({
+      token: signToken(user.id, user.tokenVersion),
+      user:  { id: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email },
+      settings: user.settings,
+    });
+  } catch (err) {
+    console.error('[auth] google sign-in error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

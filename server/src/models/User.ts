@@ -67,6 +67,9 @@ export interface IUser extends Document {
   // link the local account. Indexed sparse so accounts that haven't used SIWA
   // don't collide on a missing value.
   appleSub?: string;
+  // Sign in with Google — Google's stable `sub` claim. Same find/link/create
+  // strategy as appleSub. Sparse-unique so non-Google accounts don't collide.
+  googleSub?: string;
 }
 
 const savedLocationSchema = new Schema<ISavedLocation>({
@@ -130,6 +133,8 @@ const userSchema = new Schema<IUser>({
   // Sign in with Apple — Apple's per-app `sub`. Unique sparse so users
   // without SIWA don't all collide on a missing field.
   appleSub:               { type: String, unique: true, sparse: true },
+  // Sign in with Google — Google's `sub`. Unique sparse, same as appleSub.
+  googleSub:              { type: String, unique: true, sparse: true },
 }, { timestamps: true });
 
 export default mongoose.model<IUser>('User', userSchema);

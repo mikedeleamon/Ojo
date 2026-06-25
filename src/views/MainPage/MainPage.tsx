@@ -53,7 +53,12 @@ export default function MainPage() {
     });
   }, [settingsReady, settings.location, activeId, refreshKey]);
 
-  const location = active ? active.query : (gpsLocation || settings.location);
+  // For saved cities, pass stored coordinates as a "lat,lng" string so
+  // geocodeCity skips the CLGeocoder network call entirely (parseLatLng fast
+  // path). CLGeocoder can hang or fail in production; stored coords are exact.
+  const location = active
+    ? `${active.lat},${active.lon}`
+    : (gpsLocation || settings.location);
   const seed = snapshots[activeId] ?? null;
 
   const handleRefresh = useCallback(() => setRefreshKey(k => k + 1), []);

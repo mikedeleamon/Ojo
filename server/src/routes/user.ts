@@ -22,6 +22,24 @@ router.get('/me', async (req: AuthRequest, res: Response): Promise<void> => {
   }
 });
 
+/**
+ * GET /api/user/check-username?username=foo
+ * Lightweight availability check used by the Profile screen while editing.
+ * Returns { available } — false when another account already owns the name.
+ * Excludes the caller so re-saving your own current username reads as available.
+ */
+router.get('/check-username', async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const username = typeof req.query.username === 'string' ? req.query.username.trim() : '';
+    if (!username) { res.status(400).json({ error: 'username is required' }); return; }
+    const exists = await User.exists({ username, _id: { $ne: req.userId } });
+    res.json({ available: !exists });
+  } catch (err) {
+    console.error('[user] check-username error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.put('/profile', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { username, email } = req.body;
