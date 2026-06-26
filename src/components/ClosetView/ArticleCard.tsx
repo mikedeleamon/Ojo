@@ -8,6 +8,7 @@ import { useConfirm } from '../ConfirmDialog';
 import { useTheme } from '../../theme/ThemeContext';
 import { fonts, fontSizes, fontWeights, radius } from '../../theme/tokens';
 import type { ClothingArticle } from '../../types';
+import { articleCategories } from '../../types';
 import { CSS_COLORS } from '../../lib/colors/cssColors';
 import {
     METALLIC_GRADIENTS,
@@ -45,7 +46,7 @@ export const ArticleCard = ({
     outOfSeason,
     onEdit,
 }: ArticleCardProps) => {
-    const { colors } = useTheme();
+    const { colors, isDark } = useTheme();
     const styles = useMemo(() => makeStyles(colors), [colors]);
     const [erroredUrl, setErroredUrl] = useState<string | null>(null);
     const imgError = !!article.imageUrl && erroredUrl === article.imageUrl;
@@ -79,8 +80,10 @@ export const ArticleCard = ({
                             .filter(Boolean)
                             .join(' · ')}
                     </Text>
-                    {article.clothingCategory ? (
-                        <Text style={styles.categoryTag}>{article.clothingCategory}</Text>
+                    {articleCategories(article).length > 0 ? (
+                        <Text style={styles.categoryTag}>
+                            {articleCategories(article).join(' · ')}
+                        </Text>
                     ) : null}
                 </View>
                 <ColorSwatch color={article.color} style={styles.colorDot} />
@@ -104,7 +107,7 @@ export const TileArticleCard = ({
     onEdit,
     onRemove,
 }: TileArticleCardProps) => {
-    const { colors } = useTheme();
+    const { colors, isDark } = useTheme();
     const styles = useMemo(() => makeStyles(colors), [colors]);
     const [erroredUrl, setErroredUrl] = useState<string | null>(null);
     const imgError = !!article.imageUrl && erroredUrl === article.imageUrl;

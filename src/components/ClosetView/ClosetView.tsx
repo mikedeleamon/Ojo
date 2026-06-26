@@ -38,6 +38,7 @@ import {
     METALLIC_END,
 } from '../../lib/colors/metallicGradients';
 import { CATEGORIES, COLORS, FABRICS, ARTICLE_GENDERS } from '../../lib/colors/palettes';
+import { articleCategories } from '../../types';
 import { SwipeableArticleCard, TileArticleCard } from './ArticleCard';
 
 type SortMode = 'default' | 'type' | 'color' | 'wornRecent' | 'wornStale';
@@ -75,7 +76,7 @@ const ClosetView = ({
     onTripFit,
     tabClearance = 0,
 }: Props) => {
-    const { colors } = useTheme();
+    const { colors, isDark } = useTheme();
     const router = useRouter();
     const confirm = useConfirm();
     const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -136,12 +137,12 @@ const ClosetView = ({
                     a.clothingType.toLowerCase().includes(q) ||
                     a.color?.toLowerCase().includes(q) ||
                     a.fabricType?.toLowerCase().includes(q) ||
-                    a.clothingCategory?.toLowerCase().includes(q),
+                    articleCategories(a).some(c => c.toLowerCase().includes(q)),
             );
         }
         if (activeCategories.length)
             arts = arts.filter(
-                (a) => a.clothingCategory && activeCategories.includes(a.clothingCategory),
+                (a) => articleCategories(a).some(c => activeCategories.includes(c)),
             );
         if (activeColors.length)
             arts = arts.filter((a) => a.color && activeColors.includes(a.color));

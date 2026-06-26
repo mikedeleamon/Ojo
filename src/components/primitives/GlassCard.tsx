@@ -16,6 +16,7 @@ import { forwardRef } from 'react';
 import { View, ViewProps, StyleSheet, StyleProp, ViewStyle } from 'react-native';
 import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
 import { useTheme } from '../../theme/ThemeContext';
+import { darkColors } from '../../theme/tokens';
 
 const LIQUID_GLASS = isGlassEffectAPIAvailable();
 
@@ -23,11 +24,15 @@ interface GlassCardProps extends ViewProps {
   style?:      StyleProp<ViewStyle>;
   /** 'regular' = standard iOS 26 material; 'clear' = more subtle */
   glassStyle?: 'regular' | 'clear';
+  /** Optional solid tint applied over the glass material (native path) or
+   *  as the background colour (fallback path). Use for cases where the default
+   *  glass bg is too subtle, e.g. on a light-coloured page. */
+  tintColor?:  string;
   children?:   React.ReactNode;
 }
 
 const GlassCard = forwardRef<View, GlassCardProps>(
-  ({ style, glassStyle = 'regular', children, ...rest }, ref) => {
+  ({ style, glassStyle = 'regular', tintColor, children, ...rest }, ref) => {
     const { colors, isDark } = useTheme();
 
     if (LIQUID_GLASS) {
@@ -56,18 +61,26 @@ const GlassCard = forwardRef<View, GlassCardProps>(
           style={[styles.base, passStyle]}
           {...rest}
         >
+          {tintColor && (
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: tintColor }]} pointerEvents='none' />
+          )}
           {children}
         </GlassView>
       );
     }
 
-    // Glassmorphism fallback — same visual as before
+    // Glassmorphism fallback — tintColor replaces glassBg; border flips to white
+    // so it stays visible against a dark tile background.
     return (
       <View
         ref={ref}
         style={[
           styles.base,
-          { backgroundColor: colors.glassBg, borderWidth: 1, borderColor: colors.glassBorder },
+          {
+            backgroundColor: tintColor ?? colors.glassBg,
+            borderWidth: 1,
+            borderColor: tintColor ? darkColors.glassBorder : colors.glassBorder,
+          },
           style,
         ]}
         {...rest}
