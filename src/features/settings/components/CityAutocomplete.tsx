@@ -28,6 +28,8 @@ interface Props {
   /** Bump this number to clear the field (e.g. after a successful add). */
   resetSignal?: number;
   accessibilityLabel?: string;
+  /** Called when the text input receives focus. */
+  onInputFocus?: () => void;
 }
 
 export default function CityAutocomplete({
@@ -36,6 +38,7 @@ export default function CityAutocomplete({
   initialQuery = '',
   resetSignal = 0,
   accessibilityLabel = 'Search for a city',
+  onInputFocus,
 }: Props) {
   const { colors } = useTheme();
   const st = useMemo(
@@ -150,7 +153,7 @@ export default function CityAutocomplete({
         placeholderTextColor={colors.textMuted}
         value={query}
         onChangeText={handleChange}
-        onFocus={() => { if (results.length) setOpen(true); }}
+        onFocus={() => { if (results.length) setOpen(true); onInputFocus?.(); }}
         autoCorrect={false}
         autoCapitalize="words"
         accessibilityLabel={accessibilityLabel}

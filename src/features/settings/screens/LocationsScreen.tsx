@@ -210,6 +210,8 @@ export default function LocationsScreen() {
   const savedLocations = settings.savedLocations ?? [];
   const isMetric = settings.temperatureScale === 'Metric';
 
+  const scrollViewRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
+
   const [snapshots, setSnapshots] = useState<Record<string, WeatherSnapshot>>({});
   const [selectedCity, setSelectedCity] = useState<CitySuggestion | null>(null);
   const [resetSignal, setResetSignal] = useState(0);
@@ -352,7 +354,12 @@ export default function LocationsScreen() {
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          ref={scrollViewRef}
+          contentContainerStyle={st.content}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+        >
           <View style={st.section}>
             <Text style={st.sectionLabel}>Destinations</Text>
             <Text style={st.hint}>
@@ -373,6 +380,7 @@ export default function LocationsScreen() {
               resetSignal={resetSignal}
               placeholder="Search for a city (e.g. London)"
               accessibilityLabel="City to add"
+              onInputFocus={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
             />
             <StatusMessage status={status} />
             <Pressable

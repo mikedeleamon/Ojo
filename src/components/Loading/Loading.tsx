@@ -24,7 +24,7 @@ const Loading = () => {
     return (
         <View style={styles.root}>
             <Animated.View style={[styles.icon, { transform: [{ rotate }] }]}>
-                <SunnyIcon size={80} />
+                <SunnyIcon size={80} color={colors.textPrimary} />
             </Animated.View>
         </View>
     );
