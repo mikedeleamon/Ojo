@@ -73,7 +73,13 @@
         }
       ],
       "expo-router",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.555153415751-ejhgihp9r6tgkssuj8qhchess3blbmml"
+        }
+      ]
     ],
     "extra": {
       "router": {},

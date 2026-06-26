@@ -3,6 +3,7 @@ import type { OutfitResult, ScoreBreakdown } from '../../lib/outfit/types';
 import { FACTOR_EXPLANATIONS } from './constants';
 
 export const outfitTabSubtitle = (outfit: OutfitResult): string => {
+    if (outfit.moodLabel) return outfit.moodLabel;
     const roles = outfit.slots.map((s) => s.role);
     if (roles.includes('outerwear')) return 'Layered up';
     if (roles.includes('midLayer')) return 'Mid layer';

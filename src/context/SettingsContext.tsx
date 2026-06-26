@@ -14,7 +14,6 @@ import { storage, storageGetJSON } from '../lib/storage';
 const CACHE_KEY = 'ojo_settings_cache';
 
 export const defaults: Settings = {
-    clothingStyle: 'Casual',
     clothingStyles: ['Casual'],
     location: '',
     temperatureScale: 'Imperial',
@@ -22,6 +21,18 @@ export const defaults: Settings = {
     lowTempThreshold: 50,
     humidityPreference: 70,
 };
+
+// Ensures clothingStyles is always present — old server payloads only have
+// clothingStyle (string). Converts them so the rest of the app never has to
+// guard against the missing field.
+const normalize = (s: Settings): Settings => ({
+    ...s,
+    clothingStyles: s.clothingStyles?.length
+        ? s.clothingStyles
+        : s.clothingStyle
+          ? [s.clothingStyle]
+          : ['Casual'],
+});
 
 const readCache = async (): Promise<Settings | null> => {
     const data = await storageGetJSON<Partial<Settings>>(
@@ -64,7 +75,7 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
         const init = async () => {
             const cached = await readCache();
             if (cached && !cancelled) {
-                setSettings(cached);
+                setSettings(normalize(cached));
                 setSettingsReady(true);
             }
 
@@ -79,7 +90,7 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
                     '/api/user/settings',
                     authHeaders(),
                 );
-                const fresh = { ...defaults, ...(cached ?? {}), ...data };
+                const fresh = normalize({ ...defaults, ...(cached ?? {}), ...data });
                 if (!cancelled) {
                     setSettings(fresh);
                     setSettingsReady(true);
@@ -135,7 +146,7 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
                 '/api/user/settings',
                 authHeaders(),
             );
-            const fresh = { ...defaults, ...(cached ?? {}), ...data };
+            const fresh = normalize({ ...defaults, ...(cached ?? {}), ...data });
             setSettings(fresh);
             await writeCache(fresh);
         } catch (err: unknown) {

@@ -39,6 +39,8 @@ export interface OutfitResult {
   layering?:       LayeringResult;
   /** True when ≥30 logged outfits — preference weight is meaningfully elevated. */
   isPersonalized?: boolean;
+  /** When mood-based generation is active, labels the style this outfit was optimized for. */
+  moodLabel?:      string;
 }
 
 /** Accepts either legacy Set<string> or Map<string, number> (id→daysSinceWorn). */

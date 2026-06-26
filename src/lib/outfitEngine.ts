@@ -14,7 +14,7 @@
  * by replacing scoreOutfit() with a model inference call.
  */
 
-import { ClothingArticle, CurrentWeather, Forecast, Settings, OutfitOccasion } from '../types';
+import { ClothingArticle, CurrentWeather, Forecast, Settings, OutfitOccasion, articleCategories } from '../types';
 import {
   articlePreferenceScore, colorPairingBonus, UserPreferenceProfile,
   PERSONALIZATION_THRESHOLD, LEARNING_THRESHOLD,
@@ -325,9 +325,9 @@ const articleStyleScore = (a: ClothingArticle, style: string): number => {
   if (!aff) return 0.50;
 
   let s = 0.25; // baseline — every item contributes something
-  if (aff.types.includes(a.clothingType))                                s += 0.45;
-  if (a.clothingCategory && aff.categories.includes(a.clothingCategory)) s += 0.20;
-  if (a.fabricType       && aff.fabrics.includes(a.fabricType))          s += 0.10;
+  if (aff.types.includes(a.clothingType))                                        s += 0.45;
+  if (articleCategories(a).some(cat => aff.categories.includes(cat)))            s += 0.20;
+  if (a.fabricType && aff.fabrics.includes(a.fabricType))                        s += 0.10;
   return Math.min(1, s);
 };
 
@@ -488,10 +488,13 @@ const scoreCombo = (
   settings:       Settings,
   recentlyWorn:   RecentlyWorn,
   profile:        UserPreferenceProfile,
+  styleOverride?: string,
 ): ScoredCombo => {
   const fabric     = outfitFabricScore(slots, bucket, feelsLikeF, precipIntensity, humidity, settings.humidityPreference, windMph, isSnowing);
   const color      = outfitColorScore(slots, profile);
-  const style      = outfitStyleScore(slots, settings.clothingStyle);
+  const style      = styleOverride
+    ? outfitStyleScore(slots, styleOverride)
+    : Math.max(...(settings.clothingStyles?.length ? settings.clothingStyles : [settings.clothingStyle ?? 'Casual']).map(s => outfitStyleScore(slots, s)));
   const simplicity = simplicityScore(slots);
   const preference = outfitPreferenceScore(slots, profile);
   const occasion   = occasionScore(slots, settings.occasion ?? 'everyday');
@@ -690,7 +693,8 @@ const buildNotes = (
   }
 
   if (breakdown.style < 50) {
-    notes.push(`Style alignment is low (${breakdown.style}/100) — some pieces don't fit your ${ctx.settings.clothingStyle} style.`);
+    const styleLabel = (ctx.settings.clothingStyles?.length ? ctx.settings.clothingStyles : [ctx.settings.clothingStyle ?? 'Casual']).join(' / ');
+    notes.push(`Style alignment is low (${breakdown.style}/100) — some pieces don't fit your ${styleLabel} style.`);
   }
 
   // ── Care notes ────────────────────────────────────────────────────────
@@ -883,18 +887,12 @@ export const generateOutfits = (
   }
 
   // ── Phase 4: Sort → deduplicate → diversity filter → take top-K ──────────
-  // Enforces that each result in the top-K differs from every already-picked
-  // result by at least 2 non-accessory slots. This prevents 3 near-identical
-  // outfits that only swap an accessory or shoes from dominating the results.
-  scored.sort((a, b) => b.score - a.score);
 
   const CORE_ROLES: OutfitRole[] = ['top', 'bottom', 'fullBody', 'midLayer', 'outerwear'];
 
-  /** Returns the array of article IDs in "core" roles (non-accessory, non-footwear). */
   const coreIds = (slots: OutfitSlot[]): string[] =>
     slots.filter(s => CORE_ROLES.indexOf(s.role) !== -1).map(s => s.article._id);
 
-  /** Count how many core slots differ between two outfits. */
   const coreDifference = (a: OutfitSlot[], b: OutfitSlot[]): number => {
     const idsA = coreIds(a);
     const idsB = coreIds(b);
@@ -904,26 +902,67 @@ export const generateOutfits = (
       if (setB.has(idsA[i])) shared++;
     }
     const totalUnique = idsA.length + idsB.length - shared;
-    return totalUnique - shared; // number of IDs that appear in one but not both
+    return totalUnique - shared;
   };
 
-  const seen    = new Set<string>();
-  const topList: ScoredCombo[] = [];
+  const comboKey = (slots: OutfitSlot[]): string =>
+    slots.map(s => s.article._id).sort().join('|');
 
-  for (const combo of scored) {
-    // Dedup key: sorted article IDs (order-independent)
-    const key = combo.slots.map(s => s.article._id).sort().join('|');
-    if (seen.has(key)) continue;
+  const styleList = settings.clothingStyles?.length
+    ? settings.clothingStyles
+    : [settings.clothingStyle ?? 'Casual'];
+  const multiMood = styleList.length >= 2;
 
-    // Diversity gate: must differ by at least 2 core slots from every already-picked outfit
-    const diverse = topList.every(
-      picked => coreDifference(combo.slots, picked.slots) >= 2,
-    );
-    if (!diverse) continue;
+  type MoodCombo = ScoredCombo & { moodLabel?: string };
+  const topList: MoodCombo[] = [];
+  const seen = new Set<string>();
 
-    seen.add(key);
-    topList.push(combo);
-    if (topList.length >= topK) break;
+  const isDiverse = (combo: ScoredCombo) =>
+    topList.every(picked => coreDifference(combo.slots, picked.slots) >= 2);
+
+  if (multiMood) {
+    // ── Mood-based selection: one outfit per style, then a wild card ──
+    const moodSlots = topK - 1; // reserve one slot for the wild card
+    for (const styleName of styleList) {
+      if (topList.length >= moodSlots) break;
+      const reScored = scored.map(c => ({
+        ...scoreCombo(c.slots, bucket, effectiveFeelsLike, precipIntensity, humidity, windMph, isSnowing, settings, recentlyWorn, profile, styleName),
+        moodLabel: `${styleName} pick` as string,
+      }));
+      reScored.sort((a, b) => b.score - a.score);
+
+      for (const combo of reScored) {
+        const key = comboKey(combo.slots);
+        if (seen.has(key)) continue;
+        if (!isDiverse(combo)) continue;
+        seen.add(key);
+        topList.push(combo);
+        break;
+      }
+    }
+
+    // Wild card: best overall combo not yet picked
+    scored.sort((a, b) => b.score - a.score);
+    for (const combo of scored) {
+      if (topList.length >= topK) break;
+      const key = comboKey(combo.slots);
+      if (seen.has(key)) continue;
+      if (!isDiverse(combo)) continue;
+      seen.add(key);
+      topList.push({ ...combo, moodLabel: 'Wild card' });
+      break;
+    }
+  } else {
+    // ── Single style: original top-K with diversity ──
+    scored.sort((a, b) => b.score - a.score);
+    for (const combo of scored) {
+      const key = comboKey(combo.slots);
+      if (seen.has(key)) continue;
+      if (!isDiverse(combo)) continue;
+      seen.add(key);
+      topList.push(combo);
+      if (topList.length >= topK) break;
+    }
   }
 
   // ── Phase 5: Attach notes and build OutfitResult[] ───────────────────────
@@ -934,9 +973,6 @@ export const generateOutfits = (
     pollenHigh: weather.PollenCategory  ? POLLEN_HIGH_LABELS.has(weather.PollenCategory) : undefined,
   };
 
-  // Build layering context once — weather/forecast/settings inputs are constant
-  // across all outfit candidates, so deriveDayRange, rainForecast, and necessity
-  // scoring should not be repeated inside the per-outfit map below.
   const layeringCtx = buildLayeringContext({ weather, forecasts, settings });
 
   const isPersonalized = profile.totalOutfits >= PERSONALIZATION_THRESHOLD;
@@ -944,9 +980,6 @@ export const generateOutfits = (
   const results: OutfitResult[] = topList.map(combo => {
     const layering = generateLayeringRecommendation({ context: layeringCtx, slots: combo.slots });
 
-    // Confidence-weighted score boost: outfits with high layering confidence
-    // (well-matched layers, stable weather) get a small bump; low confidence
-    // (wardrobe gaps, high variability) gets nothing. Range: 0 to +3 points.
     const confidenceBoost = Math.round((layering.confidence - 0.5) * 6);
     const adjustedScore = Math.max(0, Math.min(100, combo.score + confidenceBoost));
 
@@ -959,10 +992,10 @@ export const generateOutfits = (
       scoreBreakdown:  combo.breakdown,
       layering,
       isPersonalized,
+      moodLabel:       combo.moodLabel,
     };
   });
 
-  // Re-sort after confidence adjustment (may swap adjacent results)
   results.sort((a, b) => b.score - a.score);
 
   return { results, status: 'ok' };

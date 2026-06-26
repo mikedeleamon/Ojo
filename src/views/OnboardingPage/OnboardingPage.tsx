@@ -123,7 +123,7 @@ export default function OnboardingPage({ onComplete }: Props) {
   const [closetErr,     setClosetErr]     = useState<string | null>(null);
   const [closetLoading, setClosetLoading] = useState(false);
 
-  const [styleChoice,  setStyleChoice]  = useState(settings.clothingStyle || 'Casual');
+  const [styleChoice,  setStyleChoice]  = useState<string[]>(settings.clothingStyles?.length ? settings.clothingStyles : ['Casual']);
   const [genderChoice, setGenderChoice] = useState<string>(settings.gender || 'All');
   const [tempUnit,     setTempUnit]     = useState<'Imperial' | 'Metric'>(
     (settings.temperatureScale as 'Imperial' | 'Metric') || 'Imperial',
@@ -192,7 +192,7 @@ export default function OnboardingPage({ onComplete }: Props) {
     try {
       await saveSettings({
         ...settings,
-        clothingStyle:      styleChoice,
+        clothingStyles:     styleChoice,
         temperatureScale:   tempUnit,
         gender:             genderChoice,
         hiTempThreshold:    hiTempF,
@@ -401,18 +401,27 @@ export default function OnboardingPage({ onComplete }: Props) {
                   <View style={st.prefSection}>
                     <Text style={st.prefLabel}>Clothing style</Text>
                     <View style={st.chipGrid}>
-                      {STYLES_LIST.map(s => (
-                        <Pressable
-                          key={s}
-                          style={[st.chip, styleChoice === s && st.chipActive]}
-                          onPress={() => setStyleChoice(s)}
-                          accessibilityRole="radio"
-                          accessibilityLabel={s}
-                          accessibilityState={{ selected: styleChoice === s }}
-                        >
-                          <Text style={[st.chipText, styleChoice === s && st.chipTextActive]}>{s}</Text>
-                        </Pressable>
-                      ))}
+                      {STYLES_LIST.map(s => {
+                        const active = styleChoice.includes(s);
+                        return (
+                          <Pressable
+                            key={s}
+                            style={[st.chip, active && st.chipActive]}
+                            onPress={() => {
+                              setStyleChoice(prev =>
+                                prev.includes(s)
+                                  ? prev.length > 1 ? prev.filter(x => x !== s) : prev
+                                  : [...prev, s]
+                              );
+                            }}
+                            accessibilityRole="checkbox"
+                            accessibilityLabel={s}
+                            accessibilityState={{ checked: active }}
+                          >
+                            <Text style={[st.chipText, active && st.chipTextActive]}>{s}</Text>
+                          </Pressable>
+                        );
+                      })}
                     </View>
                   </View>
 

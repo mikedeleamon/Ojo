@@ -89,6 +89,7 @@ const ARTICLE_EDITABLE_FIELDS = [
   'clothingType',
   'topOrBottom',
   'clothingCategory',
+  'clothingCategories',
   'fabricType',
   'color',
   'gender',

@@ -7,6 +7,7 @@ import type {
     TripFitDaySnapshot,
     TripFitStatus,
 } from '../../types';
+import { articleCategories } from '../../types';
 import type { OutfitResult, OutfitRole } from '../../lib/outfit/types';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -96,7 +97,7 @@ export function phraseEmoji(phrase: string): string {
 export function categoryKey(a: ClothingArticle): string {
     if (a.isAccessory) return 'accessory';
     const cat = (
-        a.clothingCategory ??
+        articleCategories(a)[0] ??
         a.topOrBottom ??
         a.clothingType ??
         ''

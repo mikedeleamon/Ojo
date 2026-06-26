@@ -4,11 +4,13 @@ export type { GarmentType, DetectedColor, FabricGuess };
 export type BodyZone = 'Head' | 'Neck' | 'Wrist' | 'Hand' | 'Waist' | 'Ankle' | 'Carried';
 
 export interface ArticleFormData {
-  name:             string;
-  clothingType:     string;
-  topOrBottom:      string;
-  clothingCategory: string;
-  fabricType:       string;
+  name:               string;
+  clothingType:       string;
+  topOrBottom:        string;
+  clothingCategories: string[];
+  /** @deprecated Derived from clothingCategories[0] for server backward compat. */
+  clothingCategory?:  string;
+  fabricType:         string;
   color:            string;
   gender?:          string;
   isAccessory:      boolean;
@@ -109,9 +111,9 @@ export interface WeatherSnapshot {
 }
 
 export interface Settings {
-  clothingStyle: string;
-  /** Multi-select extension of clothingStyle. First entry is used as the primary style for outfit scoring. */
-  clothingStyles?: string[];
+  clothingStyles: string[];
+  /** @deprecated Read-only — kept for backward compat with old server payloads. Use clothingStyles. */
+  clothingStyle?: string;
   location: string;
   /** Coordinates resolved from `location`; sent up so the server cron can call WeatherKit. */
   lat?: number;
@@ -128,11 +130,13 @@ export interface Settings {
 }
 
 export interface ClothingArticle {
-  _id:              string;
-  clothingType:     string;
-  name?:            string;
-  topOrBottom?:     string;
-  clothingCategory?:string;
+  _id:                 string;
+  clothingType:        string;
+  name?:               string;
+  topOrBottom?:        string;
+  clothingCategories?: string[];
+  /** @deprecated Use clothingCategories. Kept for articles saved before multi-category support. */
+  clothingCategory?:   string;
   fabricType?:      string;
   color?:           string;
   gender?:          string;
@@ -147,6 +151,13 @@ export interface ClothingArticle {
   detectedFabric?:           FabricGuess;
   identificationConfidence?: number;
 }
+
+/** Returns the article's categories, normalising old single-string articles. */
+export const articleCategories = (a: ClothingArticle | ArticleFormData): string[] => {
+  if ('clothingCategories' in a && a.clothingCategories?.length) return a.clothingCategories;
+  if (a.clothingCategory) return [a.clothingCategory];
+  return [];
+};
 
 export interface NotificationSettings {
   morningBriefEnabled:    boolean;

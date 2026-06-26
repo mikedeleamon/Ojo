@@ -11,6 +11,13 @@ import {
     Animated as RNAnimated,
     Easing as RNEasing,
 } from 'react-native';
+import Animated, {
+    useSharedValue,
+    useAnimatedStyle,
+    withTiming,
+    interpolate,
+    Easing,
+} from 'react-native-reanimated';
 import { Svg, Circle } from 'react-native-svg';
 import { View, Text, GlassCard, GlassGroup } from '../primitives';
 import { EmptyState } from '../shared';
@@ -304,12 +311,43 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
     );
     const nav = useAppNavigation();
 
+    // ─── Wore-today crossfade (UI-thread only via shared value) ───────────────
+    const confirmProgress = useSharedValue(0); // 0 = carousel, 1 = confirmation
+    const [carouselHeight, setCarouselHeight] = useState(0);
+    const [confirmHeight, setConfirmHeight]   = useState(0);
+
+    useEffect(() => {
+        confirmProgress.value = withTiming(wornLogged ? 1 : 0, {
+            duration: reduceMotion ? 0 : 280,
+            easing: Easing.inOut(Easing.ease),
+        });
+    }, [wornLogged, reduceMotion]);
+
+    const containerAnimStyle = useAnimatedStyle(() => {
+        const from = carouselHeight;
+        const to   = confirmHeight;
+        if (!from && !to) return {};
+        return {
+            height: interpolate(confirmProgress.value, [0, 1], [from, to]),
+            overflow: 'hidden' as const,
+        };
+    });
+
+    const carouselAnimStyle = useAnimatedStyle(() => ({
+        opacity: interpolate(confirmProgress.value, [0, 0.45, 1], [1, 0, 0]),
+        position: 'absolute' as const,
+        top: 0, left: 0, right: 0,
+    }));
+
+    const confirmAnimStyle = useAnimatedStyle(() => ({
+        opacity: interpolate(confirmProgress.value, [0, 0.55, 1], [0, 0, 1]),
+        position: 'absolute' as const,
+        top: 0, left: 0, right: 0,
+    }));
+
     // ─── #5: Swipe hint bounce (first render only) ──────────────────────────
     const hintAnim = useRef(new RNAnimated.Value(0)).current;
     const hintFired = useRef(false);
-
-    // ─── #8: Haptic + green glow on "Wore this today" ──────────────────────
-    const glowAnim = useRef(new RNAnimated.Value(0)).current;
 
     // ─── Pager ───────────────────────────────────────────────────────────────
     const { width: windowWidth } = useWindowDimensions();
@@ -413,7 +451,6 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
 
     const handleWoreThis = async () => {
         if (!preferred || !activeOutfit || activeOutfit.status !== 'ok') return;
-        // Success haptic — logging an outfit is a completed, consequential action.
         hapticSuccess();
         const articles = activeSlots.map((s) => s.article);
         const entry = await addHistoryEntry({
@@ -424,27 +461,12 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
                 .map((a) => a.name || a.clothingType)
                 .join(', '),
         });
-        // Append the new entry so the derived preference profile (and the ranker)
-        // reflect this outfit immediately, without a round-trip to reload history.
         setHistory((prev) => [entry, ...prev]);
         setWornLogged(true);
-        // #8 — green glow animation (skipped under Reduce Motion)
-        if (!reduceMotion) {
-            glowAnim.setValue(0);
-            RNAnimated.sequence([
-                RNAnimated.timing(glowAnim, {
-                    toValue: 1,
-                    duration: 300,
-                    useNativeDriver: false,
-                }),
-                RNAnimated.timing(glowAnim, {
-                    toValue: 0,
-                    duration: 800,
-                    useNativeDriver: false,
-                }),
-            ]).start();
-        }
-        setTimeout(() => setWornLogged(false), 3000);
+    };
+
+    const handleUndoLog = () => {
+        setWornLogged(false);
     };
 
     // Scroll the pager programmatically when activeIdx changes via dot taps or resets
@@ -581,16 +603,6 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
         outputRange: [0, -28],
     });
 
-    // #8 — Green glow interpolation for "Wore this today"
-    const glowBorderColor = glowAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: ['rgba(52,211,153,0)', 'rgba(52,211,153,0.65)'],
-    });
-    const glowShadowOpacity = glowAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: [0, 0.35],
-    });
-
     // #10 — Why this outfit explanation
     const whyExplanation = activeOutfit
         ? whyThisOutfit(activeOutfit.scoreBreakdown)
@@ -605,255 +617,321 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
         });
     };
 
+    const loggedArticles = activeSlots.map((s) => s.article);
+    const repeatCount = history.filter((e) =>
+        loggedArticles.every((a) => e.articleIds.includes(a._id)),
+    ).length;
+
     return (
         <View style={styles.root}>
-            {/* ── Header ── */}
+            {/* ── Header (always visible) ── */}
             <View style={styles.header}>
                 <PreferredBadge
                     name={preferred.name}
                     onPress={() => nav.push('/(tabs)/closet')}
                 />
-                <View style={styles.scoreBadgeRow}>
-                    <ScoreBadge
-                        score={activeOutfit.score}
-                        isPersonalized={scoreLevel === 'active'}
-                        isLearning={scoreLevel === 'learning'}
-                    />
-                    <Pressable
-                        onPress={() =>
-                            Alert.alert('Outfit', undefined, [
-                                {
-                                    text: '↑  Share outfit',
-                                    onPress: handleShare,
-                                },
-                                { text: 'Cancel', style: 'cancel' },
-                            ])
-                        }
-                        style={styles.overflowBtn}
-                        accessibilityLabel='More outfit options'
-                        accessibilityRole='button'
-                        hitSlop={8}
-                    >
-                        <Text style={styles.overflowBtnText}>···</Text>
-                    </Pressable>
-                </View>
-            </View>
-
-            {/* ── Occasion quick-switch ── */}
-            <OccasionChips
-                active={occasionOverride}
-                onChange={(o) => {
-                    setOccasionOverride(o);
-                    setActiveIdx(0);
-                    setShowBreakdown(false);
-                    setWornLogged(false);
-                    setRemovedByOutfit(new Map());
-                }}
-            />
-
-            {/* #2 — Headline above pager */}
-            <Text style={styles.headline}>{activeOutfit.headline}</Text>
-
-            {/* #10 — Why this outfit explanation */}
-            {whyExplanation && (
-                <Text style={styles.whyText}>{whyExplanation}</Text>
-            )}
-
-            {/* ── Outfit pager with #5 swipe hint bounce ── */}
-            <RNAnimated.View
-                style={{ transform: [{ translateX: hintTranslateX }] }}
-            >
-                <ScrollView
-                    ref={pagerRef}
-                    horizontal
-                    pagingEnabled
-                    showsHorizontalScrollIndicator={false}
-                    scrollEventThrottle={16}
-                    decelerationRate='fast'
-                    onMomentumScrollEnd={(e) => {
-                        const page = Math.round(
-                            e.nativeEvent.contentOffset.x / cardWidth,
-                        );
-                        if (page !== activeIdx) {
-                            setActiveIdx(page);
-                            setWornLogged(false);
-                            setShowBreakdown(false);
-                        }
-                    }}
-                >
-                    {outfits.map((outfit, i) => {
-                        const cardRemovedIds =
-                            removedByOutfit.get(i) ?? new Set<string>();
-                        return (
-                            <View
-                                key={i}
-                                style={[styles.pagerCard, { width: cardWidth }]}
-                            >
-                                <GlassGroup
-                                    spacing={12}
-                                    style={styles.pagerCardArticles}
-                                >
-                                    {outfit.slots
-                                        .filter(
-                                            (s) =>
-                                                !cardRemovedIds.has(
-                                                    s.article._id,
-                                                ),
-                                        )
-                                        .map((slot, j) => (
-                                            <ArticleThumb
-                                                key={j}
-                                                article={slot.article}
-                                                role={slot.role}
-                                                onRemove={
-                                                    REMOVABLE_ROLES.includes(
-                                                        slot.role,
-                                                    )
-                                                        ? () =>
-                                                              handleRemoveSlot(
-                                                                  i,
-                                                                  slot.article
-                                                                      ._id,
-                                                              )
-                                                        : undefined
-                                                }
-                                            />
-                                        ))}
-                                </GlassGroup>
-                                <View style={styles.pagerCardFooter}>
-                                    <Text style={styles.pagerSubtitle}>
-                                        {outfitTabSubtitle(outfit)}
-                                    </Text>
-                                </View>
-                            </View>
-                        );
-                    })}
-                </ScrollView>
-            </RNAnimated.View>
-
-            {/* ── Page dots (also tappable) + #4 reset undo ── */}
-            <View style={styles.dotsRow}>
-                {outfits.length > 1 && (
-                    <View style={styles.dots}>
-                        {outfits.map((_, i) => (
-                            <Pressable
-                                key={i}
-                                hitSlop={8}
-                                style={[
-                                    styles.dot,
-                                    i === safeIdx && styles.dotActive,
-                                ]}
-                                onPress={() => {
-                                    setActiveIdx(i);
-                                    setWornLogged(false);
-                                    setShowBreakdown(false);
-                                }}
-                            />
-                        ))}
+                {!wornLogged && (
+                    <View style={styles.scoreBadgeRow}>
+                        <ScoreBadge
+                            score={activeOutfit.score}
+                            isPersonalized={scoreLevel === 'active'}
+                            isLearning={scoreLevel === 'learning'}
+                        />
+                        <Pressable
+                            onPress={() =>
+                                Alert.alert('Outfit', undefined, [
+                                    {
+                                        text: '↑  Share outfit',
+                                        onPress: handleShare,
+                                    },
+                                    { text: 'Cancel', style: 'cancel' },
+                                ])
+                            }
+                            style={styles.overflowBtn}
+                            accessibilityLabel='More outfit options'
+                            accessibilityRole='button'
+                            hitSlop={8}
+                        >
+                            <Text style={styles.overflowBtnText}>···</Text>
+                        </Pressable>
                     </View>
                 )}
-                {removedIds.size > 0 && (
-                    <Pressable
-                        onPress={handleResetOutfit}
-                        style={styles.resetLink}
-                    >
-                        <Text style={styles.resetLinkText}>Reset outfit</Text>
-                    </Pressable>
-                )}
             </View>
 
-            {/* ── Gap card ── */}
-            {gapSuggestion && !gapDismissed && (
-                <GapCard
-                    suggestion={gapSuggestion}
-                    onDismiss={() => setGapDismissed(true)}
-                />
-            )}
-
-            {/* ── Score breakdown ── */}
-            <Pressable
-                style={styles.breakdownToggle}
-                onPress={() => setShowBreakdown((v) => !v)}
-            >
-                <Text style={styles.breakdownToggleText}>
-                    {showBreakdown ? 'Hide breakdown' : 'Score breakdown'}
-                </Text>
-            </Pressable>
-
-            {showBreakdown && (
-                <View style={styles.breakdownRow}>
-                    {BREAKDOWN_LABELS.map(({ key, label }) => (
-                        <View
-                            key={key}
-                            style={styles.breakdownItem}
-                        >
-                            <Text style={styles.breakdownLabel}>{label}</Text>
-                            <View style={styles.breakdownBarBg}>
-                                <View
-                                    style={[
-                                        styles.breakdownBarFill,
-                                        {
-                                            width: `${activeOutfit.scoreBreakdown[key]}%` as any,
-                                        },
-                                    ]}
-                                />
-                            </View>
-                            <Text style={styles.breakdownValue}>
-                                {activeOutfit.scoreBreakdown[key]}
-                            </Text>
-                        </View>
-                    ))}
-                </View>
-            )}
-
-            {/* ── Notes ── */}
-            {activeOutfit.notes.length > 0 && (
-                <View style={styles.notesList}>
-                    {activeOutfit.notes.map((n, i) => (
-                        <Text
-                            key={i}
-                            style={styles.note}
-                        >
-                            · {n}
-                        </Text>
-                    ))}
-                </View>
-            )}
-
-            {/* ── Layering recommendation ── */}
-            {showLayering && filteredLayering && (
-                <LayeringSection layering={filteredLayering} />
-            )}
-
-            {/* ── #8: Wore this today with haptic + green glow ── */}
-            <RNAnimated.View
-                style={[
-                    styles.woreThisGlow,
-                    {
-                        borderColor: glowBorderColor,
-                        shadowColor: 'rgba(52,211,153,1)',
-                        shadowOpacity: glowShadowOpacity as any,
-                    },
-                ]}
-            >
-                <Pressable
-                    style={[
-                        styles.woreThisBtn,
-                        wornLogged && styles.woreThisLogged,
-                    ]}
-                    onPress={handleWoreThis}
-                    disabled={wornLogged}
+            {/* ── Crossfade container — both panels always mounted ── */}
+            <Animated.View style={containerAnimStyle}>
+                {/* ── Carousel panel ── */}
+                <Animated.View
+                    style={carouselAnimStyle}
+                    pointerEvents={wornLogged ? 'none' : 'auto'}
+                    onLayout={(e) =>
+                        setCarouselHeight(e.nativeEvent.layout.height)
+                    }
                 >
-                    <Text
-                        style={[
-                            styles.woreThisText,
-                            wornLogged && styles.woreThisTextLogged,
-                        ]}
-                    >
-                        {wornLogged ? '✓ Logged!' : '⏱ Wore this today'}
+                    {/* ── Occasion quick-switch ── */}
+                    <OccasionChips
+                        active={occasionOverride}
+                        onChange={(o) => {
+                            setOccasionOverride(o);
+                            setActiveIdx(0);
+                            setShowBreakdown(false);
+                            setRemovedByOutfit(new Map());
+                        }}
+                    />
+
+                    {/* #2 — Headline above pager */}
+                    <Text style={styles.headline}>
+                        {activeOutfit.headline}
                     </Text>
-                </Pressable>
-            </RNAnimated.View>
+
+                    {/* #10 — Why this outfit explanation */}
+                    {whyExplanation && (
+                        <Text style={styles.whyText}>
+                            {whyExplanation}
+                        </Text>
+                    )}
+
+                    {/* ── Outfit pager with #5 swipe hint bounce ── */}
+                    <RNAnimated.View
+                        style={{
+                            transform: [{ translateX: hintTranslateX }],
+                        }}
+                    >
+                        <ScrollView
+                            ref={pagerRef}
+                            horizontal
+                            pagingEnabled
+                            showsHorizontalScrollIndicator={false}
+                            scrollEventThrottle={16}
+                            decelerationRate='fast'
+                            onMomentumScrollEnd={(e) => {
+                                const page = Math.round(
+                                    e.nativeEvent.contentOffset.x / cardWidth,
+                                );
+                                if (page !== activeIdx) {
+                                    setActiveIdx(page);
+                                    setShowBreakdown(false);
+                                }
+                            }}
+                        >
+                            {outfits.map((outfit, i) => {
+                                const cardRemovedIds =
+                                    removedByOutfit.get(i) ??
+                                    new Set<string>();
+                                return (
+                                    <View
+                                        key={i}
+                                        style={[
+                                            styles.pagerCard,
+                                            { width: cardWidth },
+                                        ]}
+                                    >
+                                        <GlassGroup
+                                            spacing={12}
+                                            style={styles.pagerCardArticles}
+                                        >
+                                            {outfit.slots
+                                                .filter(
+                                                    (s) =>
+                                                        !cardRemovedIds.has(
+                                                            s.article._id,
+                                                        ),
+                                                )
+                                                .map((slot, j) => (
+                                                    <ArticleThumb
+                                                        key={j}
+                                                        article={slot.article}
+                                                        role={slot.role}
+                                                        onRemove={
+                                                            REMOVABLE_ROLES.includes(
+                                                                slot.role,
+                                                            )
+                                                                ? () =>
+                                                                      handleRemoveSlot(
+                                                                          i,
+                                                                          slot.article._id,
+                                                                      )
+                                                                : undefined
+                                                        }
+                                                    />
+                                                ))}
+                                        </GlassGroup>
+                                        <View style={styles.pagerCardFooter}>
+                                            <Text style={styles.pagerSubtitle}>
+                                                {outfitTabSubtitle(outfit)}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                );
+                            })}
+                        </ScrollView>
+                    </RNAnimated.View>
+
+                    {/* ── Page dots + reset ── */}
+                    <View style={styles.dotsRow}>
+                        {outfits.length > 1 && (
+                            <View style={styles.dots}>
+                                {outfits.map((_, i) => (
+                                    <Pressable
+                                        key={i}
+                                        hitSlop={8}
+                                        style={[
+                                            styles.dot,
+                                            i === safeIdx && styles.dotActive,
+                                        ]}
+                                        onPress={() => {
+                                            setActiveIdx(i);
+                                            setShowBreakdown(false);
+                                        }}
+                                    />
+                                ))}
+                            </View>
+                        )}
+                        {removedIds.size > 0 && (
+                            <Pressable
+                                onPress={handleResetOutfit}
+                                style={styles.resetLink}
+                            >
+                                <Text style={styles.resetLinkText}>
+                                    Reset outfit
+                                </Text>
+                            </Pressable>
+                        )}
+                    </View>
+
+                    {/* ── Gap card ── */}
+                    {gapSuggestion && !gapDismissed && (
+                        <GapCard
+                            suggestion={gapSuggestion}
+                            onDismiss={() => setGapDismissed(true)}
+                        />
+                    )}
+
+                    {/* ── Score breakdown ── */}
+                    <Pressable
+                        style={styles.breakdownToggle}
+                        onPress={() => setShowBreakdown((v) => !v)}
+                    >
+                        <Text style={styles.breakdownToggleText}>
+                            {showBreakdown ? 'Hide breakdown' : 'Score breakdown'}
+                        </Text>
+                    </Pressable>
+
+                    {showBreakdown && (
+                        <View style={styles.breakdownRow}>
+                            {BREAKDOWN_LABELS.map(({ key, label }) => (
+                                <View key={key} style={styles.breakdownItem}>
+                                    <Text style={styles.breakdownLabel}>
+                                        {label}
+                                    </Text>
+                                    <View style={styles.breakdownBarBg}>
+                                        <View
+                                            style={[
+                                                styles.breakdownBarFill,
+                                                {
+                                                    width: `${activeOutfit.scoreBreakdown[key]}%` as any,
+                                                },
+                                            ]}
+                                        />
+                                    </View>
+                                    <Text style={styles.breakdownValue}>
+                                        {activeOutfit.scoreBreakdown[key]}
+                                    </Text>
+                                </View>
+                            ))}
+                        </View>
+                    )}
+
+                    {/* ── Notes ── */}
+                    {activeOutfit.notes.length > 0 && (
+                        <View style={styles.notesList}>
+                            {activeOutfit.notes.map((n, i) => (
+                                <Text key={i} style={styles.note}>
+                                    · {n}
+                                </Text>
+                            ))}
+                        </View>
+                    )}
+
+                    {/* ── Layering recommendation ── */}
+                    {showLayering && filteredLayering && (
+                        <LayeringSection layering={filteredLayering} />
+                    )}
+
+                    {/* ── Wore this today ── */}
+                    <Pressable
+                        style={styles.woreThisBtn}
+                        onPress={handleWoreThis}
+                    >
+                        <Text style={styles.woreThisText}>
+                            Wore this today
+                        </Text>
+                    </Pressable>
+                </Animated.View>
+
+                {/* ── Confirmation panel ── */}
+                <Animated.View
+                    style={confirmAnimStyle}
+                    pointerEvents={wornLogged ? 'auto' : 'none'}
+                    onLayout={(e) =>
+                        setConfirmHeight(e.nativeEvent.layout.height)
+                    }
+                >
+                    <View style={styles.confirmCard}>
+                        <Text style={styles.confirmTitle}>
+                            Logged for today
+                        </Text>
+
+                        <GlassGroup
+                            spacing={12}
+                            style={styles.pagerCardArticles}
+                        >
+                            {activeSlots.map((slot, j) => (
+                                <ArticleThumb
+                                    key={j}
+                                    article={slot.article}
+                                    role={slot.role}
+                                />
+                            ))}
+                        </GlassGroup>
+
+                        <View style={styles.confirmStats}>
+                            <View style={styles.confirmStat}>
+                                <Text style={styles.confirmStatValue}>
+                                    {history.length}
+                                </Text>
+                                <Text style={styles.confirmStatLabel}>
+                                    outfits logged
+                                </Text>
+                            </View>
+                            <View style={styles.confirmStat}>
+                                <Text style={styles.confirmStatValue}>
+                                    {activeOutfit.score}
+                                </Text>
+                                <Text style={styles.confirmStatLabel}>
+                                    outfit score
+                                </Text>
+                            </View>
+                            {repeatCount > 1 && (
+                                <View style={styles.confirmStat}>
+                                    <Text style={styles.confirmStatValue}>
+                                        {repeatCount}x
+                                    </Text>
+                                    <Text style={styles.confirmStatLabel}>
+                                        worn this combo
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+                    </View>
+
+                    <Pressable onPress={handleUndoLog} style={styles.confirmUndo}>
+                        <Text style={styles.confirmUndoText}>
+                            Wore something else?
+                        </Text>
+                    </Pressable>
+                </Animated.View>
+            </Animated.View>
         </View>
     );
 };

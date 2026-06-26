@@ -12,7 +12,7 @@
  * copy that was never read back.
  */
 
-import { ClothingArticle, Closet, OutfitHistoryEntry } from '../types';
+import { ClothingArticle, Closet, OutfitHistoryEntry, articleCategories } from '../types';
 
 export interface UserPreferenceProfile {
   colors:       Record<string, number>;
@@ -62,9 +62,11 @@ export const derivePreferenceProfile = (
     for (const id of entry.articleIds) {
       const a = byId.get(id);
       if (!a) continue;
-      if (a.color)            profile.colors[a.color]                = (profile.colors[a.color]                ?? 0) + 1;
-      if (a.fabricType)       profile.fabrics[a.fabricType]          = (profile.fabrics[a.fabricType]          ?? 0) + 1;
-      if (a.clothingCategory) profile.categories[a.clothingCategory] = (profile.categories[a.clothingCategory] ?? 0) + 1;
+      if (a.color)      profile.colors[a.color]          = (profile.colors[a.color]          ?? 0) + 1;
+      if (a.fabricType) profile.fabrics[a.fabricType]    = (profile.fabrics[a.fabricType]    ?? 0) + 1;
+      for (const cat of articleCategories(a)) {
+        profile.categories[cat] = (profile.categories[cat] ?? 0) + 1;
+      }
       if (a.color) outfitColors.push(a.color);
     }
 
@@ -107,9 +109,12 @@ export const articlePreferenceScore = (
     return (count + 1) / (maxCount + 1);
   };
 
-  const colorScore  = relScore(profile.colors,      article.color);
-  const fabricScore = relScore(profile.fabrics,      article.fabricType);
-  const catScore    = relScore(profile.categories,   article.clothingCategory);
+  const colorScore  = relScore(profile.colors,  article.color);
+  const fabricScore = relScore(profile.fabrics, article.fabricType);
+  const cats = articleCategories(article);
+  const catScore = cats.length
+    ? Math.max(...cats.map(cat => relScore(profile.categories, cat)))
+    : relScore(profile.categories, undefined);
 
   return colorScore * 0.5 + fabricScore * 0.3 + catScore * 0.2;
 };

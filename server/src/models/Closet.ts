@@ -6,6 +6,7 @@ export interface IArticle extends Document {
   name?: string;
   topOrBottom?: string;
   clothingCategory?: string;
+  clothingCategories?: string[];
   fabricType?: string;
   color?: string;
   gender?: string;
@@ -30,7 +31,8 @@ const articleSchema = new Schema<IArticle>({
   clothingType:     { type: String, required: true },
   name:             { type: String },
   topOrBottom:      { type: String },
-  clothingCategory: { type: String },
+  clothingCategory:   { type: String },
+  clothingCategories: { type: [String], default: undefined },
   fabricType:       { type: String },
   color:            { type: String },
   gender:           { type: String, enum: ["Men's", "Women's", 'Unisex'], default: 'Unisex' },

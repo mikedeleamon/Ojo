@@ -20,8 +20,9 @@ const getSublabel = (
   if (key === 'temperatureScale') return settings.temperatureScale === 'Imperial' ? '°F' : '°C';
   if (key === 'clothingStyle') {
     const arr = settings.clothingStyles;
-    if (arr && arr.length > 0) return arr.join(', ');
-    return settings.clothingStyle || '';
+    if (!arr?.length) return settings.clothingStyle ?? '';
+    if (arr.length <= 2) return arr.join(', ');
+    return `${arr.slice(0, 2).join(', ')} +${arr.length - 2}`;
   }
   const v = settings[key];
   return typeof v === 'string' && v.trim() ? v : '';

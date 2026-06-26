@@ -5,6 +5,7 @@
 
 export const CATEGORIES = [
     'Casual',
+    'Streetwear',
     'Formal',
     'Business Casual',
     'Athletic',

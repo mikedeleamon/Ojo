@@ -578,9 +578,8 @@ export default function PreferencesScreen() {
     );
 
     const { settings, saveSettings, settingsReady } = useSettings();
-    const [clothingStyles, setClothingStyles] = useState<string[]>(
-        settings.clothingStyles ?? [settings.clothingStyle],
-    );
+    const [clothingStyles, setClothingStyles] = useState<string[]>(settings.clothingStyles);
+    const [styleMinGuard, setStyleMinGuard] = useState(false);
     const [gender, setGender] = useState(settings.gender || 'All');
     const [tempScale, setTempScale] = useState<'Imperial' | 'Metric'>(
         settings.temperatureScale as 'Imperial' | 'Metric',
@@ -611,7 +610,7 @@ export default function PreferencesScreen() {
     useEffect(() => {
         if (!settingsReady) return;
         const isCelsius = settings.temperatureScale === 'Metric';
-        setClothingStyles(settings.clothingStyles ?? [settings.clothingStyle]);
+        setClothingStyles(settings.clothingStyles);
         setGender(settings.gender || 'All');
         setTempScale(settings.temperatureScale as 'Imperial' | 'Metric');
         setHiTemp(settings.hiTempThreshold);
@@ -635,7 +634,6 @@ export default function PreferencesScreen() {
 
     const currentSettings = (overrides: Partial<typeof settings>) => ({
         ...settings,
-        clothingStyle: clothingStyles[0] ?? settings.clothingStyle,
         clothingStyles,
         gender,
         temperatureScale: tempScale,
@@ -662,17 +660,18 @@ export default function PreferencesScreen() {
     // };
 
     const handleStyleChange = (s: string) => {
+        if (clothingStyles.includes(s) && clothingStyles.length === 1) {
+            hapticSelection();
+            setStyleMinGuard(true);
+            setTimeout(() => setStyleMinGuard(false), 2000);
+            return;
+        }
         hapticSelection();
         const next = clothingStyles.includes(s)
-            ? clothingStyles.length > 1
-                ? clothingStyles.filter((x) => x !== s)
-                : clothingStyles // keep at least one selected
+            ? clothingStyles.filter((x) => x !== s)
             : [...clothingStyles, s];
         setClothingStyles(next);
-        saveSettings(currentSettings({
-            clothingStyle: next[0] ?? s,
-            clothingStyles: next,
-        })).catch(() => {});
+        saveSettings(currentSettings({ clothingStyles: next })).catch(() => {});
     };
 
     const handleGenderChange = (g: string) => {
@@ -775,6 +774,11 @@ export default function PreferencesScreen() {
                                 );
                             })}
                         </View>
+                        {styleMinGuard && (
+                            <Text style={styles.historyEmpty}>
+                                At least one style must be selected.
+                            </Text>
+                        )}
                     </View>
 
                     {/* Wardrobe gender */}

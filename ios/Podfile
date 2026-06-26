@@ -46,6 +46,11 @@ target 'Ojo' do
   # so we reference it explicitly to avoid CocoaPods searching the CDN trunk.
   pod 'NitroModules', :path => '../node_modules/react-native-nitro-modules'
 
+  # Required by @react-native-google-signin/google-signin — AppCheckCore (a Google
+  # transitive dep) is a Swift pod that needs these two to expose module maps.
+  pod 'GoogleUtilities', :modular_headers => true
+  pod 'RecaptchaInterop', :modular_headers => true
+
   use_frameworks! :linkage => podfile_properties['ios.useFrameworks'].to_sym if podfile_properties['ios.useFrameworks']
   use_frameworks! :linkage => ENV['USE_FRAMEWORKS'].to_sym if ENV['USE_FRAMEWORKS']
 

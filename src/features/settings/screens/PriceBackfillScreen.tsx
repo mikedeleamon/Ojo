@@ -14,7 +14,7 @@ import { HangerIcon } from '../../../components/shared';
 import Loading from '../../../components/Loading/Loading';
 import { useClosets } from '../../../hooks/useClosets';
 import { hapticSuccess } from '../../../lib/haptics';
-import { ClothingArticle, ArticleFormData } from '../../../types';
+import { ClothingArticle, ArticleFormData, articleCategories } from '../../../types';
 import { spacing, radius, fonts, fontSizes, fontWeights } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/ThemeContext';
 import { ColorTokens } from '../../../theme/tokens';
@@ -24,7 +24,8 @@ const toForm = (a: ClothingArticle, price: number): ArticleFormData => ({
   name:             a.name             ?? '',
   clothingType:     a.clothingType     ?? '',
   topOrBottom:      a.topOrBottom      ?? '',
-  clothingCategory: a.clothingCategory ?? '',
+  clothingCategories: articleCategories(a),
+  clothingCategory: articleCategories(a)[0] ?? '',
   fabricType:       a.fabricType       ?? '',
   color:            a.color            ?? '',
   gender:           a.gender           ?? 'Unisex',

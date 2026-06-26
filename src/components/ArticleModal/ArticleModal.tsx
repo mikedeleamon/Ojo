@@ -10,7 +10,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import { View, Text } from '../primitives';
 import { pickImage, captureImage, uploadImageToR2 } from '../../lib/imageService';
 import { getErrorMessage } from '../../lib/auth';
-import { ClothingArticle, ArticleFormData, BodyZone } from '../../types';
+import { ClothingArticle, ArticleFormData, BodyZone, articleCategories } from '../../types';
 import { identifyClothing } from '../../services/clothingIdentifier';
 import type { GarmentType, FabricGuess, DetectedColor } from '../../services/clothingIdentifier.types';
 import { ColorTokens, fonts, fontSizes, fontWeights, spacing, radius } from '../../theme/tokens';
@@ -56,7 +56,7 @@ import { makeSt } from './ArticleModal.styles';
 // ─── Default state + edit hydration ───────────────────────────────────────────
 
 const EMPTY: ArticleFormData = {
-  name: '', clothingType: '', topOrBottom: '', clothingCategory: '',
+  name: '', clothingType: '', topOrBottom: '', clothingCategories: [],
   fabricType: '', color: '', gender: 'Unisex', isAccessory: false, bodyZone: undefined,
   merchant: '', purchasePrice: undefined, imageUrl: '',
   detectedGarmentType: undefined, detectedColors: undefined,
@@ -64,11 +64,11 @@ const EMPTY: ArticleFormData = {
 };
 
 const toForm = (a: ClothingArticle): ArticleFormData => ({
-  name:             a.name             ?? '',
-  clothingType:     a.clothingType     ?? '',
-  topOrBottom:      a.topOrBottom      ?? '',
-  clothingCategory: a.clothingCategory ?? '',
-  fabricType:       a.fabricType       ?? '',
+  name:               a.name         ?? '',
+  clothingType:       a.clothingType ?? '',
+  topOrBottom:        a.topOrBottom  ?? '',
+  clothingCategories: articleCategories(a),
+  fabricType:         a.fabricType   ?? '',
   color:            a.color            ?? '',
   gender:           a.gender           ?? 'Unisex',
   isAccessory:      a.isAccessory      ?? false,
@@ -167,6 +167,44 @@ const ChipField = ({
             <Text style={[st.chipText, value === item && st.chipTextActive]}>{item}</Text>
           </Pressable>
         ))}
+      </View>
+    </View>
+  );
+};
+
+const MultiChipField = ({
+  label, values, items, onValueChange, required = false,
+}: {
+  label: string; values: string[]; items: string[];
+  onValueChange: (v: string[]) => void; required?: boolean;
+}) => {
+  const { colors } = useTheme();
+  const st = useMemo(() => makeSt(colors), [colors]);
+  const toggle = (item: string) =>
+    onValueChange(
+      values.includes(item) ? values.filter(x => x !== item) : [...values, item],
+    );
+  return (
+    <View style={st.field}>
+      <FieldLabel>
+        {label}{required && <Text style={st.required}> *</Text>}
+      </FieldLabel>
+      <View style={st.chipGrid}>
+        {items.map(item => {
+          const active = values.includes(item);
+          return (
+            <Pressable
+              key={item}
+              style={[st.chip, active && st.chipActive]}
+              onPress={() => toggle(item)}
+              accessibilityRole="checkbox"
+              accessibilityLabel={item}
+              accessibilityState={{ checked: active }}
+            >
+              <Text style={[st.chipText, active && st.chipTextActive]}>{item}</Text>
+            </Pressable>
+          );
+        })}
       </View>
     </View>
   );
@@ -435,7 +473,14 @@ const ArticleModal = ({ closetId, onClose, onSubmit, initialData, onDelete, init
     setError(null);
     if (!form.clothingType) { setError('Clothing type is required.'); return; }
     setSaving(true);
-    try { await onSubmit(form); }
+    try {
+      await onSubmit({
+        ...form,
+        // Derive the legacy field from the first selected category so old
+        // server code that reads clothingCategory still works.
+        clothingCategory: form.clothingCategories[0] ?? '',
+      });
+    }
     catch (err) { setError(getErrorMessage(err, 'Failed to save article.')); }
     finally { setSaving(false); }
   };
@@ -597,12 +642,12 @@ const ArticleModal = ({ closetId, onClose, onSubmit, initialData, onDelete, init
             />
           )}
 
-          {/* Category */}
-          <ChipField
+          {/* Category — multi-select */}
+          <MultiChipField
             label='Category'
-            value={form.clothingCategory}
+            values={form.clothingCategories}
             items={CATEGORIES}
-            onValueChange={v => set('clothingCategory', v)}
+            onValueChange={v => set('clothingCategories', v)}
           />
 
           {/* Gender — auto-set for Dress/Skirt/Blouse, always overridable */}
