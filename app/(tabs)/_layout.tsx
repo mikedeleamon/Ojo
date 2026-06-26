@@ -13,7 +13,7 @@ export default function TabLayout() {
       <NativeTabs>
         <NativeTabs.Trigger name="index">
           <Label>Home</Label>
-          <Icon sf="sun.max.fill" />
+          <Icon src={require('../../assets/images/ojo_home_tab_icon.png')} />
         </NativeTabs.Trigger>
 
         <NativeTabs.Trigger name="closet">

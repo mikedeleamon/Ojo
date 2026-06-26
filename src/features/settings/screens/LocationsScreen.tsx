@@ -5,8 +5,8 @@ import {
   Platform,
   ScrollView,
   Animated,
-  PanResponder,
 } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -39,7 +39,6 @@ import { getAllSnapshots } from '../../../lib/weatherCache';
 import type { SavedLocation, WeatherSnapshot } from '../../../types';
 
 const SWIPE_ACTION_WIDTH = 80;
-const SWIPE_THRESHOLD    = 65; // px left to trigger delete on release
 
 function SwipeableLocationRow({
   children,
@@ -48,110 +47,56 @@ function SwipeableLocationRow({
   children: React.ReactNode;
   onDelete: () => void;
 }) {
-  const translateX        = useRef(new Animated.Value(0)).current;
-  const didPassThreshold  = useRef(false);
-  const onDeleteRef       = useRef(onDelete);
-  onDeleteRef.current     = onDelete;
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      // Only steal the gesture when movement is clearly horizontal-left.
-      onMoveShouldSetPanResponder: (_, gs) =>
-        gs.dx < -6 && Math.abs(gs.dx) > Math.abs(gs.dy) * 2,
-
-      onPanResponderGrant: () => {
-        translateX.stopAnimation();
-        translateX.setValue(0);
-        didPassThreshold.current = false;
-      },
-
-      onPanResponderMove: (_, gs) => {
-        const next = Math.min(Math.max(gs.dx, -SWIPE_ACTION_WIDTH * 1.6), 0);
-        translateX.setValue(next);
-        // Haptic tick the moment the full action is revealed.
-        if (gs.dx < -SWIPE_THRESHOLD && !didPassThreshold.current) {
-          didPassThreshold.current = true;
-          hapticSelection();
-        }
-      },
-
-      onPanResponderRelease: (_, gs) => {
-        if (gs.dx < -SWIPE_THRESHOLD) {
-          // Fly the row off to the left then remove.
-          hapticWarning();
-          Animated.timing(translateX, {
-            toValue: -600,
-            duration: 180,
-            useNativeDriver: true,
-          }).start(() => onDeleteRef.current());
-        } else {
-          // Not far enough — snap back.
-          Animated.spring(translateX, {
-            toValue: 0,
-            useNativeDriver: true,
-            bounciness: 8,
-          }).start();
-        }
-      },
-
-      onPanResponderTerminate: () => {
-        Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
-      },
-    }),
-  ).current;
-
-  // Delete-action opacity fades in as the row slides left.
-  const actionOpacity = translateX.interpolate({
-    inputRange: [-SWIPE_ACTION_WIDTH, -20, 0],
-    outputRange: [1, 0.4, 0],
-    extrapolate: 'clamp',
-  });
-  // Subtle scale-up on the label as it becomes fully revealed.
-  const actionScale = translateX.interpolate({
-    inputRange: [-SWIPE_ACTION_WIDTH, -SWIPE_THRESHOLD, 0],
-    outputRange: [1, 0.85, 0.7],
-    extrapolate: 'clamp',
-  });
-
-  return (
-    <View style={{ position: 'relative' }}>
-      {/* Red delete strip — sits behind the row, revealed as it slides left */}
-      <Animated.View
-        style={{
-          position: 'absolute',
-          right: 0, top: 0, bottom: 0,
-          width: SWIPE_ACTION_WIDTH,
-          borderRadius: radius.sm,
-          backgroundColor: 'rgba(239, 68, 68, 0.92)',
-          justifyContent: 'center',
-          alignItems: 'center',
-          opacity: actionOpacity,
-        }}
-        accessibilityElementsHidden
-        importantForAccessibility="no"
-      >
-        <Animated.Text
+  const renderRightActions = (
+    _progress: ReturnType<Animated.Value['interpolate']>,
+    dragX: ReturnType<Animated.Value['interpolate']>,
+    swipeable: Swipeable,
+  ) => {
+    const translateX = dragX.interpolate({
+      inputRange: [-SWIPE_ACTION_WIDTH, 0],
+      outputRange: [0, SWIPE_ACTION_WIDTH],
+      extrapolate: 'clamp',
+    });
+    return (
+      <Animated.View style={{ width: SWIPE_ACTION_WIDTH, alignSelf: 'stretch', transform: [{ translateX }] }}>
+        <Pressable
           style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: 'rgba(239, 68, 68, 0.92)',
+            borderRadius: radius.sm,
+          }}
+          onPress={() => {
+            hapticWarning();
+            swipeable.close();
+            onDelete();
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Delete location"
+        >
+          <Text style={{
             color: '#fff',
             fontFamily: fonts.body,
             fontSize: fontSizes.sm,
             fontWeight: fontWeights.semibold,
-            transform: [{ scale: actionScale }],
-          }}
-        >
-          Delete
-        </Animated.Text>
+          }}>
+            Delete
+          </Text>
+        </Pressable>
       </Animated.View>
+    );
+  };
 
-      {/* Row content — translates left on swipe */}
-      <Animated.View
-        {...panResponder.panHandlers}
-        style={{ transform: [{ translateX }] }}
-      >
-        {children}
-      </Animated.View>
-    </View>
+  return (
+    <Swipeable
+      renderRightActions={renderRightActions}
+      rightThreshold={40}
+      overshootRight={false}
+      onSwipeableWillOpen={() => hapticSelection()}
+    >
+      {children}
+    </Swipeable>
   );
 }
 

@@ -725,9 +725,14 @@ const WeatherHUD = ({
                             )}
                         </View>
 
-                        {/* Hourly forecast strip — interleaves sunrise/sunset tiles */}
+                        {/* Hourly forecast strip — interleaves sunrise/sunset tiles.
+                            Each tile is an individual GlassCard so it picks up
+                            colorScheme="dark" from ForceDarkPalette on MainPage,
+                            keeping tiles consistent between light and dark mode.
+                            (GlassGroup/GlassContainer has no colorScheme prop and
+                            always follows UIWindow, which breaks consistency.) */}
                         {stripItems.length > 0 && (
-                            <GlassGroup spacing={8}>
+                            <View>
                                 <ScrollView
                                     horizontal
                                     showsHorizontalScrollIndicator={false}
@@ -768,7 +773,7 @@ const WeatherHUD = ({
                                         ),
                                     )}
                                 </ScrollView>
-                            </GlassGroup>
+                            </View>
                         )}
 
                         {/* Details + outfit */}
