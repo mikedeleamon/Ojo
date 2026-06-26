@@ -44,7 +44,7 @@ const HOUR_LABEL = (h: number) => {
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-const makeLocalStyles = (colors: ColorTokens) => StyleSheet.create({
+const makeLocalStyles = (colors: ColorTokens, isDark: boolean) => StyleSheet.create({
   root:    { flex: 1, backgroundColor: colors.bgDefault },
   content: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xl },
   section: { gap: spacing.sm },
@@ -91,9 +91,9 @@ const makeLocalStyles = (colors: ColorTokens) => StyleSheet.create({
     gap:           6,
   },
   permBanner: {
-    backgroundColor: 'rgba(250, 204, 21, 0.08)',
+    backgroundColor: isDark ? 'rgba(250, 204, 21, 0.08)' : 'rgba(250, 204, 21, 0.18)',
     borderWidth:     1,
-    borderColor:     'rgba(250, 204, 21, 0.25)',
+    borderColor:     isDark ? 'rgba(250, 204, 21, 0.25)' : 'rgba(180, 130, 0, 0.45)',
     borderRadius:    radius.md,
     padding:         spacing.md,
     gap:             10,
@@ -101,23 +101,23 @@ const makeLocalStyles = (colors: ColorTokens) => StyleSheet.create({
   permText: {
     fontFamily: fonts.body,
     fontSize:   fontSizes.sm,
-    color:      'rgba(253, 224, 71, 0.9)',
+    color:      isDark ? 'rgba(253, 224, 71, 0.9)' : '#78350f',
     lineHeight: fontSizes.sm * 1.5,
   },
   permBtn: {
     alignSelf:         'flex-start',
     paddingVertical:   7,
     paddingHorizontal: 14,
-    backgroundColor:   'rgba(250, 204, 21, 0.12)',
+    backgroundColor:   isDark ? 'rgba(250, 204, 21, 0.12)' : 'rgba(250, 204, 21, 0.30)',
     borderWidth:       1,
-    borderColor:       'rgba(250, 204, 21, 0.30)',
+    borderColor:       isDark ? 'rgba(250, 204, 21, 0.30)' : 'rgba(180, 130, 0, 0.55)',
     borderRadius:      radius.pill,
   },
   permBtnText: {
     fontFamily: fonts.body,
     fontSize:   fontSizes.sm,
     fontWeight: fontWeights.medium,
-    color:      'rgba(253, 224, 71, 1)',
+    color:      isDark ? 'rgba(253, 224, 71, 1)' : '#78350f',
   },
 });
 
@@ -165,9 +165,9 @@ const ChipRow = ({
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function NotificationsScreen() {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const s  = useMemo(() => makeStyles(colors), [colors]);
-  const st = useMemo(() => makeLocalStyles(colors), [colors]);
+  const st = useMemo(() => makeLocalStyles(colors, isDark), [colors, isDark]);
 
   const [loading,     setLoading]     = useState(true);
   const [saving,      setSaving]      = useState(false);
