@@ -49,7 +49,7 @@ const InfoCard = ({ title, body }: { title: string; body: string }) => {
 export const PermissionsScreen = () => (
   <Root>
     <InfoCard title="Location"
-      body="Only the city name you enter is used for weather lookups — no GPS data is collected." />
+      body="When you pick “My Location,” your device's GPS is read once to look up local weather — the coordinates are sent only for that weather request and are never stored. Prefer not to share GPS? Add your cities by name in Locations and skip it entirely." />
     <InfoCard title="Photos"
       body="Photo access is requested only when you add a clothing image. Stored securely and only used to display your items." />
     <InfoCard title="Other"

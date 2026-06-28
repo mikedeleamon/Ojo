@@ -10,7 +10,7 @@ import OjoLogoIcon from '../../components/icons/OjoLogoIcon';
 import { useSettings } from '../../hooks/useSettings';
 import { useReduceMotion } from '../../hooks/useReduceMotion';
 import { markOnboardingComplete } from '../../lib/onboarding';
-import { requestPermission, registerPushToken } from '../../lib/notifications';
+import { requestPermission, registerPushToken, NOTIF_DEFAULTS } from '../../lib/notifications';
 import { hapticSuccess } from '../../lib/haptics';
 import { auth } from '../../lib/auth';
 import axios from '../../api/client';
@@ -213,7 +213,23 @@ export default function OnboardingPage({ onComplete }: Props) {
     setNotifLoading(true);
     try {
       const status = await requestPermission();
-      if (status === 'granted') await registerPushToken();
+      if (status === 'granted') {
+        await registerPushToken();
+        // Turn on the three briefs we just showcased so granting permission
+        // actually produces notifications. Without this the toggle is a no-op
+        // and the user hears nothing until they dig into Settings. They can
+        // still fine-tune or disable any of these there.
+        await axios.put(
+          '/api/notifications/settings',
+          {
+            ...NOTIF_DEFAULTS,
+            morningBriefEnabled:  true,
+            weatherChangeEnabled: true,
+            tempSwingEnabled:     true,
+          },
+          auth(),
+        );
+      }
     } catch { /* non-fatal — proceed regardless of the permission outcome */ }
     finally {
       setNotifLoading(false);

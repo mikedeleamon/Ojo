@@ -1,22 +1,28 @@
 import { useState, useMemo } from 'react';
 import {
     StyleSheet,
-    KeyboardAvoidingView,
     Platform,
-    ScrollView,
     Modal,
     TouchableOpacity,
     Keyboard,
 } from 'react-native';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { View, Text, TextInput, Pressable } from '../../components/primitives';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, Pressable } from '../../components/primitives';
+import {
+    AuthScaffold,
+    AuthField,
+    AuthStatus,
+    AuthButton,
+    makeAuthStyles,
+} from '../../components/auth';
 import axios from '../../api/client';
 import { AuthState, Settings } from '../../types';
 import { getErrorMessage, saveAuth } from '../../lib/auth';
 import { markOnboardingPending } from '../../lib/onboarding';
+import { validatePassword } from '../../lib/passwordPolicy';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
-import { spacing, radius, fonts, fontSizes, fontWeights } from '../../theme/tokens';
+import { spacing, fonts, fontSizes, fontWeights } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 import LegalConsentNotice from '../../components/LegalConsentNotice';
 
@@ -67,11 +73,7 @@ function validateField(
             if (!EMAIL_RE.test(val.trim())) return 'Enter a valid email address';
             return undefined;
         case 'password':
-            if (!val) return 'Required';
-            if (val.length < 8) return 'At least 8 characters required';
-            if (!/[A-Z]/.test(val)) return 'Must include at least one uppercase letter';
-            if (!/\d/.test(val)) return 'Must include at least one number';
-            return undefined;
+            return validatePassword(val);
         case 'confirmPassword':
             if (!val) return 'Required';
             if (val !== all.password) return "Passwords don't match";
@@ -113,102 +115,13 @@ interface Props {
 export default function SignupPage({ onLogin }: Props) {
     const { colors, isDark } = useTheme();
     const insets = useSafeAreaInsets();
+    const styles = useMemo(() => makeAuthStyles(colors), [colors]);
 
-    const styles = useMemo(
+    // Date-picker bottom sheet styles — unique to this screen.
+    const local = useMemo(
         () =>
             StyleSheet.create({
-                root: { flex: 1, backgroundColor: colors.bgDefault },
-                content: { flexGrow: 1, padding: spacing.md, gap: spacing.md },
-                title: {
-                    fontFamily: 'DMSerifDisplay',
-                    fontSize: 32,
-                    color: colors.textPrimary,
-                    letterSpacing: -0.02 * 32,
-                },
-                errorBox: {
-                    padding: spacing.sm,
-                    backgroundColor: colors.errorBg,
-                    borderRadius: radius.sm,
-                    borderWidth: 1,
-                    borderColor: colors.errorBorder,
-                },
-                errorText: {
-                    fontFamily: fonts.body,
-                    fontSize: fontSizes.sm,
-                    color: colors.errorText,
-                },
-                field: { gap: 4 },
-                label: {
-                    fontFamily: fonts.body,
-                    fontSize: fontSizes.xs,
-                    fontWeight: fontWeights.medium,
-                    letterSpacing: 0.1 * fontSizes.xs,
-                    textTransform: 'uppercase',
-                    color: colors.textMuted,
-                },
-                inputRow: {
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    backgroundColor: colors.glassBg,
-                    borderWidth: 1,
-                    borderColor: colors.glassBorder,
-                    borderRadius: radius.sm,
-                },
-                inputRowError: {
-                    borderColor: colors.errorBorder,
-                },
-                input: {
-                    flex: 1,
-                    paddingVertical: 12,
-                    paddingHorizontal: spacing.md,
-                    color: colors.textPrimary,
-                    fontFamily: fonts.body,
-                    fontSize: fontSizes.base,
-                },
-                inputSuffix: {
-                    paddingHorizontal: spacing.sm,
-                    paddingVertical: 12,
-                },
-                inputSuffixText: {
-                    fontFamily: fonts.body,
-                    fontSize: fontSizes.sm,
-                    color: colors.textMuted,
-                },
-                fieldError: {
-                    fontFamily: fonts.body,
-                    fontSize: fontSizes.xs,
-                    color: colors.errorText,
-                    marginTop: 2,
-                },
-                btn: {
-                    paddingVertical: 14,
-                    backgroundColor: colors.saveBtnBg,
-                    borderRadius: radius.sm,
-                    alignItems: 'center',
-                },
-                btnText: {
-                    fontFamily: fonts.body,
-                    fontSize: fontSizes.base,
-                    fontWeight: fontWeights.semibold,
-                    color: colors.saveBtnText,
-                },
-                footer: {
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                },
-                footerText: {
-                    fontFamily: fonts.body,
-                    fontSize: fontSizes.sm,
-                    color: colors.textSecondary,
-                },
-                link: {
-                    fontFamily: fonts.body,
-                    fontSize: fontSizes.sm,
-                    color: colors.textPrimary,
-                    textDecorationLine: 'underline',
-                },
-                // Date picker modal (iOS)
+                title: { fontSize: 32, letterSpacing: -0.02 * 32 },
                 pickerOverlay: {
                     flex: 1,
                     justifyContent: 'flex-end',
@@ -259,8 +172,6 @@ export default function SignupPage({ onLogin }: Props) {
     const [touched, setTouched] = useState<Set<keyof FormState>>(new Set());
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
-    const [showPassword, setShowPassword] = useState(false);
-    const [showConfirm, setShowConfirm] = useState(false);
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [pickerDate, setPickerDate] = useState<Date>(new Date(2000, 0, 1));
 
@@ -286,14 +197,13 @@ export default function SignupPage({ onLogin }: Props) {
         setFieldErrors(e => ({ ...e, [key]: err }));
     };
 
-    const hasError = (key: keyof FormState) =>
-        touched.has(key) && !!fieldErrors[key];
+    const errorFor = (key: keyof FormState) =>
+        touched.has(key) ? fieldErrors[key] : undefined;
 
     /* ── Birthday ──────────────────────────────────────────────────────────── */
 
     const handleBirthdayChange = (text: string) => {
-        const formatted = formatBirthday(text);
-        setField('birthday', formatted);
+        setField('birthday', formatBirthday(text));
     };
 
     const openDatePicker = () => {
@@ -371,287 +281,129 @@ export default function SignupPage({ onLogin }: Props) {
     /* ── Render ────────────────────────────────────────────────────────────── */
 
     return (
-        <SafeAreaView style={styles.root}>
-            <KeyboardAvoidingView
-                style={{ flex: 1 }}
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            >
-                <ScrollView
-                    contentContainerStyle={styles.content}
-                    keyboardShouldPersistTaps="handled"
-                >
-                    <Text style={styles.title}>Create account</Text>
+        <>
+            <AuthScaffold>
+                <Text style={[styles.title, local.title]}>Create account</Text>
 
-                    {error ? (
-                        <View
-                            style={styles.errorBox}
-                            accessibilityLiveRegion="assertive"
-                            accessible
-                            accessibilityLabel={error}
-                        >
-                            <Text style={styles.errorText}>{error}</Text>
-                        </View>
-                    ) : null}
+                {error ? <AuthStatus message={error} /> : null}
 
-                    {/* First name */}
-                    <View style={styles.field}>
-                        <Text style={styles.label}>First name</Text>
-                        <View
-                            style={[
-                                styles.inputRow,
-                                hasError('firstName') && styles.inputRowError,
-                            ]}
-                        >
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Jane"
-                                placeholderTextColor={colors.textMuted}
-                                autoCapitalize="words"
-                                textContentType="givenName"
-                                value={form.firstName}
-                                onChangeText={v => setField('firstName', v)}
-                                onBlur={() => handleBlur('firstName')}
-                                accessibilityLabel="First name"
-                            />
-                        </View>
-                        {hasError('firstName') && (
-                            <Text style={styles.fieldError}>{fieldErrors.firstName}</Text>
-                        )}
-                    </View>
+                <AuthField
+                    label="First name"
+                    placeholder="Jane"
+                    autoCapitalize="words"
+                    textContentType="givenName"
+                    value={form.firstName}
+                    onChangeText={v => setField('firstName', v)}
+                    onBlur={() => handleBlur('firstName')}
+                    error={errorFor('firstName')}
+                />
 
-                    {/* Last name */}
-                    <View style={styles.field}>
-                        <Text style={styles.label}>Last name</Text>
-                        <View
-                            style={[
-                                styles.inputRow,
-                                hasError('lastName') && styles.inputRowError,
-                            ]}
-                        >
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Doe"
-                                placeholderTextColor={colors.textMuted}
-                                autoCapitalize="words"
-                                textContentType="familyName"
-                                value={form.lastName}
-                                onChangeText={v => setField('lastName', v)}
-                                onBlur={() => handleBlur('lastName')}
-                                accessibilityLabel="Last name"
-                            />
-                        </View>
-                        {hasError('lastName') && (
-                            <Text style={styles.fieldError}>{fieldErrors.lastName}</Text>
-                        )}
-                    </View>
+                <AuthField
+                    label="Last name"
+                    placeholder="Doe"
+                    autoCapitalize="words"
+                    textContentType="familyName"
+                    value={form.lastName}
+                    onChangeText={v => setField('lastName', v)}
+                    onBlur={() => handleBlur('lastName')}
+                    error={errorFor('lastName')}
+                />
 
-                    {/* Date of birth */}
-                    <View style={styles.field}>
-                        <Text style={styles.label}>Date of birth</Text>
-                        <View
-                            style={[
-                                styles.inputRow,
-                                hasError('birthday') && styles.inputRowError,
-                            ]}
-                        >
-                            <TextInput
-                                style={styles.input}
-                                placeholder="MM/DD/YYYY"
-                                placeholderTextColor={colors.textMuted}
-                                keyboardType="number-pad"
-                                maxLength={10}
-                                value={form.birthday}
-                                onChangeText={handleBirthdayChange}
-                                onBlur={() => handleBlur('birthday')}
-                                accessibilityLabel="Date of birth"
-                            />
-                            <Pressable
-                                style={styles.inputSuffix}
-                                onPress={openDatePicker}
-                                accessibilityRole="button"
-                                accessibilityLabel="Open date picker"
-                            >
-                                <Text style={styles.inputSuffixText}>Pick</Text>
-                            </Pressable>
-                        </View>
-                        {hasError('birthday') && (
-                            <Text style={styles.fieldError}>{fieldErrors.birthday}</Text>
-                        )}
-                    </View>
-
-                    {/* Username */}
-                    <View style={styles.field}>
-                        <Text style={styles.label}>Username</Text>
-                        <View
-                            style={[
-                                styles.inputRow,
-                                hasError('username') && styles.inputRowError,
-                            ]}
-                        >
-                            <TextInput
-                                style={styles.input}
-                                placeholder="janedoe"
-                                placeholderTextColor={colors.textMuted}
-                                autoCapitalize="none"
-                                autoCorrect={false}
-                                textContentType="username"
-                                // Strip disallowed chars as the user types
-                                value={form.username}
-                                onChangeText={v =>
-                                    setField('username', v.replace(/[^a-zA-Z0-9_]/g, ''))
-                                }
-                                onBlur={() => handleBlur('username')}
-                                accessibilityLabel="Username"
-                            />
-                        </View>
-                        {hasError('username') && (
-                            <Text style={styles.fieldError}>{fieldErrors.username}</Text>
-                        )}
-                    </View>
-
-                    {/* Email */}
-                    <View style={styles.field}>
-                        <Text style={styles.label}>Email</Text>
-                        <View
-                            style={[
-                                styles.inputRow,
-                                hasError('email') && styles.inputRowError,
-                            ]}
-                        >
-                            <TextInput
-                                style={styles.input}
-                                placeholder="jane@example.com"
-                                placeholderTextColor={colors.textMuted}
-                                autoCapitalize="none"
-                                keyboardType="email-address"
-                                textContentType="emailAddress"
-                                autoCorrect={false}
-                                value={form.email}
-                                onChangeText={v => setField('email', v)}
-                                onBlur={() => handleBlur('email')}
-                                accessibilityLabel="Email"
-                            />
-                        </View>
-                        {hasError('email') && (
-                            <Text style={styles.fieldError}>{fieldErrors.email}</Text>
-                        )}
-                    </View>
-
-                    {/* Password */}
-                    <View style={styles.field}>
-                        <Text style={styles.label}>Password</Text>
-                        <View
-                            style={[
-                                styles.inputRow,
-                                hasError('password') && styles.inputRowError,
-                            ]}
-                        >
-                            <TextInput
-                                style={styles.input}
-                                placeholder="8+ chars · 1 uppercase · 1 number"
-                                placeholderTextColor={colors.textMuted}
-                                secureTextEntry={!showPassword}
-                                textContentType="newPassword"
-                                autoCapitalize="none"
-                                autoCorrect={false}
-                                value={form.password}
-                                onChangeText={v => setField('password', v)}
-                                onBlur={() => handleBlur('password')}
-                                accessibilityLabel="Password"
-                            />
-                            <Pressable
-                                style={styles.inputSuffix}
-                                onPress={() => setShowPassword(s => !s)}
-                                accessibilityRole="button"
-                                accessibilityLabel={
-                                    showPassword ? 'Hide password' : 'Show password'
-                                }
-                            >
-                                <Text style={styles.inputSuffixText}>
-                                    {showPassword ? 'Hide' : 'Show'}
-                                </Text>
-                            </Pressable>
-                        </View>
-                        {hasError('password') && (
-                            <Text style={styles.fieldError}>{fieldErrors.password}</Text>
-                        )}
-                    </View>
-
-                    {/* Confirm password */}
-                    <View style={styles.field}>
-                        <Text style={styles.label}>Confirm password</Text>
-                        <View
-                            style={[
-                                styles.inputRow,
-                                hasError('confirmPassword') && styles.inputRowError,
-                            ]}
-                        >
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Same password"
-                                placeholderTextColor={colors.textMuted}
-                                secureTextEntry={!showConfirm}
-                                textContentType="newPassword"
-                                autoCapitalize="none"
-                                autoCorrect={false}
-                                value={form.confirmPassword}
-                                onChangeText={v => setField('confirmPassword', v)}
-                                onBlur={() => handleBlur('confirmPassword')}
-                                accessibilityLabel="Confirm password"
-                            />
-                            <Pressable
-                                style={styles.inputSuffix}
-                                onPress={() => setShowConfirm(s => !s)}
-                                accessibilityRole="button"
-                                accessibilityLabel={
-                                    showConfirm
-                                        ? 'Hide confirm password'
-                                        : 'Show confirm password'
-                                }
-                            >
-                                <Text style={styles.inputSuffixText}>
-                                    {showConfirm ? 'Hide' : 'Show'}
-                                </Text>
-                            </Pressable>
-                        </View>
-                        {hasError('confirmPassword') && (
-                            <Text style={styles.fieldError}>
-                                {fieldErrors.confirmPassword}
-                            </Text>
-                        )}
-                    </View>
-
-                    <Pressable
-                        style={[styles.btn, loading && { opacity: 0.5 }]}
-                        onPress={handleSubmit}
-                        disabled={loading}
-                        accessibilityRole="button"
-                        accessibilityLabel={
-                            loading ? 'Creating account' : 'Create account'
-                        }
-                        accessibilityState={{ busy: loading, disabled: loading }}
-                    >
-                        <Text style={styles.btnText}>
-                            {loading ? 'Creating account…' : 'Create account'}
-                        </Text>
-                    </Pressable>
-
-                    <LegalConsentNotice prefix="By creating an account" />
-
-                    <View style={styles.footer}>
-                        <Text style={styles.footerText}>
-                            Already have an account?{' '}
-                        </Text>
+                <AuthField
+                    label="Date of birth"
+                    placeholder="MM/DD/YYYY"
+                    keyboardType="number-pad"
+                    maxLength={10}
+                    value={form.birthday}
+                    onChangeText={handleBirthdayChange}
+                    onBlur={() => handleBlur('birthday')}
+                    error={errorFor('birthday')}
+                    suffix={
                         <Pressable
-                            onPress={() => nav.goBack()}
-                            accessibilityRole="link"
-                            accessibilityLabel="Sign in"
+                            style={styles.inputSuffix}
+                            onPress={openDatePicker}
+                            accessibilityRole="button"
+                            accessibilityLabel="Open date picker"
                         >
-                            <Text style={styles.link}>Sign in</Text>
+                            <Text style={styles.inputSuffixText}>Pick</Text>
                         </Pressable>
-                    </View>
-                </ScrollView>
-            </KeyboardAvoidingView>
+                    }
+                />
+
+                <AuthField
+                    label="Username"
+                    placeholder="janedoe"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    textContentType="username"
+                    value={form.username}
+                    // Strip disallowed chars as the user types
+                    onChangeText={v =>
+                        setField('username', v.replace(/[^a-zA-Z0-9_]/g, ''))
+                    }
+                    onBlur={() => handleBlur('username')}
+                    error={errorFor('username')}
+                />
+
+                <AuthField
+                    label="Email"
+                    placeholder="jane@example.com"
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                    textContentType="emailAddress"
+                    autoCorrect={false}
+                    value={form.email}
+                    onChangeText={v => setField('email', v)}
+                    onBlur={() => handleBlur('email')}
+                    error={errorFor('email')}
+                />
+
+                <AuthField
+                    label="Password"
+                    placeholder="8+ chars · 1 uppercase · 1 number"
+                    secureToggle
+                    textContentType="newPassword"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    value={form.password}
+                    onChangeText={v => setField('password', v)}
+                    onBlur={() => handleBlur('password')}
+                    error={errorFor('password')}
+                />
+
+                <AuthField
+                    label="Confirm password"
+                    placeholder="Same password"
+                    secureToggle
+                    textContentType="newPassword"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    value={form.confirmPassword}
+                    onChangeText={v => setField('confirmPassword', v)}
+                    onBlur={() => handleBlur('confirmPassword')}
+                    error={errorFor('confirmPassword')}
+                />
+
+                <AuthButton
+                    label="Create account"
+                    loadingLabel="Creating account…"
+                    loading={loading}
+                    onPress={handleSubmit}
+                />
+
+                <LegalConsentNotice prefix="By creating an account" />
+
+                <View style={styles.footer}>
+                    <Text style={styles.footerText}>Already have an account? </Text>
+                    <Pressable
+                        onPress={() => nav.goBack()}
+                        accessibilityRole="link"
+                        accessibilityLabel="Sign in"
+                    >
+                        <Text style={styles.link}>Sign in</Text>
+                    </Pressable>
+                </View>
+            </AuthScaffold>
 
             {/* ── iOS date picker bottom sheet ──────────────────────────────── */}
             {Platform.OS === 'ios' && (
@@ -663,19 +415,19 @@ export default function SignupPage({ onLogin }: Props) {
                 >
                     {/* Outer: tap overlay to dismiss */}
                     <TouchableOpacity
-                        style={styles.pickerOverlay}
+                        style={local.pickerOverlay}
                         activeOpacity={1}
                         onPress={() => setShowDatePicker(false)}
                     >
                         {/* Inner: absorb taps so they don't reach the overlay */}
                         <TouchableOpacity
-                            style={styles.pickerSheet}
+                            style={local.pickerSheet}
                             activeOpacity={1}
                             onPress={() => { /* intentionally empty */ }}
                         >
-                            <View style={styles.pickerHeader}>
+                            <View style={local.pickerHeader}>
                                 <Pressable onPress={() => setShowDatePicker(false)}>
-                                    <Text style={styles.pickerHeaderBtn}>Cancel</Text>
+                                    <Text style={local.pickerHeaderBtn}>Cancel</Text>
                                 </Pressable>
                                 <Pressable
                                     onPress={() => {
@@ -685,8 +437,8 @@ export default function SignupPage({ onLogin }: Props) {
                                 >
                                     <Text
                                         style={[
-                                            styles.pickerHeaderBtn,
-                                            styles.pickerHeaderBtnDone,
+                                            local.pickerHeaderBtn,
+                                            local.pickerHeaderBtnDone,
                                         ]}
                                     >
                                         Done
@@ -718,6 +470,6 @@ export default function SignupPage({ onLogin }: Props) {
                     onChange={handlePickerChange}
                 />
             )}
-        </SafeAreaView>
+        </>
     );
 }

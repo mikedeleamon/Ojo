@@ -78,8 +78,10 @@ export const useClosets = (): UseClosetsResult => {
   }, [patch]);
 
   const setPreferred = useCallback(async (id: string) => {
+    // The endpoint toggles, so the returned closet may now be un-preferred.
+    // Apply its actual isPreferred and clear every other closet.
     const { data } = await axios.put<Closet>(`/api/closets/${id}/preferred`, {}, auth());
-    setClosets(prev => prev.map(c => ({ ...c, isPreferred: c._id === data._id })));
+    setClosets(prev => prev.map(c => c._id === data._id ? data : { ...c, isPreferred: false }));
   }, []);
 
   return { closets, loading, error, preferred, setClosets, refresh, createCloset, renameCloset,

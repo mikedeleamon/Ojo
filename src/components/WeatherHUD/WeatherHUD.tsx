@@ -57,7 +57,9 @@ import { flattenHsl, hslToHex, lerpHslFlat } from './colorMath';
 // gradient's colors prop is updated directly on the native view each frame,
 // bypassing the JS thread (and React reconciliation) entirely.
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
-import { gradientFor, footerBgFor, formatLastUpdated } from './weatherPalette';
+import { gradientFor, footerBgFor } from './weatherPalette';
+import { isClearNight, isThunderstorm } from '../../lib/weather/conditions';
+import LastUpdated from './LastUpdated';
 import { fToC } from '../../lib/units';
 import { humanizeCondition } from '../../lib/weather/humanizeCondition';
 import { makeStyles } from './WeatherHUD.styles';
@@ -177,7 +179,6 @@ const WeatherHUD = ({
     const [lastUpdated, setLastUpdated] = useState<Date | null>(
         seedSnapshot ? new Date(seedSnapshot.fetchedAt) : null,
     );
-    const [, setTick] = useState(0);
 
     // ── Pull-to-refresh buffering ───────────────────────────────────────────────
     // While a pull-to-refresh is in flight, incoming data is held in pendingRef
@@ -205,12 +206,6 @@ const WeatherHUD = ({
             pendingRef.current = null;
         }
     };
-
-    useEffect(() => {
-        if (!lastUpdated) return;
-        const id = setInterval(() => setTick((n) => n + 1), 60_000);
-        return () => clearInterval(id);
-    }, [lastUpdated]);
 
     // ── Re-seed on city switch ─────────────────────────────────────────────────
     // When the active city changes, its cached snapshot (if any) replaces the
@@ -549,19 +544,10 @@ const WeatherHUD = ({
         );
     }, [forecasts, sunEvents, isMetric]);
 
-    // True for "Clear" / "Mostly Clear" at night — drives the full-screen star backdrop.
-    const isClearNightBg = !!(
-        weather &&
-        !weather.IsDayTime &&
-        weather.WeatherText.toLowerCase().includes('clear')
-    );
-
-    // True for thunderstorm conditions — drives the full-screen rain + sheet-flash backdrop.
-    const isStormBg = !!(
-        weather &&
-        (weather.WeatherText.toLowerCase().includes('thunder') ||
-            weather.WeatherText.toLowerCase().includes('t-storm'))
-    );
+    // Full-screen star backdrop for clear nights; storm backdrop for thunder.
+    // Both derive from the shared classifier so they track the icon/gradient.
+    const isClearNightBg = !!weather && isClearNight(weather.WeatherText, weather.IsDayTime);
+    const isStormBg = !!weather && isThunderstorm(weather.WeatherText);
 
     // ── Error state (#9: retry + check settings) ──────────────────────────────
     if (error && !weather)
@@ -695,9 +681,10 @@ const WeatherHUD = ({
                                 {humanizeCondition(weather.WeatherText)}
                             </Text>
                             {lastUpdated && (
-                                <Text style={st.lastUpdated}>
-                                    {formatLastUpdated(lastUpdated)}
-                                </Text>
+                                <LastUpdated
+                                    date={lastUpdated}
+                                    style={st.lastUpdated}
+                                />
                             )}
                         </View>
 

@@ -55,13 +55,19 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
 
 router.put('/:id/preferred', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const target = await Closet.findOne({ _id: req.params.id, userId: req.userId });
+    if (!target) { res.status(404).json({ error: 'Closet not found' }); return; }
+
+    // Toggle: tapping "preferred" on the already-preferred closet clears it so
+    // the user can have no preferred closet; otherwise this becomes the sole
+    // preferred one. Either way every other closet is cleared first.
+    const makePreferred = !target.isPreferred;
     await Closet.updateMany({ userId: req.userId }, { isPreferred: false });
-    const closet = await Closet.findOneAndUpdate(
-      { _id: req.params.id, userId: req.userId },
-      { isPreferred: true },
+    const closet = await Closet.findByIdAndUpdate(
+      target._id,
+      { isPreferred: makePreferred },
       { new: true },
     );
-    if (!closet) { res.status(404).json({ error: 'Closet not found' }); return; }
     res.json(closet);
   } catch (err) {
     console.error('[closets] preferred update error:', err);

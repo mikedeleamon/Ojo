@@ -566,7 +566,7 @@ const ClosetView = ({
 
             {/* ── TripFit discovery banner (above article list so it's always reachable) ── */}
             {onTripFit && selected && selected.articles.length > 0 && (
-                <GlassCard style={styles.tripBanner}>
+                <GlassCard style={styles.tripBanner} tintColor={isDark ? undefined : 'rgba(0,0,0,0.07)'}>
                     <Pressable
                         style={styles.tripBannerInner}
                         onPress={onTripFit}

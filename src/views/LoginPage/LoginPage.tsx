@@ -1,19 +1,14 @@
 import { useState, useMemo, useEffect } from 'react';
-import {
-    StyleSheet,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { StyleSheet } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import { View, Text, Pressable, GlassCard } from '../../components/primitives';
 import {
-    View,
-    Text,
-    TextInput,
-    Pressable,
-    GlassCard,
-} from '../../components/primitives';
+    AuthScaffold,
+    AuthField,
+    AuthStatus,
+    AuthButton,
+    makeAuthStyles,
+} from '../../components/auth';
 import OjoLogoIcon from '../../components/icons/OjoLogoIcon';
 import axios from '../../api/client';
 import { AuthState, Settings } from '../../types';
@@ -22,13 +17,7 @@ import { isAppleSignInAvailable, signInWithApple } from '../../lib/appleSignIn';
 import { isGoogleSignInAvailable, signInWithGoogle } from '../../lib/googleSignIn';
 import GoogleGlyph from '../../components/icons/GoogleGlyph';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
-import {
-    spacing,
-    radius,
-    fonts,
-    fontSizes,
-    fontWeights,
-} from '../../theme/tokens';
+import { spacing, radius, fonts, fontSizes } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 import LegalConsentNotice from '../../components/LegalConsentNotice';
 
@@ -38,24 +27,10 @@ interface Props {
 
 export default function LoginPage({ onLogin }: Props) {
     const { colors, isDark } = useTheme();
-    const styles = useMemo(
+    const styles = useMemo(() => makeAuthStyles(colors), [colors]);
+    const local = useMemo(
         () =>
             StyleSheet.create({
-                root: { flex: 1, backgroundColor: colors.bgDefault },
-                content: {
-                    flexGrow: 1,
-                    justifyContent: 'center',
-                    padding: spacing.md,
-                },
-                card: {
-                    backgroundColor: colors.glassBg,
-                    borderRadius: radius.lg,
-                    borderWidth: 1,
-                    borderColor: colors.glassBorder,
-                    padding: spacing.lg,
-                    gap: spacing.md,
-                    alignItems: 'center',
-                },
                 logo: { width: 120, height: 48, marginBottom: spacing.sm },
                 tagline: {
                     fontFamily: fonts.body,
@@ -63,128 +38,10 @@ export default function LoginPage({ onLogin }: Props) {
                     color: colors.textSecondary,
                     marginBottom: spacing.sm,
                 },
-                errorBox: {
-                    width: '100%',
-                    padding: spacing.sm,
-                    backgroundColor: colors.errorBg,
-                    borderRadius: radius.sm,
-                    borderWidth: 1,
-                    borderColor: colors.errorBorder,
-                },
-                errorText: {
-                    fontFamily: fonts.body,
-                    fontSize: fontSizes.sm,
-                    color: colors.errorText,
-                },
-                fields: { width: '100%', gap: spacing.sm },
-                field: { gap: 6 },
-                label: {
-                    fontFamily: fonts.body,
-                    fontSize: fontSizes.xs,
-                    fontWeight: fontWeights.medium,
-                    letterSpacing: 0.1 * fontSizes.xs,
-                    textTransform: 'uppercase',
-                    color: colors.textMuted,
-                },
-                inputRow: {
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    backgroundColor: colors.glassBg,
-                    borderWidth: 1,
-                    borderColor: colors.glassBorder,
-                    borderRadius: radius.sm,
-                },
-                input: {
-                    flex: 1,
-                    paddingVertical: 12,
-                    paddingHorizontal: spacing.md,
-                    color: colors.textPrimary,
-                    fontFamily: fonts.body,
-                    fontSize: fontSizes.base,
-                },
-                inputSuffix: {
-                    paddingHorizontal: spacing.sm,
-                    paddingVertical: 12,
-                },
-                inputSuffixText: {
-                    fontFamily: fonts.body,
-                    fontSize: fontSizes.sm,
-                    color: colors.textMuted,
-                },
-                btn: {
-                    width: '100%',
-                    paddingVertical: 14,
-                    backgroundColor: colors.saveBtnBg,
-                    borderRadius: radius.sm,
-                    alignItems: 'center',
-                },
-                btnText: {
-                    fontFamily: fonts.body,
-                    fontSize: fontSizes.base,
-                    fontWeight: fontWeights.semibold,
-                    color: colors.saveBtnText,
-                },
-                footer: { flexDirection: 'row', alignItems: 'center' },
-                footerText: {
-                    fontFamily: fonts.body,
-                    fontSize: fontSizes.sm,
-                    color: colors.textSecondary,
-                },
-                link: {
-                    fontFamily: fonts.body,
-                    fontSize: fontSizes.sm,
-                    color: colors.textPrimary,
-                    textDecorationLine: 'underline',
-                },
                 forgotRow: {
                     width: '100%',
                     alignItems: 'flex-end',
                     marginTop: -spacing.xs,
-                },
-                forgotLink: {
-                    fontFamily: fonts.body,
-                    fontSize: fontSizes.sm,
-                    color: colors.textSecondary,
-                    textDecorationLine: 'underline',
-                },
-                dividerRow: {
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    width: '100%',
-                    gap: spacing.sm,
-                    marginVertical: spacing.xs,
-                },
-                dividerLine: {
-                    flex: 1,
-                    height: StyleSheet.hairlineWidth,
-                    backgroundColor: colors.glassBorder,
-                },
-                dividerText: {
-                    fontFamily: fonts.body,
-                    fontSize: fontSizes.xs,
-                    color: colors.textMuted,
-                    textTransform: 'uppercase',
-                    letterSpacing: 1,
-                },
-                appleBtn: {
-                    width: '100%',
-                    height: 48,
-                },
-                googleBtn: {
-                    width: '100%',
-                    height: 48,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: spacing.sm,
-                    backgroundColor: colors.saveBtnBg,
-                    borderRadius: radius.sm,
-                },
-                googleBtnText: {
-                    fontFamily: fonts.body,
-                    fontSize: fontSizes.base,
-                    fontWeight: fontWeights.semibold,
-                    color: colors.saveBtnText,
                 },
             }),
         [colors],
@@ -193,12 +50,11 @@ export default function LoginPage({ onLogin }: Props) {
     const nav = useAppNavigation();
     const [identifier, setIdentifier] = useState('');
     const [password, setPassword] = useState('');
-    const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [appleAvailable, setAppleAvailable] = useState(false);
     const [appleLoading, setAppleLoading] = useState(false);
-    const [googleAvailable] = useState(isGoogleSignInAvailable);
+    const [googleAvailable] = useState(() => isGoogleSignInAvailable());
     const [googleLoading, setGoogleLoading] = useState(false);
 
     useEffect(() => {
@@ -210,20 +66,6 @@ export default function LoginPage({ onLogin }: Props) {
             mounted = false;
         };
     }, []);
-
-    const handleGoogle = async () => {
-        if (googleLoading) return;
-        setError(null);
-        setGoogleLoading(true);
-        const result = await signInWithGoogle();
-        setGoogleLoading(false);
-        if (result.ok) {
-            onLogin?.();
-            return;
-        }
-        if (result.cancelled) return; // silent — user dismissed the sheet
-        setError(result.error);
-    };
 
     const handleApple = async () => {
         if (appleLoading) return;
@@ -239,6 +81,20 @@ export default function LoginPage({ onLogin }: Props) {
         setError(result.error);
     };
 
+    const handleGoogle = async () => {
+        if (googleLoading) return;
+        setError(null);
+        setGoogleLoading(true);
+        const result = await signInWithGoogle();
+        setGoogleLoading(false);
+        if (result.ok) {
+            onLogin?.();
+            return;
+        }
+        if (result.cancelled) return;
+        setError(result.error);
+    };
+
     const handleSubmit = async () => {
         setError(null);
         if (!identifier || !password) {
@@ -247,9 +103,10 @@ export default function LoginPage({ onLogin }: Props) {
         }
         setLoading(true);
         try {
-            const { data } = await axios.post<
-                AuthState & { settings: Settings }
-            >('/api/auth/login', { identifier, password });
+            const { data } = await axios.post<AuthState & { settings: Settings }>(
+                '/api/auth/login',
+                { identifier, password },
+            );
             await saveAuth(data.token, data.user);
             onLogin?.();
         } catch (err: unknown) {
@@ -260,199 +117,111 @@ export default function LoginPage({ onLogin }: Props) {
     };
 
     return (
-        <SafeAreaView style={styles.root}>
-            <KeyboardAvoidingView
-                style={{ flex: 1 }}
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            >
-                <ScrollView
-                    contentContainerStyle={styles.content}
-                    keyboardShouldPersistTaps='handled'
-                >
-                    <GlassCard style={styles.card}>
-                        <OjoLogoIcon
-                            width={styles.logo.width}
-                            height={styles.logo.height}
-                        />
-                        <Text style={styles.tagline}>
-                            Dress for the weather.
+        <AuthScaffold centered>
+            <GlassCard style={[styles.card, styles.cardCentered]}>
+                <OjoLogoIcon width={local.logo.width} height={local.logo.height} />
+                <Text style={local.tagline}>Dress for the weather.</Text>
+
+                {error ? <AuthStatus message={error} /> : null}
+
+                <AuthField
+                    label="Email or username"
+                    placeholder="you@example.com or @janedoe"
+                    value={identifier}
+                    onChangeText={setIdentifier}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    textContentType="emailAddress"
+                    returnKeyType="next"
+                />
+                <AuthField
+                    label="Password"
+                    placeholder="••••••••"
+                    secureToggle
+                    textContentType="password"
+                    value={password}
+                    onChangeText={setPassword}
+                    returnKeyType="done"
+                    onSubmitEditing={handleSubmit}
+                />
+
+                <View style={local.forgotRow}>
+                    <Pressable
+                        onPress={() => nav.push('/(auth)/forgot-password')}
+                        accessibilityRole="link"
+                        accessibilityLabel="Forgot password"
+                    >
+                        <Text style={styles.linkMuted}>Forgot password?</Text>
+                    </Pressable>
+                </View>
+
+                <AuthButton
+                    label="Sign in"
+                    loadingLabel="Signing in…"
+                    loading={loading}
+                    onPress={handleSubmit}
+                />
+
+                {(appleAvailable || googleAvailable) && (
+                    <View style={styles.dividerRow}>
+                        <View style={styles.dividerLine} />
+                        <Text style={styles.dividerText}>or</Text>
+                        <View style={styles.dividerLine} />
+                    </View>
+                )}
+
+                {appleAvailable && (
+                    <AppleAuthentication.AppleAuthenticationButton
+                        buttonType={
+                            AppleAuthentication.AppleAuthenticationButtonType
+                                .SIGN_IN
+                        }
+                        buttonStyle={
+                            isDark
+                                ? AppleAuthentication
+                                      .AppleAuthenticationButtonStyle.WHITE
+                                : AppleAuthentication
+                                      .AppleAuthenticationButtonStyle.BLACK
+                        }
+                        cornerRadius={radius.sm}
+                        style={[
+                            styles.appleBtn,
+                            appleLoading && { opacity: 0.5 },
+                        ]}
+                        onPress={handleApple}
+                    />
+                )}
+
+                {googleAvailable && (
+                    <Pressable
+                        onPress={handleGoogle}
+                        accessibilityRole="button"
+                        accessibilityLabel="Sign in with Google"
+                        style={[
+                            styles.googleBtn,
+                            { backgroundColor: isDark ? '#FFFFFF' : '#000000' },
+                            googleLoading && { opacity: 0.5 },
+                        ]}
+                    >
+                        <GoogleGlyph size={20} />
+                        <Text style={[styles.googleBtnText, { color: isDark ? '#000000' : '#FFFFFF' }]}>
+                            Sign in with Google
                         </Text>
+                    </Pressable>
+                )}
 
-                        {error ? (
-                            <View
-                                style={styles.errorBox}
-                                accessibilityLiveRegion='assertive'
-                                accessible={true}
-                                accessibilityLabel={error}
-                            >
-                                <Text style={styles.errorText}>{error}</Text>
-                            </View>
-                        ) : null}
+                <View style={styles.footer}>
+                    <Text style={styles.footerText}>Don't have an account? </Text>
+                    <Pressable
+                        onPress={() => nav.push('/(auth)/signup')}
+                        accessibilityRole="link"
+                    >
+                        <Text style={styles.link}>Sign up</Text>
+                    </Pressable>
+                </View>
 
-                        <View style={styles.fields}>
-                            <View style={styles.field}>
-                                <Text style={styles.label}>
-                                    Email or username
-                                </Text>
-                                <View style={styles.inputRow}>
-                                    <TextInput
-                                        style={styles.input}
-                                        placeholder='you@example.com or @janedoe'
-                                        placeholderTextColor={colors.textMuted}
-                                        value={identifier}
-                                        onChangeText={setIdentifier}
-                                        keyboardType='email-address'
-                                        autoCapitalize='none'
-                                        textContentType='emailAddress'
-                                        returnKeyType='next'
-                                        accessibilityLabel='Email or username'
-                                    />
-                                </View>
-                            </View>
-                            <View style={styles.field}>
-                                <Text style={styles.label}>Password</Text>
-                                <View style={styles.inputRow}>
-                                    <TextInput
-                                        style={styles.input}
-                                        placeholder='••••••••'
-                                        placeholderTextColor={colors.textMuted}
-                                        secureTextEntry={!showPassword}
-                                        textContentType='password'
-                                        value={password}
-                                        onChangeText={setPassword}
-                                        returnKeyType='done'
-                                        onSubmitEditing={handleSubmit}
-                                        accessibilityLabel='Password'
-                                    />
-                                    <Pressable
-                                        style={styles.inputSuffix}
-                                        onPress={() =>
-                                            setShowPassword((s) => !s)
-                                        }
-                                        accessibilityRole='button'
-                                        accessibilityLabel={
-                                            showPassword
-                                                ? 'Hide password'
-                                                : 'Show password'
-                                        }
-                                    >
-                                        <Text style={styles.inputSuffixText}>
-                                            {showPassword ? 'Hide' : 'Show'}
-                                        </Text>
-                                    </Pressable>
-                                </View>
-                            </View>
-                        </View>
-
-                        <View style={styles.forgotRow}>
-                            <Pressable
-                                onPress={() =>
-                                    nav.push('/(auth)/forgot-password')
-                                }
-                                accessibilityRole='link'
-                                accessibilityLabel='Forgot password'
-                            >
-                                <Text style={styles.forgotLink}>
-                                    Forgot password?
-                                </Text>
-                            </Pressable>
-                        </View>
-
-                        <Pressable
-                            style={[styles.btn, loading && { opacity: 0.5 }]}
-                            onPress={handleSubmit}
-                            disabled={loading}
-                            accessibilityRole='button'
-                            accessibilityLabel={
-                                loading ? 'Signing in' : 'Sign in'
-                            }
-                            accessibilityState={{
-                                busy: loading,
-                                disabled: loading,
-                            }}
-                        >
-                            <Text style={styles.btnText}>
-                                {loading ? 'Signing in…' : 'Sign in'}
-                            </Text>
-                        </Pressable>
-
-                        {(appleAvailable || googleAvailable) && (
-                            <View style={styles.dividerRow}>
-                                <View style={styles.dividerLine} />
-                                <Text style={styles.dividerText}>or</Text>
-                                <View style={styles.dividerLine} />
-                            </View>
-                        )}
-
-                        {appleAvailable && (
-                            <AppleAuthentication.AppleAuthenticationButton
-                                buttonType={
-                                    AppleAuthentication
-                                        .AppleAuthenticationButtonType
-                                        .SIGN_IN
-                                }
-                                buttonStyle={
-                                    isDark
-                                        ? AppleAuthentication
-                                              .AppleAuthenticationButtonStyle
-                                              .WHITE
-                                        : AppleAuthentication
-                                              .AppleAuthenticationButtonStyle
-                                              .BLACK
-                                }
-                                cornerRadius={radius.sm}
-                                style={[
-                                    styles.appleBtn,
-                                    appleLoading && { opacity: 0.5 },
-                                ]}
-                                onPress={handleApple}
-                            />
-                        )}
-
-                        {googleAvailable && (
-                            <Pressable
-                                style={[
-                                    styles.googleBtn,
-                                    googleLoading && { opacity: 0.5 },
-                                ]}
-                                onPress={handleGoogle}
-                                disabled={googleLoading}
-                                accessibilityRole="button"
-                                accessibilityLabel={
-                                    googleLoading
-                                        ? 'Signing in with Google'
-                                        : 'Sign in with Google'
-                                }
-                                accessibilityState={{
-                                    busy: googleLoading,
-                                    disabled: googleLoading,
-                                }}
-                            >
-                                <GoogleGlyph size={18} />
-                                <Text style={styles.googleBtnText}>
-                                    {googleLoading
-                                        ? 'Signing in…'
-                                        : 'Sign in with Google'}
-                                </Text>
-                            </Pressable>
-                        )}
-
-                        <View style={styles.footer}>
-                            <Text style={styles.footerText}>
-                                Don't have an account?{' '}
-                            </Text>
-                            <Pressable
-                                onPress={() => nav.push('/(auth)/signup')}
-                                accessibilityRole='link'
-                            >
-                                <Text style={styles.link}>Sign up</Text>
-                            </Pressable>
-                        </View>
-
-                        <LegalConsentNotice prefix='By continuing' />
-                    </GlassCard>
-                </ScrollView>
-            </KeyboardAvoidingView>
-        </SafeAreaView>
+                <LegalConsentNotice prefix="By continuing" />
+            </GlassCard>
+        </AuthScaffold>
     );
 }

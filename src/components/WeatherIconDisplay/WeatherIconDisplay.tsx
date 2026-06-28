@@ -15,8 +15,11 @@ import PartlyCloudyIcon from '../WeatherIcons/PartlyCloudyIcon';
 import SunnyIcon from '../WeatherIcons/SunnyIcon';
 import CloudyIcon from '../WeatherIcons/CloudyIcon';
 import SnowIcon from '../WeatherIcons/SnowIcon';
+import { iconTypeFor } from '../../lib/weather/conditions';
 
 // ─── Icon map ─────────────────────────────────────────────────────────────────
+// Icon selection derives from the shared condition classifier (see
+// lib/weather/conditions) so the icon, gradient, and footer tint can't drift.
 
 const ICONS = {
     Cloudy: 'cloudy' as const,
@@ -27,61 +30,6 @@ const ICONS = {
     Storm: 'storm' as const,
     PartlyCloudy: 'partly-cloudy' as const,
     PartlyCloudyNight: 'partly-cloudy-night' as const,
-};
-
-/**
- * Map Apple WeatherKit `conditionCode` (e.g. "MostlyClear", "HeavyRain",
- * "Thunderstorms", "PartlyCloudy", "BlowingSnow") to one of the eight
- * Ojo-internal icon types. Substring-based so it also accepts free-form
- * phrases when WeatherText originates somewhere other than WeatherKit.
- */
-const iconFor = (condition: string, isDay: boolean) => {
-    const c = condition.toLowerCase();
-    if (
-        c.includes('thunder') ||
-        c.includes('storm') ||
-        c.includes('hurricane') ||
-        c.includes('t-storm')
-    )
-        return ICONS.Storm;
-    if (
-        c.includes('snow') ||
-        c.includes('flurr') ||
-        c.includes('blizzard') ||
-        c.includes('sleet') ||
-        c.includes('hail') ||
-        c.includes('wintry')
-    )
-        return ICONS.Snow;
-    if (
-        c.includes('rain') ||
-        c.includes('shower') ||
-        c.includes('drizzle') ||
-        c.includes('precip')
-    )
-        return ICONS.Rainy;
-    if (c.includes('sunny')) return ICONS.Sunny;
-    // "MostlyClear" → sunny by day, starfield by night. Plain "Clear" → same logic.
-    if (c.includes('clear')) return isDay ? ICONS.Sunny : ICONS.ClearNight;
-    if (
-        c.includes('partly') ||
-        c.includes('intermittent') ||
-        c.includes('hazy') ||
-        c.includes('haze')
-    ) {
-        return isDay ? ICONS.PartlyCloudy : ICONS.PartlyCloudyNight;
-    }
-    if (
-        c.includes('cloud') ||
-        c.includes('overcast') ||
-        c.includes('dreary') ||
-        c.includes('fog') ||
-        c.includes('smok') ||
-        c.includes('mist') ||
-        c.includes('dust')
-    )
-        return ICONS.Cloudy;
-    return isDay ? ICONS.Sunny : ICONS.ClearNight;
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -139,7 +87,7 @@ const WeatherIconDisplay = ({
 }: Props) => {
     const { colors } = useTheme();
     const styles = useMemo(() => makeStyles(colors), [colors]);
-    const icon = iconFor(condition, isDay);
+    const icon = iconTypeFor(condition, isDay);
     const isLarge = size === 'large';
     const isSunny = icon === ICONS.Sunny;
     const isClearNight = icon === ICONS.ClearNight;

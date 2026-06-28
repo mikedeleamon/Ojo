@@ -5,6 +5,7 @@ import {
   Switch,
   Animated,
   Alert,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Slider from '@react-native-community/slider';
@@ -220,14 +221,25 @@ export default function NotificationsScreen() {
   }, []);
 
   const handleRequestPermission = async () => {
+    // Once the OS has recorded a denial it won't re-prompt — requestPermission
+    // would just return 'denied' again. Send the user straight to system
+    // settings instead, which is what the "Open Settings" label promises.
+    if (permission === 'denied') {
+      Linking.openSettings();
+      return;
+    }
     const status = await requestPermission();
     setPermission(status);
     if (status === 'granted') {
       await registerPushToken();
-    } else {
+    } else if (status === 'denied') {
       Alert.alert(
         'Notifications Blocked',
-        'Go to Settings → Ojo → Notifications to enable push notifications.',
+        'Enable notifications for Ojo in Settings to receive alerts.',
+        [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => Linking.openSettings() },
+        ],
       );
     }
   };

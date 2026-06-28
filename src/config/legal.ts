@@ -15,7 +15,7 @@ export const LEGAL_URLS = {
   termsOfService:  'https://www.ojoapp.io/terms',
 } as const;
 
-export const EFFECTIVE_DATE = 'May 29, 2026';
+export const EFFECTIVE_DATE = 'June 27, 2026';
 export const DEVELOPER_NAME = 'Ojo Studio, LLC';
 export const CONTACT_EMAIL  = 'support@ojoapp.io';
 export const WEBSITE_URL    = 'https://www.ojoapp.io';
@@ -68,13 +68,13 @@ export const PRIVACY_POLICY: LegalDocument = {
         },
         {
           heading: '2.3  Information We Do NOT Collect',
-          body: ['We do not collect financial or payment information, real-time GPS location, social media profiles, or biometric data of any kind.'],
+          body: ['We do not collect financial or payment information, social media profiles, or biometric data of any kind. We do not track your location in the background or store your GPS coordinates — see the Location entry above for how one-time, on-demand location is used.'],
         },
       ],
       bullets: [
         'Email address — used to create and authenticate your account',
         'Username — a display name of your choosing',
-        'Location (city name) — entered manually to retrieve local weather data for outfit suggestions',
+        'Location — either a city name you enter manually, or, if you choose "My Location," your device\'s GPS coordinates read on demand at that moment. Location is used solely to retrieve local weather for outfit suggestions; coordinates are sent only for the weather lookup and are not stored or tracked in the background',
         'Clothing item photos and metadata — images you upload or capture of your garments, plus descriptions, categories, colours, fabrics, and (optionally) merchant and purchase price',
         'Outfit wear history — records of which outfit suggestions you marked as "Wore this today"',
         'Push notification token — a device-specific token used solely to deliver notifications you have enabled (e.g. morning brief, weather changes)',

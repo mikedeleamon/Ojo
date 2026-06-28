@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { View, Text, TextInput, Pressable } from '../../../components/primitives';
 import axios from '../../../api/client';
 import { auth, updateToken } from '../../../lib/auth';
+import { validatePassword } from '../../../lib/passwordPolicy';
 import { useFormSubmit } from '../../../hooks/useFormSubmit';
 import { StatusMessage } from '../../../components/shared';
 import { makeStyles } from './screens.styles';
@@ -31,13 +32,14 @@ export default function PasswordScreen() {
   const [showConfirm, setShowConfirm] = useState(false);
   const { status, loading, submit, clearStatus } = useFormSubmit('Password updated.');
 
+  const newPasswordError = newPassword ? validatePassword(newPassword) : undefined;
   const validationMsg =
-    newPassword && newPassword.length < 8 ? 'New password must be at least 8 characters.' :
-    confirm && newPassword !== confirm     ? 'Passwords do not match.' : null;
+    newPasswordError ? newPasswordError :
+    confirm && newPassword !== confirm ? 'Passwords do not match.' : null;
 
   const save = () => {
     clearStatus();
-    if (!currentPassword || newPassword.length < 8 || newPassword !== confirm) return;
+    if (!currentPassword || validatePassword(newPassword) || newPassword !== confirm) return;
     submit(async () => {
       const { data } = await axios.put<{ token: string }>('/api/user/password', { currentPassword, newPassword }, auth());
       if (data?.token) await updateToken(data.token);

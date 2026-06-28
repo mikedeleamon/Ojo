@@ -52,7 +52,10 @@ export const ArticleCard = ({
     const imgError = !!article.imageUrl && erroredUrl === article.imageUrl;
 
     return (
-        <GlassCard style={[styles.articleCard, outOfSeason && styles.articleCardOOS]}>
+        <GlassCard
+            style={[styles.articleCard, outOfSeason && styles.articleCardOOS]}
+            tintColor={isDark ? undefined : 'rgba(0,0,0,0.07)'}
+        >
             <Pressable
                 style={styles.articleCardInner}
                 onPress={onEdit}
@@ -65,18 +68,34 @@ export const ArticleCard = ({
                             source={{ uri: article.imageUrl }}
                             style={styles.articleImgFill}
                             resizeMode='cover'
-                            onError={() => setErroredUrl(article.imageUrl ?? null)}
+                            onError={() =>
+                                setErroredUrl(article.imageUrl ?? null)
+                            }
                         />
                     ) : (
-                        <HangerIcon size={18} color={colors.textMuted} decorative />
+                        <HangerIcon
+                            size={18}
+                            color={colors.textMuted}
+                            decorative
+                        />
                     )}
                 </View>
                 <View style={styles.articleInfo}>
-                    <Text style={styles.articleName} numberOfLines={1}>
+                    <Text
+                        style={styles.articleName}
+                        numberOfLines={1}
+                    >
                         {article.name || article.clothingType}
                     </Text>
-                    <Text style={styles.articleMeta} numberOfLines={1}>
-                        {[article.clothingType, article.color, article.fabricType]
+                    <Text
+                        style={styles.articleMeta}
+                        numberOfLines={1}
+                    >
+                        {[
+                            article.clothingType,
+                            article.color,
+                            article.fabricType,
+                        ]
                             .filter(Boolean)
                             .join(' · ')}
                     </Text>
@@ -86,7 +105,10 @@ export const ArticleCard = ({
                         </Text>
                     ) : null}
                 </View>
-                <ColorSwatch color={article.color} style={styles.colorDot} />
+                <ColorSwatch
+                    color={article.color}
+                    style={styles.colorDot}
+                />
             </Pressable>
         </GlassCard>
     );
@@ -124,7 +146,7 @@ export const TileArticleCard = ({
     };
 
     return (
-        <GlassCard style={[styles.tileCard, { width: tileWidth }]}>
+        <GlassCard style={[styles.tileCard, { width: tileWidth }]} tintColor={isDark ? undefined : 'rgba(0,0,0,0.07)'}>
             <Pressable
                 style={styles.tileCardInner}
                 onPress={onEdit}
@@ -138,23 +160,38 @@ export const TileArticleCard = ({
                             source={{ uri: article.imageUrl }}
                             style={styles.tileImgFill}
                             resizeMode='cover'
-                            onError={() => setErroredUrl(article.imageUrl ?? null)}
+                            onError={() =>
+                                setErroredUrl(article.imageUrl ?? null)
+                            }
                         />
                     ) : (
-                        <HangerIcon size={24} color={colors.textMuted} decorative />
+                        <HangerIcon
+                            size={24}
+                            color={colors.textMuted}
+                            decorative
+                        />
                     )}
                 </View>
                 <View style={styles.tileInfo}>
-                    <Text style={styles.tileName} numberOfLines={1}>
+                    <Text
+                        style={styles.tileName}
+                        numberOfLines={1}
+                    >
                         {article.name || article.clothingType}
                     </Text>
                     <View style={styles.tileMetaRow}>
-                        <Text style={styles.tileMeta} numberOfLines={1}>
+                        <Text
+                            style={styles.tileMeta}
+                            numberOfLines={1}
+                        >
                             {[article.clothingType, article.color]
                                 .filter(Boolean)
                                 .join(' · ')}
                         </Text>
-                        <ColorSwatch color={article.color} style={styles.tileColorDot} />
+                        <ColorSwatch
+                            color={article.color}
+                            style={styles.tileColorDot}
+                        />
                     </View>
                 </View>
             </Pressable>
@@ -200,7 +237,10 @@ export const SwipeableArticleCard = (props: ArticleCardProps) => {
         });
         return (
             <Animated.View
-                style={[swipeStyles.deleteActionWrap, { transform: [{ translateX }] }]}
+                style={[
+                    swipeStyles.deleteActionWrap,
+                    { transform: [{ translateX }] },
+                ]}
             >
                 <Pressable
                     style={swipeStyles.deleteAction}
