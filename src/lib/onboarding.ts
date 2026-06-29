@@ -1,11 +1,12 @@
 /**
  * Tracks first-run onboarding.
  *
- * Onboarding is gated on an explicit "pending" signal that is set ONLY when the
- * sign-up information form is completed (see SignupPage). It is intentionally
- * NOT inferred from login state — that way a returning user whose credentials
- * are remembered, or who signs in via the login screen, never re-sees the
- * first-run flow.
+ * Onboarding is gated on an explicit "pending" signal that is set only on a
+ * first-time account creation: completing the sign-up form (see SignupPage) or
+ * a Google/Apple sign-in that created a brand-new account (see LoginPage). It is
+ * intentionally NOT inferred from login state — that way a returning user whose
+ * credentials are remembered, or who signs in via the login screen, never
+ * re-sees the first-run flow.
  *
  * - `pending`  — global flag set at sign-up, cleared on completion. AuthGate
  *                routes to /(auth)/onboarding while it is set.

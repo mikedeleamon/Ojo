@@ -23,6 +23,7 @@ export const isAppleSignInAvailable = async (): Promise<boolean> => {
 
 export interface AppleSignInResult {
   ok: true;
+  isNewUser: boolean;
 }
 
 export interface AppleSignInCancelled {
@@ -57,7 +58,7 @@ export const signInWithApple = async (): Promise<AppleSignInOutcome> => {
       return { ok: false, cancelled: false, error: 'No identity token returned from Apple.' };
     }
 
-    const { data } = await axios.post<AuthState & { settings: Settings }>(
+    const { data } = await axios.post<AuthState & { settings: Settings; isNewUser?: boolean }>(
       '/api/auth/apple',
       {
         identityToken: credential.identityToken,
@@ -71,7 +72,7 @@ export const signInWithApple = async (): Promise<AppleSignInOutcome> => {
     );
 
     await saveAuth(data.token, data.user);
-    return { ok: true };
+    return { ok: true, isNewUser: data.isNewUser === true };
   } catch (err: any) {
     // ERR_REQUEST_CANCELED is fired when the user dismisses the sheet
     if (err?.code === 'ERR_REQUEST_CANCELED') {

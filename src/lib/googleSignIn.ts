@@ -21,7 +21,7 @@ import { saveAuth } from './auth';
 const IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
 const WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 
-export interface GoogleSignInResult    { ok: true; }
+export interface GoogleSignInResult    { ok: true; isNewUser: boolean; }
 export interface GoogleSignInCancelled { ok: false; cancelled: true; }
 export interface GoogleSignInError     { ok: false; cancelled: false; error: string; }
 export type GoogleSignInOutcome =
@@ -73,12 +73,12 @@ export const signInWithGoogle = async (): Promise<GoogleSignInOutcome> => {
       return { ok: false, cancelled: false, error: 'No identity token returned from Google.' };
     }
 
-    const { data } = await axios.post<AuthState & { settings: Settings }>(
+    const { data } = await axios.post<AuthState & { settings: Settings; isNewUser?: boolean }>(
       '/api/auth/google',
       { idToken },
     );
     await saveAuth(data.token, data.user);
-    return { ok: true };
+    return { ok: true, isNewUser: data.isNewUser === true };
   } catch (err: any) {
     const code = err?.code;
     if (code === '-5' || code === '12501' || code === 'SIGN_IN_CANCELLED') {

@@ -219,6 +219,10 @@ router.post('/apple', async (req: Request, res: Response): Promise<void> => {
       if (byEmail) user = byEmail;
     }
 
+    // Whether this request created a brand-new account — the client uses this
+    // to run first-run onboarding (mirrors the email/password sign-up form).
+    const isNewUser = !user;
+
     // 3) Otherwise create a new user.
     // Apple only sends fullName on the very first sign-in — fall back gracefully.
     if (!user) {
@@ -253,6 +257,7 @@ router.post('/apple', async (req: Request, res: Response): Promise<void> => {
       token: signToken(user.id, user.tokenVersion),
       user:  { id: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email },
       settings: user.settings,
+      isNewUser,
     });
   } catch (err) {
     console.error('[auth] apple sign-in error:', err);
@@ -309,6 +314,10 @@ router.post('/google', async (req: Request, res: Response): Promise<void> => {
       if (byEmail) user = byEmail;
     }
 
+    // Whether this request created a brand-new account — the client uses this
+    // to run first-run onboarding (mirrors the email/password sign-up form).
+    const isNewUser = !user;
+
     // 3) Otherwise create a new user
     if (!user) {
       const nameParts  = (claims.name ?? '').split(' ');
@@ -341,6 +350,7 @@ router.post('/google', async (req: Request, res: Response): Promise<void> => {
       token: signToken(user.id, user.tokenVersion),
       user:  { id: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email },
       settings: user.settings,
+      isNewUser,
     });
   } catch (err) {
     console.error('[auth] google sign-in error:', err);

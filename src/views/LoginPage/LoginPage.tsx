@@ -15,6 +15,7 @@ import { AuthState, Settings } from '../../types';
 import { getAuthErrorMessage, saveAuth } from '../../lib/auth';
 import { isAppleSignInAvailable, signInWithApple } from '../../lib/appleSignIn';
 import { isGoogleSignInAvailable, signInWithGoogle } from '../../lib/googleSignIn';
+import { markOnboardingPending } from '../../lib/onboarding';
 import GoogleGlyph from '../../components/icons/GoogleGlyph';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { spacing, radius, fonts, fontSizes } from '../../theme/tokens';
@@ -74,6 +75,9 @@ export default function LoginPage({ onLogin }: Props) {
         const result = await signInWithApple();
         setAppleLoading(false);
         if (result.ok) {
+            // First-time OAuth users get the same first-run onboarding as the
+            // sign-up form; AuthGate reads this flag to redirect.
+            if (result.isNewUser) await markOnboardingPending();
             onLogin?.();
             return;
         }
@@ -88,6 +92,9 @@ export default function LoginPage({ onLogin }: Props) {
         const result = await signInWithGoogle();
         setGoogleLoading(false);
         if (result.ok) {
+            // First-time OAuth users get the same first-run onboarding as the
+            // sign-up form; AuthGate reads this flag to redirect.
+            if (result.isNewUser) await markOnboardingPending();
             onLogin?.();
             return;
         }
