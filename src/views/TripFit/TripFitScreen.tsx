@@ -1,5 +1,5 @@
-import { useMemo, useState, useCallback } from 'react';
-import { useRouter } from 'expo-router';
+import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useClosets } from '../../hooks/useClosets';
 import { useSettings } from '../../context/SettingsContext';
 import { useTripPlans } from '../../hooks/useTripPlans';
@@ -23,6 +23,19 @@ export default function TripFitScreen() {
     const { plans, loading, upsert, remove } = useTripPlans();
 
     const [mode, setMode] = useState<Mode>({ kind: 'library' });
+
+    // Deep-link: the Trip Mode card opens a specific trip via ?planId=. Handle
+    // each id once (via a ref) so returning to the library doesn't reopen it.
+    const { planId } = useLocalSearchParams<{ planId?: string }>();
+    const handledPlanId = useRef<string | null>(null);
+    useEffect(() => {
+        if (!planId || loading || handledPlanId.current === planId) return;
+        const plan = plans.find((p) => p.id === planId);
+        if (plan) {
+            handledPlanId.current = planId;
+            setMode({ kind: 'planner', existing: plan });
+        }
+    }, [planId, loading, plans]);
 
     // Build outfits from the user's preferred closet (falling back to the first).
     const { articles, closetId } = useMemo(() => {

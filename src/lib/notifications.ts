@@ -29,6 +29,7 @@ export const NOTIF_DEFAULTS: NotificationSettings = {
   weeklyRecapEnabled:   false,
   weeklyRecapDay:       0,    // Sunday
   tripPackingEnabled:   false,
+  tripModeMorningEnabled: false,
 };
 
 // ─── Permissions ──────────────────────────────────────────────────────────────
@@ -238,3 +239,100 @@ export const cancelAllTripReminders = async (): Promise<void> => {
 // Back-compat alias — NotificationsScreen imports this to clear reminders when
 // the user disables the trip-packing toggle.
 export const cancelTripPackingReminder = cancelAllTripReminders;
+
+// ─── Trip Mode morning outfit notifications ───────────────────────────────────
+// While a saved trip is underway, fire a gentle 8am-local nudge each day pointing
+// the user at the outfit TripFit already logged for that day. These are DATE
+// triggers scheduled per trip day. Identifiers are namespaced by plan id + date
+// so we can cancel a plan's whole set by prefix without a separate registry.
+//
+// Limitation: these are date-based — they fire during the trip window regardless
+// of where the device actually is (no background location). The in-app Trip Mode
+// card is what confirms the user is really at the destination.
+
+export const TRIP_MODE_MORNING_PREF_KEY = 'ojo_trip_mode_morning_enabled';
+const TRIP_MODE_PREFIX = 'ojo_tripmode_';
+const TRIP_MODE_HOUR = 8; // 8am local
+const TRIP_MODE_MAX_DAYS = 14;
+
+const morningNotifId = (planId: string, dateISO: string) =>
+  `${TRIP_MODE_PREFIX}${planId}_${dateISO}`;
+
+interface TripMorningInput {
+  id:          string;
+  destination: string;
+  startDate:   string;   // ISO yyyy-mm-dd
+  endDate:     string;   // ISO yyyy-mm-dd
+}
+
+/** Inclusive yyyy-mm-dd dates between start and end (local), capped for safety. */
+const datesInRange = (startISO: string, endISO: string): string[] => {
+  const out: string[] = [];
+  const start = new Date(startISO + 'T12:00:00');
+  const end = new Date(endISO + 'T12:00:00');
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) return out;
+  const d = new Date(start);
+  while (d <= end && out.length < TRIP_MODE_MAX_DAYS) {
+    out.push(
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
+        d.getDate(),
+      ).padStart(2, '0')}`,
+    );
+    d.setDate(d.getDate() + 1);
+  }
+  return out;
+};
+
+/** Cancel every scheduled notification whose identifier starts with `prefix`. */
+const cancelByPrefix = async (prefix: string): Promise<void> => {
+  try {
+    const all = await Notifications.getAllScheduledNotificationsAsync();
+    await Promise.all(
+      all
+        .filter((n) => (n.identifier ?? '').startsWith(prefix))
+        .map((n) =>
+          Notifications.cancelScheduledNotificationAsync(n.identifier).catch(() => {}),
+        ),
+    );
+  } catch {
+    /* ignore */
+  }
+};
+
+/** Cancel a single plan's Trip Mode morning notifications. */
+export const cancelTripMorningNotifications = async (planId: string): Promise<void> =>
+  cancelByPrefix(`${TRIP_MODE_PREFIX}${planId}_`);
+
+/** Cancel every Trip Mode morning notification (master toggle off). */
+export const cancelAllTripMorningNotifications = async (): Promise<void> =>
+  cancelByPrefix(TRIP_MODE_PREFIX);
+
+/** (Re)schedule the per-day 8am morning nudges for one trip. */
+export const scheduleTripMorningNotifications = async (
+  plan: TripMorningInput,
+): Promise<void> => {
+  // Always clear this plan's existing nudges first so updates don't duplicate.
+  await cancelTripMorningNotifications(plan.id);
+
+  const enabled = await storage.getItem(TRIP_MODE_MORNING_PREF_KEY);
+  if (enabled !== 'true') return;
+
+  const { status } = await Notifications.getPermissionsAsync();
+  if (status !== 'granted') return;
+
+  const now = new Date();
+  for (const dateISO of datesInRange(plan.startDate, plan.endDate)) {
+    const fireAt = new Date(dateISO + 'T00:00:00');
+    fireAt.setHours(TRIP_MODE_HOUR, 0, 0, 0);
+    if (fireAt <= now) continue; // skip days already past 8am
+
+    await Notifications.scheduleNotificationAsync({
+      identifier: morningNotifId(plan.id, dateISO),
+      content: {
+        title: `Good morning in ${plan.destination}! ☀️`,
+        body: "Open Ojo to see the outfit you planned for today.",
+      },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: fireAt },
+    }).catch(() => {});
+  }
+};

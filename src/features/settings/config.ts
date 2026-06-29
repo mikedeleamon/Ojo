@@ -37,6 +37,12 @@ export const SETTINGS_CONFIG: SettingsSectionConfig[] = [
     ],
   },
   {
+    title: 'Trips',
+    items: [
+      { key: 'trip-mode', label: 'Trip Mode', action: { type: 'navigate', to: '/account/trip-mode' } },
+    ],
+  },
+  {
     title: 'Privacy & Security',
     items: [
       { key: 'permissions', label: 'Permissions', action: { type: 'navigate', to: '/account/permissions' } },

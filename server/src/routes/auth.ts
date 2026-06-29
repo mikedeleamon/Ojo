@@ -208,20 +208,22 @@ router.post('/apple', async (req: Request, res: Response): Promise<void> => {
     // 1) Look up by Apple sub
     let user = await User.findOne({ appleSub: claims.sub });
 
-    // 2) Fallback: link to existing email/password account by email
+    // 2) Fallback: link to existing email/password account by email.
+    // Use findOneAndUpdate to avoid running full validators on the existing doc.
     if (!user && claims.email) {
-      const byEmail = await User.findOne({ email: claims.email.toLowerCase() });
-      if (byEmail) {
-        byEmail.appleSub = claims.sub;
-        await byEmail.save();
-        user = byEmail;
-      }
+      const byEmail = await User.findOneAndUpdate(
+        { email: claims.email.toLowerCase() },
+        { $set: { appleSub: claims.sub } },
+        { new: true },
+      );
+      if (byEmail) user = byEmail;
     }
 
-    // 3) Otherwise create a new user
+    // 3) Otherwise create a new user.
+    // Apple only sends fullName on the very first sign-in — fall back gracefully.
     if (!user) {
-      const firstName = fullName?.givenName  ?? '';
-      const lastName  = fullName?.familyName ?? '';
+      const firstName = fullName?.givenName?.trim()  || 'Apple';
+      const lastName  = fullName?.familyName?.trim() || 'User';
       // Username falls back to the Apple sub if no email is shared (private relay)
       const usernameSeed = claims.email
         ? claims.email.split('@')[0]
@@ -295,20 +297,23 @@ router.post('/google', async (req: Request, res: Response): Promise<void> => {
     // 1) Look up by Google sub
     let user = await User.findOne({ googleSub: claims.sub });
 
-    // 2) Fallback: link to existing email/password account by email
+    // 2) Fallback: link to existing email/password account by email.
+    // Use findByIdAndUpdate rather than save() to avoid running full document
+    // validators — the only thing changing is the googleSub field.
     if (!user && claims.email) {
-      const byEmail = await User.findOne({ email: claims.email.toLowerCase() });
-      if (byEmail) {
-        byEmail.googleSub = claims.sub;
-        await byEmail.save();
-        user = byEmail;
-      }
+      const byEmail = await User.findOneAndUpdate(
+        { email: claims.email.toLowerCase() },
+        { $set: { googleSub: claims.sub } },
+        { new: true },
+      );
+      if (byEmail) user = byEmail;
     }
 
     // 3) Otherwise create a new user
     if (!user) {
-      const firstName = claims.given_name  ?? '';
-      const lastName  = claims.family_name ?? '';
+      const nameParts  = (claims.name ?? '').split(' ');
+      const firstName  = claims.given_name?.trim()  || nameParts[0]  || 'Google';
+      const lastName   = claims.family_name?.trim() || nameParts.slice(1).join(' ') || 'User';
       const usernameSeed = claims.email
         ? claims.email.split('@')[0]
         : `google_${claims.sub.slice(0, 10)}`;

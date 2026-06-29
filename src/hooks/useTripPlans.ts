@@ -1,7 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { SavedTripFitPlan } from '../types';
 import { loadPlans, upsertPlan, deletePlan } from '../lib/tripStorage';
-import { scheduleTripReminders, cancelTripReminders } from '../lib/notifications';
+import {
+    scheduleTripReminders,
+    cancelTripReminders,
+    scheduleTripMorningNotifications,
+    cancelTripMorningNotifications,
+} from '../lib/notifications';
 import { tripFitStatus } from '../views/TripFit/shared';
 
 interface UseTripPlansResult {
@@ -31,6 +36,15 @@ export function useTripPlans(): UseTripPlansResult {
         loadPlans()
             .then((p) => {
                 if (!cancelled) setPlans(p);
+                // Reconcile Trip Mode morning nudges each launch: scheduling is
+                // idempotent (cancels-then-reschedules) and self-gates on the
+                // local pref + permission, so this also retro-schedules trips
+                // saved before the feature/toggle was enabled.
+                for (const plan of p) {
+                    if (tripFitStatus(plan) !== 'completed') {
+                        scheduleTripMorningNotifications(plan).catch(() => {});
+                    }
+                }
             })
             .finally(() => {
                 if (!cancelled) setLoading(false);
@@ -53,8 +67,10 @@ export function useTripPlans(): UseTripPlansResult {
         // Only schedule reminders for trips that haven't already finished.
         if (tripFitStatus(saved) !== 'completed') {
             scheduleTripReminders(saved).catch(() => {});
+            scheduleTripMorningNotifications(saved).catch(() => {});
         } else {
             cancelTripReminders(saved.id).catch(() => {});
+            cancelTripMorningNotifications(saved.id).catch(() => {});
         }
         return saved;
     }, []);
@@ -63,6 +79,7 @@ export function useTripPlans(): UseTripPlansResult {
         await deletePlan(id);
         setPlans((prev) => prev.filter((p) => p.id !== id));
         cancelTripReminders(id).catch(() => {});
+        cancelTripMorningNotifications(id).catch(() => {});
     }, []);
 
     return { plans, loading, upsert, remove, refresh };

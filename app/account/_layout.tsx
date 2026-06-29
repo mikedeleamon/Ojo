@@ -44,6 +44,7 @@ export default function AccountLayout() {
       <Stack.Screen name="units" options={{ ...subScreen, title: 'Units' }} />
       <Stack.Screen name="price-backfill" options={{ ...subScreen, title: 'Add Prices' }} />
       <Stack.Screen name="notifications" options={{ ...subScreen, title: 'Notifications' }} />
+      <Stack.Screen name="trip-mode" options={{ ...subScreen, title: 'Trip Mode' }} />
       <Stack.Screen name="permissions" options={{ ...subScreen, title: 'Permissions' }} />
       <Stack.Screen name="data-usage" options={{ ...subScreen, title: 'Data Usage' }} />
       <Stack.Screen name="legal" options={{ ...subScreen, title: 'Legal' }} />

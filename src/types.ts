@@ -127,6 +127,10 @@ export interface Settings {
   sensitivities?:  { allergies?: boolean; asthma?: boolean };
   /** Extra cities the user switches the weather HUD between (synced across devices). */
   savedLocations?: SavedLocation[];
+  /** Trip Mode: surface a saved trip's logged outfit when you're there. Default on. */
+  tripModeEnabled?: boolean;
+  /** How close (miles) to a trip city counts as "there". Default 30. */
+  tripModeRadiusMi?: number;
 }
 
 export interface ClothingArticle {
@@ -169,6 +173,8 @@ export interface NotificationSettings {
   weeklyRecapEnabled:     boolean;
   weeklyRecapDay:         number;   // 0=Sun … 6=Sat
   tripPackingEnabled:     boolean;
+  /** Morning "here's today's trip outfit" nudge during a trip. Stored locally. */
+  tripModeMorningEnabled: boolean;
 }
 
 export interface OutfitHistoryEntry {

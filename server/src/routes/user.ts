@@ -121,6 +121,8 @@ const SETTINGS_EDITABLE_FIELDS = [
   'humidityPreference',
   'gender',
   'savedLocations',
+  'tripModeEnabled',
+  'tripModeRadiusMi',
 ] as const;
 
 router.put('/settings', async (req: AuthRequest, res: Response): Promise<void> => {

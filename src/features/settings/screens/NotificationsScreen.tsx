@@ -22,7 +22,9 @@ import {
   scheduleWeeklyRecap,
   cancelWeeklyRecap,
   cancelTripPackingReminder,
+  cancelAllTripMorningNotifications,
   TRIP_PACKING_PREF_KEY,
+  TRIP_MODE_MORNING_PREF_KEY,
   localHourToUTC,
   utcHourToLocal,
   PermissionStatus,
@@ -191,15 +193,20 @@ export default function NotificationsScreen() {
       const perm = await getPermissionStatus();
       if (!cancelled) setPermission(perm);
       try {
-        const [{ data }, localTripPacking] = await Promise.all([
+        const [{ data }, localTripPacking, localTripMorning] = await Promise.all([
           axios.get('/api/notifications/settings', authHeaders()),
           storage.getItem(TRIP_PACKING_PREF_KEY),
+          storage.getItem(TRIP_MODE_MORNING_PREF_KEY),
         ]);
         if (!cancelled) {
           const merged = { ...NOTIF_DEFAULTS, ...data };
-          // tripPackingEnabled is stored locally — local value wins if present
+          // tripPackingEnabled + tripModeMorningEnabled are stored locally — the
+          // local value wins if present.
           if (localTripPacking !== null) {
             merged.tripPackingEnabled = localTripPacking === 'true';
+          }
+          if (localTripMorning !== null) {
+            merged.tripModeMorningEnabled = localTripMorning === 'true';
           }
           setNs(merged);
           setLocalHour(utcHourToLocal(merged.morningBriefHourUTC));
@@ -282,6 +289,13 @@ export default function NotificationsScreen() {
         await cancelTripPackingReminder();
       }
 
+      await storage.setItem(TRIP_MODE_MORNING_PREF_KEY, ns.tripModeMorningEnabled ? 'true' : 'false');
+      if (!ns.tripModeMorningEnabled) {
+        await cancelAllTripMorningNotifications();
+      }
+      // When enabled, per-trip nudges are (re)scheduled by useTripPlans on next
+      // load — its reconcile pass self-gates on this pref + notification permission.
+
       setSaved(true);
       hapticSuccess();
       setTimeout(() => setSaved(false), 3000);
@@ -300,7 +314,8 @@ export default function NotificationsScreen() {
     ns.tempSwingEnabled ||
     ns.closetGapEnabled ||
     ns.weeklyRecapEnabled ||
-    ns.tripPackingEnabled;
+    ns.tripPackingEnabled ||
+    ns.tripModeMorningEnabled;
 
   return (
     <SafeAreaView style={st.root} edges={['bottom']}>
@@ -434,6 +449,21 @@ export default function NotificationsScreen() {
                 onValueChange={v => set('tripPackingEnabled', v)}
                 trackColor={{ false: colors.glassBorder, true: colors.toggleTrackActive }}
                 thumbColor={ns.tripPackingEnabled ? colors.toggleThumbActive : colors.textMuted}
+              />
+            </Row>
+          </GlassCard>
+
+          <GlassCard style={st.card}>
+            <Row st={st}>
+              <RowLabel st={st}
+                title="Trip Mode Morning Outfit"
+                subtitle="While you're on a trip, a morning nudge points you to the outfit you planned for that day."
+              />
+              <Switch
+                value={ns.tripModeMorningEnabled}
+                onValueChange={v => set('tripModeMorningEnabled', v)}
+                trackColor={{ false: colors.glassBorder, true: colors.toggleTrackActive }}
+                thumbColor={ns.tripModeMorningEnabled ? colors.toggleThumbActive : colors.textMuted}
               />
             </Row>
           </GlassCard>

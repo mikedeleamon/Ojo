@@ -20,6 +20,8 @@ export const defaults: Settings = {
     hiTempThreshold: 85,
     lowTempThreshold: 50,
     humidityPreference: 70,
+    tripModeEnabled: true,
+    tripModeRadiusMi: 30,
 };
 
 // Ensures clothingStyles is always present — old server payloads only have

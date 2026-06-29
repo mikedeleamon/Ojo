@@ -16,6 +16,9 @@ export interface ISettings {
   // Extra cities the user switches the weather HUD between. Synced so the list
   // follows them across devices; weather payloads themselves stay client-side.
   savedLocations?: ISavedLocation[];
+  // Trip Mode — surface a saved trip's logged outfit when the user is there.
+  tripModeEnabled?: boolean;
+  tripModeRadiusMi?: number;
 }
 
 export interface ISavedLocation {
@@ -93,6 +96,8 @@ const settingsSchema = new Schema<ISettings>({
   humidityPreference: { type: Number, default: 60 },
   gender:             { type: String, enum: ["Men's", "Women's", "All"], default: 'All' },
   savedLocations:     { type: [savedLocationSchema], default: [] },
+  tripModeEnabled:    { type: Boolean, default: true },
+  tripModeRadiusMi:   { type: Number,  default: 30 },
 }, { _id: false });
 
 const notificationSettingsSchema = new Schema<INotificationSettings>({
