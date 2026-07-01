@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { Pressable, Image, Animated, StyleSheet } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,8 +20,8 @@ import { makeStyles } from './ClosetView.styles';
 interface ArticleCardProps {
     article: ClothingArticle;
     outOfSeason?: boolean;
-    onEdit: () => void;
-    onRemove: () => void;
+    onEdit: (article: ClothingArticle) => void;
+    onRemove: (article: ClothingArticle) => void;
 }
 
 /** Small color swatch — metallic gradient or flat CSS color, or nothing. */
@@ -41,7 +41,7 @@ const ColorSwatch = ({ color, style }: { color?: string; style: object }) => {
     return null;
 };
 
-export const ArticleCard = ({
+export const ArticleCard = memo(({
     article,
     outOfSeason,
     onEdit,
@@ -58,7 +58,7 @@ export const ArticleCard = ({
         >
             <Pressable
                 style={styles.articleCardInner}
-                onPress={onEdit}
+                onPress={() => onEdit(article)}
                 accessibilityLabel='Edit article'
                 accessibilityRole='button'
             >
@@ -112,18 +112,19 @@ export const ArticleCard = ({
             </Pressable>
         </GlassCard>
     );
-};
+});
+ArticleCard.displayName = 'ArticleCard';
 
 // ─── Tile card ────────────────────────────────────────────────────────────────
 
 interface TileArticleCardProps {
     article: ClothingArticle;
     tileWidth: number;
-    onEdit: () => void;
-    onRemove: () => void;
+    onEdit: (article: ClothingArticle) => void;
+    onRemove: (article: ClothingArticle) => void;
 }
 
-export const TileArticleCard = ({
+export const TileArticleCard = memo(({
     article,
     tileWidth,
     onEdit,
@@ -142,14 +143,14 @@ export const TileArticleCard = ({
             confirmLabel: 'Remove',
             destructive: true,
         });
-        if (ok) onRemove();
+        if (ok) onRemove(article);
     };
 
     return (
         <GlassCard style={[styles.tileCard, { width: tileWidth }]} tintColor={isDark ? undefined : 'rgba(0,0,0,0.07)'}>
             <Pressable
                 style={styles.tileCardInner}
-                onPress={onEdit}
+                onPress={() => onEdit(article)}
                 onLongPress={confirmDelete}
                 accessibilityLabel={`Edit ${article.name || article.clothingType}. Long press to delete.`}
                 accessibilityRole='button'
@@ -197,7 +198,8 @@ export const TileArticleCard = ({
             </Pressable>
         </GlassCard>
     );
-};
+});
+TileArticleCard.displayName = 'TileArticleCard';
 
 // ─── Swipeable list card ───────────────────────────────────────────────────────
 
@@ -224,7 +226,7 @@ const swipeStyles = StyleSheet.create({
     },
 });
 
-export const SwipeableArticleCard = (props: ArticleCardProps) => {
+export const SwipeableArticleCard = memo((props: ArticleCardProps) => {
     const renderRightActions = (
         _progress: ReturnType<Animated.Value['interpolate']>,
         dragX: ReturnType<Animated.Value['interpolate']>,
@@ -246,7 +248,7 @@ export const SwipeableArticleCard = (props: ArticleCardProps) => {
                     style={swipeStyles.deleteAction}
                     onPress={() => {
                         swipeable.close();
-                        props.onRemove();
+                        props.onRemove(props.article);
                     }}
                 >
                     <Text style={swipeStyles.deleteText}>Delete</Text>
@@ -264,4 +266,5 @@ export const SwipeableArticleCard = (props: ArticleCardProps) => {
             <ArticleCard {...props} />
         </Swipeable>
     );
-};
+});
+SwipeableArticleCard.displayName = 'SwipeableArticleCard';

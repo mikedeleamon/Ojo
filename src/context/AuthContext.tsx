@@ -5,6 +5,7 @@ import {
   clearAuth,
   isTokenExpiringSoon,
   refreshToken,
+  onSessionExpired,
 } from '../lib/auth';
 import { registerPushToken } from '../lib/notifications';
 
@@ -41,6 +42,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
     init();
   }, []);
+
+  // A rejected-and-unrefreshable token (surfaced by the axios 401 interceptor)
+  // clears the session; flip the app to logged-out so AuthGate routes to login.
+  useEffect(() => onSessionExpired(() => setIsLoggedIn(false)), []);
 
   const login = useCallback(() => setIsLoggedIn(true), []);
   const logout = useCallback(() => {

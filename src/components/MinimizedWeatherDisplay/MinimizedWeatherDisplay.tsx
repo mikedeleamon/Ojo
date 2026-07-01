@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 import { View, Text, GlassCard } from '../primitives';
 import WeatherIconDisplay from '../WeatherIconDisplay/WeatherIconDisplay';
@@ -50,4 +50,4 @@ const MinimizedWeatherDisplay = ({ weather, temperature, time, tempUnit, isDay, 
   );
 };
 
-export default MinimizedWeatherDisplay;
+export default memo(MinimizedWeatherDisplay);

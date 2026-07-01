@@ -86,12 +86,9 @@ const extractSunEvents = (days: DailyForecast[]): SunEvent[] => {
 
 // Linear interpolation of forecast temperature at an arbitrary ISO timestamp.
 // Forecasts are returned in Fahrenheit; the caller converts to metric if needed.
-const tempAtTime = (target: number, forecasts: Forecast[]): number | null => {
-    if (forecasts.length === 0) return null;
-    const sorted = [...forecasts].sort(
-        (a, b) =>
-            new Date(a.DateTime).getTime() - new Date(b.DateTime).getTime(),
-    );
+// `sorted` must already be chronologically ordered (the caller sorts once).
+const tempAtTime = (target: number, sorted: Forecast[]): number | null => {
+    if (sorted.length === 0) return null;
     for (let i = 0; i < sorted.length - 1; i++) {
         const t0 = new Date(sorted[i].DateTime).getTime();
         const t1 = new Date(sorted[i + 1].DateTime).getTime();
@@ -534,7 +531,7 @@ const WeatherHUD = ({
         for (const ev of sunEvents) {
             const t = new Date(ev.time).getTime();
             if (Number.isNaN(t) || t < windowStart || t > windowEnd) continue;
-            const tempF = tempAtTime(t, forecasts);
+            const tempF = tempAtTime(t, sorted);
             if (tempF === null) continue;
             const temp = Math.round(isMetric ? fToC(tempF) : tempF);
             items.push({ kind: 'sun', time: ev.time, sun: ev, temp });

@@ -167,6 +167,21 @@ const ClosetView = ({
         return arr;
     }, [filteredArticles, sortBy, wornAgeMap]);
 
+    // Stable per-render handlers so the memoized article cards don't re-render
+    // on every ClosetView update (filter/sort/edit-modal toggles). The article
+    // is passed back up rather than captured per-cell.
+    const selectedId_ = selected?._id;
+    const handleEditArticle = useCallback(
+        (a: ClothingArticle) => setEditingArticle(a),
+        [],
+    );
+    const handleRemoveArticle = useCallback(
+        (a: ClothingArticle) => {
+            if (selectedId_) onRemoveArticle(selectedId_, a._id);
+        },
+        [onRemoveArticle, selectedId_],
+    );
+
     const submitCreate = async () => {
         if (!newName.trim()) return;
         try {
@@ -616,8 +631,8 @@ const ClosetView = ({
                             key={a._id}
                             article={a}
                             tileWidth={tileWidth}
-                            onEdit={() => setEditingArticle(a)}
-                            onRemove={() => onRemoveArticle(selected._id, a._id)}
+                            onEdit={handleEditArticle}
+                            onRemove={handleRemoveArticle}
                         />
                     ))
                 ) : (
@@ -625,8 +640,8 @@ const ClosetView = ({
                         <SwipeableArticleCard
                             key={a._id}
                             article={a}
-                            onEdit={() => setEditingArticle(a)}
-                            onRemove={() => onRemoveArticle(selected._id, a._id)}
+                            onEdit={handleEditArticle}
+                            onRemove={handleRemoveArticle}
                         />
                     ))
                 )}

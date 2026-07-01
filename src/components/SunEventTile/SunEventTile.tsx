@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 import { View, Text, GlassCard } from '../primitives';
 import SunriseSunsetIcon from '../WeatherIcons/SunriseSunsetIcon';
@@ -55,4 +55,4 @@ const SunEventTile = ({ time, temperature, tempUnit }: Props) => {
     );
 };
 
-export default SunEventTile;
+export default memo(SunEventTile);

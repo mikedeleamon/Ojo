@@ -8,8 +8,6 @@ import { getCurrentLocation, formatCoords } from '../../lib/location';
 import { CURRENT_LOCATION_ID } from '../../lib/savedLocations';
 import { getAllSnapshots, setSnapshot } from '../../lib/weatherCache';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
-import { useTripMode } from '../../hooks/useTripMode';
-import TripModeCard from '../../components/TripMode/TripModeCard';
 import { ForceDarkPalette } from '../../theme/ThemeContext';
 import { darkColors } from '../../theme/tokens';
 import type { WeatherSnapshot } from '../../types';
@@ -22,11 +20,6 @@ export default function MainPage() {
   const { settings, settingsReady } = useSettings();
   const { activeId, setActiveId } = useActiveLocation();
   const nav = useAppNavigation();
-
-  // Trip Mode: when the user is in (or, GPS unavailable, scheduled for) a saved
-  // trip today, surface the logged outfit in a card docked under the HUD.
-  const tripMode = useTripMode();
-  const [tripDismissed, setTripDismissed] = useState(false);
 
   const [gpsLocation, setGpsLocation] = useState('');
   const [refreshKey,  setRefreshKey]  = useState(0);
@@ -99,21 +92,6 @@ export default function MainPage() {
           onSnapshot={handleSnapshot}
           onOpenLocations={openLocations}
         />
-        {tripMode.active && tripMode.trip && !tripDismissed && (
-          <TripModeCard
-            trip={tripMode.trip}
-            outfit={tripMode.outfit}
-            dayIndex={tripMode.dayIndex}
-            total={tripMode.total}
-            locationConfirmed={tripMode.locationConfirmed}
-            source={tripMode.source}
-            driftNote={tripMode.driftNote}
-            closetId={tripMode.closetId}
-            closetName={tripMode.closetName}
-            onOpenTrip={() => nav.push('/account/tripfit', { planId: tripMode.trip!.id })}
-            onDismiss={() => setTripDismissed(true)}
-          />
-        )}
       </View>
     </ForceDarkPalette>
   );

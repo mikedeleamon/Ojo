@@ -21,10 +21,13 @@ import Animated, {
 import { Svg, Circle } from 'react-native-svg';
 import { View, Text, GlassCard, GlassGroup } from '../primitives';
 import { EmptyState } from '../shared';
+import OccasionChips from '../OccasionChips';
 import { useClosets } from '../../hooks/useClosets';
 import { useReduceMotion } from '../../hooks/useReduceMotion';
+import { useTripMode } from '../../hooks/useTripMode';
 import { hapticSuccess } from '../../lib/haptics';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
+import TripModeCard from '../TripMode/TripModeCard';
 import {
     generateOutfits,
     personalizedScoreLevel,
@@ -214,56 +217,6 @@ const GapCard = ({
     );
 };
 
-// ─── Occasion chips ───────────────────────────────────────────────────────────
-
-const OCCASION_CHIPS: { value: OutfitOccasion; label: string }[] = [
-    { value: 'everyday', label: 'Everyday' },
-    { value: 'work', label: 'Work' },
-    { value: 'weekend', label: 'Weekend' },
-    { value: 'date', label: 'Date' },
-    { value: 'outdoor', label: 'Outdoor' },
-    { value: 'athletic', label: 'Athletic' },
-];
-
-const OccasionChips = ({
-    active,
-    onChange,
-}: {
-    active: OutfitOccasion;
-    onChange: (o: OutfitOccasion) => void;
-}) => {
-    const { colors } = useTheme();
-    const styles = useMemo(() => makeStyles(colors), [colors]);
-    return (
-        <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.occasionRow}
-        >
-            {OCCASION_CHIPS.map(({ value, label }) => (
-                <Pressable
-                    key={value}
-                    style={[
-                        styles.occasionChip,
-                        active === value && styles.occasionChipActive,
-                    ]}
-                    onPress={() => onChange(value)}
-                    hitSlop={4}
-                >
-                    <Text
-                        style={[
-                            styles.occasionChipText,
-                            active === value && styles.occasionChipTextActive,
-                        ]}
-                    >
-                        {label}
-                    </Text>
-                </Pressable>
-            ))}
-        </ScrollView>
-    );
-};
-
 // ─── Main component ───────────────────────────────────────────────────────────
 
 interface Props {
@@ -291,6 +244,13 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
     const [activeIdx, setActiveIdx] = useState(0);
     const [showBreakdown, setShowBreakdown] = useState(false);
     const [wornLogged, setWornLogged] = useState(false);
+    // The outfit captured by the "Logged for today" confirmation — either the
+    // active generated outfit or the Trip Mode outfit, so the confirmation card
+    // always shows whatever the user actually logged.
+    const [loggedOutfit, setLoggedOutfit] = useState<{
+        slots: OutfitSlot[];
+        score: number;
+    } | null>(null);
     const [worn, setWorn] = useState<Map<string, number>>(new Map());
     const [removedByOutfit, setRemovedByOutfit] = useState<
         Map<number, Set<string>>
@@ -310,6 +270,34 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
         [closets, history],
     );
     const nav = useAppNavigation();
+
+    // ─── Trip Mode ────────────────────────────────────────────────────────────
+    // When the user is in (or scheduled for) a saved trip today, the outfit they
+    // planned in TripFit becomes the primary suggestion. It renders as a banner
+    // at the top of this component; the normal generated carousel is demoted
+    // behind a "See other ideas" toggle so there's a single today's-outfit answer.
+    const tripMode = useTripMode();
+    const [tripDismissed, setTripDismissed] = useState(false);
+    const [showOtherIdeas, setShowOtherIdeas] = useState(false);
+    const showTrip = tripMode.active && !!tripMode.trip && !tripDismissed;
+
+    const tripBanner =
+        showTrip && tripMode.trip ? (
+            <TripModeCard
+                trip={tripMode.trip}
+                outfit={tripMode.outfit}
+                dayIndex={tripMode.dayIndex}
+                total={tripMode.total}
+                locationConfirmed={tripMode.locationConfirmed}
+                source={tripMode.source}
+                driftNote={tripMode.driftNote}
+                onWoreThis={() => handleWoreTrip()}
+                onOpenTrip={() =>
+                    nav.push('/account/tripfit', { planId: tripMode.trip!.id })
+                }
+                onDismiss={() => setTripDismissed(true)}
+            />
+        ) : null;
 
     // ─── Wore-today crossfade (UI-thread only via shared value) ───────────────
     const confirmProgress = useSharedValue(0); // 0 = carousel, 1 = confirmation
@@ -449,20 +437,48 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
         (filteredLayering.layers.mid !== null ||
             filteredLayering.layers.outer !== null);
 
-    const handleWoreThis = async () => {
-        if (!preferred || !activeOutfit || activeOutfit.status !== 'ok') return;
+    // Shared logger so both the generated outfit and the Trip Mode outfit flow
+    // into the same "Logged for today" confirmation.
+    const logOutfitAsWorn = async (opts: {
+        slots: OutfitSlot[];
+        score: number;
+        closetId: string;
+        closetName: string;
+    }) => {
+        const articles = opts.slots.map((s) => s.article);
+        if (articles.length === 0) return;
         hapticSuccess();
-        const articles = activeSlots.map((s) => s.article);
         const entry = await addHistoryEntry({
-            closetId: preferred._id,
-            closetName: preferred.name,
+            closetId: opts.closetId,
+            closetName: opts.closetName,
             articleIds: articles.map((a) => a._id),
             articleSummary: articles
                 .map((a) => a.name || a.clothingType)
                 .join(', '),
         });
         setHistory((prev) => [entry, ...prev]);
+        setLoggedOutfit({ slots: opts.slots, score: opts.score });
         setWornLogged(true);
+    };
+
+    const handleWoreThis = () => {
+        if (!preferred || !activeOutfit || activeOutfit.status !== 'ok') return;
+        logOutfitAsWorn({
+            slots: activeSlots,
+            score: activeOutfit.score,
+            closetId: preferred._id,
+            closetName: preferred.name,
+        });
+    };
+
+    const handleWoreTrip = () => {
+        if (!tripMode.outfit || tripMode.outfit.slots.length === 0) return;
+        logOutfitAsWorn({
+            slots: tripMode.outfit.slots,
+            score: tripMode.outfit.score,
+            closetId: tripMode.closetId,
+            closetName: tripMode.closetName,
+        });
     };
 
     const handleUndoLog = () => {
@@ -578,7 +594,10 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
             </View>
         );
 
-    if (!activeOutfit) return null;
+    if (!activeOutfit)
+        return tripBanner ? (
+            <View style={styles.root}>{tripBanner}</View>
+        ) : null;
 
     // ── Personalization level for badge ───────────────────────────────────────
     const scoreLevel = personalizedScoreLevel(profile.totalOutfits);
@@ -617,14 +636,22 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
         });
     };
 
-    const loggedArticles = activeSlots.map((s) => s.article);
+    // Confirmation reflects whatever was logged (generated outfit or trip outfit).
+    const confirmSlots = loggedOutfit?.slots ?? activeSlots;
+    const confirmScore = loggedOutfit?.score ?? activeOutfit.score;
+    const confirmArticles = confirmSlots.map((s) => s.article);
     const repeatCount = history.filter((e) =>
-        loggedArticles.every((a) => e.articleIds.includes(a._id)),
+        confirmArticles.every((a) => e.articleIds.includes(a._id)),
     ).length;
+
+    // The generated suggestion's interactive content — hidden in Trip Mode until
+    // the user opts into "other ideas".
+    const showGenerated = !showTrip || showOtherIdeas;
 
     return (
         <View style={styles.root}>
-            {/* ── Header (always visible) ── */}
+            {/* ── Header (hidden while the trip outfit is the sole focus) ── */}
+            {showGenerated && (
             <View style={styles.header}>
                 <PreferredBadge
                     name={preferred.name}
@@ -657,10 +684,11 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
                     </View>
                 )}
             </View>
+            )}
 
             {/* ── Crossfade container — both panels always mounted ── */}
             <Animated.View style={containerAnimStyle}>
-                {/* ── Carousel panel ── */}
+                {/* ── Interactive panel: trip banner + generated suggestion ── */}
                 <Animated.View
                     style={carouselAnimStyle}
                     pointerEvents={wornLogged ? 'none' : 'auto'}
@@ -668,6 +696,28 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
                         setCarouselHeight(e.nativeEvent.layout.height)
                     }
                 >
+                    {/* Trip banner and the generated suggestion are mutually
+                        exclusive — opening "other ideas" hides the banner. */}
+                    {!showOtherIdeas && tripBanner}
+
+                    {/* Trip active → planned outfit is primary; the generated
+                        suggestion is demoted behind this toggle. */}
+                    {showTrip && (
+                        <Pressable
+                            style={styles.breakdownToggle}
+                            onPress={() => setShowOtherIdeas((v) => !v)}
+                            accessibilityRole='button'
+                        >
+                            <Text style={styles.breakdownToggleText}>
+                                {showOtherIdeas
+                                    ? 'Hide other ideas'
+                                    : 'See other ideas for today'}
+                            </Text>
+                        </Pressable>
+                    )}
+
+                    {showGenerated && (
+                      <>
                     {/* ── Occasion quick-switch ── */}
                     <OccasionChips
                         active={occasionOverride}
@@ -679,14 +729,20 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
                         }}
                     />
 
-                    {/* #2 — Headline above pager */}
-                    <Text style={styles.headline}>
+                    {/* #2 — Headline above pager. The block's bottom margin sits
+                        under the subtext when present, else under the headline. */}
+                    <Text
+                        style={[
+                            styles.headline,
+                            !whyExplanation && styles.textBlockBottom,
+                        ]}
+                    >
                         {activeOutfit.headline}
                     </Text>
 
                     {/* #10 — Why this outfit explanation */}
                     {whyExplanation && (
-                        <Text style={styles.whyText}>
+                        <Text style={[styles.whyText, styles.textBlockBottom]}>
                             {whyExplanation}
                         </Text>
                     )}
@@ -855,7 +911,9 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
 
                     {/* ── Layering recommendation ── */}
                     {showLayering && filteredLayering && (
-                        <LayeringSection layering={filteredLayering} />
+                        <View style={styles.layeringSpacer}>
+                            <LayeringSection layering={filteredLayering} />
+                        </View>
                     )}
 
                     {/* ── Wore this today ── */}
@@ -867,6 +925,8 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
                             Wore this today
                         </Text>
                     </Pressable>
+                      </>
+                    )}
                 </Animated.View>
 
                 {/* ── Confirmation panel ── */}
@@ -886,7 +946,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
                             spacing={12}
                             style={styles.pagerCardArticles}
                         >
-                            {activeSlots.map((slot, j) => (
+                            {confirmSlots.map((slot, j) => (
                                 <ArticleThumb
                                     key={j}
                                     article={slot.article}
@@ -904,14 +964,16 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
                                     outfits logged
                                 </Text>
                             </View>
-                            <View style={styles.confirmStat}>
-                                <Text style={styles.confirmStatValue}>
-                                    {activeOutfit.score}
-                                </Text>
-                                <Text style={styles.confirmStatLabel}>
-                                    outfit score
-                                </Text>
-                            </View>
+                            {confirmScore > 0 && (
+                                <View style={styles.confirmStat}>
+                                    <Text style={styles.confirmStatValue}>
+                                        {confirmScore}
+                                    </Text>
+                                    <Text style={styles.confirmStatLabel}>
+                                        outfit score
+                                    </Text>
+                                </View>
+                            )}
                             {repeatCount > 1 && (
                                 <View style={styles.confirmStat}>
                                     <Text style={styles.confirmStatValue}>

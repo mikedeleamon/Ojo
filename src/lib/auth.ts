@@ -56,6 +56,33 @@ export const clearAuth = async (): Promise<void> => {
   await secureStorage.removeItem(AUTH_KEY);
 };
 
+// ─── Session-expiry notification ──────────────────────────────────────────────
+// The axios 401 interceptor lives outside React, so it can't touch AuthContext
+// state directly. It calls handleSessionExpired() when a stored token is rejected
+// and can't be refreshed; AuthContext subscribes via onSessionExpired() to flip
+// the app to logged-out, which routes the user to the login screen.
+
+type SessionExpiredListener = () => void;
+const _sessionExpiredListeners = new Set<SessionExpiredListener>();
+
+/** Subscribe to forced logouts. Returns an unsubscribe function. */
+export const onSessionExpired = (fn: SessionExpiredListener): (() => void) => {
+  _sessionExpiredListeners.add(fn);
+  return () => {
+    _sessionExpiredListeners.delete(fn);
+  };
+};
+
+/**
+ * Clear the stored session and notify subscribers. No-ops once the token is
+ * already gone, so concurrent 401s don't double-fire the listeners.
+ */
+export const handleSessionExpired = async (): Promise<void> => {
+  if (!_cachedToken) return;
+  await clearAuth();
+  _sessionExpiredListeners.forEach(fn => fn());
+};
+
 /** Swap in a new token without changing the stored user object. */
 export const updateToken = async (token: string): Promise<void> => {
   _cachedToken = token;

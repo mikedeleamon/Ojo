@@ -132,6 +132,7 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         fontSize: fontSizes.sm,
         color: colors.textSecondary,
         lineHeight: fontSizes.sm * 1.5,
+        marginTop: spacing.sm,
     },
     whyText: {
         fontFamily: fonts.body,
@@ -140,6 +141,9 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         color: colors.textMuted,
         lineHeight: fontSizes.xs * 1.5,
     },
+    // Bottom margin for the headline/subtext block — sits under the subtext when
+    // present, otherwise under the headline.
+    textBlockBottom: { marginBottom: spacing.sm },
     dotsRow: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -217,7 +221,7 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     breakdownToggle: { paddingVertical: 6, alignSelf: 'flex-start' },
     breakdownToggleText: {
         fontFamily: fonts.body,
-        fontSize: fontSizes.xs,
+        fontSize: fontSizes.base,
         color: colors.textSecondary,
         textDecorationLine: 'underline',
     },
@@ -248,6 +252,8 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         width: 24,
         textAlign: 'right',
     },
+    // Separates the layering section from the score breakdown / notes above it.
+    layeringSpacer: { marginTop: spacing.sm },
     notesList: { gap: 4 },
     note: {
         fontFamily: fonts.body,
@@ -350,33 +356,6 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         fontFamily: fonts.body,
         fontSize: fontSizes.xs,
         color: colors.textMuted,
-    },
-    occasionRow: {
-        flexDirection: 'row',
-        gap: 8,
-        paddingVertical: 2,
-    },
-    occasionChip: {
-        paddingVertical: 5,
-        paddingHorizontal: 12,
-        borderRadius: radius.pill,
-        borderWidth: 1,
-        borderColor: colors.glassBorder,
-        backgroundColor: colors.glassBg,
-    },
-    occasionChipActive: {
-        backgroundColor: colors.saveBtnBg,
-        borderColor: colors.saveBtnBg,
-    },
-    occasionChipText: {
-        fontFamily: fonts.body,
-        fontSize: fontSizes.xs,
-        color: colors.textSecondary,
-        fontWeight: fontWeights.medium,
-    },
-    occasionChipTextActive: {
-        color: colors.saveBtnText,
-        fontWeight: fontWeights.semibold,
     },
     gapCard: {
         backgroundColor: 'rgba(250,204,21,0.08)',

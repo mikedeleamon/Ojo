@@ -4,11 +4,10 @@ import type { ColorTokens } from '../../theme/tokens';
 
 export const makeStyles = (colors: ColorTokens) =>
     StyleSheet.create({
+        // Rendered inline at the top of OutfitSuggestion (not a floating overlay),
+        // so the planned trip outfit occupies the single "today's outfit" surface.
         wrap: {
-            position: 'absolute',
-            left: spacing.md,
-            right: spacing.md,
-            bottom: spacing.md,
+            marginBottom: spacing.sm,
         },
         card: {
             borderRadius: radius.lg,

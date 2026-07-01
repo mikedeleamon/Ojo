@@ -2,7 +2,6 @@ import type {
     DailyForecast,
     CurrentWeather,
     ClothingArticle,
-    OutfitOccasion,
     SavedTripFitPlan,
     TripFitDaySnapshot,
     TripFitStatus,
@@ -14,15 +13,6 @@ import type { OutfitResult, OutfitRole } from '../../lib/outfit/types';
 
 /** WeatherKit's free daily forecast reaches ~10 days out. */
 export const FORECAST_WINDOW_DAYS = 10;
-
-export const OCCASION_CHIPS: { value: OutfitOccasion; label: string }[] = [
-    { value: 'everyday', label: 'Everyday' },
-    { value: 'work', label: 'Work' },
-    { value: 'weekend', label: 'Weekend' },
-    { value: 'date', label: 'Date' },
-    { value: 'outdoor', label: 'Outdoor' },
-    { value: 'athletic', label: 'Athletic' },
-];
 
 export const PACKING_GROUPS: { key: string; label: string; emoji: string }[] = [
     { key: 'top', label: 'Tops', emoji: '👕' },
@@ -179,7 +169,10 @@ export function rehydratePlans(
         const slots = d.articleIds
             .map((id) => byId.get(id))
             .filter((a): a is ClothingArticle => !!a)
-            .map((article) => ({ role: 'top' as OutfitRole, article }));
+            // Derive a real role from the article's category so downstream UIs
+            // (e.g. the outfit confirmation card) label each item correctly
+            // instead of tagging everything "Top".
+            .map((article) => ({ role: categoryKey(article) as OutfitRole, article }));
         const result: OutfitResult = {
             status: 'ok',
             headline: '',

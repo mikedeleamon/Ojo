@@ -15,12 +15,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { View, Text, GlassCard, GlassGroup } from '../../components/primitives';
+import OccasionChips from '../../components/OccasionChips';
 import { HangerIcon } from '../../components/shared';
 import { useTheme, ForceDarkPalette } from '../../theme/ThemeContext';
 import {
     fonts,
     fontSizes,
-    fontWeights,
     radius,
     spacing,
     darkColors,
@@ -45,7 +45,6 @@ import type {
     SavedTripFitPlan,
 } from '../../types';
 import {
-    OCCASION_CHIPS,
     PACKING_GROUPS,
     FORECAST_WINDOW_DAYS,
     type DayPlan,
@@ -477,63 +476,6 @@ const groupSt = StyleSheet.create({
     },
 });
 
-// ─── OccasionChips ────────────────────────────────────────────────────────────
-
-const OccasionChips = ({
-    active,
-    onChange,
-    colors,
-}: {
-    active: OutfitOccasion;
-    onChange: (o: OutfitOccasion) => void;
-    colors: ColorTokens;
-}) => (
-    <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ flexDirection: 'row', gap: 8, paddingVertical: 2 }}
-    >
-        {OCCASION_CHIPS.map(({ value, label }) => (
-            <GlassCard
-                key={value}
-                glassStyle={active === value ? 'regular' : 'clear'}
-                style={[
-                    chipSt.chip,
-                    { borderColor: active === value ? colors.saveBtnBg : colors.glassBorder },
-                ]}
-            >
-                <Pressable
-                    onPress={() => onChange(value)}
-                    hitSlop={4}
-                    style={chipSt.chipInner}
-                    accessibilityRole='radio'
-                    accessibilityState={{ checked: active === value }}
-                >
-                    <Text
-                        style={[
-                            chipSt.chipText,
-                            { color: active === value ? colors.saveBtnText : colors.textSecondary },
-                            active === value && chipSt.chipTextActive,
-                        ]}
-                    >
-                        {label}
-                    </Text>
-                </Pressable>
-            </GlassCard>
-        ))}
-    </ScrollView>
-);
-
-const chipSt = StyleSheet.create({
-    chip: { borderRadius: radius.pill, borderWidth: 1, overflow: 'hidden' },
-    chipInner: { paddingVertical: 5, paddingHorizontal: 12 },
-    chipText: {
-        fontFamily: fonts.body,
-        fontSize: fontSizes.xs,
-        fontWeight: fontWeights.medium,
-    },
-    chipTextActive: { fontWeight: fontWeights.semibold },
-});
 
 // ─── Props ──────────────────────────────────────────────────────────────────────
 
@@ -1064,7 +1006,6 @@ export default function TripPlanner({
                             <OccasionChips
                                 active={selectedOccasion}
                                 onChange={setSelectedOccasion}
-                                colors={colors}
                             />
                         </View>
 

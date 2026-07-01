@@ -3,8 +3,6 @@ import { Image } from 'react-native';
 import { View, Text, Pressable, GlassCard } from '../primitives';
 import { HangerIcon } from '../shared';
 import { useTheme } from '../../theme/ThemeContext';
-import { addHistoryEntry } from '../../lib/outfitHistory';
-import { hapticSuccess } from '../../lib/haptics';
 import { makeStyles } from './TripModeCard.styles';
 import type { SavedTripFitPlan, ClothingArticle } from '../../types';
 import type { OutfitResult } from '../../lib/outfit/types';
@@ -17,8 +15,9 @@ interface Props {
     locationConfirmed: boolean;
     source: 'logged' | 'generated' | null;
     driftNote: string | null;
-    closetId: string;
-    closetName: string;
+    /** Log the trip outfit as worn — owned by OutfitSuggestion so it flows into
+     *  the shared "Logged for today" confirmation. */
+    onWoreThis: () => void;
     onOpenTrip: () => void;
     onDismiss: () => void;
 }
@@ -66,42 +65,20 @@ export default function TripModeCard({
     locationConfirmed,
     source,
     driftNote,
-    closetId,
-    closetName,
+    onWoreThis,
     onOpenTrip,
     onDismiss,
 }: Props) {
     const { colors } = useTheme();
     const st = useMemo(() => makeStyles(colors), [colors]);
-    const [logged, setLogged] = useState(false);
 
     const articles = useMemo(
         () => (outfit?.slots ?? []).map((s) => s.article),
         [outfit],
     );
 
-    const handleWoreThis = async () => {
-        if (logged || articles.length === 0) return;
-        setLogged(true);
-        hapticSuccess();
-        const summary = articles
-            .map((a) => a.name || a.clothingType)
-            .filter(Boolean)
-            .join(' · ');
-        try {
-            await addHistoryEntry({
-                closetId,
-                closetName,
-                articleIds: articles.map((a) => a._id),
-                articleSummary: summary || 'Trip outfit',
-            });
-        } catch {
-            /* fire-and-forget; the local write already happened in addHistoryEntry */
-        }
-    };
-
     return (
-        <View style={st.wrap} pointerEvents="box-none">
+        <View style={st.wrap}>
             <GlassCard glassStyle="regular" style={st.card}>
                 <Pressable
                     style={st.dismissBtn}
@@ -155,15 +132,13 @@ export default function TripModeCard({
 
                 <View style={st.actionsRow}>
                     <Pressable
-                        style={[st.primaryBtn, (logged || articles.length === 0) && { opacity: 0.6 }]}
-                        onPress={handleWoreThis}
-                        disabled={logged || articles.length === 0}
+                        style={[st.primaryBtn, articles.length === 0 && { opacity: 0.6 }]}
+                        onPress={onWoreThis}
+                        disabled={articles.length === 0}
                         accessibilityRole="button"
                         accessibilityLabel="Log this outfit as worn"
                     >
-                        <Text style={st.primaryBtnText}>
-                            {logged ? '✓ Logged' : 'Wore this'}
-                        </Text>
+                        <Text style={st.primaryBtnText}>Wore this</Text>
                     </Pressable>
                     <Pressable
                         style={st.secondaryBtn}
