@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import OutfitHistory from '../models/OutfitHistory';
+import User from '../models/User';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 
 const router = Router();
@@ -9,24 +10,29 @@ router.use(requireAuth);
 // Mirrors MAX_ENTRIES in the client's outfitHistory.ts.
 const MAX_ENTRIES = 2000;
 
-/** GET /api/history — entries for the authenticated user, newest first (capped) */
+/** GET /api/history — entries + clear tombstone for the authenticated user */
 router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const entries = await OutfitHistory
-      .find({ userId: req.userId })
-      .sort({ wornAt: -1 })
-      .limit(MAX_ENTRIES)
-      .lean();
+    const [entries, user] = await Promise.all([
+      OutfitHistory
+        .find({ userId: req.userId })
+        .sort({ wornAt: -1 })
+        .limit(MAX_ENTRIES)
+        .lean(),
+      User.findById(req.userId).select('historyLastClearedAt').lean(),
+    ]);
 
-    // Return in the client OutfitHistoryEntry shape
-    res.json(entries.map(e => ({
-      id:             e.clientId,
-      wornAt:         e.wornAt.toISOString(),
-      closetId:       e.closetId,
-      closetName:     e.closetName,
-      articleIds:     e.articleIds,
-      articleSummary: e.articleSummary,
-    })));
+    res.json({
+      clearedAt: user?.historyLastClearedAt?.toISOString() ?? null,
+      entries: entries.map(e => ({
+        id:             e.clientId,
+        wornAt:         e.wornAt.toISOString(),
+        closetId:       e.closetId,
+        closetName:     e.closetName,
+        articleIds:     e.articleIds,
+        articleSummary: e.articleSummary,
+      })),
+    });
   } catch (err) {
     console.error('[history] list error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -77,14 +83,18 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
   }
 });
 
-/** DELETE /api/history?confirm=true — clear all entries for the authenticated user */
+/** DELETE /api/history?confirm=true — clear all entries and stamp the tombstone */
 router.delete('/', async (req: AuthRequest, res: Response): Promise<void> => {
   if (req.query.confirm !== 'true') {
     res.status(400).json({ error: 'Pass ?confirm=true to clear all history' });
     return;
   }
   try {
-    await OutfitHistory.deleteMany({ userId: req.userId });
+    const clearedAt = new Date();
+    await Promise.all([
+      OutfitHistory.deleteMany({ userId: req.userId }),
+      User.findByIdAndUpdate(req.userId, { historyLastClearedAt: clearedAt }),
+    ]);
     res.sendStatus(204);
   } catch (err) {
     console.error('[history] clear error:', err);

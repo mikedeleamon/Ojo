@@ -8,6 +8,7 @@ import {
   onSessionExpired,
 } from '../lib/auth';
 import { registerPushToken } from '../lib/notifications';
+import { loadHistory } from '../lib/outfitHistory';
 
 interface AuthState {
   isReady: boolean;
@@ -47,7 +48,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // clears the session; flip the app to logged-out so AuthGate routes to login.
   useEffect(() => onSessionExpired(() => setIsLoggedIn(false)), []);
 
-  const login = useCallback(() => setIsLoggedIn(true), []);
+  const login = useCallback(() => {
+    setIsLoggedIn(true);
+    // Migrate any locally-accumulated (anon) entries to the server immediately
+    // so history isn't stranded if the user authenticated after using the app.
+    loadHistory().catch(() => {});
+  }, []);
   const logout = useCallback(() => {
     clearAuth();
     setIsLoggedIn(false);

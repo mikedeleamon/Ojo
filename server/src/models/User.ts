@@ -73,6 +73,10 @@ export interface IUser extends Document {
   // Sign in with Google — Google's stable `sub` claim. Same find/link/create
   // strategy as appleSub. Sparse-unique so non-Google accounts don't collide.
   googleSub?: string;
+  // Tombstone for cross-device history clears: any local entry worn before this
+  // timestamp is dropped during merge so a device that was offline when another
+  // device cleared history doesn't re-upload stale entries.
+  historyLastClearedAt?: Date;
 }
 
 const savedLocationSchema = new Schema<ISavedLocation>({
@@ -140,6 +144,7 @@ const userSchema = new Schema<IUser>({
   appleSub:               { type: String, unique: true, sparse: true },
   // Sign in with Google — Google's `sub`. Unique sparse, same as appleSub.
   googleSub:              { type: String, unique: true, sparse: true },
+  historyLastClearedAt:   { type: Date },
 }, { timestamps: true });
 
 export default mongoose.model<IUser>('User', userSchema);

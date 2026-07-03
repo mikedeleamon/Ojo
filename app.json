@@ -8,11 +8,6 @@
     "icon": "./assets/ojo_app_icon@1x.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/images/logos/ojoLogo.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#000000"
-    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.ojostudio.ojo",
@@ -70,6 +65,15 @@
           "icon": "./assets/ojo_app_icon@1x.png",
           "color": "#87DE5A",
           "sounds": []
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/logos/ojoLogo.png",
+          "imageWidth": 150,
+          "resizeMode": "contain",
+          "backgroundColor": "#000000"
         }
       ],
       "expo-router",

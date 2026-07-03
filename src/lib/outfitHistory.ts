@@ -37,7 +37,7 @@ const syncDelete = (id: string) =>
   api.delete(`/api/history/${id}`, authHeaders()).catch(() => {});
 
 const syncClear = () =>
-  api.delete('/api/history', authHeaders()).catch(() => {});
+  api.delete('/api/history?confirm=true', authHeaders()).catch(() => {});
 
 // ─── One-time migration: push local entries that server doesn't have ──────────
 
@@ -54,20 +54,32 @@ const migrateLocalToServer = async (serverIds: Set<string>, local: OutfitHistory
 /**
  * Load history: tries server first, merges with local, falls back to local-only.
  * Deduplication is by entry `id` (client-generated).
+ * The server response includes a `clearedAt` tombstone: any local entry worn
+ * before that timestamp is silently dropped so a device that was offline during
+ * a clear on another device doesn't re-upload stale entries.
  */
 export const loadHistory = async (): Promise<OutfitHistoryEntry[]> => {
   const local = await loadLocalHistory();
 
   try {
-    const res = await api.get<OutfitHistoryEntry[]>('/api/history', authHeaders());
-    const serverEntries: OutfitHistoryEntry[] = res.data ?? [];
+    const res = await api.get<{ entries: OutfitHistoryEntry[]; clearedAt: string | null }>(
+      '/api/history',
+      authHeaders(),
+    );
+    const serverEntries: OutfitHistoryEntry[] = res.data?.entries ?? [];
+    const clearedAt = res.data?.clearedAt ? new Date(res.data.clearedAt).getTime() : null;
     const serverIds = new Set(serverEntries.map(e => e.id));
 
-    // One-time migration of local-only entries
-    migrateLocalToServer(serverIds, local).catch(() => {});
+    // Drop local entries that pre-date a clear performed on another device
+    const survivingLocal = clearedAt
+      ? local.filter(e => new Date(e.wornAt).getTime() >= clearedAt)
+      : local;
+
+    // One-time migration of local-only entries that survived the tombstone check
+    migrateLocalToServer(serverIds, survivingLocal).catch(() => {});
 
     // Merge: server wins for entries with matching id; local-only entries appended
-    const localOnly = local.filter(e => !serverIds.has(e.id));
+    const localOnly = survivingLocal.filter(e => !serverIds.has(e.id));
     const merged = [...serverEntries, ...localOnly]
       .sort((a, b) => new Date(b.wornAt).getTime() - new Date(a.wornAt).getTime())
       .slice(0, MAX_ENTRIES);

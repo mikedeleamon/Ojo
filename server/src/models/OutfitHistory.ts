@@ -23,5 +23,7 @@ const outfitHistorySchema = new Schema<IOutfitHistory>({
 // Fast timeline queries and uniqueness guard
 outfitHistorySchema.index({ userId: 1, wornAt: -1 });
 outfitHistorySchema.index({ userId: 1, clientId: 1 }, { unique: true });
+// Auto-expire entries older than 3 years so storage cost stays bounded at scale
+outfitHistorySchema.index({ wornAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 365 * 3 });
 
 export default mongoose.model<IOutfitHistory>('OutfitHistory', outfitHistorySchema);
