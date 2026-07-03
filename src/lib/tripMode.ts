@@ -49,10 +49,10 @@ export interface ActiveTripSelection {
  * Pick the trip Trip Mode should surface today, or null if none apply.
  *
  * - With GPS: prefer the *nearest* overlapping trip within `radiusMi` and mark it
- *   location-confirmed. If GPS is available but the user isn't near any trip city,
- *   fall back to the soonest-starting overlapping trip as an unconfirmed,
- *   date-only prompt.
- * - Without GPS: return the soonest-starting overlapping trip, unconfirmed.
+ *   location-confirmed. If GPS is available but confirms the user isn't near any
+ *   trip city, return null — don't surface a trip we know they haven't reached.
+ * - Without GPS (unavailable/denied): fall back to the soonest-starting
+ *   overlapping trip as an unconfirmed, date-only prompt.
  */
 export const selectActiveTrip = (
   plans: SavedTripFitPlan[],
@@ -79,12 +79,9 @@ export const selectActiveTrip = (
     if (nearest && nearestMi <= radiusMi) {
       return { trip: nearest, locationConfirmed: true, distanceMi: nearestMi };
     }
-    // GPS available but user isn't near any trip city → date-only soft prompt.
-    return {
-      trip: overlapping[0],
-      locationConfirmed: false,
-      distanceMi: Number.isFinite(nearestMi) ? nearestMi : null,
-    };
+    // GPS confirmed the user isn't near any trip city — don't surface a trip
+    // they haven't reached yet.
+    return null;
   }
 
   // No GPS → unconfirmed date-only prompt for the soonest overlapping trip.

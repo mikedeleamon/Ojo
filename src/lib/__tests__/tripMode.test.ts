@@ -91,11 +91,9 @@ describe('selectActiveTrip', () => {
     expect(sel!.distanceMi).toBeLessThan(30);
   });
 
-  it('falls back to a date-only prompt when GPS is out of radius', () => {
+  it('returns null when GPS confirms the user is out of radius', () => {
     const sel = selectActiveTrip([trip()], TODAY, LA, 30);
-    expect(sel).not.toBeNull();
-    expect(sel!.locationConfirmed).toBe(false);
-    expect(sel!.distanceMi).toBeGreaterThan(30);
+    expect(sel).toBeNull();
   });
 
   it('falls back to a date-only prompt when GPS is unavailable', () => {
