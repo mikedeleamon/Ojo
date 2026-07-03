@@ -46,7 +46,7 @@ export const ArticleCard = memo(({
     outOfSeason,
     onEdit,
 }: ArticleCardProps) => {
-    const { colors, isDark } = useTheme();
+    const { colors } = useTheme();
     const styles = useMemo(() => makeStyles(colors), [colors]);
     const [erroredUrl, setErroredUrl] = useState<string | null>(null);
     const imgError = !!article.imageUrl && erroredUrl === article.imageUrl;
@@ -54,7 +54,6 @@ export const ArticleCard = memo(({
     return (
         <GlassCard
             style={[styles.articleCard, outOfSeason && styles.articleCardOOS]}
-            tintColor={isDark ? undefined : 'rgba(0,0,0,0.07)'}
         >
             <Pressable
                 style={styles.articleCardInner}
@@ -130,7 +129,7 @@ export const TileArticleCard = memo(({
     onEdit,
     onRemove,
 }: TileArticleCardProps) => {
-    const { colors, isDark } = useTheme();
+    const { colors } = useTheme();
     const styles = useMemo(() => makeStyles(colors), [colors]);
     const [erroredUrl, setErroredUrl] = useState<string | null>(null);
     const imgError = !!article.imageUrl && erroredUrl === article.imageUrl;
@@ -147,7 +146,7 @@ export const TileArticleCard = memo(({
     };
 
     return (
-        <GlassCard style={[styles.tileCard, { width: tileWidth }]} tintColor={isDark ? undefined : 'rgba(0,0,0,0.07)'}>
+        <GlassCard style={[styles.tileCard, { width: tileWidth }]}>
             <Pressable
                 style={styles.tileCardInner}
                 onPress={() => onEdit(article)}

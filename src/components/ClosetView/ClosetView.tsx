@@ -76,7 +76,7 @@ const ClosetView = ({
     onTripFit,
     tabClearance = 0,
 }: Props) => {
-    const { colors, isDark } = useTheme();
+    const { colors } = useTheme();
     const router = useRouter();
     const confirm = useConfirm();
     const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -581,7 +581,7 @@ const ClosetView = ({
 
             {/* ── TripFit discovery banner (above article list so it's always reachable) ── */}
             {onTripFit && selected && selected.articles.length > 0 && (
-                <GlassCard style={styles.tripBanner} tintColor={isDark ? undefined : 'rgba(0,0,0,0.07)'}>
+                <GlassCard style={styles.tripBanner}>
                     <Pressable
                         style={styles.tripBannerInner}
                         onPress={onTripFit}
