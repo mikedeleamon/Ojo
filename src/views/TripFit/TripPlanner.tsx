@@ -34,8 +34,9 @@ import { gradientFor } from '../../components/WeatherHUD/weatherPalette';
 import { humanizeCondition } from '../../lib/weather/humanizeCondition';
 import api from '../../api/client';
 import { authHeaders } from '../../lib/auth';
-import { geocodeCity } from '../../lib/geocoding';
 import { newPlanId } from '../../lib/tripStorage';
+import CityAutocomplete from '../../features/settings/components/CityAutocomplete';
+import type { CitySuggestion } from '../../lib/citySearch';
 import TripCalendar from './TripCalendar';
 import type {
     DailyForecast,
@@ -666,9 +667,8 @@ export default function TripPlanner({
 
     // ── Core: fetch forecast + generate day-by-day outfits ──
     const generate = useCallback(async (): Promise<boolean> => {
-        const query = destination.trim();
-        if (!query) {
-            Alert.alert('Enter a destination', 'Type a city name to plan your trip.');
+        if (!destination.trim() || !(latRef.current || lonRef.current)) {
+            Alert.alert('Select a destination', 'Choose a city from the suggestions list.');
             return false;
         }
         if (!tripStart || !tripEnd) {
@@ -681,17 +681,7 @@ export default function TripPlanner({
         setActiveIdx(0);
 
         try {
-            // Reuse stored coordinates for saved trips; only geocode when missing.
-            let coords = latRef.current || lonRef.current
-                ? { lat: latRef.current, lon: lonRef.current }
-                : null;
-            if (!coords) {
-                const g = await geocodeCity(query);
-                if (!g) throw new Error(`City not found: "${query}"`);
-                coords = { lat: g.lat, lon: g.lon };
-                latRef.current = g.lat;
-                lonRef.current = g.lon;
-            }
+            const coords = { lat: latRef.current, lon: lonRef.current };
 
             const res = await api.get<DailyForecast[]>('/api/weather/daily', {
                 params: { lat: coords.lat, lon: coords.lon },
@@ -775,22 +765,12 @@ export default function TripPlanner({
 
     // ── Save a beyond-window trip for later (pending, no outfits yet) ──
     const onSaveForLater = useCallback(async () => {
-        const query = destination.trim();
-        if (!query || !tripStart || !tripEnd) {
-            Alert.alert('Add details', 'Enter a destination and trip dates first.');
+        if (!destination.trim() || !(latRef.current || lonRef.current) || !tripStart || !tripEnd) {
+            Alert.alert('Add details', 'Choose a destination from the suggestions list and pick trip dates.');
             return;
         }
         setSavingPending(true);
         try {
-            if (!(latRef.current || lonRef.current)) {
-                const g = await geocodeCity(query);
-                if (!g) {
-                    Alert.alert('City not found', `Couldn't locate "${query}". Check the spelling.`);
-                    return;
-                }
-                latRef.current = g.lat;
-                lonRef.current = g.lon;
-            }
             await persist({ days: [], checkedIds: [], forecastFetchedAt: undefined });
             onBack();
         } finally {
@@ -954,28 +934,23 @@ export default function TripPlanner({
                         {/* Destination */}
                         <View style={st.inputSection}>
                             <Text style={st.label}>Destination</Text>
-                            <TextInput
-                                style={[
-                                    st.textInput,
-                                    {
-                                        color: colors.textPrimary,
-                                        borderColor: colors.glassBorder,
-                                        backgroundColor: colors.glassBg,
-                                    },
-                                ]}
-                                placeholder='e.g. New York, Tokyo, London'
-                                placeholderTextColor={colors.textMuted}
-                                value={destination}
-                                onChangeText={(t) => {
-                                    setDestination(t);
-                                    // City changed → drop cached coords so we re-geocode.
-                                    latRef.current = 0;
-                                    lonRef.current = 0;
+                            <CityAutocomplete
+                                initialQuery={destination}
+                                onSelect={(city: CitySuggestion | null) => {
+                                    if (city) {
+                                        setDestination(city.name);
+                                        latRef.current = city.lat;
+                                        lonRef.current = city.lon;
+                                    } else {
+                                        // Editing away from a prior pick invalidates it —
+                                        // force a fresh selection before planning/saving.
+                                        setDestination('');
+                                        latRef.current = 0;
+                                        lonRef.current = 0;
+                                    }
                                 }}
-                                returnKeyType='done'
-                                onSubmitEditing={onPlan}
-                                autoCapitalize='words'
-                                autoCorrect={false}
+                                placeholder='e.g. New York, Tokyo, London'
+                                accessibilityLabel='Search for a destination city'
                             />
                         </View>
 

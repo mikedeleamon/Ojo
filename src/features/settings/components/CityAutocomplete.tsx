@@ -102,8 +102,11 @@ export default function CityAutocomplete({
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   // True right after a pick so the debounce effect doesn't immediately
-  // re-search the label text we just placed in the input.
-  const justPicked = useRef(false);
+  // re-search the label text we just placed in the input. Also seeded true
+  // when mounted with a non-empty initialQuery, so an already-confirmed
+  // value (e.g. editing an existing trip's destination) doesn't pop the
+  // dropdown open before the user has touched the field.
+  const justPicked = useRef(!!initialQuery);
 
   // Clear when the parent bumps resetSignal (skip the initial 0).
   useEffect(() => {
