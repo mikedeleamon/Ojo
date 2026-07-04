@@ -1,0 +1,6 @@
+{
+  "name": "ojo-widget-bridge",
+  "version": "1.0.0",
+  "description": "Local Expo module that writes the Ojo widget snapshot (today's outfit / trip mode) and cached thumbnails into the shared App Group container, then reloads WidgetKit timelines. Native-only; its JS wrapper lives in the app at src/lib/widget/.",
+  "private": true
+}
