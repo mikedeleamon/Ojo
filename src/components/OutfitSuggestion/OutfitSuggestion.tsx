@@ -27,6 +27,8 @@ import { useReduceMotion } from '../../hooks/useReduceMotion';
 import { useTripMode } from '../../hooks/useTripMode';
 import { hapticSuccess } from '../../lib/haptics';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
+import { buildWidgetInput } from '../../lib/widget/buildInput';
+import { updateWidgetSnapshot } from '../../lib/widget/updateWidgetSnapshot';
 import TripModeCard from '../TripMode/TripModeCard';
 import {
     generateOutfits,
@@ -386,6 +388,45 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
 
     const safeIdx = Math.min(activeIdx, Math.max(0, outfits.length - 1));
     const activeOutfit: OutfitResult | null = outfits[safeIdx] ?? null;
+
+    // ─── Home-screen widget sync ──────────────────────────────────────────────
+    // Mirror today's answer — the Trip Mode outfit when active, else the top
+    // generated outfit — to the iOS widget whenever the resolved state settles.
+    // Uses outfits[0] (the primary recommendation), not the swiped card, so the
+    // widget stays stable while the user browses. No-ops off-iOS / without the
+    // native bridge; thumbnail caching + timeline reload happen natively.
+    useEffect(() => {
+        if (loading || tripMode.loading) return;
+        void updateWidgetSnapshot(
+            buildWidgetInput({
+                todayOutfit: outfits[0] ?? null,
+                weather,
+                settings,
+                trip: {
+                    active: tripMode.active,
+                    plan: tripMode.trip,
+                    outfit: tripMode.outfit,
+                    dayIndex: tripMode.dayIndex,
+                    total: tripMode.total,
+                    driftNote: tripMode.driftNote,
+                    locationConfirmed: tripMode.locationConfirmed,
+                },
+            }),
+        );
+    }, [
+        loading,
+        outfits,
+        weather,
+        settings,
+        tripMode.loading,
+        tripMode.active,
+        tripMode.trip,
+        tripMode.outfit,
+        tripMode.dayIndex,
+        tripMode.total,
+        tripMode.driftNote,
+        tripMode.locationConfirmed,
+    ]);
 
     useEffect(() => {
         if (!activeOutfit || activeOutfit.notes.length === 0) return;

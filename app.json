@@ -84,7 +84,8 @@
           "iosUrlScheme": "com.googleusercontent.apps.555153415751-ejhgihp9r6tgkssuj8qhchess3blbmml"
         }
       ],
-      "./plugins/withOjoAppGroup"
+      "./plugins/withOjoAppGroup",
+      "@bacons/apple-targets"
     ],
     "extra": {
       "router": {},

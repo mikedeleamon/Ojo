@@ -9,6 +9,7 @@ import {
 } from '../lib/auth';
 import { registerPushToken } from '../lib/notifications';
 import { loadHistory } from '../lib/outfitHistory';
+import { clearWidgetSnapshot } from '../lib/widget/updateWidgetSnapshot';
 
 interface AuthState {
   isReady: boolean;
@@ -57,6 +58,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(() => {
     clearAuth();
     setIsLoggedIn(false);
+    // Wipe the widget so a signed-out device doesn't keep showing the last
+    // user's outfit/trip. No-ops off-iOS / without the native bridge.
+    void clearWidgetSnapshot();
   }, []);
 
   return (

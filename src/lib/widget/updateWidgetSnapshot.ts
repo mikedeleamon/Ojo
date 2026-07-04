@@ -13,6 +13,7 @@
  * whole snapshot.
  */
 
+import { OUTFIT_DEEP_LINK } from './deepLinks';
 import { cacheThumb, isWidgetBridgeAvailable, pruneThumbs, writeSnapshot } from './native';
 import type { OjoWidgetSnapshot, WidgetSnapshotInput } from './snapshot.types';
 
@@ -67,7 +68,7 @@ export async function clearWidgetSnapshot(): Promise<void> {
     updatedAt: new Date().toISOString(),
     headline: '',
     items: [],
-    deepLink: 'ojo://outfit',
+    deepLink: OUTFIT_DEEP_LINK,
   };
 
   try {
