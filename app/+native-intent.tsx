@@ -5,6 +5,7 @@
  * Widget contract (see src/lib/widget/deepLinks.ts):
  *   ojo://outfit     → "/"                              (home tab · today's outfit)
  *   ojo://trip/<id>  → "/account/tripfit?planId=<id>"   (opens the saved trip)
+ *   ojo://trips      → "/account/tripfit"               (opens the trip library)
  *
  * expo-router hands us the FULL incoming URL as `path` (which may be null).
  * Anything we don't recognize is returned unchanged so normal routing/linking
@@ -35,6 +36,9 @@ export function redirectSystemPath({
 
     // Home / today's outfit
     if (normalized === '/outfit') return '/';
+
+    // Trip library (no id) → TripFit's saved-trip list
+    if (normalized === '/trips') return '/account/tripfit';
 
     // Trip → open the saved plan in TripFit
     const trip = normalized.match(/^\/trip\/([^/]+)$/);

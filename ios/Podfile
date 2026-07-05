@@ -2,6 +2,16 @@ require File.join(File.dirname(`node --print "require.resolve('expo/package.json
 require File.join(File.dirname(`node --print "require.resolve('react-native/package.json')"`), "scripts/react_native_pods")
 
 require 'json'
+require 'xcodeproj'
+
+# Xcode 26 writes pbxproj files at objectVersion 70, which this version of the
+# xcodeproj gem doesn't recognize yet (https://github.com/CocoaPods/CocoaPods/issues/12889).
+# Patch in a compatibility label so `pod install` doesn't hard-fail. Remove once
+# CocoaPods ships official support for object version 70.
+xcodeproj_compat_table = Xcodeproj::Constants::COMPATIBILITY_VERSION_BY_OBJECT_VERSION.merge(70 => 'Xcode 16.0')
+Xcodeproj::Constants.send(:remove_const, :COMPATIBILITY_VERSION_BY_OBJECT_VERSION)
+Xcodeproj::Constants.const_set(:COMPATIBILITY_VERSION_BY_OBJECT_VERSION, xcodeproj_compat_table.freeze)
+
 podfile_properties = JSON.parse(File.read(File.join(__dir__, 'Podfile.properties.json'))) rescue {}
 
 def ccache_enabled?(podfile_properties)

@@ -107,6 +107,21 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     },
     hero: { alignItems: 'center', paddingVertical: spacing.lg },
     weatherAttribution: { alignItems: 'center', paddingVertical: spacing.sm },
+    shareForecastBtn: {
+        alignSelf: 'center',
+        marginTop: spacing.sm,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 999,
+        backgroundColor: colors.glassBg,
+        borderWidth: 1,
+        borderColor: colors.glassBorder,
+    },
+    shareForecastBtnText: {
+        fontFamily: fonts.bodyMedium,
+        fontSize: fontSizes.sm,
+        color: colors.textSecondary,
+    },
 
     hiLo: {
         fontFamily: fonts.body,

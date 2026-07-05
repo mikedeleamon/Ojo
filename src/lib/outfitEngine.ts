@@ -29,6 +29,7 @@ import type {
   OutfitResult,
   PrecipIntensity,
   RecentlyWorn,
+  AccessoryAlerts,
 } from './outfit/types';
 import {
   getWeatherBucket,
@@ -709,6 +710,17 @@ const buildNotes = (
   return notes;
 };
 
+// ─── Widget accessory alerts ───────────────────────────────────────────────────
+// Same gaps as the "wardrobe gap"/condition notes above, but as structured flags
+// instead of English strings — consumed by the widget's glyph row, which can't
+// substring-match prose without risking drift from the copy above.
+
+const buildAccessoryAlerts = (slots: OutfitSlot[], ctx: NotesContext): AccessoryAlerts => ({
+  rain:         ctx.precipIntensity,
+  missingBoots: ctx.isSnowing && !slots.some(s => s.article.clothingType === 'Boots'),
+  missingHat:   ctx.uvHigh && !slots.some(s => s.article.clothingType === 'Hat' || s.article.clothingType === 'Cap'),
+});
+
 // ─── Main: generate top-K ranked outfits ──────────────────────────────────────
 
 export const generateOutfits = (
@@ -991,6 +1003,7 @@ export const generateOutfits = (
       score:           adjustedScore,
       scoreBreakdown:  combo.breakdown,
       layering,
+      accessoryAlerts: buildAccessoryAlerts(combo.slots, notesCtx),
       isPersonalized,
       moodLabel:       combo.moodLabel,
     };

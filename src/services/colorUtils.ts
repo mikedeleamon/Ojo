@@ -49,23 +49,46 @@ const COLOR_TABLE: Array<{ name: string; hex: string; r: number; g: number; b: n
   { name: 'silver',       hex: '#C0C0C0', r: 192, g: 192, b: 192 },
 ];
 
-function colorDistance(
-  r1: number, g1: number, b1: number,
-  r2: number, g2: number, b2: number,
-): number {
-  return Math.sqrt(
-    Math.pow(r1 - r2, 2) +
-    Math.pow(g1 - g2, 2) +
-    Math.pow(b1 - b2, 2),
-  );
+function srgbToLinear(c: number): number {
+  const cs = c / 255;
+  return cs <= 0.04045 ? cs / 12.92 : Math.pow((cs + 0.055) / 1.055, 2.4);
 }
 
-export function rgbToColorName(r: number, g: number, b: number): { name: string; hex: string } {
-  let minDist = Infinity;
-  let best = COLOR_TABLE[0];
+/**
+ * sRGB (D65) → CIE Lab. Lab distance tracks human color perception far better
+ * than raw RGB Euclidean distance — e.g. navy and black sit close together in
+ * RGB but read as clearly different colors, which Lab distance reflects.
+ */
+export function rgbToLab(r: number, g: number, b: number): { l: number; a: number; b: number } {
+  const rl = srgbToLinear(r);
+  const gl = srgbToLinear(g);
+  const bl = srgbToLinear(b);
 
-  for (const color of COLOR_TABLE) {
-    const dist = colorDistance(r, g, b, color.r, color.g, color.b);
+  const x = rl * 0.4124564 + gl * 0.3575761 + bl * 0.1804375;
+  const y = rl * 0.2126729 + gl * 0.7151522 + bl * 0.0721750;
+  const z = rl * 0.0193339 + gl * 0.1191920 + bl * 0.9503041;
+
+  const xn = x / 0.95047, yn = y / 1.0, zn = z / 1.08883;
+  const f = (t: number) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+  const fx = f(xn), fy = f(yn), fz = f(zn);
+
+  return { l: 116 * fy - 16, a: 500 * (fx - fy), b: 200 * (fy - fz) };
+}
+
+const COLOR_TABLE_LAB = COLOR_TABLE.map((c) => ({ ...c, lab: rgbToLab(c.r, c.g, c.b) }));
+
+/**
+ * Nearest named color to a Lab point. Exposed separately from rgbToColorName
+ * so callers that already have Lab values (e.g. cluster centroids) can skip
+ * converting back through RGB first.
+ */
+export function nearestColorNameFromLab(l: number, a: number, b: number): { name: string; hex: string } {
+  let minDist = Infinity;
+  let best = COLOR_TABLE_LAB[0];
+
+  for (const color of COLOR_TABLE_LAB) {
+    const dl = l - color.lab.l, da = a - color.lab.a, db = b - color.lab.b;
+    const dist = dl * dl + da * da + db * db;
     if (dist < minDist) {
       minDist = dist;
       best = color;
@@ -73,6 +96,11 @@ export function rgbToColorName(r: number, g: number, b: number): { name: string;
   }
 
   return { name: best.name, hex: best.hex };
+}
+
+export function rgbToColorName(r: number, g: number, b: number): { name: string; hex: string } {
+  const lab = rgbToLab(r, g, b);
+  return nearestColorNameFromLab(lab.l, lab.a, lab.b);
 }
 
 export interface PaletteSwatch {

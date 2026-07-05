@@ -30,6 +30,9 @@ import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { buildWidgetInput } from '../../lib/widget/buildInput';
 import { updateWidgetSnapshot } from '../../lib/widget/updateWidgetSnapshot';
 import TripModeCard from '../TripMode/TripModeCard';
+import ShareToInstagramSheet from '../ShareCard/ShareToInstagramSheet';
+import TodayOutfitShareCard from '../ShareCard/TodayOutfitShareCard';
+import { outfitShareLink } from '../../lib/share/deepLinks';
 import {
     generateOutfits,
     personalizedScoreLevel,
@@ -246,6 +249,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
     const [activeIdx, setActiveIdx] = useState(0);
     const [showBreakdown, setShowBreakdown] = useState(false);
     const [wornLogged, setWornLogged] = useState(false);
+    const [showShareSheet, setShowShareSheet] = useState(false);
     // The outfit captured by the "Logged for today" confirmation — either the
     // active generated outfit or the Trip Mode outfit, so the confirmation card
     // always shows whatever the user actually logged.
@@ -411,6 +415,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
                     driftNote: tripMode.driftNote,
                     locationConfirmed: tripMode.locationConfirmed,
                 },
+                upcoming: tripMode.upcoming,
             }),
         );
     }, [
@@ -418,6 +423,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
         outfits,
         weather,
         settings,
+        tripMode.upcoming,
         tripMode.loading,
         tripMode.active,
         tripMode.trip,
@@ -711,6 +717,10 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
                                     {
                                         text: '↑  Share outfit',
                                         onPress: handleShare,
+                                    },
+                                    {
+                                        text: '📸  Share to Instagram',
+                                        onPress: () => setShowShareSheet(true),
                                     },
                                     { text: 'Cancel', style: 'cancel' },
                                 ])
@@ -1035,6 +1045,21 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
                     </Pressable>
                 </Animated.View>
             </Animated.View>
+
+            <ShareToInstagramSheet
+                visible={showShareSheet}
+                onClose={() => setShowShareSheet(false)}
+                renderCard={(cardRef) => (
+                    <TodayOutfitShareCard
+                        ref={cardRef}
+                        slots={confirmSlots}
+                        score={confirmScore}
+                        isPersonalized={scoreLevel === 'active'}
+                        weather={weather}
+                    />
+                )}
+                attributionURL={outfitShareLink()}
+            />
         </View>
     );
 };

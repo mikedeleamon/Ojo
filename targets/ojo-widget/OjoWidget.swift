@@ -5,6 +5,7 @@ import WidgetKit
 struct OjoWidgetBundle: WidgetBundle {
   var body: some Widget {
     OjoWidget()
+    OjoTripCountdownWidget()
   }
 }
 
@@ -17,6 +18,6 @@ struct OjoWidget: Widget {
     }
     .configurationDisplayName("Today's Outfit")
     .description("Your Ojo outfit for today — and your trip look when you're traveling.")
-    .supportedFamilies([.systemSmall, .systemMedium])
+    .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular, .accessoryInline])
   }
 }

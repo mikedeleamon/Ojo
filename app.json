@@ -85,6 +85,7 @@
         }
       ],
       "./plugins/withOjoAppGroup",
+      "./plugins/withInstagramShareScheme",
       "@bacons/apple-targets"
     ],
     "extra": {

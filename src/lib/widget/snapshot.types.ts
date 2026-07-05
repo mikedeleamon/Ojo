@@ -11,7 +11,30 @@
  * own domain objects (OutfitResult, trip selection) into a small, stable shape.
  */
 
+import type { WeatherKind } from '../weather/conditions';
+
 export type WidgetMode = 'today' | 'trip' | 'empty';
+
+/**
+ * Weather-driven accessory gaps not already visible from the outfit's item
+ * thumbnails, most-urgent first (rain risks getting caught out; a missing
+ * layer is next most common; boots/UV are more situational). The widget
+ * renders these as a small glyph row — see native.ts / OjoWidgetViews.swift.
+ */
+export type WidgetAlertKind = 'rain' | 'layer' | 'snow' | 'uv';
+
+export interface OjoWidgetUpcomingTrip {
+  /** SavedTripFitPlan.id */
+  planId: string;
+  /** SavedTripFitPlan.destination */
+  destination: string;
+  /** Whole days from today to the trip's start date (always > 0). */
+  daysUntil: number;
+  /** Unique packable article count across the trip's planned days (0 while pending — beyond the forecast window). */
+  totalItems: number;
+  /** SavedTripFitPlan.checkedIds.length */
+  packedItems: number;
+}
 
 export interface OjoWidgetSnapshotItem {
   /** ClothingArticle.id */
@@ -44,9 +67,19 @@ export interface OjoWidgetSnapshot {
   headline: string;
   /** Optional secondary line, e.g. "72°F · Partly cloudy". */
   tempLine?: string;
+  /** Local-weather classification driving the widget's gradient background (see lib/weather/conditions.ts). Omitted only when no weather was available. */
+  weatherKind?: WeatherKind;
+  /** Local daytime flag; the gradient's day/night variant for 'clear' and 'partlyCloudy'. */
+  isDay?: boolean;
   items: OjoWidgetSnapshotItem[];
+  /** Short layering call-to-action from layeringEngine's recommendation, e.g. "Bring a jacket — windy after 4pm." Omitted in 'empty' mode. */
+  layerNote?: string;
+  /** Accessory gaps the outfit thumbnails don't already cover, priority order. Empty when nothing's missing. */
+  alerts: WidgetAlertKind[];
   /** Present only when mode === 'trip'. */
   trip?: OjoWidgetTripInfo;
+  /** The soonest saved trip that hasn't started yet, independent of `mode` — powers the separate Trip Countdown widget. */
+  upcomingTrip?: OjoWidgetUpcomingTrip;
   /** Deep link opened on tap, e.g. "ojo://outfit" or "ojo://trip/<id>". */
   deepLink: string;
 }
@@ -56,12 +89,17 @@ export interface WidgetSnapshotInput {
   mode: WidgetMode;
   headline: string;
   tempLine?: string;
+  weatherKind?: WeatherKind;
+  isDay?: boolean;
   items: {
     id: string;
     role: string;
     /** Remote (R2) image URL; cached to a local thumbnail before writing. */
     imageUrl: string;
   }[];
+  layerNote?: string;
+  alerts: WidgetAlertKind[];
   trip?: OjoWidgetTripInfo;
+  upcomingTrip?: OjoWidgetUpcomingTrip;
   deepLink: string;
 }

@@ -13,7 +13,13 @@ import {
     toLocalISODate,
     DEFAULT_TRIP_MODE_RADIUS_MI,
 } from '../lib/tripMode';
-import { rehydratePlans, buildTripWeather, activeOutfit } from '../views/TripFit/shared';
+import {
+    rehydratePlans,
+    buildTripWeather,
+    activeOutfit,
+    daysUntil,
+    planArticleIds,
+} from '../views/TripFit/shared';
 import { generateOutfits } from '../lib/outfitEngine';
 import type {
     SavedTripFitPlan,
@@ -22,6 +28,16 @@ import type {
     ClothingArticle,
 } from '../types';
 import type { OutfitResult } from '../lib/outfit/types';
+
+/** A saved trip that hasn't started yet — independent of whether Trip Mode is "active" today. */
+export interface UpcomingTripInfo {
+    plan: SavedTripFitPlan;
+    /** Whole days from today to the trip's start date (always > 0). */
+    daysUntil: number;
+    /** Unique packable article count across the trip's planned days (0 while pending). */
+    totalItems: number;
+    packedItems: number;
+}
 
 export interface TripModeState {
     active: boolean;
@@ -38,6 +54,8 @@ export interface TripModeState {
     driftNote: string | null;
     closetId: string;
     closetName: string;
+    /** The soonest saved trip that hasn't started yet, e.g. for a "days until" countdown. */
+    upcoming: UpcomingTripInfo | null;
     refresh: () => void;
 }
 
@@ -68,7 +86,7 @@ export const useTripMode = (): TripModeState => {
     const { closets, loading: closetsLoading } = useClosets();
     const { settings, settingsReady } = useSettings();
 
-    const [resolved, setResolved] = useState<Omit<TripModeState, 'loading' | 'refresh'>>(INACTIVE);
+    const [resolved, setResolved] = useState<Omit<TripModeState, 'loading' | 'refresh' | 'upcoming'>>(INACTIVE);
     const [working, setWorking] = useState(true);
     const [nonce, setNonce] = useState(0);
 
@@ -196,8 +214,26 @@ export const useTripMode = (): TripModeState => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [settingsReady, plansLoading, closetsLoading, enabled, radiusMi, plans, closets, nonce]);
 
+    // Soonest saved trip that hasn't started yet. Independent of the async
+    // GPS/weather resolution above — a pure function of `plans` + today's date,
+    // so a countdown is available immediately without waiting on location.
+    const upcoming = useMemo<UpcomingTripInfo | null>(() => {
+        if (!enabled) return null;
+        const next = plans
+            .map((plan) => ({ plan, days: daysUntil(plan.startDate) }))
+            .filter(({ days }) => days > 0)
+            .sort((a, b) => a.days - b.days)[0];
+        if (!next) return null;
+        return {
+            plan: next.plan,
+            daysUntil: next.days,
+            totalItems: planArticleIds(next.plan).length,
+            packedItems: next.plan.checkedIds.length,
+        };
+    }, [plans, enabled]);
+
     return useMemo(
-        () => ({ ...resolved, loading: working, refresh }),
-        [resolved, working, refresh],
+        () => ({ ...resolved, upcoming, loading: working, refresh }),
+        [resolved, upcoming, working, refresh],
     );
 };

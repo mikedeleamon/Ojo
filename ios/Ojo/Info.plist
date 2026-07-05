@@ -50,6 +50,11 @@
     <string>1</string>
     <key>ITSAppUsesNonExemptEncryption</key>
     <false/>
+    <key>LSApplicationQueriesSchemes</key>
+    <array>
+      <string>instagram-stories</string>
+      <string>instagram</string>
+    </array>
     <key>LSMinimumSystemVersion</key>
     <string>15.1</string>
     <key>LSRequiresIPhoneOS</key>

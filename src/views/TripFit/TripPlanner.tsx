@@ -62,6 +62,9 @@ import {
     rehydratePlans,
     snapshotFromPlans,
 } from './shared';
+import ShareToInstagramSheet from '../../components/ShareCard/ShareToInstagramSheet';
+import TripFitShareCard from '../../components/ShareCard/TripFitShareCard';
+import { tripShareLink } from '../../lib/share/deepLinks';
 
 // ─── Local date helper ──────────────────────────────────────────────────────────
 // Build a yyyy-mm-dd string from a Date using LOCAL components, so a calendar
@@ -119,6 +122,7 @@ const DayCard = ({
     animValue,
     isReplanning,
     onReplan,
+    onShare,
 }: {
     plan: DayPlan;
     colors: ColorTokens;
@@ -126,6 +130,7 @@ const DayCard = ({
     animValue: Animated.Value;
     isReplanning: boolean;
     onReplan: () => void;
+    onShare: () => void;
 }) => {
     const outfit = activeOutfit(plan);
     const articles = outfit.slots.map(
@@ -197,6 +202,22 @@ const DayCard = ({
                         )}
                     </Pressable>
                 </GlassCard>
+
+                <GlassCard glassStyle='clear' style={dayCardSt.shareBtn}>
+                    <Pressable
+                        onPress={onShare}
+                        style={dayCardSt.replanInner}
+                        accessibilityRole='button'
+                        accessibilityLabel='Share this day to Instagram'
+                        hitSlop={8}
+                    >
+                        <Text
+                            style={[dayCardSt.replanIcon, { color: colors.textSecondary }]}
+                        >
+                            📸
+                        </Text>
+                    </Pressable>
+                </GlassCard>
             </GlassCard>
         </Animated.View>
     );
@@ -212,6 +233,13 @@ const dayCardSt = StyleSheet.create({
         position: 'absolute',
         top: spacing.xs,
         right: spacing.xs,
+        borderRadius: radius.pill,
+        overflow: 'hidden',
+    },
+    shareBtn: {
+        position: 'absolute',
+        top: spacing.xs,
+        right: spacing.xs + 38,
         borderRadius: radius.pill,
         overflow: 'hidden',
     },
@@ -540,6 +568,7 @@ export default function TripPlanner({
     );
     const [error, setError] = useState<string | null>(null);
     const [activeIdx, setActiveIdx] = useState(0);
+    const [shareDayIdx, setShareDayIdx] = useState<number | null>(null);
     const [checkedIds, setCheckedIds] = useState<Set<string>>(
         new Set(existingPlan?.checkedIds ?? []),
     );
@@ -1152,6 +1181,7 @@ export default function TripPlanner({
                                         animValue={animValues[i] ?? new Animated.Value(1)}
                                         isReplanning={replanningIdx === i}
                                         onReplan={() => onReplanDay(i)}
+                                        onShare={() => setShareDayIdx(i)}
                                     />
                                 ))}
                             </ScrollView>
@@ -1236,6 +1266,23 @@ export default function TripPlanner({
                     </Pressable>
                 )}
             </ScrollView>
+
+            {shareDayIdx !== null && plans[shareDayIdx] && (
+                <ShareToInstagramSheet
+                    visible
+                    onClose={() => setShareDayIdx(null)}
+                    renderCard={(cardRef) => (
+                        <TripFitShareCard
+                            ref={cardRef}
+                            destination={destination}
+                            day={plans[shareDayIdx].day}
+                            slots={activeOutfit(plans[shareDayIdx]).slots}
+                            dayLabel={`Day ${shareDayIdx + 1} of ${plans.length}`}
+                        />
+                    )}
+                    attributionURL={tripShareLink(planIdRef.current)}
+                />
+            )}
         </SafeAreaView>
     );
 }

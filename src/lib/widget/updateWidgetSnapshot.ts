@@ -39,8 +39,13 @@ export async function updateWidgetSnapshot(input: WidgetSnapshotInput): Promise<
     updatedAt: new Date().toISOString(),
     headline: input.headline,
     tempLine: input.tempLine,
+    weatherKind: input.weatherKind,
+    isDay: input.isDay,
     items: resolved,
+    layerNote: input.layerNote,
+    alerts: input.alerts,
     trip: input.trip,
+    upcomingTrip: input.upcomingTrip,
     deepLink: input.deepLink,
   };
 
@@ -68,6 +73,7 @@ export async function clearWidgetSnapshot(): Promise<void> {
     updatedAt: new Date().toISOString(),
     headline: '',
     items: [],
+    alerts: [],
     deepLink: OUTFIT_DEEP_LINK,
   };
 

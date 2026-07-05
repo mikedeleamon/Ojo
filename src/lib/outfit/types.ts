@@ -29,6 +29,13 @@ export interface ScoreBreakdown {
   preference: number;
 }
 
+/** Weather-driven accessory gaps the chosen outfit's slots don't already cover — widget glyph source. */
+export interface AccessoryAlerts {
+  rain:         PrecipIntensity;
+  missingBoots: boolean;
+  missingHat:   boolean;
+}
+
 export interface OutfitResult {
   status:          OutfitStatus;
   headline:        string;
@@ -37,6 +44,7 @@ export interface OutfitResult {
   score:           number;
   scoreBreakdown:  ScoreBreakdown;
   layering?:       LayeringResult;
+  accessoryAlerts?: AccessoryAlerts;
   /** True when ≥30 logged outfits — preference weight is meaningfully elevated. */
   isPersonalized?: boolean;
   /** When mood-based generation is active, labels the style this outfit was optimized for. */

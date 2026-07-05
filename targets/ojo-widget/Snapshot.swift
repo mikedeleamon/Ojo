@@ -10,8 +10,23 @@ struct WidgetSnapshot: Codable {
   let updatedAt: String
   let headline: String
   let tempLine: String?
+  /// Mirrors lib/weather/conditions.ts WeatherKind. Optional (rather than
+  /// required) so a snapshot written before this field existed still decodes —
+  /// WeatherGradient.swift falls back to a neutral gradient when nil.
+  let weatherKind: String?
+  let isDay: Bool?
   let items: [Item]
+  /// Short layering call-to-action from the JS layering engine, e.g. "Bring a
+  /// jacket — windy after 4pm." Optional so older snapshots still decode.
+  let layerNote: String?
+  /// Accessory gaps not already visible from `items`' thumbnails, priority
+  /// order: "rain" | "layer" | "snow" | "uv". Optional (not just empty) so a
+  /// snapshot written before this field existed still decodes.
+  let alerts: [String]?
   let trip: TripInfo?
+  /// The soonest saved trip that hasn't started yet — independent of `mode`;
+  /// powers the separate Trip Countdown widget.
+  let upcomingTrip: UpcomingTrip?
   let deepLink: String
 
   struct Item: Codable, Identifiable {
@@ -28,6 +43,14 @@ struct WidgetSnapshot: Codable {
     let driftNote: String?
     let locationConfirmed: Bool
   }
+
+  struct UpcomingTrip: Codable {
+    let planId: String
+    let destination: String
+    let daysUntil: Int
+    let totalItems: Int
+    let packedItems: Int
+  }
 }
 
 extension WidgetSnapshot {
@@ -37,12 +60,17 @@ extension WidgetSnapshot {
     updatedAt: "",
     headline: "Today's Outfit",
     tempLine: "72° · Clear",
+    weatherKind: "clear",
+    isDay: true,
     items: [
       Item(id: "1", role: "top", thumb: nil),
       Item(id: "2", role: "bottom", thumb: nil),
       Item(id: "3", role: "footwear", thumb: nil),
     ],
+    layerNote: "Layer up — cooler after sunset.",
+    alerts: ["layer"],
     trip: nil,
+    upcomingTrip: nil,
     deepLink: "ojo://outfit"
   )
 
@@ -52,8 +80,13 @@ extension WidgetSnapshot {
     updatedAt: "",
     headline: "",
     tempLine: nil,
+    weatherKind: nil,
+    isDay: nil,
     items: [],
+    layerNote: nil,
+    alerts: [],
     trip: nil,
+    upcomingTrip: nil,
     deepLink: "ojo://outfit"
   )
 }

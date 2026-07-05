@@ -38,6 +38,9 @@ import Loading from '../Loading/Loading';
 import WeatherDetails from '../WeatherDetails/WeatherDetails';
 import MinimizedWeatherDisplay from '../MinimizedWeatherDisplay/MinimizedWeatherDisplay';
 import SunEventTile from '../SunEventTile/SunEventTile';
+import ShareToInstagramSheet from '../ShareCard/ShareToInstagramSheet';
+import WeatherForecastShareCard from '../ShareCard/WeatherForecastShareCard';
+import { weatherShareLink } from '../../lib/share/deepLinks';
 import { useWeatherTheme } from '../../context/WeatherContext';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import {
@@ -170,6 +173,9 @@ const WeatherHUD = ({
     const [sunEvents, setSunEvents] = useState<SunEvent[]>(
         seedSnapshot ? extractSunEvents(seedSnapshot.daily) : [],
     );
+    // Kept for the "Share forecast" card (WeatherForecastShareCard) — the daily
+    // payload was already being fetched for sun events, just not retained.
+    const [daily, setDaily] = useState<DailyForecast[]>(seedSnapshot?.daily ?? []);
     const [loading, setLoading] = useState(!seedSnapshot);
     const [error, setError] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
@@ -185,6 +191,7 @@ const WeatherHUD = ({
         weather: CurrentWeather;
         forecasts: Forecast[];
         sunEvents: SunEvent[];
+        daily: DailyForecast[];
     } | null>(null);
     const isRefreshRef = useRef(false);
 
@@ -194,10 +201,12 @@ const WeatherHUD = ({
                 weather: w,
                 forecasts: f,
                 sunEvents: s,
+                daily: d,
             } = pendingRef.current;
             setWeather(w);
             setForecasts(f);
             setSunEvents(s);
+            setDaily(d);
             setFooterBg(footerBgFor(w.WeatherText, w.IsDayTime));
             setLastUpdated(new Date());
             pendingRef.current = null;
@@ -284,11 +293,13 @@ const WeatherHUD = ({
                         weather: w,
                         forecasts: fRes.data ?? [],
                         sunEvents: events,
+                        daily: dRes.data ?? [],
                     };
                 } else {
                     setWeather(w);
                     setForecasts(fRes.data ?? []);
                     setSunEvents(events);
+                    setDaily(dRes.data ?? []);
                     setFooterBg(footerBgFor(w.WeatherText, w.IsDayTime));
                     setLastUpdated(new Date());
                 }
@@ -474,6 +485,7 @@ const WeatherHUD = ({
     // iOS UIVisualEffectView initialise its blur correctly every time — the
     // entering/exiting Reanimated animations handle the fade.
     const [miniVisible, setMiniVisible] = useState(false);
+    const [showShareSheet, setShowShareSheet] = useState(false);
 
     useAnimatedReaction(
         () => heroBottomY > 0 && scrollY.value > heroBottomY - 40,
@@ -768,6 +780,20 @@ const WeatherHUD = ({
                                 forecasts={forecasts}
                             />
                         </GlassCard>
+
+                        {daily.length > 0 && (
+                            <Pressable
+                                style={st.shareForecastBtn}
+                                onPress={() => setShowShareSheet(true)}
+                                accessibilityRole='button'
+                                accessibilityLabel='Share forecast to Instagram'
+                            >
+                                <Text style={st.shareForecastBtnText}>
+                                    📸  Share forecast
+                                </Text>
+                            </Pressable>
+                        )}
+
                         {/* WeatherKit attribution — required by Apple. */}
                         <View style={st.weatherAttribution}>
                             <Pressable
@@ -862,6 +888,22 @@ const WeatherHUD = ({
                             </Pressable>
                         </GlassCard>
                     </View>
+
+                    <ShareToInstagramSheet
+                        visible={showShareSheet}
+                        onClose={() => setShowShareSheet(false)}
+                        renderCard={(cardRef) => (
+                            <WeatherForecastShareCard
+                                ref={cardRef}
+                                place={place?.name ?? 'My Location'}
+                                weather={weather}
+                                daily={daily}
+                            />
+                        )}
+                        attributionURL={weatherShareLink()}
+                        backgroundTopColor='#0C4A6E'
+                        backgroundBottomColor='#0F172A'
+                    />
                 </View>
             )}
         </AnimatedLinearGradient>

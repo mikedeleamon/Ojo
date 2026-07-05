@@ -15,6 +15,7 @@ import notificationRoutes from './routes/notifications';
 import historyRoutes from './routes/history';
 import tripsRoutes from './routes/trips';
 import tripFitRoutes from './routes/tripfit';
+import shareRoutes from './routes/share';
 import { startNotificationService } from './services/notificationService';
 
 const app = express();
@@ -127,6 +128,7 @@ app.use('/api/notifications', generalLimiter, notificationRoutes);
 app.use('/api/history',       generalLimiter, historyRoutes);
 app.use('/api/trips',         generalLimiter, tripsRoutes);
 app.use('/api/tripfit',       generalLimiter, tripFitRoutes);
+app.use('/s',                 generalLimiter, shareRoutes);
 
 // ─── Global error handler ─────────────────────────────────────────────────────
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
