@@ -92,6 +92,7 @@ const ClosetView = ({
             : (closets[0]?._id ?? ''),
     );
     const [editingArticle, setEditingArticle] = useState<ClothingArticle | null>(null);
+    const [addingManually, setAddingManually] = useState(false);
     const [creating, setCreating] = useState(false);
     const [newName, setNewName] = useState('');
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -239,6 +240,14 @@ const ClosetView = ({
                 style: 'destructive',
                 onPress: () => handleDelete(c._id),
             },
+            { text: 'Cancel', style: 'cancel' },
+        ]);
+    };
+
+    const openAddChooser = () => {
+        Alert.alert('Add to Closet', undefined, [
+            { text: 'Use Photo', onPress: () => router.push('/capture') },
+            { text: 'Enter Manually', onPress: () => setAddingManually(true) },
             { text: 'Cancel', style: 'cancel' },
         ]);
     };
@@ -613,7 +622,7 @@ const ClosetView = ({
                         <Text style={styles.emptyTitle}>No articles yet</Text>
                         <Pressable
                             style={styles.addBtn}
-                            onPress={() => router.push('/capture')}
+                            onPress={openAddChooser}
                         >
                             <Text style={styles.addBtnText}>Add your first piece</Text>
                         </Pressable>
@@ -648,12 +657,12 @@ const ClosetView = ({
 
             </ScrollView>
 
-            {/* ── Floating action button — opens the camera flow ── */}
-            {selected && !editingArticle && (
+            {/* ── Floating action button — opens the add-article chooser ── */}
+            {selected && !editingArticle && !addingManually && (
                 <Pressable
                     style={styles.fab}
-                    onPress={() => router.push('/capture')}
-                    accessibilityLabel='Add article — open camera'
+                    onPress={openAddChooser}
+                    accessibilityLabel='Add article'
                     accessibilityRole='button'
                 >
                     <PlusIcon size={24} color={colors.saveBtnText} />
@@ -672,6 +681,17 @@ const ClosetView = ({
                     onSubmit={async (data) => {
                         await onEditArticle(selected._id, editingArticle._id, data);
                         setEditingArticle(null);
+                    }}
+                />
+            )}
+
+            {addingManually && selected && (
+                <ArticleModal
+                    closetId={selected._id}
+                    onClose={() => setAddingManually(false)}
+                    onSubmit={async (data) => {
+                        await onAddArticle(selected._id, data);
+                        setAddingManually(false);
                     }}
                 />
             )}
