@@ -60,8 +60,6 @@ export interface CurrentWeather {
   Wind: { Speed: { Imperial: { Value: number }; Metric: { Value: number } } };
   RelativeHumidity: number;
   UVIndexText: string;
-  /** Numeric UV index (0–11+). Optional so older cached/server payloads without it still typecheck. */
-  UVIndex?: number;
   // AQI / pollen are not provided by Apple WeatherKit. Kept optional so the
   // outfit engine and UI keep compiling; values are always undefined today
   // (and can be backfilled by a secondary provider later without a refactor).

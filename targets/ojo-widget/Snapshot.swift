@@ -23,9 +23,10 @@ struct WidgetSnapshot: Codable {
   /// order: "rain" | "layer" | "snow" | "uv". Optional (not just empty) so a
   /// snapshot written before this field existed still decodes.
   let alerts: [String]?
-  /// Numeric UV index for the "uv" alert's label ("UV n"). Nil when unknown
-  /// (older payload / backend without the numeric field) → label stays "UV".
-  let uvIndex: Int?
+  /// UV category text ("High"/"Very High"/"Extreme") for the "uv" alert's
+  /// label — matches the app's WeatherDetails "UV Index" stat. Nil when
+  /// unknown → label stays plain "UV".
+  let uvIndexText: String?
   /// Same-day layer-change steps (layeringEngine's buildTimeline), capped to a
   /// few by the JS side. Only present on days with a real temp swing or a
   /// precip start/stop — most days this is nil, not just empty.
@@ -89,7 +90,7 @@ extension WidgetSnapshot {
     ],
     layerNote: "Layer up — cooler after sunset.",
     alerts: ["layer"],
-    uvIndex: nil,
+    uvIndexText: "High",
     timeline: [
       TimelineStep(time: "Afternoon", action: "Remove your jacket — warming up"),
       TimelineStep(time: "Evening", action: "Add it back — sun is setting, cooling down"),
@@ -111,7 +112,7 @@ extension WidgetSnapshot {
     items: [],
     layerNote: nil,
     alerts: [],
-    uvIndex: nil,
+    uvIndexText: nil,
     timeline: nil,
     emptyReason: nil,
     trip: nil,

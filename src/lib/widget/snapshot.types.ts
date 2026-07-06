@@ -99,8 +99,8 @@ export interface OjoWidgetSnapshot {
   layerNote?: string;
   /** Accessory gaps the outfit thumbnails don't already cover, priority order. Empty when nothing's missing. */
   alerts: WidgetAlertKind[];
-  /** Numeric UV index for the 'uv' alert's label ("UV n"). Present only when the UV alert is active and the reading is known. */
-  uvIndex?: number;
+  /** UV category text ("High"/"Very High"/"Extreme") for the 'uv' alert's label — same value the app's WeatherDetails "UV Index" stat shows. Present only when the UV alert is active. */
+  uvIndexText?: string;
   /** Same-day layer-change steps (layeringEngine's buildTimeline), capped for widget display. Only present on days with a real temperature swing or a precip start/stop — most days this is omitted. */
   timeline?: WidgetTimelineStep[];
   /** Present only when mode === 'empty' — which setup step the user is missing, so the empty state can be specific. */
@@ -128,7 +128,7 @@ export interface WidgetSnapshotInput {
   }[];
   layerNote?: string;
   alerts: WidgetAlertKind[];
-  uvIndex?: number;
+  uvIndexText?: string;
   timeline?: WidgetTimelineStep[];
   emptyReason?: WidgetEmptyReason;
   trip?: OjoWidgetTripInfo;

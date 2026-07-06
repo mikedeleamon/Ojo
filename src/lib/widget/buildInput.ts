@@ -40,7 +40,7 @@ const itemsFromOutfit = (outfit: OutfitResult): WidgetSnapshotInput['items'] =>
  */
 const widgetAlertsFor = (
   outfit: OutfitResult,
-): { layerNote?: string; alerts: WidgetAlertKind[]; uvIndex?: number; timeline?: WidgetTimelineStep[] } => {
+): { layerNote?: string; alerts: WidgetAlertKind[]; uvIndexText?: string; timeline?: WidgetTimelineStep[] } => {
   const alerts: WidgetAlertKind[] = [];
   if ((outfit.accessoryAlerts?.rain ?? 'none') !== 'none') alerts.push('rain');
   if (outfit.layering?.missingMid || outfit.layering?.missingOuter) alerts.push('layer');
@@ -49,8 +49,8 @@ const widgetAlertsFor = (
   return {
     layerNote: outfit.layering?.recommendation,
     alerts,
-    // Only meaningful alongside the 'uv' alert; the widget reads it as "UV n".
-    uvIndex: outfit.accessoryAlerts?.missingHat ? outfit.accessoryAlerts?.uvIndex : undefined,
+    // Only meaningful alongside the 'uv' alert; the widget reads it as "UV High" — same category text WeatherDetails shows.
+    uvIndexText: outfit.accessoryAlerts?.missingHat ? outfit.accessoryAlerts?.uvIndexText : undefined,
     timeline: outfit.layering?.timeline?.slice(0, MAX_WIDGET_TIMELINE_STEPS),
   };
 };

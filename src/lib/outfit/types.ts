@@ -34,8 +34,8 @@ export interface AccessoryAlerts {
   rain:         PrecipIntensity;
   missingBoots: boolean;
   missingHat:   boolean;
-  /** Numeric UV index when the UV alert is active, so the widget can read "UV n". */
-  uvIndex?:     number;
+  /** UV category text ("High"/"Very High"/"Extreme") when the UV alert is active — same field WeatherDetails' "UV Index" stat shows, so the widget's copy matches the app. */
+  uvIndexText?: string;
 }
 
 export interface OutfitResult {

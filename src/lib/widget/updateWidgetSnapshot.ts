@@ -44,7 +44,7 @@ export async function updateWidgetSnapshot(input: WidgetSnapshotInput): Promise<
     items: resolved,
     layerNote: input.layerNote,
     alerts: input.alerts,
-    uvIndex: input.uvIndex,
+    uvIndexText: input.uvIndexText,
     timeline: input.timeline,
     emptyReason: input.emptyReason,
     trip: input.trip,

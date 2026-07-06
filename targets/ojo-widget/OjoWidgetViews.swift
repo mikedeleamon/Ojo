@@ -230,9 +230,10 @@ struct WeatherCuesView: View {
 }
 
 /// The chip's text. Most alerts use their static label; "uv" appends the
-/// numeric index when known ("UV 8") so it's an actual reading, not just "UV".
+/// category text when known ("UV High") — the same wording the app's
+/// WeatherDetails "UV Index" stat uses, so the widget's copy matches the app.
 private func alertLabel(_ kind: String, spec: AlertGlyphSpec, snap: WidgetSnapshot) -> String {
-  if kind == "uv", let uv = snap.uvIndex {
+  if kind == "uv", let uv = snap.uvIndexText, !uv.isEmpty {
     return "UV \(uv)"
   }
   return spec.label
@@ -255,9 +256,8 @@ private func timelineActionIcon(_ action: String) -> String {
 /// A compact same-day sequence from layeringEngine's buildTimeline, e.g.
 /// "Afternoon → Evening" with an icon per step showing what changes. Distinct
 /// from the plain recommendation sentence: this shows WHEN advice shifts
-/// during the day, which a single static line can't convey. Home Screen
-/// Medium only (see LayerHintView's showTimeline) — Small has no room left
-/// once headline/temp/items are laid out.
+/// during the day, which a single static line can't convey. Rendered via
+/// WeatherCuesView (the compact hint line + the large widget's cues row).
 struct TimelineStripView: View {
   let steps: [WidgetSnapshot.TimelineStep]
 
@@ -283,24 +283,52 @@ struct TimelineStripView: View {
 
 // MARK: - Outfit thumbnail row
 
-/// A row of garment thumbnails at a FIXED height. The fixed height matters: in a
-/// tight VStack, a flexible `.aspectRatio(.fit)` thumbnail collapses toward zero
-/// when vertical space runs out (which hid the clothes on the medium widget) —
-/// pinning the height guarantees the items always render, and only lower-priority
-/// content below gets clipped instead.
+/// A row of portrait garment tiles — the original look: each tile keeps a fixed
+/// aspect ratio (`.fit`) so clothing photos aren't stretched or cropped into
+/// landscape. `maxHeight` optionally caps the tile height on the large widget so
+/// they don't balloon; small/medium leave it nil and let the tiles size to the
+/// row's available space (matching the placeholder layout).
 struct OutfitThumbRow: View {
   let items: [WidgetSnapshot.Item]
   var maxCount: Int
-  var height: CGFloat
+  var ratio: CGFloat = 0.8
   var spacing: CGFloat = 6
+  var maxHeight: CGFloat? = nil
+  /// Floor so tiles can't get squeezed toward invisible under vertical
+  /// pressure from sibling content (the original items-disappeared bug) —
+  /// shape/proportion still comes from `aspectRatio`, this only guarantees a
+  /// minimum, it doesn't change normal sizing.
+  var minHeight: CGFloat? = nil
 
   var body: some View {
     HStack(spacing: spacing) {
       ForEach(Array(items.prefix(maxCount))) { item in
         ThumbView(item: item)
-          .frame(maxWidth: .infinity)
-          .frame(height: height)
+          .aspectRatio(ratio, contentMode: .fit)
+          .frame(minHeight: minHeight)
       }
+    }
+    .frame(maxHeight: maxHeight)
+  }
+}
+
+/// The compact single hint line for the small/medium widgets — mirrors the
+/// original placeholder layout: shows the weather cues (timeline / alert chips,
+/// including the "UV n" reading) when there's something to flag, otherwise the
+/// outfit description. One line only, so the layout stays close to the original.
+struct CompactHintView: View {
+  let snap: WidgetSnapshot
+  var maxAlerts: Int = 3
+
+  private var hasCues: Bool {
+    (snap.timeline?.isEmpty == false) || (snap.alerts?.isEmpty == false)
+  }
+
+  var body: some View {
+    if hasCues {
+      WeatherCuesView(snap: snap, maxAlerts: maxAlerts)
+    } else {
+      OutfitDescriptionView(snap: snap, lineLimit: 1)
     }
   }
 }
@@ -311,7 +339,7 @@ struct MediumOutfitView: View {
   let snap: WidgetSnapshot
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
+    VStack(alignment: .leading, spacing: 8) {
       VStack(alignment: .leading, spacing: 2) {
         if snap.mode == .trip, let trip = snap.trip {
           TripBadge(trip: trip)
@@ -331,7 +359,9 @@ struct MediumOutfitView: View {
         }
       }
 
-      // 1 line on medium to leave room for the thumbnails below.
+      // Always show the description (like Large) — it's the core "what to
+      // wear" answer and shouldn't depend on there being layering to discuss.
+      // Kept to 1 line here (Large gets 2) to leave room for the cues below.
       OutfitDescriptionView(snap: snap, lineLimit: 1)
 
       if snap.items.isEmpty {
@@ -339,7 +369,7 @@ struct MediumOutfitView: View {
           .font(.caption)
           .foregroundStyle(.white.opacity(0.75))
       } else {
-        OutfitThumbRow(items: snap.items, maxCount: 4, height: 56)
+        OutfitThumbRow(items: snap.items, maxCount: 4, ratio: 0.8, minHeight: 50)
       }
 
       WeatherCuesView(snap: snap)
@@ -376,24 +406,16 @@ struct SmallOutfitView: View {
         }
       }
 
-      OutfitThumbRow(items: snap.items, maxCount: 3, height: 58, spacing: 4)
+      OutfitThumbRow(items: snap.items, maxCount: 3, ratio: 0.7, spacing: 4, minHeight: 44)
+
+      CompactHintView(snap: snap, maxAlerts: 1)
 
       Spacer(minLength: 0)
 
-      // The outfit description is the small widget's payoff line; fall back to
-      // the weather headline only when there's no description (e.g. empty state).
-      if let note = snap.layerNote, !note.isEmpty {
-        Text(note)
-          .font(.system(size: 11, weight: .medium))
-          .foregroundStyle(.white.opacity(0.9))
-          .lineLimit(2)
-          .fixedSize(horizontal: false, vertical: true)
-      } else {
-        Text(headlineText(snap))
-          .font(.system(size: 12, weight: .semibold))
-          .foregroundStyle(.white)
-          .lineLimit(1)
-      }
+      Text(headlineText(snap))
+        .font(.system(size: 12, weight: .semibold))
+        .foregroundStyle(.white)
+        .lineLimit(1)
     }
     .padding(10)
   }
@@ -435,7 +457,7 @@ struct LargeOutfitView: View {
           .font(.subheadline)
           .foregroundStyle(.white.opacity(0.75))
       } else {
-        OutfitThumbRow(items: snap.items, maxCount: 4, height: 150, spacing: 10)
+        OutfitThumbRow(items: snap.items, maxCount: 4, ratio: 0.8, spacing: 10, maxHeight: 180)
       }
 
       WeatherCuesView(snap: snap)

@@ -579,7 +579,6 @@ interface NotesContext {
   windMph:          number;
   uvHigh:           boolean;
   uvIndexText:      string;
-  uvIndex?:         number;
   isSnowing:        boolean;
   settings:         Settings;
   aqiHigh?:         boolean;
@@ -720,7 +719,7 @@ const buildAccessoryAlerts = (slots: OutfitSlot[], ctx: NotesContext): Accessory
   rain:         ctx.precipIntensity,
   missingBoots: ctx.isSnowing && !slots.some(s => s.article.clothingType === 'Boots'),
   missingHat:   ctx.uvHigh && !slots.some(s => s.article.clothingType === 'Hat' || s.article.clothingType === 'Cap'),
-  uvIndex:      ctx.uvIndex,
+  uvIndexText:  ctx.uvIndexText,
 });
 
 // ─── Main: generate top-K ranked outfits ──────────────────────────────────────
@@ -982,7 +981,7 @@ export const generateOutfits = (
   // ── Phase 5: Attach notes and build OutfitResult[] ───────────────────────
 
   const notesCtx: NotesContext = {
-    bucket, precipIntensity, windMph, uvHigh, uvIndexText, uvIndex: weather.UVIndex, isSnowing, settings,
+    bucket, precipIntensity, windMph, uvHigh, uvIndexText, isSnowing, settings,
     aqiHigh:    weather.AirQualityText  ? AQI_HIGH_LABELS.has(weather.AirQualityText)  : undefined,
     pollenHigh: weather.PollenCategory  ? POLLEN_HIGH_LABELS.has(weather.PollenCategory) : undefined,
   };
