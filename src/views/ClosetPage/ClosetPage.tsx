@@ -1,6 +1,7 @@
 import { useMemo, useCallback } from 'react';
 import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { View, Text } from '../../components/primitives';
 import ClosetView from '../../components/ClosetView/ClosetView';
@@ -25,6 +26,9 @@ export default function ClosetPage() {
   const { colors } = useTheme();
   const { push } = useAppNavigation();
   const tabPad = useTabBarPadding();
+  // `?new=1` (from the widget's no-closet empty state, ojo://closet/new) opens
+  // the create-closet form on arrival.
+  const { new: newParam } = useLocalSearchParams<{ new?: string }>();
 
   const st = useMemo(() => StyleSheet.create({
     root:        { flex: 1, backgroundColor: colors.bgDefault },
@@ -71,6 +75,7 @@ export default function ClosetPage() {
 
       <ClosetView
         closets={closets}
+        autoCreate={newParam === '1'}
         onCreateCloset={createCloset}
         onRenameCloset={renameCloset}
         onDeleteCloset={deleteCloset}

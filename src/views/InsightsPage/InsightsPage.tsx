@@ -3,16 +3,16 @@ import {
   ScrollView,
   Image,
   Pressable,
-  Share,
   Linking,
   Animated,
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Svg, Circle } from 'react-native-svg';
+import { Svg, Circle, Path } from 'react-native-svg';
 import { useFocusEffect } from 'expo-router';
 import { View, Text, GlassCard, GlassGroup } from '../../components/primitives';
+import { HangerIcon } from '../../components/shared/HangerIcon';
 import Loading from '../../components/Loading/Loading';
 import { useClosets } from '../../hooks/useClosets';
 import { useTabBarPadding } from '../../hooks/useTabBarPadding';
@@ -46,6 +46,9 @@ import {
 import { SWATCH } from './swatches';
 import { ColorChord } from './ColorChord';
 import { ColorPalette } from './ColorPalette';
+import ShareToInstagramSheet from '../../components/ShareCard/ShareToInstagramSheet';
+import DonationListShareCard from '../../components/ShareCard/DonationListShareCard';
+import { donationShareLink } from '../../lib/share/deepLinks';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -85,8 +88,40 @@ const PlaceholderThumb = ({
       justifyContent: 'center',
     }}
   >
-    <Text style={{ fontSize: size * 0.45 }}>👕</Text>
+    <HangerIcon size={size * 0.5} color={colors.textMuted} decorative />
   </View>
+);
+
+// Cost-per-wear status glyphs — replace ✅/⚠️ emoji with on-brand tinted marks
+// that match the app's green/amber semantic palette.
+const BestGlyph = () => (
+  <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+    <Circle cx={12} cy={12} r={10} stroke="#34d399" strokeWidth={1.6} />
+    <Path
+      d="M7.5 12.5l3 3 6-6.5"
+      stroke="#34d399"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
+const WarnGlyph = () => (
+  <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M12 3.5 2.5 20.5h19L12 3.5Z"
+      stroke="#fbbf24"
+      strokeWidth={1.6}
+      strokeLinejoin="round"
+    />
+    <Path
+      d="M12 10v4.5M12 17.6v.01"
+      stroke="#fbbf24"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+    />
+  </Svg>
 );
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -112,6 +147,7 @@ export default function InsightsPage() {
   const [sleepExpanded, setSleepExpanded] = useState(false);
   const [donateExpanded, setDonateExpanded] = useState(false);
   const [windowDays,    setWindowDays]    = useState<number>(90);
+  const [showDonationShare, setShowDonationShare] = useState(false);
 
   // Animated ring value (0 → utilizationRate)
   const ringAnim = useRef(new Animated.Value(0)).current;
@@ -198,14 +234,8 @@ export default function InsightsPage() {
     }
   };
 
-  const handleShareDonationList = async () => {
-    if (!data) return;
-    const items = data.sleeping.filter(i => donationQueue.includes(i.article._id));
-    if (items.length === 0) return;
-    const list = items
-      .map((i, n) => `${n + 1}. ${articleLabel(i)}`)
-      .join('\n');
-    Share.share({ message: `My donation list:\n${list}` });
+  const handleShareDonationList = () => {
+    setShowDonationShare(true);
   };
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -231,7 +261,7 @@ export default function InsightsPage() {
           </View>
           <GlassCard style={styles.healthCard}>
             <View style={{ alignItems: 'center', padding: spacing.lg, gap: spacing.md }}>
-              <Text style={{ fontSize: 40 }}>📊</Text>
+              <HangerIcon size={40} color={colors.textMuted} decorative />
               <Text style={[styles.ringPct, { fontSize: 18, textAlign: 'center' }]}>
                 Your insights are waiting
               </Text>
@@ -534,7 +564,7 @@ export default function InsightsPage() {
 
             {health.bestCPW && (
               <View style={styles.cpwRow}>
-                <Text style={styles.cpwEmoji}>✅</Text>
+                <BestGlyph />
                 <View style={styles.cpwThumb}>
                   {health.bestCPW.article.imageUrl ? (
                     <Image
@@ -560,7 +590,7 @@ export default function InsightsPage() {
             {health.worstCPW &&
               health.worstCPW.article._id !== health.bestCPW?.article._id && (
                 <View style={styles.cpwRow}>
-                  <Text style={styles.cpwEmoji}>⚠️</Text>
+                  <WarnGlyph />
                   <View style={styles.cpwThumb}>
                     {health.worstCPW.article.imageUrl ? (
                       <Image
@@ -772,6 +802,17 @@ export default function InsightsPage() {
           </GlassCard>
         )}
       </ScrollView>
+
+      {showDonationShare && (
+        <ShareToInstagramSheet
+          visible
+          onClose={() => setShowDonationShare(false)}
+          renderCard={(cardRef) => (
+            <DonationListShareCard ref={cardRef} items={queuedInsights} />
+          )}
+          attributionURL={donationShareLink()}
+        />
+      )}
     </SafeAreaView>
   );
 }

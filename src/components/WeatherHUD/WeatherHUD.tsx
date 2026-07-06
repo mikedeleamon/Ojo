@@ -173,9 +173,6 @@ const WeatherHUD = ({
     const [sunEvents, setSunEvents] = useState<SunEvent[]>(
         seedSnapshot ? extractSunEvents(seedSnapshot.daily) : [],
     );
-    // Kept for the "Share forecast" card (WeatherForecastShareCard) — the daily
-    // payload was already being fetched for sun events, just not retained.
-    const [daily, setDaily] = useState<DailyForecast[]>(seedSnapshot?.daily ?? []);
     const [loading, setLoading] = useState(!seedSnapshot);
     const [error, setError] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
@@ -191,7 +188,6 @@ const WeatherHUD = ({
         weather: CurrentWeather;
         forecasts: Forecast[];
         sunEvents: SunEvent[];
-        daily: DailyForecast[];
     } | null>(null);
     const isRefreshRef = useRef(false);
 
@@ -201,12 +197,10 @@ const WeatherHUD = ({
                 weather: w,
                 forecasts: f,
                 sunEvents: s,
-                daily: d,
             } = pendingRef.current;
             setWeather(w);
             setForecasts(f);
             setSunEvents(s);
-            setDaily(d);
             setFooterBg(footerBgFor(w.WeatherText, w.IsDayTime));
             setLastUpdated(new Date());
             pendingRef.current = null;
@@ -293,13 +287,11 @@ const WeatherHUD = ({
                         weather: w,
                         forecasts: fRes.data ?? [],
                         sunEvents: events,
-                        daily: dRes.data ?? [],
                     };
                 } else {
                     setWeather(w);
                     setForecasts(fRes.data ?? []);
                     setSunEvents(events);
-                    setDaily(dRes.data ?? []);
                     setFooterBg(footerBgFor(w.WeatherText, w.IsDayTime));
                     setLastUpdated(new Date());
                 }
@@ -781,7 +773,7 @@ const WeatherHUD = ({
                             />
                         </GlassCard>
 
-                        {daily.length > 0 && (
+                        {forecasts.length > 0 && (
                             <Pressable
                                 style={st.shareForecastBtn}
                                 onPress={() => setShowShareSheet(true)}
@@ -897,7 +889,8 @@ const WeatherHUD = ({
                                 ref={cardRef}
                                 place={place?.name ?? 'My Location'}
                                 weather={weather}
-                                daily={daily}
+                                hourly={forecasts}
+                                isMetric={isMetric}
                             />
                         )}
                         attributionURL={weatherShareLink()}

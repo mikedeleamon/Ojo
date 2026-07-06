@@ -29,3 +29,6 @@ export const tripShareLink = (planId: string): string | null =>
 
 /** Attribution link for a shared weather forecast. */
 export const weatherShareLink = (): string | null => buildShareUrl('/s/weather');
+
+/** Attribution link for a shared donation list. */
+export const donationShareLink = (): string | null => buildShareUrl('/s/donation');

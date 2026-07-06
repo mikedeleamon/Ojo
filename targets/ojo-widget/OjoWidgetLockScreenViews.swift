@@ -33,10 +33,10 @@ private struct LockScreenContent {
       line2 = snap.tempLine
       inlineText = snap.tempLine ?? line1
     case .empty:
-      icon = "eye"
+      icon = emptyStateGlyph(snap.emptyReason)
       line1 = "No outfit yet"
-      line2 = "Add clothes to start"
-      inlineText = line1
+      line2 = emptyStateTitle(snap.emptyReason)
+      inlineText = emptyStateTitle(snap.emptyReason)
     }
   }
 }

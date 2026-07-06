@@ -278,6 +278,7 @@ const ArticleModal = ({ closetId, onClose, onSubmit, initialData, onDelete, init
   const [error,      setError]     = useState<string | null>(null);
   const [saving,     setSaving]    = useState(false);
   const [deleting,   setDeleting]  = useState(false);
+  const [uploading,  setUploading] = useState(false);
   const [identifying,    setIdentifying]   = useState(false);
   const [previewError,   setPreviewError]  = useState(false);
   const [topLabelText,   setTopLabelText]  = useState<string>('');
@@ -302,6 +303,7 @@ const ArticleModal = ({ closetId, onClose, onSubmit, initialData, onDelete, init
     if (localUri && width && height) {
       runIdentification(localUri, width, height);
     }
+    setUploading(true);
     uploadImageToR2(uri, closetId).then(r2Url => {
       if (uploadIgnoredRef.current) return;
       if (r2Url) {
@@ -309,7 +311,7 @@ const ArticleModal = ({ closetId, onClose, onSubmit, initialData, onDelete, init
       } else {
         Alert.alert('Upload failed', 'Could not upload the image. You can add one manually.');
       }
-    });
+    }).finally(() => setUploading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // intentionally runs once on mount only
 
@@ -435,12 +437,20 @@ const ArticleModal = ({ closetId, onClose, onSubmit, initialData, onDelete, init
       if (result.localUri && result.width && result.height) {
         runIdentification(result.localUri, result.width, result.height);
       }
-      // Upload to R2 and set the public URL
-      const r2Url = await uploadImageToR2(result.uri, closetId);
-      if (r2Url) {
-        set('imageUrl', r2Url);
-      } else {
-        Alert.alert('Error', 'Failed to upload image. Please try again.');
+      // Upload to R2 and set the public URL. uploadIgnoredRef guards against a
+      // stale result overwriting a subsequent Remove.
+      uploadIgnoredRef.current = false;
+      setUploading(true);
+      try {
+        const r2Url = await uploadImageToR2(result.uri, closetId);
+        if (uploadIgnoredRef.current) return;
+        if (r2Url) {
+          set('imageUrl', r2Url);
+        } else {
+          Alert.alert('Error', 'Failed to upload image. Please try again.');
+        }
+      } finally {
+        setUploading(false);
       }
     }
   };
@@ -452,12 +462,20 @@ const ArticleModal = ({ closetId, onClose, onSubmit, initialData, onDelete, init
       if (result.localUri && result.width && result.height) {
         runIdentification(result.localUri, result.width, result.height);
       }
-      // Upload to R2 and set the public URL
-      const r2Url = await uploadImageToR2(result.uri, closetId);
-      if (r2Url) {
-        set('imageUrl', r2Url);
-      } else {
-        Alert.alert('Error', 'Failed to upload image. Please try again.');
+      // Upload to R2 and set the public URL. uploadIgnoredRef guards against a
+      // stale result overwriting a subsequent Remove.
+      uploadIgnoredRef.current = false;
+      setUploading(true);
+      try {
+        const r2Url = await uploadImageToR2(result.uri, closetId);
+        if (uploadIgnoredRef.current) return;
+        if (r2Url) {
+          set('imageUrl', r2Url);
+        } else {
+          Alert.alert('Error', 'Failed to upload image. Please try again.');
+        }
+      } finally {
+        setUploading(false);
       }
     }
   };
@@ -537,7 +555,7 @@ const ArticleModal = ({ closetId, onClose, onSubmit, initialData, onDelete, init
                   resizeMode='cover'
                   onError={() => setPreviewError(true)}
                 />
-                <Pressable style={st.clearImg} onPress={() => { uploadIgnoredRef.current = true; set('imageUrl', ''); }} accessibilityRole="button">
+                <Pressable style={st.clearImg} onPress={() => { uploadIgnoredRef.current = true; setUploading(false); set('imageUrl', ''); }} accessibilityRole="button">
                   <Text style={st.clearImgText}>Remove</Text>
                 </Pressable>
               </View>
@@ -777,19 +795,23 @@ const ArticleModal = ({ closetId, onClose, onSubmit, initialData, onDelete, init
             <Text style={st.cancelBtnText}>Cancel</Text>
           </Pressable>
           <Pressable
-            style={[st.submitBtn, saving && { opacity: 0.5 }]}
+            style={[st.submitBtn, (saving || uploading) && { opacity: 0.5 }]}
             onPress={handleSubmit}
-            disabled={saving}
+            disabled={saving || uploading}
             accessibilityRole="button"
-            accessibilityLabel={saving
-              ? (isEditing ? 'Saving' : 'Adding')
-              : (isEditing ? 'Save changes' : 'Add to closet')}
-            accessibilityState={{ busy: saving, disabled: saving }}
+            accessibilityLabel={uploading
+              ? 'Uploading photo'
+              : saving
+                ? (isEditing ? 'Saving' : 'Adding')
+                : (isEditing ? 'Save changes' : 'Add to closet')}
+            accessibilityState={{ busy: saving || uploading, disabled: saving || uploading }}
           >
             <Text style={st.submitBtnText}>
-              {saving
-                ? (isEditing ? 'Saving…'       : 'Adding…')
-                : (isEditing ? 'Save changes'   : 'Add to closet')}
+              {uploading
+                ? 'Uploading photo…'
+                : saving
+                  ? (isEditing ? 'Saving…'       : 'Adding…')
+                  : (isEditing ? 'Save changes'   : 'Add to closet')}
             </Text>
           </Pressable>
         </View>

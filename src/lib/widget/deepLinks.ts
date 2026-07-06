@@ -9,10 +9,14 @@
  *   ojo://outfit     → "/"                              (home tab · today's outfit)
  *   ojo://trip/<id>  → "/account/tripfit?planId=<id>"   (opens the saved trip)
  *   ojo://trips      → "/account/tripfit"               (opens the trip library)
+ *   ojo://closet/new → "/closet?new=1"                  (closet tab, create form open)
  */
 
 /** Home tab / today's outfit. */
 export const OUTFIT_DEEP_LINK = 'ojo://outfit';
+
+/** Closet tab with the create-closet form auto-opened — the no_closet empty state. */
+export const CLOSET_NEW_DEEP_LINK = 'ojo://closet/new';
 
 /** A specific saved trip, opened in TripFit. */
 export const tripDeepLink = (planId: string): string =>

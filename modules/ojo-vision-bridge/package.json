@@ -1,0 +1,6 @@
+{
+  "name": "ojo-vision-bridge",
+  "version": "1.0.0",
+  "description": "Local Expo module that segments the primary foreground subject out of a garment photo using iOS Vision (VNGenerateForegroundInstanceMaskRequest) and returns a transparent-background PNG cutout. Native-only; its JS wrapper lives in the app at src/lib/vision/.",
+  "private": true
+}

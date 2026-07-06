@@ -560,7 +560,8 @@ export default function CameraPage() {
   // that path so the user doesn't land back on the redirect placeholder.
   // When absent (e.g. opened from the Closet add button), dismiss simply
   // pops the modal so the caller's tab stays selected.
-  const { return: returnParam } = useLocalSearchParams<{ return?: string }>();
+  const { return: returnParam, closetId: closetIdParam } =
+    useLocalSearchParams<{ return?: string; closetId?: string }>();
 
   const [permission, requestPermission] = useCameraPermissions();
   const [facing,    setFacing]    = useState<CameraType>('back');
@@ -569,9 +570,15 @@ export default function CameraPage() {
   const [cropped,   setCropped]   = useState<ImageData | null>(null);
 
   const { closets, loading: closetsLoading, addArticle } = useClosets();
+  // Prefer the closet the user launched from (passed by the Closet tab's add
+  // chooser); fall back to the preferred/first closet for the global Add tab.
   const targetCloset = useMemo(
-    () => closets.find(c => c.isPreferred) ?? closets[0] ?? null,
-    [closets],
+    () =>
+      (closetIdParam ? closets.find(c => c._id === closetIdParam) : null) ??
+      closets.find(c => c.isPreferred) ??
+      closets[0] ??
+      null,
+    [closets, closetIdParam],
   );
 
   const dismiss = useCallback(() => {

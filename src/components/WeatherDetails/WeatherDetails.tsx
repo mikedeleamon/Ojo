@@ -75,7 +75,9 @@ const WeatherDetails = ({ weather, settings, forecasts }: Props) => {
 
       {/* Always-visible wind + humidity */}
       <GlassGroup spacing={spacing.sm} style={st.grid}>
-        <Stat label="Wind"     value={`${weather.Wind.Speed.Imperial.Value} mph`} />
+        <Stat label="Wind"     value={isMetric
+          ? `${weather.Wind.Speed.Metric.Value} km/h`
+          : `${weather.Wind.Speed.Imperial.Value} mph`} />
         <Stat label="Humidity" value={`${weather.RelativeHumidity}%`} />
       </GlassGroup>
 

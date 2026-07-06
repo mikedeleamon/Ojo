@@ -1,20 +1,28 @@
 /**
- * colorExtractor.ts — pure-JS pixel-based color extraction.
+ * colorExtractor.ts — pixel-based color extraction.
  *
  * Strategy:
- *   1. Resize the image to a 32×32 thumbnail using expo-image-manipulator (PNG).
- *   2. Decode the base64 PNG in JavaScript: pako inflates the IDAT chunk,
- *      PNG filter reconstruction gives us raw RGB pixels.
- *   3. Convert to CIE Lab, drop extreme-lightness outliers (shadow creases,
+ *   1. Try the native OjoVisionBridge (iOS 17+ Vision subject segmentation)
+ *      to get a garment-only cutout. Falls back to a blind inner-60%
+ *      center-crop whenever segmentation is unavailable or unconfident —
+ *      old OS, Android, Expo Go, or no subject found.
+ *   2. Resize to a 32×32 thumbnail using expo-image-manipulator (PNG).
+ *   3. Decode the base64 PNG (see pngDecoder.ts): pako inflates the IDAT
+ *      chunk, PNG filter reconstruction gives us raw pixels (RGB, or RGBA
+ *      when the source is a segmented cutout — transparent pixels are
+ *      dropped before clustering).
+ *   4. Convert to CIE Lab, drop extreme-lightness outliers (shadow creases,
  *      specular highlights), k-means cluster in Lab space, then name each
  *      cluster's centroid — naming happens once per cluster, not per pixel.
  *
- * No native modules — works on any platform without a rebuild.
+ * No native modules required — the segmentation step degrades gracefully
+ * when the bridge isn't linked, so this still works on any platform.
  */
 
 import * as ImageManipulator from 'expo-image-manipulator';
-import { inflate } from 'pako';
 import { rgbToLab, nearestColorNameFromLab } from './colorUtils';
+import { segmentGarment, isVisionBridgeAvailable } from '../lib/vision/native';
+import { base64ToBytes, parsePNGPixels, parsePNGPixelsRGBA } from './pngDecoder';
 import type { DetectedColor } from './clothingIdentifier.types';
 
 const SAMPLE_SIZE = 32; // 32×32 = 1024 pixel samples
@@ -26,137 +34,97 @@ export async function extractColorsFromImage(
   maxColors = 3,
 ): Promise<DetectedColor[]> {
   try {
-    // Center-crop to inner 60% first to focus on the garment, not the background
-    const original = await ImageManipulator.manipulateAsync(imageUri, []);
-    const ow = original.width;
-    const oh = original.height;
-    const cropRatio = 0.6;
-    const cx = Math.round(ow * (1 - cropRatio) / 2);
-    const cy = Math.round(oh * (1 - cropRatio) / 2);
-    const cw = Math.round(ow * cropRatio);
-    const ch = Math.round(oh * cropRatio);
-
-    const small = await ImageManipulator.manipulateAsync(
-      imageUri,
-      [
-        { crop: { originX: cx, originY: cy, width: cw, height: ch } },
-        { resize: { width: SAMPLE_SIZE, height: SAMPLE_SIZE } },
-      ],
-      { format: ImageManipulator.SaveFormat.PNG, base64: true },
+    const maskedUri = await segmentGarment(imageUri);
+    // Diagnostic: `bridge=absent` here means the native module isn't linked
+    // into the build (Podfile.lock missing OjoVisionBridge) — every photo
+    // then silently uses the heuristic crop, so segmentation is never tested.
+    console.log(
+      `[Ojo][vision] bridge=${isVisionBridgeAvailable() ? 'linked' : 'absent'} `
+      + `segment=${maskedUri ? 'cutout' : 'null'}`,
     );
-    if (!small.base64) return [];
 
-    const bytes = base64ToBytes(small.base64);
-    const pixels = parsePNGPixels(bytes);
-    if (pixels.length === 0) return [];
+    if (maskedUri) {
+      const colors = await extractFromMaskedImage(maskedUri, maxColors);
+      if (colors.length > 0) {
+        logColorPath('segmented', colors);
+        return colors;
+      }
+      console.log('[Ojo][vision] cutout had no usable pixels — falling back to heuristic crop');
+    }
 
-    return clusterColors(pixels, maxColors);
+    const colors = await extractFromHeuristicCrop(imageUri, maxColors);
+    logColorPath('heuristic-crop', colors);
+    return colors;
   } catch (e) {
     console.warn('[Ojo] colorExtractor error:', e);
     return [];
   }
 }
 
-// ─── Base64 decode ────────────────────────────────────────────────────────────
-
-export function base64ToBytes(b64: string): Uint8Array {
-  // atob is available in React Native (Hermes) since RN 0.72
-  const binary = atob(b64);
-  const out = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
-  return out;
+/** One greppable line per identification: which path won and the colors it
+ *  produced — so an on-device test can be read from the Metro logs. */
+function logColorPath(path: string, colors: DetectedColor[]): void {
+  const summary = colors
+    .map((c) => `${c.name} ${(c.prominence * 100).toFixed(0)}%`)
+    .join(', ');
+  console.log(`[Ojo][vision] colors via ${path}: ${summary || '(none)'}`);
 }
 
-// ─── Minimal PNG parser ───────────────────────────────────────────────────────
+/** Vision has already isolated the garment — no blind crop needed, just
+ *  resize and drop whatever background sliver came through as transparent. */
+async function extractFromMaskedImage(
+  maskedUri: string,
+  maxColors: number,
+): Promise<DetectedColor[]> {
+  const small = await ImageManipulator.manipulateAsync(
+    maskedUri,
+    [{ resize: { width: SAMPLE_SIZE, height: SAMPLE_SIZE } }],
+    { format: ImageManipulator.SaveFormat.PNG, base64: true },
+  );
+  if (!small.base64) return [];
 
-function readU32(b: Uint8Array, o: number): number {
-  return ((b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3]) >>> 0;
+  const bytes = base64ToBytes(small.base64);
+  const rgba = parsePNGPixelsRGBA(bytes);
+  if (rgba.length === 0) return [];
+
+  const ALPHA_THRESHOLD = 32; // drop fully- and near-transparent (anti-aliased edge) pixels
+  const pixels: Array<[number, number, number]> = rgba
+    .filter(([, , , a]) => a >= ALPHA_THRESHOLD)
+    .map(([r, g, b]) => [r, g, b]);
+  if (pixels.length === 0) return [];
+
+  return clusterColors(pixels, maxColors);
 }
 
-export function parsePNGPixels(bytes: Uint8Array): Array<[number, number, number]> {
-  // Validate PNG signature
-  if (bytes[0] !== 0x89 || bytes[1] !== 0x50) return [];
+/** No segmentation available — same blind inner-60% center-crop as before. */
+async function extractFromHeuristicCrop(
+  imageUri: string,
+  maxColors: number,
+): Promise<DetectedColor[]> {
+  const original = await ImageManipulator.manipulateAsync(imageUri, []);
+  const ow = original.width;
+  const oh = original.height;
+  const cropRatio = 0.6;
+  const cx = Math.round(ow * (1 - cropRatio) / 2);
+  const cy = Math.round(oh * (1 - cropRatio) / 2);
+  const cw = Math.round(ow * cropRatio);
+  const ch = Math.round(oh * cropRatio);
 
-  let offset = 8;
-  let width = 0, height = 0, colorType = 2;
-  const idatParts: Uint8Array[] = [];
+  const small = await ImageManipulator.manipulateAsync(
+    imageUri,
+    [
+      { crop: { originX: cx, originY: cy, width: cw, height: ch } },
+      { resize: { width: SAMPLE_SIZE, height: SAMPLE_SIZE } },
+    ],
+    { format: ImageManipulator.SaveFormat.PNG, base64: true },
+  );
+  if (!small.base64) return [];
 
-  // Walk chunks
-  while (offset + 8 <= bytes.length) {
-    const length = readU32(bytes, offset);
-    const type   = String.fromCharCode(bytes[offset+4], bytes[offset+5], bytes[offset+6], bytes[offset+7]);
-    const data   = bytes.slice(offset + 8, offset + 8 + length);
+  const bytes = base64ToBytes(small.base64);
+  const pixels = parsePNGPixels(bytes);
+  if (pixels.length === 0) return [];
 
-    if (type === 'IHDR') {
-      width     = readU32(data, 0);
-      height    = readU32(data, 4);
-      // data[8] = bit depth, data[9] = color type
-      colorType = data[9]; // 2 = RGB, 6 = RGBA
-    } else if (type === 'IDAT') {
-      idatParts.push(data);
-    } else if (type === 'IEND') {
-      break;
-    }
-    offset += 12 + length; // 4 length + 4 type + N data + 4 CRC
-  }
-
-  if (!width || !height || !idatParts.length) return [];
-
-  // Concatenate all IDAT chunks then decompress
-  const totalLen  = idatParts.reduce((s, c) => s + c.length, 0);
-  const compressed = new Uint8Array(totalLen);
-  let pos = 0;
-  for (const chunk of idatParts) { compressed.set(chunk, pos); pos += chunk.length; }
-
-  let raw: Uint8Array;
-  try { raw = inflate(compressed); } catch { return []; }
-
-  // Channels: RGB = 3, RGBA = 4
-  const ch     = colorType === 6 ? 4 : 3;
-  const stride = 1 + width * ch; // 1 filter byte + pixel data per row
-
-  const recon = new Uint8Array(height * width * ch);
-  const pixels: Array<[number, number, number]> = [];
-
-  for (let y = 0; y < height; y++) {
-    const filter   = raw[y * stride];
-    const rowBase  = y * stride + 1;
-    const reconRow = y * width * ch;
-    const prevRow  = y > 0 ? recon.subarray((y - 1) * width * ch, y * width * ch) : null;
-
-    for (let x = 0; x < width; x++) {
-      for (let c = 0; c < ch; c++) {
-        const rawVal = raw[rowBase + x * ch + c];
-        const left   = x > 0 ? recon[reconRow + (x - 1) * ch + c] : 0;
-        const up     = prevRow ? prevRow[x * ch + c] : 0;
-        const upLeft = (x > 0 && prevRow) ? prevRow[(x - 1) * ch + c] : 0;
-
-        let v: number;
-        switch (filter) {
-          case 0:  v = rawVal; break;                                               // None
-          case 1:  v = (rawVal + left) & 0xFF; break;                              // Sub
-          case 2:  v = (rawVal + up) & 0xFF; break;                                // Up
-          case 3:  v = (rawVal + Math.floor((left + up) / 2)) & 0xFF; break;       // Average
-          case 4:  v = (rawVal + paeth(left, up, upLeft)) & 0xFF; break;           // Paeth
-          default: v = rawVal;
-        }
-        recon[reconRow + x * ch + c] = v;
-      }
-    }
-
-    for (let x = 0; x < width; x++) {
-      const i = reconRow + x * ch;
-      pixels.push([recon[i], recon[i + 1], recon[i + 2]]);
-    }
-  }
-
-  return pixels;
-}
-
-function paeth(a: number, b: number, c: number): number {
-  const p = a + b - c;
-  const pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c);
-  return pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+  return clusterColors(pixels, maxColors);
 }
 
 // ─── Color clustering ─────────────────────────────────────────────────────────

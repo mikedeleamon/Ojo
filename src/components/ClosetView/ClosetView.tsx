@@ -15,6 +15,7 @@ import { Closet, ClothingArticle, ArticleFormData } from '../../types';
 import { QuickAddData } from '../../views/ClosetPage/ClosetPage';
 import { spacing } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
+import { hapticImpact } from '../../lib/haptics';
 import { makeStyles } from './ClosetView.styles';
 import {
     SearchIcon,
@@ -47,6 +48,8 @@ type SortMode = 'default' | 'type' | 'color' | 'wornRecent' | 'wornStale';
 interface Props {
     closets: Closet[];
     initialSelectedId?: string;
+    /** Open the create-closet form on mount — set by the widget's no-closet deep link (ojo://closet/new). */
+    autoCreate?: boolean;
     onCreateCloset: (name: string) => Promise<void>;
     onRenameCloset: (id: string, name: string) => Promise<void>;
     onDeleteCloset: (id: string) => Promise<void>;
@@ -66,6 +69,7 @@ interface Props {
 const ClosetView = ({
     closets,
     initialSelectedId,
+    autoCreate = false,
     onCreateCloset,
     onRenameCloset,
     onDeleteCloset,
@@ -111,6 +115,13 @@ const ClosetView = ({
             recentlyWornWithAge(30).then(setWornAgeMap).catch(() => {});
         }, []),
     );
+
+    // Arriving via the widget's no-closet deep link (ojo://closet/new) opens the
+    // create-closet form. Fires once when the flag flips true; if the user then
+    // cancels, it won't reopen (deps unchanged) until a fresh navigation.
+    useEffect(() => {
+        if (autoCreate) setCreating(true);
+    }, [autoCreate]);
 
     const selected = closets.find((c) => c._id === selectedId) ?? closets[0];
     const filterCount = activeCategories.length + activeColors.length + activeFabrics.length + activeGenders.length;
@@ -245,8 +256,16 @@ const ClosetView = ({
     };
 
     const openAddChooser = () => {
+        if (!selected) return;
+        // Pass the closet the user is viewing so the photo path files the new
+        // item here too — matching "Enter Manually" (which uses selected._id)
+        // instead of silently defaulting to the preferred closet.
+        const closetId = selected._id;
         Alert.alert('Add to Closet', undefined, [
-            { text: 'Use Photo', onPress: () => router.push('/capture') },
+            {
+                text: 'Use Photo',
+                onPress: () => router.push({ pathname: '/capture', params: { closetId } }),
+            },
             { text: 'Enter Manually', onPress: () => setAddingManually(true) },
             { text: 'Cancel', style: 'cancel' },
         ]);
@@ -343,7 +362,7 @@ const ClosetView = ({
                             key={c._id}
                             style={[styles.closetTab, styles.closetTabInner, styles.closetTabActive]}
                             onPress={onPress}
-                            onLongPress={() => openTabMenu(c)}
+                            onLongPress={() => { hapticImpact(); openTabMenu(c); }}
                             delayLongPress={400}
                             accessibilityLabel={a11y}
                         >
@@ -354,7 +373,7 @@ const ClosetView = ({
                             <Pressable
                                 style={styles.closetTabInner}
                                 onPress={onPress}
-                                onLongPress={() => openTabMenu(c)}
+                                onLongPress={() => { hapticImpact(); openTabMenu(c); }}
                                 delayLongPress={400}
                                 accessibilityLabel={a11y}
                             >

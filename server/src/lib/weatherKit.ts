@@ -187,6 +187,8 @@ export interface NormalisedCurrent {
   Wind: { Speed: { Imperial: { Value: number }; Metric: { Value: number } } };
   RelativeHumidity: number;
   UVIndexText: string;
+  /** Numeric UV index (0–11+ scale), rounded. Kept alongside UVIndexText for the widget's "UV n" readout. */
+  UVIndex: number;
 }
 
 export interface NormalisedHour {
@@ -237,6 +239,7 @@ export async function getCurrent(lat: number, lon: number): Promise<NormalisedCu
     }},
     RelativeHumidity: Math.round((c.humidity ?? 0) * 100),
     UVIndexText: uvBucket(c.uvIndex ?? 0),
+    UVIndex: Math.round(c.uvIndex ?? 0),
   };
 }
 

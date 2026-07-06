@@ -4,9 +4,7 @@ import {
     ScrollView,
     Image,
     Pressable,
-    Alert,
     Linking,
-    Share,
     useWindowDimensions,
     Animated as RNAnimated,
     Easing as RNEasing,
@@ -50,7 +48,6 @@ import {
     GapSuggestion,
     GapType,
 } from '../../lib/wardrobeGaps';
-import { humanizeCondition } from '../../lib/weather/humanizeCondition';
 import {
     ClothingArticle,
     CurrentWeather,
@@ -256,6 +253,9 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
     const [loggedOutfit, setLoggedOutfit] = useState<{
         slots: OutfitSlot[];
         score: number;
+        // Full source outfit (headline/layering/accessoryAlerts) so the home-screen
+        // widget can show the worn outfit's description + cues, not just its items.
+        result: OutfitResult | null;
     } | null>(null);
     const [worn, setWorn] = useState<Map<string, number>>(new Map());
     const [removedByOutfit, setRemovedByOutfit] = useState<
@@ -393,9 +393,23 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
     const safeIdx = Math.min(activeIdx, Math.max(0, outfits.length - 1));
     const activeOutfit: OutfitResult | null = outfits[safeIdx] ?? null;
 
+    // The outfit the user logged as worn today, reshaped for the widget: the
+    // actual worn slots (minus any removed items) but carrying the source
+    // outfit's headline/layering/accessoryAlerts so the widget can still show
+    // its description + cues. Takes precedence in buildWidgetInput.
+    const wornOutfitForWidget = useMemo<OutfitResult | null>(() => {
+        if (!wornLogged || !loggedOutfit?.result) return null;
+        return {
+            ...loggedOutfit.result,
+            slots: loggedOutfit.slots,
+            score: loggedOutfit.score,
+        };
+    }, [wornLogged, loggedOutfit]);
+
     // ─── Home-screen widget sync ──────────────────────────────────────────────
-    // Mirror today's answer — the Trip Mode outfit when active, else the top
-    // generated outfit — to the iOS widget whenever the resolved state settles.
+    // Mirror today's answer — the worn outfit if the user logged one, else the
+    // Trip Mode outfit when active, else the top generated outfit — to the iOS
+    // widget whenever the resolved state settles.
     // Uses outfits[0] (the primary recommendation), not the swiped card, so the
     // widget stays stable while the user browses. No-ops off-iOS / without the
     // native bridge; thumbnail caching + timeline reload happen natively.
@@ -404,6 +418,9 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
         void updateWidgetSnapshot(
             buildWidgetInput({
                 todayOutfit: outfits[0] ?? null,
+                wornOutfit: wornOutfitForWidget,
+                outfitStatus: status,
+                closetCount: closets.length,
                 weather,
                 settings,
                 trip: {
@@ -421,6 +438,9 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
     }, [
         loading,
         outfits,
+        status,
+        closets.length,
+        wornOutfitForWidget,
         weather,
         settings,
         tripMode.upcoming,
@@ -491,6 +511,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
         score: number;
         closetId: string;
         closetName: string;
+        result: OutfitResult | null;
     }) => {
         const articles = opts.slots.map((s) => s.article);
         if (articles.length === 0) return;
@@ -504,7 +525,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
                 .join(', '),
         });
         setHistory((prev) => [entry, ...prev]);
-        setLoggedOutfit({ slots: opts.slots, score: opts.score });
+        setLoggedOutfit({ slots: opts.slots, score: opts.score, result: opts.result });
         setWornLogged(true);
     };
 
@@ -515,6 +536,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
             score: activeOutfit.score,
             closetId: preferred._id,
             closetName: preferred.name,
+            result: activeOutfit,
         });
     };
 
@@ -525,6 +547,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
             score: tripMode.outfit.score,
             closetId: tripMode.closetId,
             closetName: tripMode.closetName,
+            result: tripMode.outfit,
         });
     };
 
@@ -649,20 +672,6 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
     // ── Personalization level for badge ───────────────────────────────────────
     const scoreLevel = personalizedScoreLevel(profile.totalOutfits);
 
-    // ── Share handler (Feature 10) ────────────────────────────────────────────
-    const handleShare = async () => {
-        const articles = activeSlots.map((s) => s.article);
-        const lines = articles
-            .map(
-                (a) =>
-                    `• ${a.name || a.clothingType}${a.color ? ` (${a.color})` : ''}`,
-            )
-            .join('\n');
-        const tempF = Math.round(weather.Temperature.Imperial.Value);
-        const msg = `👔 My Ojo Outfit — Score: ${activeOutfit.score}${activeOutfit.isPersonalized ? ' ★' : ''}\n${'─'.repeat(22)}\n${lines}\n\n🌤️ ${tempF}°F · ${humanizeCondition(weather.WeatherText)}\n\nStyled with Ojo`;
-        Share.share({ message: msg }).catch(() => {});
-    };
-
     // #5 — Swipe hint: translate the pager slightly left, then snap back
     const hintTranslateX = hintAnim.interpolate({
         inputRange: [0, 1],
@@ -712,21 +721,9 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
                             isLearning={scoreLevel === 'learning'}
                         />
                         <Pressable
-                            onPress={() =>
-                                Alert.alert('Outfit', undefined, [
-                                    {
-                                        text: '↑  Share outfit',
-                                        onPress: handleShare,
-                                    },
-                                    {
-                                        text: '📸  Share to Instagram',
-                                        onPress: () => setShowShareSheet(true),
-                                    },
-                                    { text: 'Cancel', style: 'cancel' },
-                                ])
-                            }
+                            onPress={() => setShowShareSheet(true)}
                             style={styles.overflowBtn}
-                            accessibilityLabel='More outfit options'
+                            accessibilityLabel='Share outfit'
                             accessibilityRole='button'
                             hitSlop={8}
                         >

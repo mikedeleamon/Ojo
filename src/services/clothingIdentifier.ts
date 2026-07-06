@@ -15,7 +15,8 @@
 import * as ImageManipulator from 'expo-image-manipulator';
 import { loadTensorflowModel } from 'react-native-fast-tflite';
 import type { TensorflowModel } from 'react-native-fast-tflite';
-import { base64ToBytes, extractColorsFromImage, parsePNGPixels } from './colorExtractor';
+import { extractColorsFromImage } from './colorExtractor';
+import { base64ToBytes, parsePNGPixels } from './pngDecoder';
 
 import type {
   ClothingIdentificationResult,

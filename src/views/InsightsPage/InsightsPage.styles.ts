@@ -299,9 +299,6 @@ export const makeStyles = (colors: ColorTokens) =>
       fontSize: fontSizes.base,
       color: colors.textSecondary,
     },
-    cpwEmoji: {
-      fontSize: 20,
-    },
     cpwNudge: {
       fontFamily: fonts.body,
       fontSize: fontSizes.xs,

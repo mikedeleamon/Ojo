@@ -34,6 +34,8 @@ export interface AccessoryAlerts {
   rain:         PrecipIntensity;
   missingBoots: boolean;
   missingHat:   boolean;
+  /** Numeric UV index when the UV alert is active, so the widget can read "UV n". */
+  uvIndex?:     number;
 }
 
 export interface OutfitResult {

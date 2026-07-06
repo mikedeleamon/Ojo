@@ -1,8 +1,9 @@
 import { forwardRef } from 'react';
 import { View, Text } from '../primitives';
-import { CurrentWeather, DailyForecast } from '../../types';
+import { CurrentWeather, Forecast } from '../../types';
 import { humanizeConditionShort } from '../../lib/weather/humanizeCondition';
-import { phraseEmoji } from '../../views/TripFit/shared';
+import { fToC } from '../../lib/units';
+import WeatherIconDisplay from '../WeatherIconDisplay/WeatherIconDisplay';
 import ShareCardFrame from './ShareCardFrame';
 import cs from './shareCardCommon.styles';
 import { fonts, fontSizes } from '../../theme/tokens';
@@ -11,18 +12,26 @@ import { StyleSheet } from 'react-native';
 interface WeatherForecastShareCardProps {
   place: string;
   weather: CurrentWeather;
-  /** Next few days, soonest first — typically WeatherSnapshot.daily.slice(0, 5). */
-  daily: DailyForecast[];
+  /** Next few hours, soonest first — typically WeatherSnapshot.forecasts.slice(0, 5). */
+  hourly: Forecast[];
+  /** Render temperatures in °C rather than °F. */
+  isMetric?: boolean;
 }
 
 const styles = StyleSheet.create({
-  dayRow: {
+  conditionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 6,
+  },
+  hourRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 28,
     gap: 6,
   },
-  dayTile: {
+  hourTile: {
     flex: 1,
     alignItems: 'center',
     paddingVertical: 12,
@@ -30,46 +39,67 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.10)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.18)',
-    gap: 4,
+    gap: 6,
   },
-  dayLabel: {
+  hourLabel: {
     fontFamily: fonts.bodySemiBold,
     fontSize: fontSizes.xs,
     color: 'rgba(255,255,255,0.7)',
   },
-  dayEmoji: {
-    fontSize: 18,
-  },
-  dayTemp: {
+  hourTemp: {
     fontFamily: fonts.bodyMedium,
     fontSize: fontSizes.xs,
     color: '#FFFFFF',
   },
 });
 
-const dayAbbrev = (iso: string) =>
-  new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' });
+// e.g. "3 PM" → "3PM" — compact enough for the narrow hour tiles.
+const hourLabel = (iso: string) =>
+  new Date(iso)
+    .toLocaleTimeString('en-US', { hour: 'numeric' })
+    .replace(/\s+/g, '');
 
 const WeatherForecastShareCard = forwardRef<View, WeatherForecastShareCardProps>(
-  ({ place, weather, daily }, ref) => {
-    const tempF = Math.round(weather.Temperature.Imperial.Value);
-    const upcoming = daily.slice(0, 5);
+  ({ place, weather, hourly, isMetric = false }, ref) => {
+    // Hourly forecast temps are always Fahrenheit; convert per the unit setting.
+    const currentTemp = Math.round(
+      isMetric
+        ? weather.Temperature.Metric.Value
+        : weather.Temperature.Imperial.Value,
+    );
+    const upcoming = hourly.slice(0, 5);
 
     return (
       <ShareCardFrame gradientColors={['#0C4A6E', '#0F172A', '#0F172A']} ref={ref}>
         <Text style={cs.eyebrow}>{place}</Text>
-        <Text style={cs.headline}>{tempF}°</Text>
-        <Text style={cs.subline}>
-          {phraseEmoji(weather.WeatherText)} {humanizeConditionShort(weather.WeatherText)}
-        </Text>
+        <Text style={cs.headline}>{currentTemp}°</Text>
+        <View style={styles.conditionRow}>
+          <WeatherIconDisplay
+            condition={weather.WeatherText}
+            isDay={weather.IsDayTime}
+            size='small'
+          />
+          <Text style={cs.subline}>
+            {humanizeConditionShort(weather.WeatherText)}
+          </Text>
+        </View>
 
-        <View style={styles.dayRow}>
-          {upcoming.map((d) => (
-            <View key={d.date} style={styles.dayTile}>
-              <Text style={styles.dayLabel}>{dayAbbrev(d.date)}</Text>
-              <Text style={styles.dayEmoji}>{phraseEmoji(d.dayPhrase)}</Text>
-              <Text style={styles.dayTemp}>
-                {Math.round(d.maxTempF)}°/{Math.round(d.minTempF)}°
+        <View style={styles.hourRow}>
+          {upcoming.map((h, i) => (
+            <View key={h.DateTime} style={styles.hourTile}>
+              <Text style={styles.hourLabel}>
+                {i === 0 ? 'Now' : hourLabel(h.DateTime)}
+              </Text>
+              <WeatherIconDisplay
+                condition={h.IconPhrase}
+                isDay={h.IsDaylight}
+                size='small'
+              />
+              <Text style={styles.hourTemp}>
+                {isMetric
+                  ? fToC(h.Temperature.Value)
+                  : Math.round(h.Temperature.Value)}
+                °
               </Text>
             </View>
           ))}

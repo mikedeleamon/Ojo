@@ -3,11 +3,13 @@ import WidgetKit
 
 /// A fixed, on-brand gradient rather than the weather gradient used by the main
 /// widget — this surface is about an upcoming trip, not today's conditions, so
-/// tying its color to current weather would send the wrong signal.
+/// tying its color to current weather would send the wrong signal. Matches the
+/// brand green ramp used in the Ojo logo (src/components/icons/OjoLogoIcon.tsx).
 private let tripCountdownGradient: [Color] = [
-  Color(red: 0x0F / 255, green: 0x17 / 255, blue: 0x2A / 255),
-  Color(red: 0x1E / 255, green: 0x29 / 255, blue: 0x3B / 255),
-  Color.ojoAccent.opacity(0.55),
+  Color(red: 0x4F / 255, green: 0xEE / 255, blue: 0xC3 / 255), // #4feec3
+  Color.ojoAccent,                                             // #87DE5A
+  Color(red: 0x65 / 255, green: 0xBA / 255, blue: 0x02 / 255), // #65ba02
+  Color(red: 0x56 / 255, green: 0xB1 / 255, blue: 0x07 / 255), // #56b107
 ]
 
 extension View {
@@ -93,7 +95,7 @@ private struct TripCountdownContent: View {
         Text(dayLabel)
           .font(.system(size: 13, weight: .semibold))
       }
-      .foregroundStyle(Color.ojoAccent)
+      .foregroundStyle(.white)
 
       Text(trip.destination)
         .font(.headline)
@@ -126,7 +128,7 @@ private struct TripCountdownEmptyView: View {
     VStack(spacing: 6) {
       Image(systemName: "airplane")
         .font(.system(size: 22))
-        .foregroundStyle(Color.ojoAccent)
+        .foregroundStyle(.white)
       Text("Plan a trip to see your countdown")
         .font(.caption)
         .multilineTextAlignment(.center)

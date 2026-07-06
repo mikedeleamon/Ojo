@@ -6,7 +6,6 @@ import {
     Pressable,
     StyleSheet,
     Alert,
-    Share,
     Image,
     Animated,
     useWindowDimensions,
@@ -64,6 +63,7 @@ import {
 } from './shared';
 import ShareToInstagramSheet from '../../components/ShareCard/ShareToInstagramSheet';
 import TripFitShareCard from '../../components/ShareCard/TripFitShareCard';
+import PackingListShareCard from '../../components/ShareCard/PackingListShareCard';
 import { tripShareLink } from '../../lib/share/deepLinks';
 
 // ─── Local date helper ──────────────────────────────────────────────────────────
@@ -569,6 +569,7 @@ export default function TripPlanner({
     const [error, setError] = useState<string | null>(null);
     const [activeIdx, setActiveIdx] = useState(0);
     const [shareDayIdx, setShareDayIdx] = useState<number | null>(null);
+    const [showPackingShare, setShowPackingShare] = useState(false);
     const [checkedIds, setCheckedIds] = useState<Set<string>>(
         new Set(existingPlan?.checkedIds ?? []),
     );
@@ -895,21 +896,13 @@ export default function TripPlanner({
     // ── Share packing list ──
     const handleSharePacking = useCallback(() => {
         if (!packingList.length) return;
-        const lines: string[] = [`✈️ TripFit Packing List — ${destination}`, ''];
-        for (const { key, label, emoji } of PACKING_GROUPS) {
-            const items = packingList.filter((a) => categoryKey(a) === key);
-            if (!items.length) continue;
-            lines.push(`${emoji} ${label}:`);
-            for (const a of items) {
-                lines.push(
-                    `  • ${a.name || a.clothingType}${a.color ? ` (${a.color})` : ''}`,
-                );
-            }
-            lines.push('');
-        }
-        lines.push('Packed with Ojo ✨');
-        Share.share({ message: lines.join('\n') }).catch(() => {});
-    }, [packingList, destination]);
+        setShowPackingShare(true);
+    }, [packingList]);
+
+    const packingDateRangeLabel =
+        days > 0 && tripStart && tripEnd
+            ? `${days} day${days !== 1 ? 's' : ''} · ${fmtShortDate(tripStart)} – ${fmtShortDate(tripEnd)}`
+            : undefined;
 
     const st = useMemo(() => makeStyles(colors), [colors]);
     const calContainerWidth = windowWidth - spacing.md * 2;
@@ -1278,6 +1271,22 @@ export default function TripPlanner({
                             day={plans[shareDayIdx].day}
                             slots={activeOutfit(plans[shareDayIdx]).slots}
                             dayLabel={`Day ${shareDayIdx + 1} of ${plans.length}`}
+                        />
+                    )}
+                    attributionURL={tripShareLink(planIdRef.current)}
+                />
+            )}
+
+            {showPackingShare && (
+                <ShareToInstagramSheet
+                    visible
+                    onClose={() => setShowPackingShare(false)}
+                    renderCard={(cardRef) => (
+                        <PackingListShareCard
+                            ref={cardRef}
+                            destination={destination}
+                            packingList={packingList}
+                            dateRangeLabel={packingDateRangeLabel}
                         />
                     )}
                     attributionURL={tripShareLink(planIdRef.current)}

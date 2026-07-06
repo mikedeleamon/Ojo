@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
 import api from '../api/client';
 import { authHeaders } from '../lib/auth';
 import { useTripPlans } from './useTripPlans';
@@ -94,6 +95,22 @@ export const useTripMode = (): TripModeState => {
 
     const enabled = settings.tripModeEnabled !== false; // default on
     const radiusMi = settings.tripModeRadiusMi ?? DEFAULT_TRIP_MODE_RADIUS_MI;
+
+    // The resolution effect below only re-runs when plans/closets/settings
+    // change — nothing re-checks `todayISO` on its own, so a trip whose end
+    // date has passed can keep showing as active if the app was simply left
+    // foregrounded/backgrounded across midnight rather than relaunched.
+    // Re-resolving on every foreground return closes that gap cheaply.
+    const appState = useRef(AppState.currentState);
+    useEffect(() => {
+        const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
+            if (appState.current.match(/inactive|background/) && next === 'active') {
+                refresh();
+            }
+            appState.current = next;
+        });
+        return () => sub.remove();
+    }, [refresh]);
 
     useEffect(() => {
         let cancelled = false;

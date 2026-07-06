@@ -23,6 +23,17 @@ struct WidgetSnapshot: Codable {
   /// order: "rain" | "layer" | "snow" | "uv". Optional (not just empty) so a
   /// snapshot written before this field existed still decodes.
   let alerts: [String]?
+  /// Numeric UV index for the "uv" alert's label ("UV n"). Nil when unknown
+  /// (older payload / backend without the numeric field) → label stays "UV".
+  let uvIndex: Int?
+  /// Same-day layer-change steps (layeringEngine's buildTimeline), capped to a
+  /// few by the JS side. Only present on days with a real temp swing or a
+  /// precip start/stop — most days this is nil, not just empty.
+  let timeline: [TimelineStep]?
+  /// Present only when mode == .empty: "no_closet" | "empty_closet" |
+  /// "insufficient" — which setup step the user is missing. Optional so older
+  /// snapshots still decode.
+  let emptyReason: String?
   let trip: TripInfo?
   /// The soonest saved trip that hasn't started yet — independent of `mode`;
   /// powers the separate Trip Countdown widget.
@@ -51,6 +62,15 @@ struct WidgetSnapshot: Codable {
     let totalItems: Int
     let packedItems: Int
   }
+
+  /// `time` is one of layeringEngine's 7 buckets (Early morning/Morning/Late
+  /// morning/Early afternoon/Afternoon/Evening/Night); `action` is free text
+  /// from a small fixed set of templates — see TimelineStripView's icon match.
+  struct TimelineStep: Codable, Identifiable {
+    let time: String
+    let action: String
+    var id: String { "\(time)|\(action)" }
+  }
 }
 
 extension WidgetSnapshot {
@@ -69,6 +89,12 @@ extension WidgetSnapshot {
     ],
     layerNote: "Layer up — cooler after sunset.",
     alerts: ["layer"],
+    uvIndex: nil,
+    timeline: [
+      TimelineStep(time: "Afternoon", action: "Remove your jacket — warming up"),
+      TimelineStep(time: "Evening", action: "Add it back — sun is setting, cooling down"),
+    ],
+    emptyReason: nil,
     trip: nil,
     upcomingTrip: nil,
     deepLink: "ojo://outfit"
@@ -85,6 +111,9 @@ extension WidgetSnapshot {
     items: [],
     layerNote: nil,
     alerts: [],
+    uvIndex: nil,
+    timeline: nil,
+    emptyReason: nil,
     trip: nil,
     upcomingTrip: nil,
     deepLink: "ojo://outfit"
