@@ -332,7 +332,7 @@ const ArticleModal = ({ closetId, onClose, onSubmit, initialData, onDelete, init
         [{ crop: { originX: width * 0.1, originY: height * 0.05, width: width * 0.8, height: height * 0.55 } }],
         { format: ImageManipulator.SaveFormat.JPEG },
       );
-      const result = await identifyClothing(cropped.uri, { confidenceThreshold: 0.5, maxColors: 3 });
+      const result = await identifyClothing(cropped.uri, { confidenceThreshold: 0.35, maxColors: 3 });
 
       // Debug — check Metro console to see what ML Kit + palette returned
       console.log('[Ojo] identification result:', JSON.stringify({

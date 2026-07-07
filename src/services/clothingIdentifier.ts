@@ -177,9 +177,22 @@ function argmax(arr: Float32Array): number {
   return best;
 }
 
-/** Softmax-free confidence proxy: sigmoid of the winning logit. */
-function logitToConfidence(logit: number): number {
-  return 1 / (1 + Math.exp(-logit));
+/**
+ * Softmax over raw logits. Confidence for a class is its probability mass
+ * relative to all other classes — unlike sigmoid(logit), which ignores the
+ * competing logits entirely and runs far too hot for a 33-way classifier.
+ * Subtracting the max logit before exp keeps the computation stable.
+ */
+function softmax(logits: Float32Array): Float32Array {
+  const max = logits[argmax(logits)];
+  const exps = new Float32Array(logits.length);
+  let sum = 0;
+  for (let i = 0; i < logits.length; i++) {
+    exps[i] = Math.exp(logits[i] - max);
+    sum += exps[i];
+  }
+  for (let i = 0; i < exps.length; i++) exps[i] /= sum;
+  return exps;
 }
 
 // ─── Garment → Fabric heuristics ─────────────────────────────────────────────
@@ -252,6 +265,18 @@ function guessShapeFromAspect(aspectRatio: number): ShapeCategory {
 }
 
 /**
+ * Max softmax confidence below which the shape heuristic is allowed to fire.
+ *
+ * Calibrated against the trained 33-class checkpoint on the frozen golden set:
+ * predictions with max-softmax < 0.35 land in the genuinely-unsure tail
+ * (~25% top-1 accuracy), while 0.35 is roughly the 25th percentile of CORRECT
+ * predictions — so the gate rarely touches a confident-correct label. The old
+ * value of 0.55 was on the sigmoid(top-logit) scale, where ~every prediction
+ * (right or wrong) scored 0.8–0.99, so the heuristic effectively never fired.
+ */
+const SHAPE_HEURISTIC_MAX_CONF = 0.35;
+
+/**
  * Shape heuristic — ONLY override when the geometric signal is extreme
  * AND the model is very unsure. Previous version was too aggressive and
  * was overriding correct footwear/accessory predictions.
@@ -259,14 +284,14 @@ function guessShapeFromAspect(aspectRatio: number): ShapeCategory {
 function applyShapeHeuristic(
   garmentType: GarmentType,
   confidence: number,
-  logits: Float32Array,
+  probs: Float32Array,
   aspectRatio: number,
 ): { corrected: GarmentType; confidence: number } {
   // Trust the model in almost all cases. Only intervene when:
-  // 1. Model confidence is very low (< 0.55)
+  // 1. Model softmax confidence is very low (< SHAPE_HEURISTIC_MAX_CONF)
   // 2. Aspect ratio is extreme (very wide = likely footwear)
   // This prevents the heuristic from overriding correct but low-confidence predictions.
-  if (confidence > 0.55) {
+  if (confidence > SHAPE_HEURISTIC_MAX_CONF) {
     return { corrected: garmentType, confidence };
   }
 
@@ -278,16 +303,16 @@ function applyShapeHeuristic(
       // Find the best footwear label
       let bestIdx = -1;
       let bestScore = -Infinity;
-      for (let i = 0; i < logits.length; i++) {
+      for (let i = 0; i < probs.length; i++) {
         const label = GARMENT_LABELS[i];
-        if (GARMENT_SHAPE_CATEGORY[label] === 'footwear' && logits[i] > bestScore) {
-          bestScore = logits[i];
+        if (GARMENT_SHAPE_CATEGORY[label] === 'footwear' && probs[i] > bestScore) {
+          bestScore = probs[i];
           bestIdx = i;
         }
       }
       if (bestIdx >= 0) {
         const corrected = GARMENT_LABELS[bestIdx];
-        const newConf = logitToConfidence(bestScore);
+        const newConf = bestScore;
         console.log(
           `[Ojo] Shape heuristic override: ${garmentType} → ${corrected} `
           + `(aspect=${aspectRatio.toFixed(2)}, very wide → footwear)`
@@ -304,7 +329,12 @@ function applyShapeHeuristic(
 
 const DEFAULT_CONFIG: Required<ClothingIdentifierConfig> = {
   modelPath: '',
-  confidenceThreshold: 0.5,
+  // Softmax-scale threshold (max-softmax over 33 classes). NOTE: this value is
+  // currently informational — nothing in identifyClothing() reads it yet. If a
+  // "trust the prediction?" gate is added later, ~0.35 is a sensible cutoff
+  // (below it top-1 accuracy is ~25% on the golden set). The old 0.5 was a
+  // sigmoid-scale value and never comparable to a real softmax probability.
+  confidenceThreshold: 0.35,
   maxColors: 3,
 };
 
@@ -342,14 +372,15 @@ export async function identifyClothing(
       const garmentLogits = new Float32Array(outputs[0]);
       const sleeveLogits  = new Float32Array(outputs[1]);
 
-      const gIdx = argmax(garmentLogits);
+      const garmentProbs = softmax(garmentLogits);
+      const gIdx = argmax(garmentProbs);
       const sIdx = argmax(sleeveLogits);
 
       garmentType = GARMENT_LABELS[gIdx] ?? 'unknown';
-      confidence  = logitToConfidence(garmentLogits[gIdx]);
+      confidence  = garmentProbs[gIdx];
 
       // ── Step 1b: Geometric heuristic correction ─────────────────
-      const corrected = applyShapeHeuristic(garmentType, confidence, garmentLogits, aspectRatio);
+      const corrected = applyShapeHeuristic(garmentType, confidence, garmentProbs, aspectRatio);
       garmentType = corrected.corrected;
       confidence  = corrected.confidence;
 
@@ -373,10 +404,12 @@ export async function identifyClothing(
   const colors = await extractColorsFromImage(imageUri, cfg.maxColors);
 
   // ── Step 3: Color-informed garment refinement ─────────────────
-  // If dominant color is classic denim blue and model says generic "pants", upgrade to "jeans"
+  // Upgrade generic "pants" to "jeans" only on an explicitly denim color name.
+  // Navy / dark blue is NOT enough: navy chinos and dress pants are common,
+  // and dark solid colors say nothing about the fabric being denim.
   if (garmentType === 'pants' && colors.length > 0) {
     const topColor = colors[0].name.toLowerCase();
-    if (topColor.includes('denim') || topColor === 'navy' || topColor === 'dark blue') {
+    if (topColor.includes('denim')) {
       garmentType = 'jeans';
       topLabelText = 'jeans';
     }

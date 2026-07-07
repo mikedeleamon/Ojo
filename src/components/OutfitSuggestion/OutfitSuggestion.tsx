@@ -41,6 +41,7 @@ import {
     articleZoneLabel,
 } from '../../lib/outfitEngine';
 import { addHistoryEntry, recentlyWornWithAge, loadHistory } from '../../lib/outfitHistory';
+import { recordSuccessfulOutfit, maybeRequestReview } from '../../services/reviewManager';
 import { derivePreferenceProfile } from '../../lib/userPreferences';
 import {
     recordGapsFromNotes,
@@ -389,6 +390,17 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
         );
         return { outfits: results, status };
     }, [preferred, weather, effectiveSettings, worn, forecasts, profile]);
+
+    // Feeds the in-app review prompt's eligibility count. recordSuccessfulOutfit
+    // caps itself at once per calendar day, since this memo above recomputes on
+    // every weather/preference/worn-status change, not just once per "real"
+    // generation. Never awaited/blocking — must not interrupt the outfit UI.
+    useEffect(() => {
+        if (status !== 'ok' || outfits.length === 0) return;
+        recordSuccessfulOutfit()
+            .then(() => maybeRequestReview())
+            .catch(() => {});
+    }, [status, outfits.length]);
 
     const safeIdx = Math.min(activeIdx, Math.max(0, outfits.length - 1));
     const activeOutfit: OutfitResult | null = outfits[safeIdx] ?? null;

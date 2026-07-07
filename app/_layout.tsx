@@ -14,6 +14,7 @@ import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import { ConfirmProvider } from '../src/components/ConfirmDialog';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { isOnboardingComplete, isOnboardingPending } from '../src/lib/onboarding';
+import { recordAppOpen } from '../src/services/reviewManager';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -85,6 +86,12 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 // ─── Root layout ─────────────────────────────────────────────────────────────
 export default function RootLayout() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
+
+  // Counts cold starts only (this effect runs once per process launch, not
+  // per foreground resume) — feeds the in-app review eligibility check.
+  useEffect(() => {
+    recordAppOpen().catch(() => {});
+  }, []);
 
   useEffect(() => {
     SplashScreen.hideAsync();
