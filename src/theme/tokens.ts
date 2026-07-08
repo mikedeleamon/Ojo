@@ -77,6 +77,16 @@ export const lightColors = {
   toggleTrackActive: 'rgba(5, 150, 105, 0.45)',
 } as const;
 
+// ─── Brand hero tint ──────────────────────────────────────────────────────────
+// The logo's mint→leaf gradient, laid OVER a glass surface (not replacing it)
+// so a primary "hero" button reads as brand-tinted glass rather than a solid
+// fill. Per-theme because the mint end is invisible on the light background
+// and needs deeper, warmer stops.
+export const brandHeroTint: { dark: [string, string]; light: [string, string] } = {
+  dark:  ['rgba(79, 238, 195, 0.42)', 'rgba(101, 186, 2, 0.42)'],
+  light: ['rgba(18, 185, 140, 0.32)', 'rgba(76, 154, 22, 0.34)'],
+};
+
 // Backward-compat alias — files not yet updated still compile fine
 export const colors = darkColors;
 
