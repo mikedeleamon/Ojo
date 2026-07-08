@@ -417,6 +417,7 @@ const buildCandidates = (
       ],
       stat: { value: `${dormantDays}`, label: 'days off' },
       ...(article.imageUrl ? { imageUrl: article.imageUrl } : {}),
+      ...(article.color ? { colorNames: [article.color] } : {}),
     });
   }
 
@@ -468,6 +469,7 @@ const buildCandidates = (
       ],
       stat: { value: `${mvp.weekWears}`, label: 'wears this week' },
       ...(mvp.article.imageUrl ? { imageUrl: mvp.article.imageUrl } : {}),
+      ...(mvp.article.color ? { colorNames: [mvp.article.color] } : {}),
     });
   }
 
@@ -487,6 +489,7 @@ const buildCandidates = (
         `Welcome to the rotation, ${label}. First wear: ${day}.`,
       ],
       ...(debut.article.imageUrl ? { imageUrl: debut.article.imageUrl } : {}),
+      ...(debut.article.color ? { colorNames: [debut.article.color] } : {}),
     });
   }
 
@@ -554,6 +557,7 @@ const buildCandidates = (
       ],
       stat: { value: `${dormantDays}`, label: 'days sleeping' },
       ...(article.imageUrl ? { imageUrl: article.imageUrl } : {}),
+      ...(article.color ? { colorNames: [article.color] } : {}),
     });
   }
 

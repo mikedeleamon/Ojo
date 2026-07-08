@@ -244,6 +244,8 @@ describe('item templates', () => {
     expect(mvp).toBeDefined();
     expect(mvp!.headline + mvp!.body).toMatch(/Black Tee|3 (appearances|times)/);
     expect(mvp!.stat).toEqual({ value: '3', label: 'wears this week' });
+    // item cards carry the garment's own color so the UI can tint to match
+    expect(mvp!.colorNames).toEqual(['Navy']);
   });
 });
 

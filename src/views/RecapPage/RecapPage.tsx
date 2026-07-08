@@ -18,6 +18,7 @@ import { useTheme } from '../../theme/ThemeContext';
 import { ColorTokens, spacing, radius, fonts, fontSizes, fontWeights } from '../../theme/tokens';
 import { CSS_COLORS } from '../../lib/colors/cssColors';
 import { METALLIC_GRADIENTS, METALLIC_START, METALLIC_END } from '../../lib/colors/metallicGradients';
+import { SECTION_ACCENT, BRAND_SOLID, recapTint, brandWash, hexToRgba } from '../../lib/recapVisuals';
 import { hapticSelection } from '../../lib/haptics';
 import { getUserId } from '../../lib/auth';
 import { loadHistory } from '../../lib/outfitHistory';
@@ -34,17 +35,6 @@ const SECTION_LABELS: Partial<Record<RecapSection, string>> = {
   items:   'In the closet',
   habits:  'Patterns',
   context: 'This week',
-};
-
-/** One accent hue per section — gives the list visual rhythm instead of six
- *  identical glass tiles. Opener gets its own dark hero treatment below. */
-const SECTION_ACCENT: Record<RecapSection, string> = {
-  opener:  '#818CF8',
-  color:   '#F472B6',
-  items:   '#34D399',
-  habits:  '#FBBF24',
-  context: '#38BDF8',
-  closer:  '#A78BFA',
 };
 
 const HERO_GRADIENT = ['#1E293B', '#0F172A'] as const;
@@ -113,7 +103,6 @@ const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     fontSize:      fontSizes.xs,
     letterSpacing: 1.5,
     textTransform: 'uppercase',
-    color:         'rgba(255,255,255,0.6)',
   },
   heroStatValue: {
     fontFamily: fonts.display,
@@ -152,12 +141,8 @@ const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     paddingHorizontal: spacing.md,
     gap: 6,
   },
-  accentBar: {
-    position: 'absolute',
-    left:     0,
-    top:      0,
-    bottom:   0,
-    width:    4,
+  tintWash: {
+    ...StyleSheet.absoluteFillObject,
   },
   headerRow: {
     flexDirection:  'row',
@@ -246,8 +231,9 @@ const makeStyles = (colors: ColorTokens) => StyleSheet.create({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function RecapPage() {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const st = useMemo(() => makeStyles(colors), [colors]);
+  const brandSolid = isDark ? BRAND_SOLID.dark : BRAND_SOLID.light;
   const { closets, loading: closetsLoading } = useClosets();
 
   const [cards,     setCards]     = useState<RecapCard[] | null>(null);
@@ -302,7 +288,16 @@ export default function RecapPage() {
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                 />
-                <Text style={st.heroEyebrow}>Weekly Recap</Text>
+                {/* Brand mint→leaf wash — the same tinted-glass language as the
+                    "Wore this today" button, laid over the hero's dark base. */}
+                <LinearGradient
+                  colors={brandWash(true)}
+                  style={StyleSheet.absoluteFillObject}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  pointerEvents='none'
+                />
+                <Text style={[st.heroEyebrow, { color: BRAND_SOLID.dark }]}>Weekly Recap</Text>
                 {card.stat && (
                   <>
                     <Text style={st.heroStatValue}>{card.stat.value}</Text>
@@ -315,16 +310,41 @@ export default function RecapPage() {
             );
           }
 
-          const accent = SECTION_ACCENT[card.section];
-          const label  = SECTION_LABELS[card.section];
+          const label = SECTION_LABELS[card.section];
+          const tint  = recapTint(card);
+          const foreground =
+            tint.kind === 'brand' ? brandSolid
+            : isDark ? SECTION_ACCENT.dark[card.section]
+            : SECTION_ACCENT.light[card.section];
 
           return (
-            <GlassCard key={card.templateId} style={st.card}>
-              <View style={[st.accentBar, { backgroundColor: accent }]} pointerEvents='none' />
+            <GlassCard
+              key={card.templateId}
+              style={st.card}
+              tintColor={tint.kind === 'flat' ? hexToRgba(tint.hex, isDark ? 0.16 : 0.12) : undefined}
+            >
+              {tint.kind === 'gradient' && (
+                <LinearGradient
+                  colors={[hexToRgba(tint.colors[0], isDark ? 0.22 : 0.16), hexToRgba(tint.colors[1], isDark ? 0.22 : 0.16)]}
+                  style={st.tintWash}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  pointerEvents='none'
+                />
+              )}
+              {tint.kind === 'brand' && (
+                <LinearGradient
+                  colors={brandWash(isDark)}
+                  style={st.tintWash}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  pointerEvents='none'
+                />
+              )}
 
               {(label || card.imageUrl) && (
                 <View style={st.headerRow}>
-                  {label ? <Text style={[st.eyebrow, { color: accent }]}>{label}</Text> : <View />}
+                  {label ? <Text style={[st.eyebrow, { color: foreground }]}>{label}</Text> : <View />}
                   {card.imageUrl && (
                     <View style={st.thumbWrap}>
                       <Thumb uri={card.imageUrl} style={st.thumbImg} />
@@ -337,7 +357,7 @@ export default function RecapPage() {
                 <View style={st.statRow}>
                   {card.stat && (
                     <View style={st.statBlock}>
-                      <Text style={[st.statValue, { color: accent }]}>{card.stat.value}</Text>
+                      <Text style={[st.statValue, { color: foreground }]}>{card.stat.value}</Text>
                       <Text style={st.statLabel}>{card.stat.label}</Text>
                     </View>
                   )}
