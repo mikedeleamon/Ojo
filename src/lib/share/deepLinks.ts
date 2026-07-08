@@ -32,3 +32,6 @@ export const weatherShareLink = (): string | null => buildShareUrl('/s/weather')
 
 /** Attribution link for a shared donation list. */
 export const donationShareLink = (): string | null => buildShareUrl('/s/donation');
+
+/** Attribution link for a shared weekly recap. */
+export const recapShareLink = (): string | null => buildShareUrl('/s/recap');

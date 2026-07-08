@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Image, StyleSheet, useColorScheme, View } from 'react-native';
 import { Slot, Stack, useRouter, useSegments } from 'expo-router';
+import * as Notifications from 'expo-notifications';
+import { redirectSystemPath } from './+native-intent';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -83,6 +85,39 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// ─── Notification tap routing ────────────────────────────────────────────────
+// Local notifications carry an optional `data.url` (`ojo://…`) — the same
+// scheme the widget deep links use, mapped through the same +native-intent
+// table so notification taps and widget taps can't drift apart. Covers both
+// cold starts (the response that launched the app) and warm taps. Renders
+// nothing; lives inside AuthGate so the login redirect still wins when
+// signed out.
+function NotificationDeepLinkRouter() {
+  const router = useRouter();
+  const response = Notifications.useLastNotificationResponse();
+  const handledId = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!response) return;
+    const url = response.notification.request.content.data?.url;
+    if (typeof url !== 'string') return;
+
+    // Each tap is one response object; dedupe so re-renders don't re-navigate.
+    const id = `${response.notification.request.identifier}:${response.notification.date}`;
+    if (handledId.current === id) return;
+    handledId.current = id;
+
+    try {
+      const mapped = redirectSystemPath({ path: url, initial: false });
+      if (mapped && mapped.startsWith('/')) router.push(mapped as never);
+    } catch {
+      // Never let a bad link crash launch — the app just opens normally.
+    }
+  }, [response, router]);
+
+  return null;
+}
+
 // ─── Root layout ─────────────────────────────────────────────────────────────
 export default function RootLayout() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
@@ -128,6 +163,7 @@ export default function RootLayout() {
                   <ConfirmProvider>
                     <AuthGate>
                       <ThemedStatusBar />
+                      <NotificationDeepLinkRouter />
                       {/* Stack so the camera screen can present as a fullScreenModal
                           that covers the native tab bar. All other routes are
                           auto-discovered and inherit default options. */}

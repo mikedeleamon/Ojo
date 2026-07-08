@@ -63,4 +63,8 @@ router.get('/weather', (_req: Request, res: Response) => {
   res.type('html').send(landingHtml({ title: "Today's Forecast", deepLink: 'ojo://outfit' }));
 });
 
+router.get('/recap', (_req: Request, res: Response) => {
+  res.type('html').send(landingHtml({ title: 'My Week in Outfits', deepLink: 'ojo://recap' }));
+});
+
 export default router;

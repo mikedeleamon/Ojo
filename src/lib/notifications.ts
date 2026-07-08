@@ -97,8 +97,11 @@ export const scheduleWeeklyRecap = async (dayOfWeek: number): Promise<void> => {
   await Notifications.scheduleNotificationAsync({
     identifier: WEEKLY_RECAP_ID,
     content: {
-      title: 'Weekly Wardrobe Recap',
-      body: 'See what you wore this week and discover new outfit ideas.',
+      // Scheduled ahead of time, so the copy can't reference the week's data —
+      // this is the static-safe variant from WEEKLY_RECAP_TEMPLATES.md.
+      title: 'The recap is in',
+      body: 'Your closet had opinions this week. See what they were.',
+      data: { url: 'ojo://recap' },
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.WEEKLY,

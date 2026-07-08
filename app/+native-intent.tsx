@@ -7,6 +7,7 @@
  *   ojo://trip/<id>  → "/account/tripfit?planId=<id>"   (opens the saved trip)
  *   ojo://trips      → "/account/tripfit"               (opens the trip library)
  *   ojo://closet/new → "/closet?new=1"                  (closet tab, create form open)
+ *   ojo://recap      → "/account/recap"                 (weekly wardrobe recap)
  *
  * expo-router hands us the FULL incoming URL as `path` (which may be null).
  * Anything we don't recognize is returned unchanged so normal routing/linking
@@ -40,6 +41,9 @@ export function redirectSystemPath({
 
     // New closet → closet tab with the create-closet form auto-opened
     if (normalized === '/closet/new') return '/closet?new=1';
+
+    // Weekly wardrobe recap (notification tap / share landing page)
+    if (normalized === '/recap') return '/account/recap';
 
     // Trip library (no id) → TripFit's saved-trip list
     if (normalized === '/trips') return '/account/tripfit';
