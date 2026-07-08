@@ -27,6 +27,12 @@ import { toLocalISODate } from './tripMode';
 export type RecapSection = 'opener' | 'color' | 'items' | 'habits' | 'context' | 'closer';
 export type RecapCta = 'share' | 'shop';
 
+/** A number pulled out of the body copy for a big-numeral display. */
+export interface RecapStat {
+  value: string;
+  label: string;
+}
+
 export interface RecapCard {
   templateId: string;
   section:    RecapSection;
@@ -35,6 +41,12 @@ export interface RecapCard {
   cta?:       RecapCta;
   /** Set on gap_nudge so the UI can route the shop CTA like the Wardrobe Gap Card. */
   gapType?:   GapType;
+  /** Headline number for the card, rendered large (e.g. "7" / "outfits this week"). */
+  stat?:        RecapStat;
+  /** CSS_COLORS/METALLIC_GRADIENTS names for a swatch — 1 for color_story/DNA cards, 2 for color_pair. */
+  colorNames?:  string[];
+  /** Garment photo for item-focused cards, when the article has one. */
+  imageUrl?:    string;
 }
 
 /** A template shown in a previous recap, for cooldown suppression. */
@@ -293,6 +305,9 @@ interface Candidate {
   bodies:    string[];
   cta?:      RecapCta;
   gapType?:  GapType;
+  stat?:       RecapStat;
+  colorNames?: string[];
+  imageUrl?:   string;
 }
 
 const buildCandidates = (
@@ -327,6 +342,7 @@ const buildCandidates = (
       id: 'milestone', section: 'habits',
       headlines: [`Outfit #${milestone}, logged.`, `That's ${milestone} outfits.`],
       bodies: [body],
+      stat: { value: `${milestone}`, label: 'outfits, all-time' },
     });
   }
 
@@ -351,6 +367,7 @@ const buildCandidates = (
         `${nOutfits(count)} logged during your ${plan.destination} trip — planned before you even left.`,
         `Your ${plan.destination} TripFit met the real world this week. ${ucfirst(nOutfits(count))} made the log.`,
       ],
+      stat: { value: `${count}`, label: `outfits in ${plan.destination}` },
     });
   }
 
@@ -364,6 +381,7 @@ const buildCandidates = (
         `${topColor} isn't in your usual top three (${dna.topColors[0]}, ${dna.topColors[1]}) — but it owned this week.`,
         `Your Style DNA says ${dna.topColors[0]}. This week said ${topColor}. We'll see who wins.`,
       ],
+      colorNames: [topColor],
     });
   } else if (topColor && dna.level !== 'none' && dna.topColors.includes(topColor)) {
     out.push({
@@ -373,22 +391,23 @@ const buildCandidates = (
         `${topColor} again — the same signature Ojo has learned from ${dna.totalOutfits} logged outfits.`,
         `Some things don't change: ${topColor} stays at the top of your rotation.`,
       ],
+      colorNames: [topColor],
     });
   }
 
   // woke_up — biggest comeback past the sleeping threshold
-  let woke: { label: string; dormantDays: number } | null = null;
+  let woke: { article: ClothingArticle; label: string; dormantDays: number } | null = null;
   for (const s of stats.perArticle.values()) {
     if (!s.lastWearBeforeWeek) continue;
     const gap = Math.floor(
       (s.firstWearThisWeek.getTime() - s.lastWearBeforeWeek.getTime()) / DAY_MS,
     );
     if (gap >= WOKE_THRESHOLD_DAYS && (!woke || gap > woke.dormantDays)) {
-      woke = { label: articleLabel(s.article), dormantDays: gap };
+      woke = { article: s.article, label: articleLabel(s.article), dormantDays: gap };
     }
   }
   if (woke) {
-    const { label, dormantDays } = woke;
+    const { article, label, dormantDays } = woke;
     out.push({
       id: 'woke_up', section: 'items',
       headlines: ['Back from the bench.', `The ${label} awakens.`],
@@ -396,6 +415,8 @@ const buildCandidates = (
         `After ${dormantDays} days off, your ${label} got its moment. Welcome back.`,
         `${dormantDays} days of silence, then this week happened. Comebacks look good on you.`,
       ],
+      stat: { value: `${dormantDays}`, label: 'days off' },
+      ...(article.imageUrl ? { imageUrl: article.imageUrl } : {}),
     });
   }
 
@@ -409,6 +430,7 @@ const buildCandidates = (
         `An outfit logged every day since ${dayLabel(streak.start, now)}. The algorithm is taking notes — literally.`,
         `${streak.length} days in a row. Your Style DNA is getting sharper by the outfit.`,
       ],
+      stat: { value: `${streak.length}`, label: streak.length === 1 ? 'day streak' : 'days straight' },
     });
   }
 
@@ -425,6 +447,8 @@ const buildCandidates = (
         `It showed up in ${topColorCount} of your ${outfitCount} outfits. That's a favorite, not a phase.`,
         `${topColorCount} appearances in seven days — at this point it's a personality trait.`,
       ],
+      stat: { value: `${topColorCount}/${outfitCount}`, label: 'outfits' },
+      colorNames: [topColor],
     });
   }
 
@@ -442,6 +466,8 @@ const buildCandidates = (
         `${mvp.weekWears} appearances in seven days — someone's earning their hanger space.`,
         `Your ${label} clocked in ${mvp.weekWears} times this week. Give it the weekend off.`,
       ],
+      stat: { value: `${mvp.weekWears}`, label: 'wears this week' },
+      ...(mvp.article.imageUrl ? { imageUrl: mvp.article.imageUrl } : {}),
     });
   }
 
@@ -460,6 +486,7 @@ const buildCandidates = (
         `Your ${label} finally left the closet — logged for the first time on ${day}.`,
         `Welcome to the rotation, ${label}. First wear: ${day}.`,
       ],
+      ...(debut.article.imageUrl ? { imageUrl: debut.article.imageUrl } : {}),
     });
   }
 
@@ -481,11 +508,13 @@ const buildCandidates = (
       id: 'color_pair', section: 'color',
       headlines: [`${colorA} + ${colorB}, again.`, "You've found your combo."],
       bodies,
+      stat: { value: `${pairCount}`, label: 'outfits paired' },
+      colorNames: [colorA, colorB],
     });
   }
 
   // cpw_win — cost-per-wear crossed below a round threshold this week
-  let cpwWin: { label: string; cpw: number } | null = null;
+  let cpwWin: { article: ClothingArticle; label: string; cpw: number } | null = null;
   for (const s of stats.perArticle.values()) {
     const price = s.article.purchasePrice;
     if (price == null || price <= 0) continue;
@@ -494,11 +523,11 @@ const buildCandidates = (
     const cpwNow = price / s.totalWears;
     const crossed = CPW_THRESHOLDS.some(t => cpwNow <= t && cpwBefore > t);
     if (crossed && (!cpwWin || cpwNow < cpwWin.cpw)) {
-      cpwWin = { label: articleLabel(s.article), cpw: cpwNow };
+      cpwWin = { article: s.article, label: articleLabel(s.article), cpw: cpwNow };
     }
   }
   if (cpwWin) {
-    const { label, cpw } = cpwWin;
+    const { article, label, cpw } = cpwWin;
     const dollars = `$${cpw.toFixed(2)}`;
     out.push({
       id: 'cpw_win', section: 'habits',
@@ -507,6 +536,8 @@ const buildCandidates = (
         `Every wear counts — it's down to ${dollars} per wear after this week.`,
         `${dollars} a wear and falling. That's what a good buy looks like.`,
       ],
+      stat: { value: dollars, label: 'per wear' },
+      ...(article.imageUrl ? { imageUrl: article.imageUrl } : {}),
     });
   }
 
@@ -521,6 +552,8 @@ const buildCandidates = (
         `Your ${label} hasn't been out in ${dormantDays} days. No pressure — it remembers you, though.`,
         `${dormantDays} days and counting for your ${label}. Just leaving that here.`,
       ],
+      stat: { value: `${dormantDays}`, label: 'days sleeping' },
+      ...(article.imageUrl ? { imageUrl: article.imageUrl } : {}),
     });
   }
 
@@ -544,6 +577,9 @@ export const buildWeeklyRecap = (input: RecapInput): RecapCard[] => {
     body:       ucfirst(pickVariant(c.bodies, weekSeed, `${c.id}.b`)),
     ...(c.cta ? { cta: c.cta } : {}),
     ...(c.gapType ? { gapType: c.gapType } : {}),
+    ...(c.stat ? { stat: c.stat } : {}),
+    ...(c.colorNames ? { colorNames: c.colorNames } : {}),
+    ...(c.imageUrl ? { imageUrl: c.imageUrl } : {}),
   });
 
   const stats = buildWeekStats(input.closets, input.history, now);
@@ -572,6 +608,7 @@ export const buildWeeklyRecap = (input: RecapInput): RecapCard[] => {
             `You got dressed with intent on ${stats.daysLogged} of 7 days. Here's how it went.`,
             `Logged across ${stats.daysLogged} days — your closet showed up this week.`,
           ],
+          stat: { value: `${stats.outfitCount}`, label: 'outfits this week' },
         }
       : {
           id: 'hero_light', section: 'opener',
@@ -580,6 +617,7 @@ export const buildWeeklyRecap = (input: RecapInput): RecapCard[] => {
             `${ucfirst(nOutfits(stats.outfitCount))} logged — few enough to remember, good enough to recap.`,
             'Not a busy week for the log, but the details below still earned a mention.',
           ],
+          stat: { value: `${stats.outfitCount}`, label: stats.outfitCount === 1 ? 'outfit this week' : 'outfits this week' },
         },
   );
 
@@ -607,6 +645,7 @@ export const buildWeeklyRecap = (input: RecapInput): RecapCard[] => {
             `${GAP_LABELS[gap.type]} would've completed ${gap.count} outfits this month. Just saying.`,
             `Ojo keeps reaching for ${GAP_LABELS[gap.type]} that isn't there — ${gap.count} times and counting.`,
           ],
+          stat: { value: `${gap.count}`, label: 'outfits missed it' },
         })
       : null;
 

@@ -79,11 +79,14 @@ describe('openers', () => {
 
     const busy = recap({ closets, history: [entry(1, ['a1']), entry(2, ['a1']), entry(3, ['a1'])] });
     expect(busy[0].templateId).toBe('hero_week');
+    // opener carries a structured stat for the big-numeral hero display
+    expect(busy[0].stat).toEqual({ value: '3', label: 'outfits this week' });
 
     const light = recap({ closets, history: [entry(1, ['a1'])] });
     expect(light[0].templateId).toBe('hero_light');
     // singular grammar, never "1 outfits"
     expect(light[0].body).not.toMatch(/1 outfits/);
+    expect(light[0].stat).toEqual({ value: '1', label: 'outfit this week' });
   });
 });
 
@@ -131,6 +134,9 @@ describe('color templates', () => {
     // Navy present in 3 of 4 outfits — never "4 of 4" (the per-article count)
     expect(story!.headline + story!.body).toMatch(/Navy/);
     expect(story!.body).toMatch(/3 of your 4|personality trait/);
+    // structured swatch + stat data for the UI, not just prose
+    expect(story!.colorNames).toEqual(['Navy']);
+    expect(story!.stat).toEqual({ value: '3/4', label: 'outfits' });
   });
 
   it('only one color-section card appears even when story + pair both fire', () => {
@@ -143,13 +149,36 @@ describe('color templates', () => {
     const colorCards = cards.filter(c => c.section === 'color');
     expect(colorCards).toHaveLength(1);
   });
+
+  it('color_pair carries both color names for the swatch, distinct from color_story', () => {
+    // Navy+Rust pair twice; four other solo-color outfits keep either color's
+    // per-outfit share under color_story's 3-occurrence bar.
+    const n = article({ _id: 'n1', color: 'Navy' });
+    const r = article({ _id: 'r1', color: 'Rust', clothingType: 'Jeans' });
+    const w = article({ _id: 'w1', color: 'White', clothingType: 'Shirt' });
+    const b = article({ _id: 'b1', color: 'Black', clothingType: 'Shirt' });
+    const g = article({ _id: 'g1', color: 'Grey', clothingType: 'Shirt' });
+    const gr = article({ _id: 'gr1', color: 'Green', clothingType: 'Shirt' });
+    const cards = recap({
+      closets: [closet([n, r, w, b, g, gr])],
+      history: [
+        entry(1, ['n1', 'r1']), entry(2, ['n1', 'r1']),
+        entry(3, ['w1']), entry(4, ['b1']), entry(5, ['g1']), entry(6, ['gr1']),
+      ],
+    });
+    expect(ids(cards)).not.toContain('color_story');
+    const pair = cards.find(c => c.templateId === 'color_pair');
+    expect(pair).toBeDefined();
+    expect(pair!.colorNames).toEqual(['Navy', 'Rust']);
+    expect(pair!.stat).toEqual({ value: '2', label: 'outfits paired' });
+  });
 });
 
 // ─── Item templates ───────────────────────────────────────────────────────────
 
 describe('item templates', () => {
   it('woke_up fires for a 90+ day comeback and suppresses still_sleeping', () => {
-    const hero    = article({ _id: 'hero', name: 'Denim Jacket' });
+    const hero    = article({ _id: 'hero', name: 'Denim Jacket', imageUrl: 'https://cdn/hero.jpg' });
     const sleeper = article({ _id: 'zzz', name: 'Wool Coat' });
     const filler  = article({ _id: 'f1', color: 'White' });
     const cards = recap({
@@ -165,6 +194,8 @@ describe('item templates', () => {
     const woke = cards.find(c => c.templateId === 'woke_up');
     expect(woke).toBeDefined();
     expect(woke!.headline + woke!.body).toMatch(/Denim Jacket|99 days|days off/);
+    expect(woke!.stat).toEqual({ value: '99', label: 'days off' });
+    expect(woke!.imageUrl).toBe('https://cdn/hero.jpg');
     expect(ids(cards)).not.toContain('still_sleeping');
   });
 
@@ -212,6 +243,7 @@ describe('item templates', () => {
     const mvp = cards.find(c => c.templateId === 'mvp_item');
     expect(mvp).toBeDefined();
     expect(mvp!.headline + mvp!.body).toMatch(/Black Tee|3 (appearances|times)/);
+    expect(mvp!.stat).toEqual({ value: '3', label: 'wears this week' });
   });
 });
 
@@ -295,6 +327,7 @@ describe('composition', () => {
     expect(secondLast.cta).toBe('shop');
     expect(secondLast.gapType).toBe('missing_coat');
     expect(secondLast.body).toMatch(/coat/i);
+    expect(secondLast.stat).toEqual({ value: '5', label: 'outfits missed it' });
   });
 
   it('never exceeds 6 cards even when everything fires', () => {
