@@ -122,18 +122,6 @@ export const clearHistory = async (): Promise<void> => {
 
 // ─── Query helpers (unchanged, operate on local for speed) ───────────────────
 
-/** Returns article IDs worn within the last `withinDays` days (default 3). */
-export const recentlyWornIds = async (withinDays = 3): Promise<Set<string>> => {
-  const cutoff = Date.now() - withinDays * 24 * 60 * 60 * 1000;
-  const ids = new Set<string>();
-  (await loadLocalHistory()).forEach(entry => {
-    if (new Date(entry.wornAt).getTime() >= cutoff) {
-      entry.articleIds.forEach(id => ids.add(id));
-    }
-  });
-  return ids;
-};
-
 /**
  * Returns a map of article ID → days since last worn (fractional).
  * Only includes articles worn within the last `withinDays` days.

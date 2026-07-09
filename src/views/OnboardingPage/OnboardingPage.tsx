@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import {
-  StyleSheet, Animated, TextInput as RNTextInput,
+  Animated, TextInput as RNTextInput,
   ScrollView, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,7 +14,7 @@ import { requestPermission, registerPushToken, NOTIF_DEFAULTS } from '../../lib/
 import { hapticSuccess } from '../../lib/haptics';
 import { auth } from '../../lib/auth';
 import axios from '../../api/client';
-import { spacing, radius, fonts, fontSizes, fontWeights, shadows } from '../../theme/tokens';
+import { spacing, radius } from '../../theme/tokens';
 import { fToC, cToF } from '../../lib/units';
 import { useTheme } from '../../theme/ThemeContext';
 import { ColorTokens } from '../../theme/tokens';

@@ -7,7 +7,7 @@ import { loadHistory, deleteHistoryEntry, clearHistory } from '../../../lib/outf
 import { useFocusEffect } from 'expo-router';
 import { OutfitHistoryEntry } from '../../../types';
 import { makeStyles } from './screens.styles';
-import { spacing, radius, fonts, fontSizes } from '../../../theme/tokens';
+import { spacing, radius, fonts } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/ThemeContext';
 import { ColorTokens } from '../../../theme/tokens';
 

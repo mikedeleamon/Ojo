@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Image, StyleSheet, useColorScheme, View } from 'react-native';
-import { Slot, Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import { redirectSystemPath } from './+native-intent';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';

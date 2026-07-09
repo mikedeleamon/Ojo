@@ -30,6 +30,10 @@ import type {
   PrecipIntensity,
   RecentlyWorn,
   AccessoryAlerts,
+  WearContext,
+  WornEngineInfo,
+  NegativeSignal,
+  NegativeSignalSource,
 } from './outfit/types';
 import {
   getWeatherBucket,
@@ -55,6 +59,10 @@ export type {
   PrecipIntensity,
   RecentlyWorn,
   Season,
+  WearContext,
+  WornEngineInfo,
+  NegativeSignal,
+  NegativeSignalSource,
 };
 export {
   getWeatherBucket,
@@ -1015,31 +1023,34 @@ export const generateOutfits = (
   return { results, status: 'ok' };
 };
 
-// ─── Backwards-compatible single-result export ────────────────────────────────
+// ─── Wear instrumentation ─────────────────────────────────────────────────────
+// Captures ranker-training context alongside each worn outfit (OutfitHistoryEntry
+// .context/.engine/.negatives — see server/src/scripts/exportTrainingData.ts).
+// Bump ENGINE_VERSION whenever the scoring formula changes materially, so the
+// training export can weight or filter entries by which formula produced them.
 
-export const generateOutfit = (
-  articles:     ClothingArticle[],
-  weather:      CurrentWeather,
-  settings:     Settings,
-  recentlyWorn: RecentlyWorn = new Set(),
-  forecasts:    Forecast[]  = [],
-): OutfitResult => {
-  const { results, status } = generateOutfits(articles, weather, settings, recentlyWorn, 1, undefined, forecasts);
-  return results[0] ?? {
-    status,
-    headline:       '',
-    slots:          [],
-    notes:          [],
-    score:          0,
-    scoreBreakdown: { fabric: 0, color: 0, style: 0, simplicity: 0, preference: 0 },
+export const ENGINE_VERSION = 'v1';
+
+/**
+ * Weather + preference snapshot at the moment an outfit is worn. Mirrors the
+ * weather-derived values generateOutfits() computes internally, minus the
+ * morning forecast-blend — there's no forecast to blend against at wear time,
+ * only the live reading.
+ */
+export const buildWearContext = (weather: CurrentWeather, settings: Settings): WearContext => {
+  const feelsLikeF = weather.RealFeelTemperature.Imperial.Value;
+  return {
+    feelsLikeF,
+    bucket:          getWeatherBucket(feelsLikeF, settings.hiTempThreshold, settings.lowTempThreshold),
+    precipIntensity: classifyPrecipitation(weather),
+    humidity:        weather.RelativeHumidity,
+    windMph:         weather.Wind.Speed.Imperial.Value,
+    isSnowing:       /snow/i.test(weather.WeatherText ?? ''),
+    hourOfDay:       new Date().getHours(),
+    occasion:        settings.occasion,
+    styles: settings.clothingStyles?.length
+      ? settings.clothingStyles
+      : [settings.clothingStyle ?? 'Casual'],
   };
 };
 
-// ─── Backwards-compatible weather headline ────────────────────────────────────
-
-export const weatherHeadline = (weather: CurrentWeather, settings: Settings): string =>
-  headline(getWeatherBucket(
-    weather.RealFeelTemperature.Imperial.Value,
-    settings.hiTempThreshold,
-    settings.lowTempThreshold,
-  ));

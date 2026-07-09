@@ -549,7 +549,6 @@ const cropStyles = StyleSheet.create({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function CameraPage() {
-  const { isDark } = useTheme();
   const insets    = useSafeAreaInsets();
   const router    = useRouter();
   const isFocused = useIsFocused();

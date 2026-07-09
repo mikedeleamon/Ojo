@@ -252,18 +252,6 @@ const GARMENT_SHAPE_CATEGORY: Record<GarmentType, ShapeCategory> = {
   'unknown': 'ambiguous',
 };
 
-/** Guess shape category from image aspect ratio */
-function guessShapeFromAspect(aspectRatio: number): ShapeCategory {
-  // Landscape (wider than tall) → strongly suggests footwear or belt
-  if (aspectRatio > 1.5) return 'footwear';
-  // Tall portrait → tops, bottoms, or full-body (never footwear)
-  if (aspectRatio < 0.6) return 'bottom';
-  // Roughly square with slight portrait lean → tops
-  if (aspectRatio >= 0.6 && aspectRatio <= 0.9) return 'top';
-  // Remaining (0.9–1.5) is ambiguous
-  return 'ambiguous';
-}
-
 /**
  * Max softmax confidence below which the shape heuristic is allowed to fire.
  *

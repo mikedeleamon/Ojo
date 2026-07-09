@@ -1,5 +1,3 @@
-import { DetectedColor } from './clothingIdentifier.types';
-
 const COLOR_TABLE: Array<{ name: string; hex: string; r: number; g: number; b: number }> = [
   { name: 'white',        hex: '#FFFFFF', r: 255, g: 255, b: 255 },
   { name: 'off-white',    hex: '#FAF7F0', r: 250, g: 247, b: 240 },
@@ -101,46 +99,4 @@ export function nearestColorNameFromLab(l: number, a: number, b: number): { name
 export function rgbToColorName(r: number, g: number, b: number): { name: string; hex: string } {
   const lab = rgbToLab(r, g, b);
   return nearestColorNameFromLab(lab.l, lab.a, lab.b);
-}
-
-export interface PaletteSwatch {
-  rgb: [number, number, number];
-  population: number;
-}
-
-export type RawPalette = Partial<Record<
-  'vibrant' | 'darkVibrant' | 'lightVibrant' | 'muted' | 'darkMuted' | 'lightMuted',
-  PaletteSwatch
->>;
-
-export function paletteToDetectedColors(
-  palette: RawPalette | null | undefined,
-  maxColors: number = 3,
-): DetectedColor[] {
-  if (!palette) return [];
-  const swatches = Object.values(palette).filter(Boolean) as PaletteSwatch[];
-
-  if (swatches.length === 0) return [];
-
-  const totalPopulation = swatches.reduce((sum, s) => sum + s.population, 0);
-
-  const results: DetectedColor[] = swatches.map((swatch) => {
-    const [r, g, b] = swatch.rgb;
-    const { name, hex } = rgbToColorName(r, g, b);
-    return {
-      name,
-      hex,
-      prominence: totalPopulation > 0 ? swatch.population / totalPopulation : 0,
-    };
-  });
-
-  const seen = new Set<string>();
-  return results
-    .sort((a, b) => b.prominence - a.prominence)
-    .filter(({ name }) => {
-      if (seen.has(name)) return false;
-      seen.add(name);
-      return true;
-    })
-    .slice(0, maxColors);
 }

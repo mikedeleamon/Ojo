@@ -16,7 +16,6 @@ import Animated, {
     interpolate,
     Easing,
 } from 'react-native-reanimated';
-import { Svg, Circle } from 'react-native-svg';
 import { View, Text, GlassCard, GlassGroup } from '../primitives';
 import { EmptyState } from '../shared';
 import OccasionChips from '../OccasionChips';
@@ -37,7 +36,6 @@ import {
     OutfitRole,
     OutfitSlot,
     OutfitResult,
-    ScoreBreakdown,
     articleZoneLabel,
 } from '../../lib/outfitEngine';
 import { addHistoryEntry, recentlyWornWithAge, loadHistory } from '../../lib/outfitHistory';
@@ -145,7 +143,6 @@ const ArticleThumb = ({
 const ScoreBadge = ({
     score,
     isPersonalized,
-    isLearning,
 }: {
     score: number;
     isPersonalized?: boolean;
@@ -231,7 +228,7 @@ interface Props {
 const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
     const { colors } = useTheme();
     const styles = useMemo(() => makeStyles(colors), [colors]);
-    const { closets, loading, preferred, setPreferred, setClosets, refresh } =
+    const { closets, loading, preferred, setPreferred, refresh } =
         useClosets();
     const reduceMotion = useReduceMotion();
 

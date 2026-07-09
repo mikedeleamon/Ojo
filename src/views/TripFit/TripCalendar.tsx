@@ -106,7 +106,7 @@ export default function TripCalendar({
         onRangeChange(rangeStart, clampedEnd);
     }, [startDate, endDate, onRangeChange, maxDays]);
 
-    const st = makeStyles(colors, cellSize);
+    const st = makeStyles(cellSize);
 
     return (
         <GlassCard style={st.container} glassStyle="regular">
@@ -221,7 +221,7 @@ export default function TripCalendar({
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-function makeStyles(colors: ReturnType<typeof useTheme>['colors'], cellSize: number) {
+function makeStyles(cellSize: number) {
     return StyleSheet.create({
         container: {
             borderRadius: radius.md,

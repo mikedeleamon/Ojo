@@ -1,4 +1,5 @@
 import { GarmentType, DetectedColor, FabricGuess } from './services/clothingIdentifier.types';
+import type { WearContext, WornEngineInfo, NegativeSignal } from './lib/outfit/types';
 export type { GarmentType, DetectedColor, FabricGuess };
 
 export type BodyZone = 'Head' | 'Neck' | 'Wrist' | 'Hand' | 'Waist' | 'Ankle' | 'Carried';
@@ -184,6 +185,10 @@ export interface OutfitHistoryEntry {
   closetName:string;
   articleIds:string[];
   articleSummary: string;
+  /** Ranker-training instrumentation — absent on entries logged before it existed. */
+  context?:   WearContext;
+  engine?:    WornEngineInfo;
+  negatives?: NegativeSignal[];
 }
 
 export interface Closet {

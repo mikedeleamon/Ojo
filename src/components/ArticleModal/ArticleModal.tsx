@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import {
-  StyleSheet, Modal, ScrollView, TextInput, Pressable,
+  Modal, ScrollView, TextInput, Pressable,
   Image, Alert, AccessibilityInfo, findNodeHandle, View as RNView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,8 +12,7 @@ import { pickImage, captureImage, uploadImageToR2 } from '../../lib/imageService
 import { getErrorMessage } from '../../lib/auth';
 import { ClothingArticle, ArticleFormData, BodyZone, articleCategories } from '../../types';
 import { identifyClothing } from '../../services/clothingIdentifier';
-import type { GarmentType, FabricGuess, DetectedColor } from '../../services/clothingIdentifier.types';
-import { ColorTokens, fonts, fontSizes, fontWeights, spacing, radius } from '../../theme/tokens';
+import { fonts, fontSizes } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 
 import { CATEGORIES, COLORS, FABRICS, ARTICLE_GENDERS } from '../../lib/colors/palettes';

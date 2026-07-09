@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { StyleSheet, Modal } from 'react-native';
-import { View, Text, Pressable } from './primitives';
+import { View, Text } from './primitives';
 import LegalWebViewScreen from '../features/settings/screens/LegalWebViewScreen';
 import { PRIVACY_POLICY, TERMS_OF_SERVICE } from '../config/legal';
 import { fonts, fontSizes } from '../theme/tokens';

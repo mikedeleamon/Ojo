@@ -27,7 +27,6 @@ import {
 import type { ColorTokens } from '../../theme/tokens';
 import { useReduceMotion } from '../../hooks/useReduceMotion';
 import { generateOutfits } from '../../lib/outfitEngine';
-import type { OutfitResult } from '../../lib/outfitEngine';
 import { recordGapsFromNotes } from '../../lib/wardrobeGaps';
 import { gradientFor } from '../../components/WeatherHUD/weatherPalette';
 import { humanizeCondition } from '../../lib/weather/humanizeCondition';

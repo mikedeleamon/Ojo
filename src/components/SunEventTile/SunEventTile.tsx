@@ -1,6 +1,6 @@
 import { memo, useMemo } from 'react';
 import { StyleSheet } from 'react-native';
-import { View, Text, GlassCard } from '../primitives';
+import { Text, GlassCard } from '../primitives';
 import SunriseSunsetIcon from '../WeatherIcons/SunriseSunsetIcon';
 import { ColorTokens, fonts, fontSizes, radius, spacing } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { StyleSheet, Modal, Alert, AccessibilityInfo, findNodeHandle, View as RNView } from 'react-native';
+import { StyleSheet, Modal, AccessibilityInfo, findNodeHandle, View as RNView } from 'react-native';
 import { ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { View, Text, TextInput, Pressable, GlassCard } from '../../../components/primitives';

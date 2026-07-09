@@ -189,22 +189,3 @@ export const lerpHslFlat = (
     }
     return out;
 };
-
-/**
- * Interpolate an array of color stops with per-stop staggering.
- * Each stop's animation is offset by a small delay so the gradient appears to
- * "wave" through colors rather than every pixel moving in lockstep.
- */
-export const lerpGradient = (
-    from: readonly string[],
-    to: readonly string[],
-    t: number,
-): string[] => {
-    'worklet';
-    const stagger = 0.15;
-    return to.map((_, i) => {
-        const offset = (i / Math.max(1, to.length - 1)) * stagger;
-        const stopT = Math.max(0, Math.min(1, (t - offset) / (1 - stagger)));
-        return lerpColor(from[i] ?? from[0], to[i] ?? to[0], easeInOut(stopT));
-    });
-};

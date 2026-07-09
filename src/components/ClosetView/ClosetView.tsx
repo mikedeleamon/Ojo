@@ -12,7 +12,6 @@ import { HangerIcon } from '../shared/HangerIcon';
 import { useConfirm } from '../ConfirmDialog';
 import ArticleModal from '../ArticleModal/ArticleModal';
 import { Closet, ClothingArticle, ArticleFormData } from '../../types';
-import { QuickAddData } from '../../views/ClosetPage/ClosetPage';
 import { spacing } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 import { hapticImpact } from '../../lib/haptics';

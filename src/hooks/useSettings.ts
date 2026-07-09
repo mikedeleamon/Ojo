@@ -1,1 +1,1 @@
-export { useSettings, defaults, clearSettingsCache } from '../context/SettingsContext';
+export { useSettings } from '../context/SettingsContext';

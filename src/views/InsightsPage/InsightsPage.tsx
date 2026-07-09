@@ -5,7 +5,6 @@ import {
   Pressable,
   Linking,
   Animated,
-  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -37,7 +36,6 @@ import {
   removeFromDonationQueue,
 } from '../../lib/donationQueue';
 import { makeStyles } from './InsightsPage.styles';
-import { CSS_COLORS } from '../../lib/colors/cssColors';
 import {
   METALLIC_GRADIENTS,
   METALLIC_START,
@@ -133,7 +131,7 @@ const activeStatLabel = (d: number): string =>
   d === 30 ? 'worn this month' : d === 90 ? 'worn this quarter' : 'worn this year';
 
 export default function InsightsPage() {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { closets, loading: closetsLoading, removeArticle } = useClosets();
   const tabPad = useTabBarPadding();
