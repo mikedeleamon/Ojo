@@ -1,8 +1,10 @@
 import {
+  buildRecap,
   buildWeeklyRecap,
   isoWeekKey,
   RecapCard,
   RecapInput,
+  RecapWeekMeta,
 } from '../recapEngine';
 import type { Closet, ClothingArticle, OutfitHistoryEntry, SavedTripFitPlan } from '../../types';
 
@@ -369,6 +371,72 @@ describe('composition', () => {
 });
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+// ─── Week meta ────────────────────────────────────────────────────────────────
+
+describe('week meta', () => {
+  const metaOf = (over: Partial<RecapInput>): RecapWeekMeta =>
+    buildRecap({ closets: [], history: [], now: NOW, seed: 'u1', ...over }).meta;
+
+  it('lays out 7 day-slots oldest→today with per-outfit dominant colors', () => {
+    const b1 = article({ _id: 'b1', color: 'Blue' });
+    const b2 = article({ _id: 'b2', color: 'Blue', clothingType: 'Jeans' });
+    const k  = article({ _id: 'k',  color: 'Black', clothingType: 'Shirt' });
+    const m = metaOf({
+      closets: [closet([b1, b2, k])],
+      history: [
+        entry(0, ['b1', 'b2', 'k']),  // today: Blue dominant (2 blue vs 1 black)
+        entry(0, ['k']),               // today: Black
+        entry(2, ['b1']),              // two days ago: Blue
+      ],
+    });
+    expect(m.daily).toHaveLength(7);
+    expect(m.daily[6].colors).toEqual(['Blue', 'Black']);  // today, chronological
+    expect(m.daily[4].colors).toEqual(['Blue']);           // two days ago
+    expect(m.daily[0].colors).toEqual([]);                 // empty day → no blocks
+    expect(m.daily.map(d => d.initial)).toHaveLength(7);
+  });
+
+  it('palette ranks colors by per-outfit presence, capped at 4', () => {
+    const bl = article({ _id: 'bl', color: 'Blue' });
+    const bk = article({ _id: 'bk', color: 'Black', clothingType: 'Shirt' });
+    const cr = article({ _id: 'cr', color: 'Cream', clothingType: 'Jeans' });
+    const ol = article({ _id: 'ol', color: 'Olive', clothingType: 'Coat' });
+    const rd = article({ _id: 'rd', color: 'Red',   clothingType: 'Hat' });
+    const m = metaOf({
+      closets: [closet([bl, bk, cr, ol, rd])],
+      history: [
+        entry(0, ['bl']), entry(1, ['bl']), entry(2, ['bl']),  // Blue ×3
+        entry(3, ['bk']), entry(4, ['bk']),                    // Black ×2
+        entry(5, ['cr']),                                      // Cream ×1
+        entry(6, ['ol']),                                      // Olive ×1
+      ],
+    });
+    expect(m.palette.length).toBeLessThanOrEqual(4);
+    expect(m.palette[0]).toEqual({ name: 'Blue', count: 3 });
+    expect(m.palette[1]).toEqual({ name: 'Black', count: 2 });
+    expect(m.palette.map(p => p.name)).not.toContain('Red');  // Red never worn
+  });
+
+  it('stamps the week label, ISO stamp, and rolling date range', () => {
+    const [year, week] = isoWeekKey(NOW).split('-W');
+    const m = metaOf({});
+    expect(m.weekLabel).toBe(`Week ${Number(week)} · ${year}`);
+    expect(m.weekStamp).toBe(`${year} — W${week}`);
+    expect(m.dateRange).toBe('Jul 1–7');  // NOW is 2026-07-07; window is −6d
+  });
+
+  it('reports all-time count and the milestone it is climbing toward', () => {
+    const a = article({ _id: 'a1' });
+    const m = metaOf({
+      closets: [closet([a])],
+      history: [entry(1, ['a1']), entry(2, ['a1']), entry(3, ['a1'])],
+    });
+    expect(m.outfitsThisWeek).toBe(3);
+    expect(m.allTime.count).toBe(3);
+    expect(m.allTime.milestone).toBe(10);  // smallest milestone ≥ 3
+  });
+});
 
 describe('isoWeekKey', () => {
   it('formats an ISO week key', () => {

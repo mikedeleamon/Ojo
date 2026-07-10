@@ -41,11 +41,6 @@ export default StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
-  footerLogo: {
-    width: 20,
-    height: 20,
-    resizeMode: 'contain',
-  },
   footerText: {
     fontFamily: fonts.bodyMedium,
     fontSize: fontSizes.sm,

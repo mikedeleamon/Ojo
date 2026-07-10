@@ -17,7 +17,11 @@ import {
   OutfitHistoryEntry,
   SavedTripFitPlan,
 } from '../types';
-import { computeStyleDNA, derivePreferenceProfile } from './userPreferences';
+import {
+  computeStyleDNA,
+  derivePreferenceProfile,
+  UserPreferenceProfile,
+} from './userPreferences';
 import { SLEEPING_THRESHOLD } from './insightsEngine';
 import { GapSuggestion, GapType } from './wardrobeGaps';
 import { toLocalISODate } from './tripMode';
@@ -47,6 +51,38 @@ export interface RecapCard {
   colorNames?:  string[];
   /** Garment photo for item-focused cards, when the article has one. */
   imageUrl?:    string;
+}
+
+/** One day in the week's rhythm strip. `colors` holds one entry per outfit
+ *  logged that day — the outfit's dominant article-color NAME, or null when
+ *  none of its articles carry a color. UI resolves names→hex (recapVisuals). */
+export interface RecapDay {
+  initial: string;              // weekday initial, e.g. "M"
+  date:    string;              // local ISO date
+  colors:  (string | null)[];   // dominant color name per outfit, chronological
+}
+
+/** A color's share of the week, by per-outfit presence. Hex is resolved in the
+ *  UI layer so the engine stays free of color tables. */
+export interface RecapPaletteEntry {
+  name:  string;
+  count: number;
+}
+
+/**
+ * Week-level facts the redesigned recap surfaces need beyond the card deck —
+ * the masthead stamps, the hero rhythm strip, the color bar, the all-time
+ * meter. Computed from the same 7-day window as the cards; never hard-coded.
+ */
+export interface RecapWeekMeta {
+  weekLabel:       string;   // "Week 28 · 2026"
+  dateRange:       string;   // "Jul 4–10"
+  weekStamp:       string;   // "2026 — W28"
+  outfitsThisWeek: number;
+  daysLogged:      number;
+  daily:           RecapDay[];          // exactly 7, oldest → today
+  palette:         RecapPaletteEntry[]; // top ≤4, count desc
+  allTime:         { count: number; milestone: number };
 }
 
 /** A template shown in a previous recap, for cooldown suppression. */
@@ -182,6 +218,10 @@ interface WeekStats {
   /** Articles NOT worn this week, with days since their last wear. */
   dormant:      Array<{ article: ClothingArticle; dormantDays: number }>;
   loggedDates:  Set<string>;            // local ISO dates across ALL history
+  /** One row per THIS WEEK'S OUTFIT (chronological): its local date + dominant
+   *  article-color name (most frequent, ties alphabetical), null if uncolored.
+   *  Feeds the hero rhythm strip. */
+  perOutfit:    Array<{ date: string; color: string | null }>;
 }
 
 const buildWeekStats = (
@@ -219,14 +259,22 @@ const buildWeekStats = (
   const colorOutfits = new Map<string, number>();
   const pairOutfits  = new Map<string, number>();
   const daySet       = new Set<string>();
+  const perOutfit: WeekStats['perOutfit'] = [];
 
   for (const entry of weekHistory) {
-    daySet.add(toLocalISODate(new Date(entry.wornAt)));
+    const date = toLocalISODate(new Date(entry.wornAt));
+    daySet.add(date);
     const colors = new Set<string>();
+    const freq   = new Map<string, number>();
     for (const id of entry.articleIds) {
       const c = byId.get(id)?.color;
-      if (c) colors.add(c);
+      if (c) { colors.add(c); freq.set(c, (freq.get(c) ?? 0) + 1); }
     }
+    // Dominant = most-worn color in the outfit; alphabetical breaks ties so the
+    // strip is deterministic.
+    const dominant = [...freq.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? null;
+    perOutfit.push({ date, color: dominant });
     const sorted = [...colors].sort();
     for (let i = 0; i < sorted.length; i++) {
       colorOutfits.set(sorted[i], (colorOutfits.get(sorted[i]) ?? 0) + 1);
@@ -272,6 +320,7 @@ const buildWeekStats = (
     perArticle,
     dormant,
     loggedDates,
+    perOutfit,
   };
 };
 
@@ -314,11 +363,11 @@ const buildCandidates = (
   stats: WeekStats,
   input: Required<Pick<RecapInput, 'closets' | 'history'>> & RecapInput,
   now: Date,
+  allProfile: UserPreferenceProfile,
 ): Candidate[] => {
   const { outfitCount } = stats;
   const out: Candidate[] = [];
 
-  const allProfile = derivePreferenceProfile(input.closets, input.history);
   const dna = computeStyleDNA(allProfile);
 
   // Week's top color by per-outfit presence; ties broken alphabetically.
@@ -564,13 +613,81 @@ const buildCandidates = (
   return out;
 };
 
+// ─── Week meta ────────────────────────────────────────────────────────────────
+
+/** "2026-W28" → { label: "Week 28 · 2026", stamp: "2026 — W28" }. */
+const weekStamps = (now: Date): { label: string; stamp: string } => {
+  const [year, week] = isoWeekKey(now).split('-W');
+  return { label: `Week ${Number(week)} · ${year}`, stamp: `${year} — W${week}` };
+};
+
+/** Rolling 7-day window as "Jul 4–10" (same month) or "Jun 29–Jul 5". */
+const formatRange = (now: Date): string => {
+  const start = new Date(now.getTime() - (WEEK_DAYS - 1) * DAY_MS);
+  const fmt = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const endStr = start.getMonth() === now.getMonth() ? `${now.getDate()}` : fmt(now);
+  return `${fmt(start)}–${endStr}`;
+};
+
+/**
+ * Week-level display facts for the redesigned surfaces (masthead, rhythm strip,
+ * color bar, all-time meter). Same 7-day window as the cards; colors stay as
+ * names for the UI to resolve.
+ */
+const buildWeekMeta = (
+  stats: WeekStats,
+  allProfile: UserPreferenceProfile,
+  now: Date,
+): RecapWeekMeta => {
+  // Group this week's outfits by day, then lay out 7 slots oldest → today.
+  const byDate = new Map<string, (string | null)[]>();
+  for (const o of stats.perOutfit) {
+    const list = byDate.get(o.date) ?? [];
+    list.push(o.color);
+    byDate.set(o.date, list);
+  }
+  const daily: RecapDay[] = [];
+  for (let i = WEEK_DAYS - 1; i >= 0; i--) {
+    const d = new Date(now.getTime() - i * DAY_MS);
+    const date = toLocalISODate(d);
+    daily.push({
+      initial: d.toLocaleDateString('en-US', { weekday: 'narrow' }),
+      date,
+      colors: byDate.get(date) ?? [],
+    });
+  }
+
+  const palette: RecapPaletteEntry[] = [...stats.colorOutfits.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 4)
+    .map(([name, count]) => ({ name, count }));
+
+  const count = allProfile.totalOutfits;
+  // Smallest milestone the count has reached (or is climbing toward), for the meter.
+  const milestone = [...MILESTONES].sort((a, b) => a - b).find(m => m >= count) ?? count;
+
+  const { label, stamp } = weekStamps(now);
+  return {
+    weekLabel:       label,
+    dateRange:       formatRange(now),
+    weekStamp:       stamp,
+    outfitsThisWeek: stats.outfitCount,
+    daysLogged:      stats.daysLogged,
+    daily,
+    palette,
+    allTime:         { count, milestone },
+  };
+};
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
- * Build the week's recap cards. Deterministic for a given (input, now, seed):
- * reopening the recap renders identical copy.
+ * Build the week's recap cards plus the week meta the redesigned screen needs.
+ * Deterministic for a given (input, now, seed): reopening renders identically.
  */
-export const buildWeeklyRecap = (input: RecapInput): RecapCard[] => {
+export const buildRecap = (
+  input: RecapInput,
+): { cards: RecapCard[]; meta: RecapWeekMeta } => {
   const now = input.now ?? new Date();
   const weekSeed = `${isoWeekKey(now)}|${input.seed ?? ''}`;
 
@@ -587,16 +704,21 @@ export const buildWeeklyRecap = (input: RecapInput): RecapCard[] => {
   });
 
   const stats = buildWeekStats(input.closets, input.history, now);
+  const allProfile = derivePreferenceProfile(input.closets, input.history);
+  const meta = buildWeekMeta(stats, allProfile, now);
 
   if (stats.outfitCount === 0) {
-    return [render({
-      id: 'empty_week', section: 'opener',
-      headlines: ['A week off the record.', 'The closet kept quiet.'],
-      bodies: [
-        "No outfits logged this week. Tap 'Wore this' on your next one and the recap gets interesting.",
-        'Nothing logged — even Ojo takes a week off sometimes. See you next Sunday.',
-      ],
-    })];
+    return {
+      cards: [render({
+        id: 'empty_week', section: 'opener',
+        headlines: ['A week off the record.', 'The closet kept quiet.'],
+        bodies: [
+          "No outfits logged this week. Tap 'Wore this' on your next one and the recap gets interesting.",
+          'Nothing logged — even Ojo takes a week off sometimes. See you next Sunday.',
+        ],
+      })],
+      meta,
+    };
   }
 
   const opener = render(
@@ -634,7 +756,7 @@ export const buildWeeklyRecap = (input: RecapInput): RecapCard[] => {
     );
   };
 
-  const candidates = buildCandidates(stats, input, now)
+  const candidates = buildCandidates(stats, input, now, allProfile)
     .filter(c => !onCooldown(c.id));
   const byId = new Map(candidates.map(c => [c.id, c]));
 
@@ -686,5 +808,12 @@ export const buildWeeklyRecap = (input: RecapInput): RecapCard[] => {
     }));
   }
 
-  return cards;
+  return { cards, meta };
 };
+
+/**
+ * Cards-only view of {@link buildRecap} — kept for callers and tests that only
+ * need the deck. Deterministic for a given (input, now, seed).
+ */
+export const buildWeeklyRecap = (input: RecapInput): RecapCard[] =>
+  buildRecap(input).cards;

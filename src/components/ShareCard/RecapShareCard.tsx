@@ -1,223 +1,169 @@
+/**
+ * RecapShareCard — the 9:16 Weekly Recap poster exported to Instagram Stories.
+ * Self-contained (no device chrome): the Ojo mark + week label up top, a
+ * centered hero block (eyebrow, giant outfit count, tagline, color bar) and a
+ * 3-up stat row, then the Ojo footer.
+ *
+ * The background freezes whatever weather gradient the page's cycling
+ * background was showing when the user tapped share (`gradientColors`), under
+ * the same ink scrim — so the poster reads as a still frame of the live screen.
+ *
+ * Rendered on-screen at CARD_WIDTH×CARD_HEIGHT (9:16) and captured by
+ * useShareCapture at a fixed 1080×1920, so the exported PNG matches this
+ * preview 1:1. Deliberately theme-independent — a shared card is brand surface.
+ */
+
 import { forwardRef } from 'react';
-import { StyleSheet, Image } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { View, Text } from '../primitives';
-import { RecapCard } from '../../lib/recapEngine';
-import { recapTint, resolveColorHex, brandWash, hexToRgba } from '../../lib/recapVisuals';
-import ShareCardFrame from './ShareCardFrame';
-import { CARD_WIDTH } from './ShareCardFrame.styles';
-import { fonts, fontSizes } from '../../theme/tokens';
-import cs from './shareCardCommon.styles';
+import { RecapCard, RecapWeekMeta } from '../../lib/recapEngine';
+import {
+  RECAP_PALETTE as P,
+  RECAP_BRAND_GRADIENT,
+  RECAP_GRADIENT_START,
+  RECAP_GRADIENT_END,
+  RECAP_SCRIM,
+  RecapGradient,
+} from '../../lib/recapVisuals';
+import OjoLogo from '../OjoLogo';
+import RecapColorBar from '../recap/RecapColorBar';
+import { CARD_WIDTH, CARD_HEIGHT } from './ShareCardFrame.styles';
+import { fonts } from '../../theme/tokens';
 
 interface RecapShareCardProps {
-  /** The full week's cards; the opener leads, every other non-closer card
-   *  becomes a stat chip in the grid below it. */
   cards: RecapCard[];
+  meta: RecapWeekMeta;
+  /** The gradient showing on the page at share time; falls back to the brand. */
+  gradientColors?: RecapGradient;
 }
 
-/** Navy → a hint of the brand leaf green → navy, echoing brandHeroTint instead
- *  of the plain dark gradient every other share template uses. */
-const RECAP_GRADIENT = ['#0F172A', '#122C1E', '#0F172A'] as const;
+interface Stat { value: string; label: string; color: string }
 
-const GRID_GAP = 10;
-const PAD = 24 * 2;
-const CHIP_WIDTH = (CARD_WIDTH - PAD - GRID_GAP) / 2;
+/** The 3 headline stats, assembled from whichever cards fired, with fallbacks
+ *  so the row is always full. */
+const pickStats = (cards: RecapCard[], meta: RecapWeekMeta): Stat[] => {
+  const byId = (id: string) => cards.find(c => c.templateId === id);
+  const color = byId('color_story');
+  const mvp = byId('mvp_item');
+  const milestone = byId('milestone');
+  const top = meta.palette[0];
 
-const st = StyleSheet.create({
-  headline: {
-    lineHeight: 34,
-  },
-  subline: {
-    lineHeight: 19,
-  },
-  heroStatValue: {
-    fontFamily: fonts.display,
-    fontSize:   48,
-    lineHeight: 50,
-    color:      '#FFFFFF',
-    marginTop:  4,
-  },
-  heroStatLabel: {
-    fontFamily:    fonts.bodyMedium,
-    fontSize:      fontSizes.xs,
-    color:         'rgba(255,255,255,0.65)',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginTop:     2,
-  },
-  grid: {
-    marginTop:     16,
-    flexDirection: 'row',
-    flexWrap:      'wrap',
-    gap:           GRID_GAP,
-  },
-  chip: {
-    width:           CHIP_WIDTH,
-    minHeight:       96,
-    borderRadius:    16,
-    padding:         12,
-    gap:             6,
-    justifyContent:  'flex-end',
-    overflow:        'hidden',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth:     1,
-    borderColor:     'rgba(255,255,255,0.14)',
-  },
-  chipWash: { ...StyleSheet.absoluteFillObject },
-  chipTopRow: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    justifyContent: 'space-between',
-  },
-  chipThumb: { width: 26, height: 26, borderRadius: 8 },
-  chipDotRow: { flexDirection: 'row', gap: 4 },
-  chipDot: {
-    width: 9, height: 9, borderRadius: 4.5,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)',
-  },
-  chipValue: {
-    fontFamily: fonts.display,
-    fontSize:   26,
-    lineHeight: 28,
-    color:      '#FFFFFF',
-  },
-  chipLabel: {
-    fontFamily:    fonts.bodyMedium,
-    fontSize:      fontSizes.xs,
-    color:         'rgba(255,255,255,0.7)',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  chipHeadline: {
-    fontFamily: fonts.display,
-    fontSize:   fontSizes.sm,
-    lineHeight: fontSizes.sm * 1.3,
-    color:      '#FFFFFF',
-  },
-});
+  return [
+    color?.stat
+      ? { value: color.stat.value, label: (color.colorNames?.[0] ?? top?.name ?? 'Color').toUpperCase(), color: P.blueText }
+      : { value: `${top?.count ?? meta.outfitsThisWeek}`, label: (top?.name ?? 'Looks').toUpperCase(), color: P.blueText },
+    mvp?.stat
+      ? { value: `${mvp.stat.value}×`, label: 'MVP', color: P.mint }
+      : { value: `${meta.daysLogged}`, label: 'DAYS LOGGED', color: P.mint },
+    { value: milestone?.stat?.value ?? `${meta.allTime.count}`, label: 'ALL-TIME', color: P.text },
+  ];
+};
 
-const RecapShareCard = forwardRef<View, RecapShareCardProps>(({ cards }, ref) => {
-  const opener  = cards.find(c => c.section === 'opener');
-  const middles = cards.filter(c => c.section !== 'opener' && c.section !== 'closer').slice(0, 4);
+const RecapShareCard = forwardRef<View, RecapShareCardProps>(
+  ({ cards, meta, gradientColors = RECAP_BRAND_GRADIENT }, ref) => {
+  const opener = cards.find(c => c.section === 'opener');
+  const stats = pickStats(cards, meta);
 
   return (
-    <ShareCardFrame gradientColors={RECAP_GRADIENT} ref={ref}>
-      <Text style={cs.eyebrow}>Weekly Recap</Text>
-      {opener?.stat && (
-        <>
-          <Text
-            style={st.heroStatValue}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.5}
-          >
-            {opener.stat.value}
+    <View ref={ref} style={styles.frame} collapsable={false}>
+      <LinearGradient
+        colors={gradientColors}
+        start={RECAP_GRADIENT_START}
+        end={RECAP_GRADIENT_END}
+        style={StyleSheet.absoluteFill}
+      />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: RECAP_SCRIM }]} />
+
+      <View style={styles.safe}>
+        {/* Top row */}
+        <View style={styles.topRow}>
+          <OjoLogo size={34} />
+          <Text style={styles.weekStamp}>{meta.weekLabel}</Text>
+        </View>
+
+        {/* Centered hero block */}
+        <View style={styles.middle}>
+          <Text style={styles.eyebrow}>THE WEEK IN WEAR</Text>
+          <Text style={styles.heroNumber} numberOfLines={1} allowFontScaling={false}>
+            {meta.outfitsThisWeek}
           </Text>
-          <Text
-            style={st.heroStatLabel}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.7}
-          >
-            {opener.stat.label}
-          </Text>
-        </>
-      )}
-      <Text
-        style={[cs.headline, st.headline]}
-        numberOfLines={2}
-        adjustsFontSizeToFit
-        minimumFontScale={0.6}
-      >
-        {opener?.headline ?? 'My week in outfits'}
-      </Text>
-      {opener?.body ? (
-        <Text
-          style={[cs.subline, st.subline]}
-          numberOfLines={2}
-          adjustsFontSizeToFit
-          minimumFontScale={0.7}
-        >
-          {opener.body}
-        </Text>
-      ) : null}
+          <Text style={styles.tagline}>{opener?.headline ?? 'Your week, worn well.'}</Text>
+          <RecapColorBar
+            palette={meta.palette}
+            height={28}
+            showLegend={false}
+            style={styles.bar}
+          />
+        </View>
 
-      <View style={st.grid}>
-        {middles.map(card => {
-          const tint = recapTint(card);
-          return (
-            <View key={card.templateId} style={st.chip}>
-              {tint.kind === 'flat' && (
-                <View style={[st.chipWash, { backgroundColor: hexToRgba(tint.hex, 0.30) }]} />
-              )}
-              {tint.kind === 'gradient' && (
-                <LinearGradient
-                  colors={[hexToRgba(tint.colors[0], 0.32), hexToRgba(tint.colors[1], 0.32)]}
-                  style={st.chipWash}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                />
-              )}
-              {tint.kind === 'brand' && (
-                <LinearGradient
-                  colors={brandWash(true)}
-                  style={st.chipWash}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                />
-              )}
-
-              {(card.imageUrl || card.colorNames) && (
-                <View style={st.chipTopRow}>
-                  {card.imageUrl && (
-                    <Image source={{ uri: card.imageUrl }} style={st.chipThumb} resizeMode='cover' />
-                  )}
-                  {card.colorNames && (
-                    <View style={st.chipDotRow}>
-                      {card.colorNames.map(name => {
-                        const hex = resolveColorHex(name);
-                        return hex ? <View key={name} style={[st.chipDot, { backgroundColor: hex }]} /> : null;
-                      })}
-                    </View>
-                  )}
-                </View>
-              )}
-
-              {card.stat ? (
-                <View>
-                  <Text
-                    style={st.chipValue}
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.6}
-                  >
-                    {card.stat.value}
-                  </Text>
-                  <Text
-                    style={st.chipLabel}
-                    numberOfLines={2}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.7}
-                  >
-                    {card.stat.label}
-                  </Text>
-                </View>
-              ) : (
-                <Text
-                  style={st.chipHeadline}
-                  numberOfLines={3}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.75}
-                >
-                  {card.headline}
-                </Text>
-              )}
+        {/* 3-up stats */}
+        <View style={styles.statRow}>
+          {stats.map((s, i) => (
+            <View key={i} style={styles.statCol}>
+              <Text style={[styles.statValue, { color: s.color }]} numberOfLines={1} allowFontScaling={false}>
+                {s.value}
+              </Text>
+              <Text style={styles.statLabel} numberOfLines={1}>{s.label}</Text>
             </View>
-          );
-        })}
+          ))}
+        </View>
+
+        {/* Footer */}
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>STYLED BY</Text>
+          <OjoLogo size={22} />
+        </View>
       </View>
-    </ShareCardFrame>
+    </View>
   );
+});
+
+const styles = StyleSheet.create({
+  frame: {
+    width: CARD_WIDTH,
+    height: CARD_HEIGHT,
+    overflow: 'hidden',
+    backgroundColor: P.ink,
+  },
+  safe: {
+    flex: 1,
+    paddingTop: 84,
+    paddingBottom: 84,
+    paddingHorizontal: 30,
+    justifyContent: 'space-between',
+  },
+  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  weekStamp: {
+    fontFamily: fonts.bodySemiBold, fontSize: 10, letterSpacing: 1.4,
+    textTransform: 'uppercase', color: P.muted,
+  },
+
+  middle: { flex: 1, justifyContent: 'center', gap: 10 },
+  eyebrow: {
+    fontFamily: fonts.bodySemiBold, fontSize: 11, letterSpacing: 2.4,
+    textTransform: 'uppercase', color: P.mint,
+  },
+  // lineHeight must clear the serif's full ascent+descent or RN shears the
+  // numerals off at the top (see RecapPage.styles).
+  heroNumber: {
+    fontFamily: fonts.display, fontSize: 116, lineHeight: 132,
+    includeFontPadding: false,
+    letterSpacing: -4, color: P.text, marginTop: -10, marginBottom: -12,
+  },
+  tagline: { fontFamily: fonts.display, fontSize: 30, lineHeight: 36, letterSpacing: -0.4, color: P.text },
+  bar: { marginTop: 12 },
+
+  statRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  statCol: { flex: 1, alignItems: 'flex-start' },
+  statValue: { fontFamily: fonts.display, fontSize: 30, lineHeight: 38, includeFontPadding: false, letterSpacing: -1 },
+  statLabel: {
+    fontFamily: fonts.bodySemiBold, fontSize: 9, letterSpacing: 1.2,
+    textTransform: 'uppercase', color: P.muted, marginTop: 3,
+  },
+
+  footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  footerText: { fontFamily: fonts.bodySemiBold, fontSize: 11, letterSpacing: 1.4, color: 'rgba(242,240,234,0.85)' },
 });
 
 RecapShareCard.displayName = 'RecapShareCard';

@@ -90,6 +90,15 @@ export async function shareToInstagramStory(
   return shareViaGenericSheet(input.backgroundImage);
 }
 
+/**
+ * Public "Save or share elsewhere" path — opens the OS share sheet (Save Image,
+ * Messages, Mail…) with the PNG, independent of Instagram or the Facebook App
+ * ID. Backs the share sheet's secondary button.
+ */
+export async function shareImageElsewhere(image: string): Promise<ShareStoryOutcome> {
+  return shareViaGenericSheet(image);
+}
+
 /** Universal fallback: OS share sheet with the image, no IG/App ID needed. */
 async function shareViaGenericSheet(backgroundImage: string): Promise<ShareStoryOutcome> {
   const Share = getShareModule();

@@ -11,9 +11,9 @@
  */
 
 import { forwardRef } from 'react';
-import { Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { View, Text } from '../primitives';
+import OjoLogo from '../OjoLogo';
 import styles from './ShareCardFrame.styles';
 
 interface ShareCardFrameProps {
@@ -34,11 +34,8 @@ const ShareCardFrame = forwardRef<View, ShareCardFrameProps>(
       <View style={styles.safeArea}>
         <View style={styles.content}>{children}</View>
         <View style={styles.footer}>
-          <Image
-            source={require('../../../assets/images/logos/ojo_word_logo_2.png')}
-            style={styles.footerLogo}
-          />
-          <Text style={styles.footerText}>Styled with Ojo</Text>
+          <Text style={styles.footerText}>Styled by</Text>
+          <OjoLogo size={24} />
         </View>
       </View>
     </View>
