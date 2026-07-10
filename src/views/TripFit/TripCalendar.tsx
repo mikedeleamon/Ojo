@@ -1,8 +1,24 @@
 import { useState, useCallback } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { Svg, Path } from 'react-native-svg';
 import { GlassCard } from '../../components/primitives';
 import { useTheme } from '../../theme/ThemeContext';
 import { fonts, fontSizes, radius, spacing } from '../../theme/tokens';
+
+/** Centered chevron glyph for the month nav buttons. */
+function NavChevron({ dir, color }: { dir: 'left' | 'right'; color: string }) {
+    return (
+        <Svg width={16} height={16} viewBox="0 0 16 16" fill="none">
+            <Path
+                d={dir === 'left' ? 'M10 3.5 5.5 8l4.5 4.5' : 'M6 3.5 10.5 8 6 12.5'}
+                stroke={color}
+                strokeWidth={1.75}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+        </Svg>
+    );
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -123,7 +139,7 @@ export default function TripCalendar({
                         hitSlop={8}
                         style={st.navBtnInner}
                     >
-                        <Text style={[st.navArrow, { color: colors.textPrimary }]}>‹</Text>
+                        <NavChevron dir="left" color={colors.textPrimary} />
                     </Pressable>
                 </GlassCard>
 
@@ -139,7 +155,7 @@ export default function TripCalendar({
                         hitSlop={8}
                         style={st.navBtnInner}
                     >
-                        <Text style={[st.navArrow, { color: colors.textPrimary }]}>›</Text>
+                        <NavChevron dir="right" color={colors.textPrimary} />
                     </Pressable>
                 </GlassCard>
             </View>
@@ -235,6 +251,8 @@ function makeStyles(cellSize: number) {
             marginBottom: spacing.xs,
         },
         navBtn: {
+            width: 32,
+            height: 32,
             borderRadius: radius.pill,
             overflow: 'hidden',
         },
@@ -242,15 +260,10 @@ function makeStyles(cellSize: number) {
             opacity: 0,
         },
         navBtnInner: {
-            paddingHorizontal: 12,
-            paddingVertical: 4,
+            width: 32,
+            height: 32,
             alignItems: 'center',
             justifyContent: 'center',
-        },
-        navArrow: {
-            fontSize: 22,
-            lineHeight: 26,
-            fontFamily: fonts.bodySemiBold,
         },
         monthLabel: {
             fontFamily: fonts.bodySemiBold,

@@ -2,7 +2,6 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { StyleSheet, Modal, ScrollView, AccessibilityInfo, findNodeHandle, View as RNView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
-import { Svg, Path } from 'react-native-svg';
 import { View, Text, Pressable, GlassCard, GlassGroup } from '../../components/primitives';
 import { SETTINGS_CONFIG, SettingsAction } from './config';
 import SettingsSection from './components/SettingsSection';
@@ -29,16 +28,8 @@ export default function SettingsScreen({ onLogout }: Props) {
             borderBottomWidth: 1,
             borderBottomColor: colors.glassBorder,
         },
-        homeBtn: {
-            backgroundColor: colors.glassBg,
-            borderWidth: 1,
-            borderColor: colors.glassBorder,
-            borderRadius: radius.sm,
-        },
-        homeBtnInner: {
-            padding: 8,
-            paddingHorizontal: 10,
-        },
+        backBtn: { padding: 4 },
+        backArrow: { fontSize: 28, lineHeight: 32 },
         title: {
             fontFamily: 'DMSerifDisplay',
             fontSize: 28,
@@ -165,27 +156,14 @@ export default function SettingsScreen({ onLogout }: Props) {
     return (
         <SafeAreaView style={styles.root}>
             <View style={styles.header}>
-                <GlassCard glassStyle="clear" style={styles.homeBtn}>
-                    <Pressable
-                        onPress={() => nav.goBack()}
-                        style={styles.homeBtnInner}
-                        accessibilityLabel='Go to Home'
-                        accessibilityRole="button"
-                    >
-                        <Svg width={18} height={18} viewBox='0 0 18 18' fill='none'
-                            accessibilityElementsHidden={true}
-                            importantForAccessibility="no"
-                        >
-                            <Path
-                                d='M11 14l-5-5 5-5'
-                                stroke={colors.textPrimary}
-                                strokeWidth={1.5}
-                                strokeLinecap='round'
-                                strokeLinejoin='round'
-                            />
-                        </Svg>
-                    </Pressable>
-                </GlassCard>
+                <Pressable
+                    onPress={() => nav.goBack()}
+                    style={styles.backBtn}
+                    accessibilityLabel='Go to Home'
+                    accessibilityRole="button"
+                >
+                    <Text style={[styles.backArrow, { color: colors.textPrimary }]}>‹</Text>
+                </Pressable>
                 <Text style={styles.title}>Account</Text>
             </View>
 

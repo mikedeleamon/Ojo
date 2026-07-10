@@ -145,8 +145,10 @@ private struct TripCountdownContent: View {
     }
   }
 
-  /// Arrival-day forecast peek: condition glyph + H/L, with a rain hint. Nothing
-  /// renders for pending trips whose saved plan has no forecast yet.
+  /// Arrival-day forecast peek: condition glyph + H/L. The condition symbol
+  /// already conveys rain (e.g. cloud.rain.fill), so the bare umbrella added no
+  /// information — precip lives in the rectangular Lock Screen's "· rain" text,
+  /// and TripWeather carries no chance % to show a real value.
   @ViewBuilder private var weatherLine: some View {
     if let w = trip.weather {
       HStack(spacing: 5) {
@@ -154,9 +156,6 @@ private struct TripCountdownContent: View {
           .font(.system(size: 11))
         Text("H:\(w.high)° L:\(w.low)°")
           .font(.system(size: 12, weight: .medium))
-        if w.precip {
-          Image(systemName: "umbrella.fill").font(.system(size: 10))
-        }
       }
       .foregroundStyle(.white.opacity(0.9))
     }
