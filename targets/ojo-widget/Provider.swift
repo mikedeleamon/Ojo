@@ -12,12 +12,12 @@ struct OjoProvider: TimelineProvider {
 
   func getSnapshot(in context: Context, completion: @escaping (OjoEntry) -> Void) {
     // Show the sample in the gallery preview; real data on the home screen.
-    let snap = context.isPreview ? .placeholder : (SnapshotStore.load() ?? .placeholder)
+    let snap = context.isPreview ? .placeholder : resolvedSnapshot()
     completion(OjoEntry(date: Date(), snapshot: snap))
   }
 
   func getTimeline(in context: Context, completion: @escaping (Timeline<OjoEntry>) -> Void) {
-    let snap = SnapshotStore.load() ?? .empty
+    let snap = SnapshotStore.load().map(applyingChosenVariant) ?? .empty
     let entry = OjoEntry(date: Date(), snapshot: snap)
 
     // The app pushes updates immediately via WidgetCenter.reloadAllTimelines().
@@ -36,4 +36,14 @@ private func nextMidnight() -> Date? {
     matching: DateComponents(hour: 0, minute: 0),
     matchingPolicy: .nextTime
   )
+}
+
+/// The snapshot with the user's "Change fit" choice applied — index 0 unless
+/// they cycled fits since this exact snapshot was written (see VariantIndexStore).
+private func applyingChosenVariant(_ snap: WidgetSnapshot) -> WidgetSnapshot {
+  snap.applyingVariant(VariantIndexStore.currentIndex(for: snap))
+}
+
+private func resolvedSnapshot() -> WidgetSnapshot {
+  SnapshotStore.load().map(applyingChosenVariant) ?? .placeholder
 }

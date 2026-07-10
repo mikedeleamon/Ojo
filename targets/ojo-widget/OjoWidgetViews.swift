@@ -22,7 +22,7 @@ extension Color {
 extension View {
   @ViewBuilder
   func ojoWidgetBackground(_ snapshot: WidgetSnapshot, family: WidgetFamily) -> some View {
-    if family == .accessoryRectangular || family == .accessoryInline {
+    if family == .accessoryRectangular || family == .accessoryInline || family == .accessoryCircular {
       if #available(iOS 17.0, *) {
         containerBackground(for: .widget) { Color.clear }
       } else {
@@ -69,6 +69,8 @@ struct OjoWidgetView: View {
   @ViewBuilder private var content: some View {
     let snap = entry.snapshot
     switch family {
+    case .accessoryCircular:
+      LockScreenCircularView(snap: snap)
     case .accessoryRectangular:
       LockScreenRectangularView(snap: snap)
     case .accessoryInline:
@@ -162,20 +164,118 @@ struct WeatherIconView: View {
   }
 }
 
-// MARK: - Layer hint (weather-driven accessory nudge)
+// MARK: - Hero temperature (the glance's largest element)
 
-private struct AlertGlyphSpec {
-  let symbol: String
-  let label: String
+/// The redesigned hierarchy leads with the temperature — large, rounded,
+/// monospaced digits, white on the weather gradient. Falls back to the legacy
+/// `tempLine` string for snapshots written before the structured weather block.
+struct TempHeroView: View {
+  let snap: WidgetSnapshot
+  var size: CGFloat = 40
+
+  var body: some View {
+    if let w = snap.weather {
+      Text("\(w.temp)°")
+        .font(.system(size: size, weight: .semibold, design: .rounded))
+        .monospacedDigit()
+        .foregroundStyle(.white)
+    } else if let t = snap.tempLine, !t.isEmpty {
+      Text(t)
+        .font(.system(size: 13, weight: .semibold))
+        .foregroundStyle(.white)
+    }
+  }
 }
 
-private func alertGlyph(_ kind: String) -> AlertGlyphSpec {
-  switch kind {
-  case "rain":  return AlertGlyphSpec(symbol: "umbrella.fill", label: "Rain")
-  case "layer": return AlertGlyphSpec(symbol: "tshirt.fill", label: "Layer up")
-  case "snow":  return AlertGlyphSpec(symbol: "snowflake", label: "Boots")
-  case "uv":    return AlertGlyphSpec(symbol: "sun.max.fill", label: "UV")
-  default:      return AlertGlyphSpec(symbol: "exclamationmark.circle", label: kind)
+/// "Feels 74° · Clear · H:78° L:61°" — the hero temperature's supporting line.
+/// Degrades gracefully: missing pieces are dropped, and a snapshot without the
+/// weather block falls back to the legacy `tempLine`. `includeFeelsLike` is off
+/// for the medium family, which has a narrower left column.
+func weatherMetaLine(
+  _ snap: WidgetSnapshot,
+  includeFeelsLike: Bool = true,
+  includeHighLow: Bool = true
+) -> String? {
+  guard let w = snap.weather else { return snap.tempLine }
+  var parts: [String] = []
+  if includeFeelsLike, let f = w.feelsLike { parts.append("Feels \(f)°") }
+  if let c = w.condition, !c.isEmpty { parts.append(c) }
+  if includeHighLow, let h = w.high, let l = w.low { parts.append("H:\(h)° L:\(l)°") }
+  return parts.isEmpty ? snap.tempLine : parts.joined(separator: " · ")
+}
+
+// MARK: - Signal chips (weather signals + accessory gaps, one merged row)
+
+/// One frosted capsule — white-on-translucent so it reads on any of the
+/// weather gradients (the spec's orange/blue-tinted chips assume a light
+/// surface and would vanish against the dark scrim).
+private struct SignalChip: View {
+  let symbol: String
+  let text: String
+
+  var body: some View {
+    HStack(spacing: 3) {
+      Image(systemName: symbol)
+        .font(.system(size: 8, weight: .semibold))
+      Text(text)
+        .font(.system(size: 9, weight: .semibold))
+        .tracking(0.4)
+    }
+    .padding(.horizontal, 7)
+    .padding(.vertical, 3)
+    .background(Capsule().fill(Color.white.opacity(0.18)))
+    .foregroundStyle(.white)
+    .lineLimit(1)
+  }
+}
+
+private struct ChipSpec: Identifiable {
+  let id: String
+  let symbol: String
+  let text: String
+}
+
+/// Merges the ambient weather signals (rain %, high UV) with the outfit-gap
+/// alerts (missing layer / boots) into one chip row, replacing the old glyph
+/// row so the same signal can't appear twice. Priority mirrors the old alert
+/// order: rain first (most likely to catch you out), UV last.
+private func signalChips(_ snap: WidgetSnapshot, maxCount: Int) -> [ChipSpec] {
+  var chips: [ChipSpec] = []
+  let alerts = Set(snap.alerts ?? [])
+
+  // Rain: the daily chance when known (ambient signal, per the spec), else
+  // only when the outfit-gap alert fired.
+  if let rc = snap.weather?.rainChance, rc >= 20 {
+    chips.append(ChipSpec(id: "rain", symbol: "umbrella.fill", text: "RAIN \(rc)%"))
+  } else if alerts.contains("rain") {
+    chips.append(ChipSpec(id: "rain", symbol: "umbrella.fill", text: "RAIN"))
+  }
+  if alerts.contains("layer") {
+    chips.append(ChipSpec(id: "layer", symbol: "tshirt.fill", text: "LAYER UP"))
+  }
+  if alerts.contains("snow") {
+    chips.append(ChipSpec(id: "snow", symbol: "snowflake", text: "BOOTS"))
+  }
+  // UV: category text ("UV VERY HIGH"), same wording as the app's "UV Index"
+  // stat — shown whenever the day is High+, not just when a hat is missing.
+  if let uv = snap.uvIndexText ?? snap.weather?.uvText,
+     ["High", "Very High", "Extreme"].contains(uv) {
+    chips.append(ChipSpec(id: "uv", symbol: "sun.max.fill", text: "UV \(uv.uppercased())"))
+  }
+  return Array(chips.prefix(maxCount))
+}
+
+struct SignalChipsView: View {
+  let snap: WidgetSnapshot
+  var maxCount: Int = 3
+
+  var body: some View {
+    let chips = signalChips(snap, maxCount: maxCount)
+    if !chips.isEmpty {
+      HStack(spacing: 5) {
+        ForEach(chips) { SignalChip(symbol: $0.symbol, text: $0.text) }
+      }
+    }
   }
 }
 
@@ -200,10 +300,10 @@ struct OutfitDescriptionView: View {
 }
 
 /// Weather cues that ADD to the description: a same-day timeline strip (rarer,
-/// more specific — see TimelineStripView) or a compact accessory-gap glyph row
-/// (see widgetAlertsFor in buildInput.ts). Shown only when the day has
-/// something time-sensitive or a gap the item thumbnails don't already cover;
-/// most days this renders nothing.
+/// more specific — see TimelineStripView) or the merged signal-chip row (rain %
+/// / UV / accessory gaps — see SignalChipsView). One row of vertical budget:
+/// the timeline wins on the rare days it exists, since it already conveys the
+/// rain start/stop the chips would.
 struct WeatherCuesView: View {
   let snap: WidgetSnapshot
   var maxAlerts: Int = 3
@@ -212,31 +312,10 @@ struct WeatherCuesView: View {
   var body: some View {
     if showTimeline, let timeline = snap.timeline, !timeline.isEmpty {
       TimelineStripView(steps: timeline)
-    } else if let alerts = snap.alerts, !alerts.isEmpty {
-      HStack(spacing: 8) {
-        ForEach(Array(alerts.prefix(maxAlerts)), id: \.self) { kind in
-          let spec = alertGlyph(kind)
-          HStack(spacing: 3) {
-            Image(systemName: spec.symbol)
-              .font(.system(size: 10, weight: .semibold))
-            Text(alertLabel(kind, spec: spec, snap: snap))
-              .font(.system(size: 10, weight: .semibold))
-          }
-        }
-      }
-      .foregroundStyle(.white.opacity(0.9))
+    } else {
+      SignalChipsView(snap: snap, maxCount: maxAlerts)
     }
   }
-}
-
-/// The chip's text. Most alerts use their static label; "uv" appends the
-/// category text when known ("UV High") — the same wording the app's
-/// WeatherDetails "UV Index" stat uses, so the widget's copy matches the app.
-private func alertLabel(_ kind: String, spec: AlertGlyphSpec, snap: WidgetSnapshot) -> String {
-  if kind == "uv", let uv = snap.uvIndexText, !uv.isEmpty {
-    return "UV \(uv)"
-  }
-  return spec.label
 }
 
 // MARK: - Timeline strip (same-day layer changes)
@@ -312,16 +391,15 @@ struct OutfitThumbRow: View {
   }
 }
 
-/// The compact single hint line for the small/medium widgets — mirrors the
-/// original placeholder layout: shows the weather cues (timeline / alert chips,
-/// including the "UV n" reading) when there's something to flag, otherwise the
-/// outfit description. One line only, so the layout stays close to the original.
+/// The compact single hint line for the small widget — shows the weather cues
+/// (timeline strip or signal chips) when there's something to flag, otherwise
+/// the outfit description. One line only, so the layout stays glanceable.
 struct CompactHintView: View {
   let snap: WidgetSnapshot
   var maxAlerts: Int = 3
 
   private var hasCues: Bool {
-    (snap.timeline?.isEmpty == false) || (snap.alerts?.isEmpty == false)
+    (snap.timeline?.isEmpty == false) || !signalChips(snap, maxCount: 1).isEmpty
   }
 
   var body: some View {
@@ -335,53 +413,65 @@ struct CompactHintView: View {
 
 // MARK: - Medium
 
+/// HStack split: the weather reading on the left (hero temperature, meta line,
+/// description, cues), the outfit on the right — the spec's medium layout on
+/// the brand gradient. The description keeps its always-on slot (it's the core
+/// "what to wear" answer); the cues row is the merged chips or timeline.
 struct MediumOutfitView: View {
   let snap: WidgetSnapshot
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      VStack(alignment: .leading, spacing: 2) {
+    HStack(alignment: .top, spacing: 12) {
+      VStack(alignment: .leading, spacing: 4) {
         if snap.mode == .trip, let trip = snap.trip {
           TripBadge(trip: trip)
         }
-        HStack(spacing: 6) {
-          WeatherIconView(kind: snap.weatherKind, isDay: snap.isDay, size: 18)
-          Text(headlineText(snap))
-            .font(.headline)
-            .foregroundStyle(.white)
-            .lineLimit(1)
+        HStack(alignment: .center, spacing: 6) {
+          TempHeroView(snap: snap, size: 34)
+          WeatherIconView(kind: snap.weatherKind, isDay: snap.isDay, size: 30)
         }
-        if let temp = snap.tempLine, !temp.isEmpty {
-          Text(temp)
-            .font(.caption)
+        // Feels-like is dropped here (unlike Large) — the medium left column is
+        // narrow, so the meta line stays condition + H/L only.
+        if let meta = weatherMetaLine(snap, includeFeelsLike: false), !meta.isEmpty {
+          Text(meta)
+            .font(.system(size: 10, weight: .medium))
             .foregroundStyle(.white.opacity(0.75))
             .lineLimit(1)
+            .minimumScaleFactor(0.85)
+        }
+
+        Text(headlineText(snap))
+          .font(.system(size: 12, weight: .semibold))
+          .foregroundStyle(.white)
+          .lineLimit(1)
+
+        // Always show the description (like Large) — it's the core "what to
+        // wear" answer and shouldn't depend on there being layering to discuss.
+        OutfitDescriptionView(snap: snap, lineLimit: 1)
+
+        Spacer(minLength: 0)
+
+        if snap.mode == .trip, let drift = snap.trip?.driftNote, !drift.isEmpty {
+          Text(drift)
+            .font(.system(size: 10))
+            .foregroundStyle(.white.opacity(0.75))
+            .lineLimit(1)
+        } else {
+          WeatherCuesView(snap: snap, maxAlerts: 2)
         }
       }
-
-      // Always show the description (like Large) — it's the core "what to
-      // wear" answer and shouldn't depend on there being layering to discuss.
-      // Kept to 1 line here (Large gets 2) to leave room for the cues below.
-      OutfitDescriptionView(snap: snap, lineLimit: 1)
+      .frame(maxWidth: .infinity, alignment: .leading)
 
       if snap.items.isEmpty {
         Text("No outfit yet")
           .font(.caption)
           .foregroundStyle(.white.opacity(0.75))
       } else {
-        OutfitThumbRow(items: snap.items, maxCount: 4, ratio: 0.8, minHeight: 50)
+        // The outfit column: portrait tiles at the original reference ratio,
+        // with the min-height floor so sibling content can't squeeze them out.
+        OutfitThumbRow(items: snap.items, maxCount: 3, ratio: 0.8, minHeight: 50)
+          .frame(maxHeight: .infinity)
       }
-
-      WeatherCuesView(snap: snap)
-
-      if snap.mode == .trip, let drift = snap.trip?.driftNote, !drift.isEmpty {
-        Text(drift)
-          .font(.system(size: 10))
-          .foregroundStyle(.white.opacity(0.75))
-          .lineLimit(2)
-      }
-
-      Spacer(minLength: 0)
     }
     .padding(12)
   }
@@ -389,28 +479,28 @@ struct MediumOutfitView: View {
 
 // MARK: - Small
 
+/// One idea per glance: weather glyph + hero temperature up top, the outfit
+/// strip in the middle, and a single line — description, else headline — at
+/// the bottom. No chips or meta line; the small family cuts detail, not type.
 struct SmallOutfitView: View {
   let snap: WidgetSnapshot
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
-      HStack(spacing: 4) {
-        WeatherIconView(kind: snap.weatherKind, isDay: snap.isDay, size: 14)
-        if snap.mode == .trip, let trip = snap.trip {
-          TripBadge(trip: trip)
-        } else if let temp = snap.tempLine, !temp.isEmpty {
-          Text(temp)
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(.white.opacity(0.75))
-            .lineLimit(1)
-        }
+      if snap.mode == .trip, let trip = snap.trip {
+        TripBadge(trip: trip)
+      }
+      HStack(alignment: .center) {
+        WeatherIconView(kind: snap.weatherKind, isDay: snap.isDay, size: 24)
+        Spacer(minLength: 4)
+        TempHeroView(snap: snap, size: 26)
       }
 
       OutfitThumbRow(items: snap.items, maxCount: 3, ratio: 0.7, spacing: 4, minHeight: 44)
 
-      CompactHintView(snap: snap, maxAlerts: 1)
-
       Spacer(minLength: 0)
+
+      CompactHintView(snap: snap, maxAlerts: 1)
 
       Text(headlineText(snap))
         .font(.system(size: 12, weight: .semibold))
@@ -423,44 +513,71 @@ struct SmallOutfitView: View {
 
 // MARK: - Large
 
-/// The systemLarge layout: the same content as Medium but with room to breathe —
-/// bigger thumbnails, a full 2-line description, and both the weather cues and
-/// (space permitting) the trip drift note, none of which have to fight for space.
+/// The systemLarge layout: a full weather header (hero temperature + meta on
+/// the left, sunset + signal chips on the right), the outfit headline, big
+/// tiles, the 2-line description, cues/drift — and, when the snapshot carries
+/// alternate fits, an interactive "Change fit" footer (iOS 17+).
 struct LargeOutfitView: View {
   let snap: WidgetSnapshot
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
-      VStack(alignment: .leading, spacing: 3) {
-        if snap.mode == .trip, let trip = snap.trip {
-          TripBadge(trip: trip)
+    VStack(alignment: .leading, spacing: 10) {
+      if snap.mode == .trip, let trip = snap.trip {
+        TripBadge(trip: trip)
+      }
+
+      HStack(alignment: .top) {
+        VStack(alignment: .leading, spacing: 2) {
+          HStack(alignment: .center, spacing: 8) {
+            TempHeroView(snap: snap, size: 44)
+            WeatherIconView(kind: snap.weatherKind, isDay: snap.isDay, size: 40)
+          }
+          if let meta = weatherMetaLine(snap), !meta.isEmpty {
+            Text(meta)
+              .font(.system(size: 12, weight: .medium))
+              .foregroundStyle(.white.opacity(0.75))
+              .lineLimit(1)
+              .minimumScaleFactor(0.85)
+          }
         }
-        HStack(spacing: 8) {
-          WeatherIconView(kind: snap.weatherKind, isDay: snap.isDay, size: 28)
-          Text(headlineText(snap))
-            .font(.title3.weight(.semibold))
-            .foregroundStyle(.white)
-            .lineLimit(1)
-        }
-        if let temp = snap.tempLine, !temp.isEmpty {
-          Text(temp)
-            .font(.subheadline)
+        Spacer(minLength: 8)
+        VStack(alignment: .trailing, spacing: 5) {
+          if let sunset = snap.weather?.sunset {
+            HStack(spacing: 3) {
+              Image(systemName: "sunset.fill")
+                .font(.system(size: 9))
+              Text(sunset)
+                .font(.system(size: 10, weight: .semibold))
+            }
             .foregroundStyle(.white.opacity(0.75))
-            .lineLimit(1)
+          }
+          SignalChipsView(snap: snap, maxCount: 2)
         }
       }
 
-      OutfitDescriptionView(snap: snap, lineLimit: 2)
+      Text(headlineText(snap))
+        .font(.title3.weight(.semibold))
+        .foregroundStyle(.white)
+        .lineLimit(1)
 
       if snap.items.isEmpty {
         Text("No outfit yet")
           .font(.subheadline)
           .foregroundStyle(.white.opacity(0.75))
       } else {
-        OutfitThumbRow(items: snap.items, maxCount: 4, ratio: 0.8, spacing: 10, maxHeight: 180)
+        // Extra horizontal inset beyond the widget padding — without it the
+        // end tiles run right up against the widget's edge on device.
+        OutfitThumbRow(items: snap.items, maxCount: 4, ratio: 0.8, spacing: 10, maxHeight: 170)
+          .padding(.horizontal, 10)
       }
 
-      WeatherCuesView(snap: snap)
+      OutfitDescriptionView(snap: snap, lineLimit: 2)
+
+      // The chips already live in the header; only the (rarer) timeline strip
+      // adds anything down here.
+      if let timeline = snap.timeline, !timeline.isEmpty {
+        TimelineStripView(steps: timeline)
+      }
 
       if snap.mode == .trip, let drift = snap.trip?.driftNote, !drift.isEmpty {
         Text(drift)
@@ -470,8 +587,44 @@ struct LargeOutfitView: View {
       }
 
       Spacer(minLength: 0)
+
+      ChangeFitFooter(snap: snap)
     }
     .padding(16)
+  }
+}
+
+/// "Change fit ›" — an interactive AppIntent button that cycles the snapshot's
+/// pre-written outfit variants without opening the app. Only rendered when
+/// there's something to cycle to, and only on iOS 17+ (interactive widgets);
+/// iOS 16 keeps the whole-widget tap.
+struct ChangeFitFooter: View {
+  let snap: WidgetSnapshot
+
+  var body: some View {
+    if #available(iOS 17.0, *), snap.variantCount > 1 {
+      VStack(spacing: 8) {
+        Divider().overlay(Color.white.opacity(0.25))
+        HStack {
+          Spacer()
+          Button(intent: ChangeFitIntent()) {
+            HStack(spacing: 4) {
+              Image(systemName: "arrow.triangle.2.circlepath")
+                .font(.system(size: 10, weight: .semibold))
+              Text("Change fit")
+                .font(.system(size: 12, weight: .semibold))
+              Image(systemName: "chevron.right")
+                .font(.system(size: 9, weight: .bold))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(Capsule().fill(Color.white.opacity(0.18)))
+          }
+          .buttonStyle(.plain)
+        }
+      }
+    }
   }
 }
 
@@ -506,12 +659,15 @@ struct EmptyStateView: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
-      // Keep the weather backdrop meaningful: show the icon + temp when present.
+      // Keep the weather backdrop meaningful: hero temperature + glyph, same
+      // hierarchy as the outfit views, so the empty state reads as "the same
+      // widget, minus the outfit" rather than a different design.
       if onGradient {
-        HStack(spacing: 6) {
-          WeatherIconView(kind: snap.weatherKind, isDay: snap.isDay, size: 18)
-          if let temp = snap.tempLine, !temp.isEmpty {
-            Text(temp)
+        HStack(alignment: .center, spacing: 6) {
+          TempHeroView(snap: snap, size: 24)
+          WeatherIconView(kind: snap.weatherKind, isDay: snap.isDay, size: 24)
+          if let cond = snap.weather?.condition, !cond.isEmpty {
+            Text(cond)
               .font(.caption)
               .foregroundStyle(.white.opacity(0.75))
               .lineLimit(1)

@@ -68,6 +68,58 @@ export interface OjoWidgetSnapshotItem {
   thumb: string | null;
 }
 
+/**
+ * Structured weather readout for the redesigned widget — temperature is the
+ * hero element, with feels-like / H-L / rain % / sunset as supporting signals.
+ * All values are pre-converted to the user's unit on the JS side so Swift only
+ * renders. Distinct from `tempLine` (kept for Lock Screen + older snapshots).
+ */
+export interface OjoWidgetWeather {
+  /** Current temperature, rounded, in `unit`. */
+  temp: number;
+  /** RealFeel, rounded, in `unit`. */
+  feelsLike?: number;
+  /** Today's high, in `unit`. */
+  high?: number;
+  /** Today's low, in `unit`. */
+  low?: number;
+  unit: 'F' | 'C';
+  /** Humanized condition title, e.g. "Partly Cloudy". */
+  condition?: string;
+  /** Chance of precipitation today, 0–100 (WeatherKit daily precipitationChance). */
+  rainChance?: number;
+  /** UV category text ("Low"…"Extreme") — always present when weather is, unlike `uvIndexText`, which only rides the uv *alert*. */
+  uvText?: string;
+  /** Formatted local sunset time, e.g. "8:14 PM". */
+  sunset?: string;
+}
+
+/**
+ * One complete outfit the widget can render — the "Change fit" AppIntent cycles
+ * through these without waking the app (the widget can't run the outfit
+ * engine, so alternates must be pre-written). Index 0 is the primary
+ * recommendation and always mirrors the snapshot's top-level fields, which are
+ * kept for older widget binaries decoding a new snapshot.
+ */
+export interface WidgetOutfitVariant {
+  headline: string;
+  items: OjoWidgetSnapshotItem[];
+  layerNote?: string;
+  alerts: WidgetAlertKind[];
+  uvIndexText?: string;
+  timeline?: WidgetTimelineStep[];
+}
+
+/** Input-side variant — thumbnails are still remote URLs (see WidgetSnapshotInput.items). */
+export interface WidgetOutfitVariantInput {
+  headline: string;
+  items: { id: string; role: string; imageUrl: string }[];
+  layerNote?: string;
+  alerts: WidgetAlertKind[];
+  uvIndexText?: string;
+  timeline?: WidgetTimelineStep[];
+}
+
 export interface OjoWidgetTripInfo {
   /** SavedTripFitPlan.destination */
   destination: string;
@@ -90,11 +142,15 @@ export interface OjoWidgetSnapshot {
   headline: string;
   /** Optional secondary line, e.g. "72°F · Partly cloudy". */
   tempLine?: string;
+  /** Structured weather readout for the hero-temperature layout. Omitted when no weather was available (older snapshots also lack it — Swift falls back to `tempLine`). */
+  weather?: OjoWidgetWeather;
   /** Local-weather classification driving the widget's gradient background (see lib/weather/conditions.ts). Omitted only when no weather was available. */
   weatherKind?: WeatherKind;
   /** Local daytime flag; the gradient's day/night variant for 'clear' and 'partlyCloudy'. */
   isDay?: boolean;
   items: OjoWidgetSnapshotItem[];
+  /** All renderable outfits for today, primary first — the "Change fit" intent cycles them. Omitted for empty mode and pre-variant snapshots (Swift then treats the top-level fields as the only variant). */
+  variants?: WidgetOutfitVariant[];
   /** Short layering call-to-action from layeringEngine's recommendation, e.g. "Bring a jacket — windy after 4pm." Omitted in 'empty' mode. */
   layerNote?: string;
   /** Accessory gaps the outfit thumbnails don't already cover, priority order. Empty when nothing's missing. */
@@ -118,6 +174,7 @@ export interface WidgetSnapshotInput {
   mode: WidgetMode;
   headline: string;
   tempLine?: string;
+  weather?: OjoWidgetWeather;
   weatherKind?: WeatherKind;
   isDay?: boolean;
   items: {
@@ -126,6 +183,8 @@ export interface WidgetSnapshotInput {
     /** Remote (R2) image URL; cached to a local thumbnail before writing. */
     imageUrl: string;
   }[];
+  /** All renderable outfits for today, primary first. Index 0 mirrors the top-level fields. */
+  variants?: WidgetOutfitVariantInput[];
   layerNote?: string;
   alerts: WidgetAlertKind[];
   uvIndexText?: string;

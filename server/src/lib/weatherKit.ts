@@ -202,6 +202,8 @@ export interface NormalisedDaily {
   maxTempF: number;
   dayPhrase: string;          // conditionCode
   hasPrecipitation: boolean;
+  /** Chance of precipitation for the day, 0–100. */
+  precipProbability: number;
   sunrise?: string;
   sunset?: string;
 }
@@ -264,6 +266,7 @@ export async function getDaily(lat: number, lon: number): Promise<NormalisedDail
     hasPrecipitation:
       (d.precipitationChance ?? 0) > 0.3 ||
       (d.precipitationType !== undefined && d.precipitationType !== 'clear'),
+    precipProbability: Math.round((d.precipitationChance ?? 0) * 100),
     sunrise: d.sunrise,
     sunset:  d.sunset,
   }));

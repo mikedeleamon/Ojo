@@ -4,15 +4,18 @@
  * testable; the React wiring lives in OutfitSuggestion.
  */
 
-import type { CurrentWeather, SavedTripFitPlan, Settings } from '../../types';
+import type { CurrentWeather, DailyForecast, SavedTripFitPlan, Settings } from '../../types';
 import type { OutfitResult } from '../outfit/types';
+import { fToC } from '../units';
 import { classifyCondition } from '../weather/conditions';
 import { humanizeConditionTitle } from '../weather/humanizeCondition';
 import { CLOSET_NEW_DEEP_LINK, OUTFIT_DEEP_LINK, tripDeepLink } from './deepLinks';
 import type {
   OjoWidgetUpcomingTrip,
+  OjoWidgetWeather,
   WidgetAlertKind,
   WidgetEmptyReason,
+  WidgetOutfitVariantInput,
   WidgetSnapshotInput,
   WidgetTimelineStep,
 } from './snapshot.types';
@@ -22,6 +25,9 @@ export type WidgetOutfitStatus = 'ok' | 'no_preferred' | 'empty_closet' | 'insuf
 
 /** Widget width can't fit layeringEngine's full 5-step timeline; keep the soonest few. */
 const MAX_WIDGET_TIMELINE_STEPS = 3;
+
+/** "Change fit" cycles pre-written outfits; cap them to bound snapshot size + thumbnail cache. */
+const MAX_WIDGET_VARIANTS = 3;
 
 const itemsFromOutfit = (outfit: OutfitResult): WidgetSnapshotInput['items'] =>
   outfit.slots.map((s) => ({
@@ -70,6 +76,69 @@ export function formatTempLine(
   return cond ? `${temp} · ${cond}` : temp;
 }
 
+/** Local calendar date as "YYYY-MM-DD" — matches DailyForecast.date. */
+const localISODate = (d: Date): string => {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+/** Today's entry from the 10-day forecast; falls back to the first entry (which is today in practice). */
+const todayDailyFor = (daily?: DailyForecast[]): DailyForecast | undefined => {
+  if (!daily || daily.length === 0) return undefined;
+  const today = localISODate(new Date());
+  return daily.find((d) => d.date === today) ?? daily[0];
+};
+
+/** "8:14 PM" from an ISO timestamp — manual format so it doesn't lean on Intl availability. */
+const formatSunset = (iso?: string): string | undefined => {
+  if (!iso) return undefined;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return undefined;
+  const h24 = d.getHours();
+  const h = h24 % 12 === 0 ? 12 : h24 % 12;
+  const m = String(d.getMinutes()).padStart(2, '0');
+  return `${h}:${m} ${h24 >= 12 ? 'PM' : 'AM'}`;
+};
+
+/**
+ * The widget's structured weather readout, pre-converted to the user's unit so
+ * Swift only renders. H/L, rain % and sunset come from today's daily forecast
+ * and degrade to undefined when it isn't available (the layout drops them).
+ */
+export function buildWeatherBlock(
+  weather: CurrentWeather | null | undefined,
+  settings: Settings,
+  daily?: DailyForecast[],
+): OjoWidgetWeather | undefined {
+  if (!weather) return undefined;
+  const isMetric = settings.temperatureScale === 'Metric';
+  const today = todayDailyFor(daily);
+  return {
+    temp: Math.round(
+      isMetric ? weather.Temperature.Metric.Value : weather.Temperature.Imperial.Value,
+    ),
+    feelsLike: Math.round(
+      isMetric
+        ? weather.RealFeelTemperature.Metric.Value
+        : weather.RealFeelTemperature.Imperial.Value,
+    ),
+    high: today ? (isMetric ? fToC(today.maxTempF) : Math.round(today.maxTempF)) : undefined,
+    low: today ? (isMetric ? fToC(today.minTempF) : Math.round(today.minTempF)) : undefined,
+    unit: isMetric ? 'C' : 'F',
+    condition: humanizeConditionTitle(weather.WeatherText) || undefined,
+    rainChance: today?.precipProbability,
+    uvText: weather.UVIndexText || undefined,
+    sunset: formatSunset(today?.sunset),
+  };
+}
+
+/** One outfit reshaped for the snapshot's variants array. */
+const variantFromOutfit = (outfit: OutfitResult): WidgetOutfitVariantInput => ({
+  headline: outfit.headline || "Today's outfit",
+  items: itemsFromOutfit(outfit),
+  ...widgetAlertsFor(outfit),
+});
+
 export interface WidgetTripData {
   active: boolean;
   plan: SavedTripFitPlan | null;
@@ -89,7 +158,8 @@ export interface WidgetUpcomingTripData {
 }
 
 export interface WidgetSyncData {
-  todayOutfit: OutfitResult | null;
+  /** Today's generated outfits, top-ranked first — index 0 is the primary answer, the rest become "Change fit" variants. */
+  todayOutfits: OutfitResult[];
   /** The outfit the user actually logged as worn today, if any. Takes precedence over the generated suggestion — the widget should reflect what they chose, not the top-ranked alternative. */
   wornOutfit: OutfitResult | null;
   /** Today's generation status — drives the empty state's specific message when there's no outfit. */
@@ -98,6 +168,8 @@ export interface WidgetSyncData {
   closetCount: number;
   weather: CurrentWeather | null | undefined;
   settings: Settings;
+  /** 10-day daily forecast — today's entry supplies the widget's H/L, rain % and sunset. */
+  daily?: DailyForecast[];
   trip: WidgetTripData;
   /** Independent of `trip`/`mode` — powers the separate Trip Countdown widget. */
   upcoming: WidgetUpcomingTripData | null;
@@ -139,35 +211,43 @@ const upcomingTripFor = (
  * this kind of mismatch, so this isn't a silent inconsistency.
  */
 export function buildWidgetInput(data: WidgetSyncData): WidgetSnapshotInput {
-  const { trip, todayOutfit, wornOutfit, outfitStatus, closetCount, weather, settings, upcoming } = data;
+  const { trip, todayOutfits, wornOutfit, outfitStatus, closetCount, weather, settings, daily, upcoming } = data;
   const weatherKind = weather ? classifyCondition(weather.WeatherText) : undefined;
   const isDay = weather?.IsDayTime;
+  const weatherBlock = buildWeatherBlock(weather, settings, daily);
   const upcomingTrip = upcomingTripFor(upcoming);
 
   // What the user actually logged as worn today wins over everything else —
   // including Trip Mode and the generated suggestion. The widget should show
-  // the outfit they committed to, not the top-ranked alternative.
+  // the outfit they committed to, not the top-ranked alternative. A worn
+  // outfit is a commitment, so there's nothing to "change fit" to: one variant.
   if (wornOutfit && wornOutfit.slots.length > 0) {
     return {
       mode: 'today',
       headline: wornOutfit.headline || "Today's outfit",
       tempLine: formatTempLine(weather, settings),
+      weather: weatherBlock,
       weatherKind,
       isDay,
       items: itemsFromOutfit(wornOutfit),
+      variants: [variantFromOutfit(wornOutfit)],
       ...widgetAlertsFor(wornOutfit),
       upcomingTrip,
       deepLink: OUTFIT_DEEP_LINK,
     };
   }
 
+  // Trip Mode is also a single variant — the alternates come from the everyday
+  // generator and would fight the outfit the user planned for this trip.
   if (trip.active && trip.plan && trip.outfit) {
     return {
       mode: 'trip',
       headline: trip.outfit.headline || 'Trip outfit',
+      weather: weatherBlock,
       weatherKind,
       isDay,
       items: itemsFromOutfit(trip.outfit),
+      variants: [variantFromOutfit(trip.outfit)],
       ...widgetAlertsFor(trip.outfit),
       trip: {
         destination: trip.plan.destination,
@@ -181,15 +261,19 @@ export function buildWidgetInput(data: WidgetSyncData): WidgetSnapshotInput {
     };
   }
 
-  if (todayOutfit && todayOutfit.slots.length > 0) {
+  const wearable = todayOutfits.filter((o) => o.slots.length > 0);
+  if (wearable.length > 0) {
+    const primary = wearable[0];
     return {
       mode: 'today',
-      headline: todayOutfit.headline || "Today's outfit",
+      headline: primary.headline || "Today's outfit",
       tempLine: formatTempLine(weather, settings),
+      weather: weatherBlock,
       weatherKind,
       isDay,
-      items: itemsFromOutfit(todayOutfit),
-      ...widgetAlertsFor(todayOutfit),
+      items: itemsFromOutfit(primary),
+      variants: wearable.slice(0, MAX_WIDGET_VARIANTS).map(variantFromOutfit),
+      ...widgetAlertsFor(primary),
       upcomingTrip,
       deepLink: OUTFIT_DEEP_LINK,
     };
@@ -204,6 +288,7 @@ export function buildWidgetInput(data: WidgetSyncData): WidgetSnapshotInput {
     mode: 'empty',
     headline: '',
     tempLine: formatTempLine(weather, settings),
+    weather: weatherBlock,
     weatherKind,
     isDay,
     items: [],

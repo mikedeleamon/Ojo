@@ -18,6 +18,6 @@ struct OjoWidget: Widget {
     }
     .configurationDisplayName("Today's Outfit")
     .description("Your Ojo outfit for today — and your trip look when you're traveling.")
-    .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .accessoryRectangular, .accessoryInline])
+    .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .accessoryCircular, .accessoryRectangular, .accessoryInline])
   }
 }

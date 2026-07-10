@@ -15,33 +15,61 @@
 
 import { OUTFIT_DEEP_LINK } from './deepLinks';
 import { cacheThumb, isWidgetBridgeAvailable, pruneThumbs, writeSnapshot } from './native';
-import type { OjoWidgetSnapshot, WidgetSnapshotInput } from './snapshot.types';
+import type {
+  OjoWidgetSnapshot,
+  OjoWidgetSnapshotItem,
+  WidgetSnapshotInput,
+} from './snapshot.types';
 
 /** Widgets show at most a few items; cap work and payload size. */
 const MAX_WIDGET_ITEMS = 4;
 
-export async function updateWidgetSnapshot(input: WidgetSnapshotInput): Promise<void> {
-  if (!isWidgetBridgeAvailable()) return;
-
-  const items = input.items.slice(0, MAX_WIDGET_ITEMS);
-
-  // Cache thumbnails in parallel; each resolves to a local path or null.
-  const resolved = await Promise.all(
-    items.map(async (it) => ({
+/** Cache one outfit's thumbnails in parallel; each resolves to a local path or null. */
+const resolveItems = async (
+  items: WidgetSnapshotInput['items'],
+): Promise<OjoWidgetSnapshotItem[]> =>
+  Promise.all(
+    items.slice(0, MAX_WIDGET_ITEMS).map(async (it) => ({
       id: it.id,
       role: it.role,
       thumb: await cacheThumb(it.imageUrl),
     })),
   );
 
+export async function updateWidgetSnapshot(input: WidgetSnapshotInput): Promise<void> {
+  if (!isWidgetBridgeAvailable()) return;
+
+  // Every variant's thumbnails must be pre-cached — the "Change fit" intent
+  // swaps variants without the app running, so nothing can be fetched later.
+  // (cacheThumb keys by URL hash, so an item shared between variants — or with
+  // the top-level items, which mirror variant 0 — is downloaded once.)
+  const variants = input.variants
+    ? await Promise.all(
+        input.variants.map(async (v) => ({
+          headline: v.headline,
+          items: await resolveItems(v.items),
+          layerNote: v.layerNote,
+          alerts: v.alerts,
+          uvIndexText: v.uvIndexText,
+          timeline: v.timeline,
+        })),
+      )
+    : undefined;
+
+  // Top-level items mirror variant 0 (already resolved above); only a
+  // variant-less input (empty mode / legacy caller) resolves its own.
+  const resolved = variants?.[0]?.items ?? (await resolveItems(input.items));
+
   const snapshot: OjoWidgetSnapshot = {
     mode: input.mode,
     updatedAt: new Date().toISOString(),
     headline: input.headline,
     tempLine: input.tempLine,
+    weather: input.weather,
     weatherKind: input.weatherKind,
     isDay: input.isDay,
     items: resolved,
+    variants,
     layerNote: input.layerNote,
     alerts: input.alerts,
     uvIndexText: input.uvIndexText,
@@ -54,11 +82,12 @@ export async function updateWidgetSnapshot(input: WidgetSnapshotInput): Promise<
 
   try {
     writeSnapshot(JSON.stringify(snapshot));
-    // Drop any thumbnails from previous snapshots that today's no longer uses.
-    const keep = resolved
+    // Drop any thumbnails from previous snapshots that today's no longer uses —
+    // keeping every variant's, not just the visible outfit's.
+    const keep = [...resolved, ...(variants ?? []).flatMap((v) => v.items)]
       .map((r) => r.thumb)
       .filter((t): t is string => t != null);
-    pruneThumbs(keep);
+    pruneThumbs([...new Set(keep)]);
   } catch (e) {
     console.warn('[Ojo] updateWidgetSnapshot failed:', e);
   }

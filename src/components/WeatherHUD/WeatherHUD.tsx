@@ -168,6 +168,11 @@ const WeatherHUD = ({
     const [forecasts, setForecasts] = useState<Forecast[]>(
         seedSnapshot?.forecasts ?? [],
     );
+    // Kept as state (not just flattened into sunEvents) so today's High/Low,
+    // rain chance and sunset can flow down to the outfit card + widget snapshot.
+    const [daily, setDaily] = useState<DailyForecast[]>(
+        seedSnapshot?.daily ?? [],
+    );
     const [sunEvents, setSunEvents] = useState<SunEvent[]>(
         seedSnapshot ? extractSunEvents(seedSnapshot.daily) : [],
     );
@@ -185,6 +190,7 @@ const WeatherHUD = ({
     const pendingRef = useRef<{
         weather: CurrentWeather;
         forecasts: Forecast[];
+        daily: DailyForecast[];
         sunEvents: SunEvent[];
     } | null>(null);
     const isRefreshRef = useRef(false);
@@ -194,10 +200,12 @@ const WeatherHUD = ({
             const {
                 weather: w,
                 forecasts: f,
+                daily: d,
                 sunEvents: s,
             } = pendingRef.current;
             setWeather(w);
             setForecasts(f);
+            setDaily(d);
             setSunEvents(s);
             setFooterBg(footerBgFor(w.WeatherText, w.IsDayTime));
             setLastUpdated(new Date());
@@ -212,6 +220,7 @@ const WeatherHUD = ({
         if (!seedSnapshot) return;
         setWeather(seedSnapshot.weather);
         setForecasts(seedSnapshot.forecasts);
+        setDaily(seedSnapshot.daily);
         setSunEvents(extractSunEvents(seedSnapshot.daily));
         if (seedSnapshot.place) setPlace(seedSnapshot.place);
         setFooterBg(
@@ -284,11 +293,13 @@ const WeatherHUD = ({
                     pendingRef.current = {
                         weather: w,
                         forecasts: fRes.data ?? [],
+                        daily: dRes.data ?? [],
                         sunEvents: events,
                     };
                 } else {
                     setWeather(w);
                     setForecasts(fRes.data ?? []);
+                    setDaily(dRes.data ?? []);
                     setSunEvents(events);
                     setFooterBg(footerBgFor(w.WeatherText, w.IsDayTime));
                     setLastUpdated(new Date());
@@ -768,6 +779,7 @@ const WeatherHUD = ({
                                 weather={weather}
                                 settings={settings}
                                 forecasts={forecasts}
+                                daily={daily}
                             />
                         </GlassCard>
 

@@ -72,3 +72,38 @@ struct LockScreenInlineView: View {
     Label(c.inlineText, systemImage: c.icon)
   }
 }
+
+/// The circular Lock Screen family: weather glyph over the temperature (or the
+/// trip day / empty glyph — a number-less circle still reads as Ojo). Uses the
+/// standard AccessoryWidgetBackground so it matches first-party circulars, and
+/// rounded monospaced digits to mirror the Home Screen hero temperature.
+struct LockScreenCircularView: View {
+  let snap: WidgetSnapshot
+
+  /// The circle's number line: temperature for today/empty, trip day when
+  /// traveling. Nil (icon-only) when neither is known.
+  private var valueText: String? {
+    if snap.mode == .trip, let trip = snap.trip {
+      return "D\(trip.dayIndex)"
+    }
+    if let temp = snap.weather?.temp { return "\(temp)°" }
+    return nil
+  }
+
+  var body: some View {
+    let c = LockScreenContent(snap)
+    ZStack {
+      AccessoryWidgetBackground()
+      VStack(spacing: 0) {
+        Image(systemName: c.icon)
+          .font(.system(size: valueText == nil ? 18 : 12, weight: .semibold))
+          .widgetAccentable()
+        if let value = valueText {
+          Text(value)
+            .font(.system(size: 15, weight: .semibold, design: .rounded))
+            .monospacedDigit()
+        }
+      }
+    }
+  }
+}

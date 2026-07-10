@@ -10,12 +10,19 @@ struct WidgetSnapshot: Codable {
   let updatedAt: String
   let headline: String
   let tempLine: String?
+  /// Structured weather readout for the hero-temperature layout. Optional —
+  /// pre-redesign snapshots lack it; views fall back to `tempLine`.
+  let weather: WeatherBlock?
   /// Mirrors lib/weather/conditions.ts WeatherKind. Optional (rather than
   /// required) so a snapshot written before this field existed still decodes —
   /// WeatherGradient.swift falls back to a neutral gradient when nil.
   let weatherKind: String?
   let isDay: Bool?
   let items: [Item]
+  /// All renderable outfits for today, primary first — the "Change fit" intent
+  /// cycles them. Optional: empty mode and pre-variant snapshots omit it, in
+  /// which case the top-level fields are the only variant.
+  let variants: [Variant]?
   /// Short layering call-to-action from the JS layering engine, e.g. "Bring a
   /// jacket — windy after 4pm." Optional so older snapshots still decode.
   let layerNote: String?
@@ -48,6 +55,32 @@ struct WidgetSnapshot: Codable {
     let thumb: String?
   }
 
+  /// Mirrors snapshot.types.ts `OjoWidgetWeather`. Values arrive pre-converted
+  /// to the user's unit; Swift only renders. Everything but `temp`/`unit` is
+  /// optional so a partial readout (e.g. no daily forecast) still decodes.
+  struct WeatherBlock: Codable {
+    let temp: Int
+    let feelsLike: Int?
+    let high: Int?
+    let low: Int?
+    let unit: String        // "F" | "C"
+    let condition: String?  // "Partly Cloudy"
+    let rainChance: Int?    // 0–100
+    let uvText: String?     // "Low"…"Extreme"
+    let sunset: String?     // "8:14 PM"
+  }
+
+  /// Mirrors snapshot.types.ts `WidgetOutfitVariant` — one complete outfit the
+  /// widget can render. Index 0 mirrors the snapshot's top-level fields.
+  struct Variant: Codable {
+    let headline: String
+    let items: [Item]
+    let layerNote: String?
+    let alerts: [String]?
+    let uvIndexText: String?
+    let timeline: [TimelineStep]?
+  }
+
   struct TripInfo: Codable {
     let destination: String
     let dayIndex: Int
@@ -75,12 +108,55 @@ struct WidgetSnapshot: Codable {
 }
 
 extension WidgetSnapshot {
+  /// How many outfits the "Change fit" intent can cycle through — never 0, so
+  /// `index % variantCount` is always safe.
+  var variantCount: Int { max(variants?.count ?? 1, 1) }
+
+  /// Returns a copy whose top-level outfit fields (headline/items/layerNote/
+  /// alerts/uvIndexText/timeline) are replaced by `variants[index mod count]`,
+  /// so every view keeps reading the same top-level fields regardless of which
+  /// fit the user has cycled to. Index 0 / missing variants → self unchanged.
+  func applyingVariant(_ index: Int) -> WidgetSnapshot {
+    guard let variants = variants, !variants.isEmpty else { return self }
+    let v = variants[((index % variants.count) + variants.count) % variants.count]
+    return WidgetSnapshot(
+      mode: mode,
+      updatedAt: updatedAt,
+      headline: v.headline,
+      tempLine: tempLine,
+      weather: weather,
+      weatherKind: weatherKind,
+      isDay: isDay,
+      items: v.items,
+      variants: variants,
+      layerNote: v.layerNote,
+      alerts: v.alerts,
+      uvIndexText: v.uvIndexText,
+      timeline: v.timeline,
+      emptyReason: emptyReason,
+      trip: trip,
+      upcomingTrip: upcomingTrip,
+      deepLink: deepLink
+    )
+  }
+
   /// Gallery / pre-data sample shown before the app writes a real snapshot.
   static let placeholder = WidgetSnapshot(
     mode: .today,
     updatedAt: "",
     headline: "Today's Outfit",
     tempLine: "72° · Clear",
+    weather: WeatherBlock(
+      temp: 72,
+      feelsLike: 74,
+      high: 78,
+      low: 61,
+      unit: "F",
+      condition: "Clear",
+      rainChance: 10,
+      uvText: "High",
+      sunset: "8:14 PM"
+    ),
     weatherKind: "clear",
     isDay: true,
     items: [
@@ -88,6 +164,7 @@ extension WidgetSnapshot {
       Item(id: "2", role: "bottom", thumb: nil),
       Item(id: "3", role: "footwear", thumb: nil),
     ],
+    variants: nil,
     layerNote: "Layer up — cooler after sunset.",
     alerts: ["layer"],
     uvIndexText: "High",
@@ -107,9 +184,11 @@ extension WidgetSnapshot {
     updatedAt: "",
     headline: "",
     tempLine: nil,
+    weather: nil,
     weatherKind: nil,
     isDay: nil,
     items: [],
+    variants: nil,
     layerNote: nil,
     alerts: [],
     uvIndexText: nil,

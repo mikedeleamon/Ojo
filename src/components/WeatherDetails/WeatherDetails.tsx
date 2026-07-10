@@ -3,11 +3,11 @@ import { StyleSheet, Pressable } from 'react-native';
 import { Svg, Path } from 'react-native-svg';
 import { View, Text, GlassCard, GlassGroup } from '../primitives';
 import OutfitSuggestion from '../OutfitSuggestion/OutfitSuggestion';
-import { CurrentWeather, Forecast, Settings } from '../../types';
+import { CurrentWeather, DailyForecast, Forecast, Settings } from '../../types';
 import { type ColorTokens, fonts, fontSizes, fontWeights, spacing, radius } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 
-interface Props { weather: CurrentWeather; settings: Settings; forecasts: Forecast[]; }
+interface Props { weather: CurrentWeather; settings: Settings; forecasts: Forecast[]; daily?: DailyForecast[]; }
 
 const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   root:       { gap: spacing.md },
@@ -32,7 +32,7 @@ const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   pillValue: { fontFamily: fonts.body, fontSize: fontSizes.xs, fontWeight: fontWeights.semibold },
 });
 
-const WeatherDetails = ({ weather, settings, forecasts }: Props) => {
+const WeatherDetails = ({ weather, settings, forecasts, daily }: Props) => {
   const { colors } = useTheme();
   const st = useMemo(() => makeStyles(colors), [colors]);
   const [expanded, setExpanded] = useState(false);
@@ -71,7 +71,7 @@ const WeatherDetails = ({ weather, settings, forecasts }: Props) => {
 
   return (
     <View style={st.root}>
-      <OutfitSuggestion weather={weather} settings={settings} forecasts={forecasts} />
+      <OutfitSuggestion weather={weather} settings={settings} forecasts={forecasts} daily={daily} />
 
       {/* Always-visible wind + humidity */}
       <GlassGroup spacing={spacing.sm} style={st.grid}>

@@ -53,6 +53,7 @@ import {
 import {
     ClothingArticle,
     CurrentWeather,
+    DailyForecast,
     Forecast,
     Settings,
     OutfitOccasion,
@@ -229,9 +230,11 @@ interface Props {
     weather: CurrentWeather;
     settings: Settings;
     forecasts: Forecast[];
+    /** 10-day daily forecast — today's entry feeds the widget's H/L, rain % and sunset. */
+    daily?: DailyForecast[];
 }
 
-const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
+const OutfitSuggestion = ({ weather, settings, forecasts, daily }: Props) => {
     const { colors, isDark } = useTheme();
     const styles = useMemo(() => makeStyles(colors), [colors]);
     const heroTint = isDark ? brandHeroTint.dark : brandHeroTint.light;
@@ -433,12 +436,13 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
         if (loading || tripMode.loading) return;
         void updateWidgetSnapshot(
             buildWidgetInput({
-                todayOutfit: outfits[0] ?? null,
+                todayOutfits: outfits,
                 wornOutfit: wornOutfitForWidget,
                 outfitStatus: status,
                 closetCount: closets.length,
                 weather,
                 settings,
+                daily,
                 trip: {
                     active: tripMode.active,
                     plan: tripMode.trip,
@@ -459,6 +463,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
         wornOutfitForWidget,
         weather,
         settings,
+        daily,
         tripMode.upcoming,
         tripMode.loading,
         tripMode.active,

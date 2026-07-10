@@ -83,6 +83,8 @@ export interface DailyForecast {
   maxTempF:         number;
   dayPhrase:        string;   // WeatherKit conditionCode
   hasPrecipitation: boolean;
+  /** Chance of precipitation for the day, 0–100. Optional: older cached snapshots predate it. */
+  precipProbability?: number;
   sunrise?:         string;   // ISO timestamp
   sunset?:          string;   // ISO timestamp
 }

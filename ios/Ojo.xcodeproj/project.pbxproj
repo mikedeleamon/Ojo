@@ -67,7 +67,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		XX250F8EC9943E2DD8AB3AXX /* Exceptions for "ojo-widget" folder in "OjoWidget" target */ = {
+		XX250F8EC9943E2DD8AB3AXX /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				"expo-target.config.js",
@@ -78,18 +78,7 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		XX5D8DF1B93C2D5AECF80AXX /* ojo-widget */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				XX250F8EC9943E2DD8AB3AXX /* Exceptions for "ojo-widget" folder in "OjoWidget" target */,
-			);
-			explicitFileTypes = {
-			};
-			explicitFolders = (
-			);
-			path = "ojo-widget";
-			sourceTree = "<group>";
-		};
+		XX5D8DF1B93C2D5AECF80AXX /* ojo-widget */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (XX250F8EC9943E2DD8AB3AXX /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = "ojo-widget"; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
