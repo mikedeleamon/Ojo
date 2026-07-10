@@ -100,6 +100,8 @@ export interface OjoWidgetSnapshotItem {
  * renders. Distinct from `tempLine` (kept for Lock Screen + older snapshots).
  */
 export interface OjoWidgetWeather {
+  /** Display name of the city this weather is for, e.g. "New York". Omitted when unresolved (widget then just shows the temperature). */
+  city?: string;
   /** Current temperature, rounded, in `unit`. */
   temp: number;
   /** RealFeel, rounded, in `unit`. */

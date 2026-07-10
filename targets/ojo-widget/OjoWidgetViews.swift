@@ -187,6 +187,25 @@ struct TempHeroView: View {
   }
 }
 
+/// The active city — the header's top line in the redesigned layout (Apple
+/// Weather widget convention: city on top, big temperature below). Shown only
+/// in today/empty modes; trip mode's TripBadge already names the destination,
+/// and the small family omits it entirely (one glance, tightest space).
+struct CityLabel: View {
+  let snap: WidgetSnapshot
+  var size: CGFloat = 11
+  var weight: Font.Weight = .semibold
+
+  var body: some View {
+    if snap.mode != .trip, let city = snap.weather?.city, !city.isEmpty {
+      Text(city)
+        .font(.system(size: size, weight: weight))
+        .foregroundStyle(.white.opacity(0.85))
+        .lineLimit(1)
+    }
+  }
+}
+
 /// "Feels 74° · Clear · H:78° L:61°" — the hero temperature's supporting line.
 /// Degrades gracefully: missing pieces are dropped, and a snapshot without the
 /// weather block falls back to the legacy `tempLine`. `includeFeelsLike` is off
@@ -425,6 +444,8 @@ struct MediumOutfitView: View {
       VStack(alignment: .leading, spacing: 4) {
         if snap.mode == .trip, let trip = snap.trip {
           TripBadge(trip: trip)
+        } else {
+          CityLabel(snap: snap, weight: .bold)
         }
         HStack(alignment: .center, spacing: 6) {
           TempHeroView(snap: snap, size: 34)
@@ -528,6 +549,7 @@ struct LargeOutfitView: View {
 
       HStack(alignment: .top) {
         VStack(alignment: .leading, spacing: 2) {
+          CityLabel(snap: snap, size: 12, weight: .bold)
           HStack(alignment: .center, spacing: 8) {
             TempHeroView(snap: snap, size: 44)
             WeatherIconView(kind: snap.weatherKind, isDay: snap.isDay, size: 40)
@@ -663,6 +685,7 @@ struct EmptyStateView: View {
       // hierarchy as the outfit views, so the empty state reads as "the same
       // widget, minus the outfit" rather than a different design.
       if onGradient {
+        CityLabel(snap: snap)
         HStack(alignment: .center, spacing: 6) {
           TempHeroView(snap: snap, size: 24)
           WeatherIconView(kind: snap.weatherKind, isDay: snap.isDay, size: 24)

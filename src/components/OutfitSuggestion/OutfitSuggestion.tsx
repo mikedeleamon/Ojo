@@ -232,9 +232,11 @@ interface Props {
     forecasts: Forecast[];
     /** 10-day daily forecast — today's entry feeds the widget's H/L, rain % and sunset. */
     daily?: DailyForecast[];
+    /** Active city display name — shown in the widget header. */
+    city?: string;
 }
 
-const OutfitSuggestion = ({ weather, settings, forecasts, daily }: Props) => {
+const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) => {
     const { colors, isDark } = useTheme();
     const styles = useMemo(() => makeStyles(colors), [colors]);
     const heroTint = isDark ? brandHeroTint.dark : brandHeroTint.light;
@@ -443,6 +445,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily }: Props) => {
                 weather,
                 settings,
                 daily,
+                city,
                 trip: {
                     active: tripMode.active,
                     plan: tripMode.trip,
@@ -464,6 +467,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily }: Props) => {
         weather,
         settings,
         daily,
+        city,
         tripMode.upcoming,
         tripMode.loading,
         tripMode.active,

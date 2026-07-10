@@ -109,11 +109,13 @@ export function buildWeatherBlock(
   weather: CurrentWeather | null | undefined,
   settings: Settings,
   daily?: DailyForecast[],
+  city?: string,
 ): OjoWidgetWeather | undefined {
   if (!weather) return undefined;
   const isMetric = settings.temperatureScale === 'Metric';
   const today = todayDailyFor(daily);
   return {
+    city: city?.trim() || undefined,
     temp: Math.round(
       isMetric ? weather.Temperature.Metric.Value : weather.Temperature.Imperial.Value,
     ),
@@ -172,6 +174,8 @@ export interface WidgetSyncData {
   settings: Settings;
   /** 10-day daily forecast — today's entry supplies the widget's H/L, rain % and sunset. */
   daily?: DailyForecast[];
+  /** Display name of the active city (resolved place name), shown in the widget header. */
+  city?: string;
   trip: WidgetTripData;
   /** Independent of `trip`/`mode` — powers the separate Trip Countdown widget. */
   upcoming: WidgetUpcomingTripData | null;
@@ -239,10 +243,10 @@ const upcomingTripFor = (
  * this kind of mismatch, so this isn't a silent inconsistency.
  */
 export function buildWidgetInput(data: WidgetSyncData): WidgetSnapshotInput {
-  const { trip, todayOutfits, wornOutfit, outfitStatus, closetCount, weather, settings, daily, upcoming } = data;
+  const { trip, todayOutfits, wornOutfit, outfitStatus, closetCount, weather, settings, daily, city, upcoming } = data;
   const weatherKind = weather ? classifyCondition(weather.WeatherText) : undefined;
   const isDay = weather?.IsDayTime;
-  const weatherBlock = buildWeatherBlock(weather, settings, daily);
+  const weatherBlock = buildWeatherBlock(weather, settings, daily, city);
   const upcomingTrip = upcomingTripFor(upcoming, settings);
 
   // What the user actually logged as worn today wins over everything else —

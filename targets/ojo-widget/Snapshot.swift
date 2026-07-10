@@ -59,6 +59,7 @@ struct WidgetSnapshot: Codable {
   /// to the user's unit; Swift only renders. Everything but `temp`/`unit` is
   /// optional so a partial readout (e.g. no daily forecast) still decodes.
   struct WeatherBlock: Codable {
+    let city: String?       // "New York" — nil when unresolved
     let temp: Int
     let feelsLike: Int?
     let high: Int?
@@ -162,6 +163,7 @@ extension WidgetSnapshot {
     headline: "Today's Outfit",
     tempLine: "72° · Clear",
     weather: WeatherBlock(
+      city: "New York",
       temp: 72,
       feelsLike: 74,
       high: 78,

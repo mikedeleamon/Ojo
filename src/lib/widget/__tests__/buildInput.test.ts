@@ -84,8 +84,9 @@ const baseData = (over: Partial<WidgetSyncData> = {}): WidgetSyncData => ({
 });
 
 describe('buildWeatherBlock', () => {
-  it('converts everything to the imperial unit with H/L, rain % and sunset from today', () => {
-    expect(buildWeatherBlock(weather, settings, daily)).toEqual({
+  it('includes the city when provided and converts to the imperial unit with H/L, rain % and sunset', () => {
+    expect(buildWeatherBlock(weather, settings, daily, 'New York')).toEqual({
+      city: 'New York',
       temp: 72,
       feelsLike: 76,
       high: 78,

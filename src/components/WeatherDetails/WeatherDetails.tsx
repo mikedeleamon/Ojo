@@ -7,7 +7,7 @@ import { CurrentWeather, DailyForecast, Forecast, Settings } from '../../types';
 import { type ColorTokens, fonts, fontSizes, fontWeights, spacing, radius } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 
-interface Props { weather: CurrentWeather; settings: Settings; forecasts: Forecast[]; daily?: DailyForecast[]; }
+interface Props { weather: CurrentWeather; settings: Settings; forecasts: Forecast[]; daily?: DailyForecast[]; city?: string; }
 
 const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   root:       { gap: spacing.md },
@@ -32,7 +32,7 @@ const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   pillValue: { fontFamily: fonts.body, fontSize: fontSizes.xs, fontWeight: fontWeights.semibold },
 });
 
-const WeatherDetails = ({ weather, settings, forecasts, daily }: Props) => {
+const WeatherDetails = ({ weather, settings, forecasts, daily, city }: Props) => {
   const { colors } = useTheme();
   const st = useMemo(() => makeStyles(colors), [colors]);
   const [expanded, setExpanded] = useState(false);
@@ -71,7 +71,7 @@ const WeatherDetails = ({ weather, settings, forecasts, daily }: Props) => {
 
   return (
     <View style={st.root}>
-      <OutfitSuggestion weather={weather} settings={settings} forecasts={forecasts} daily={daily} />
+      <OutfitSuggestion weather={weather} settings={settings} forecasts={forecasts} daily={daily} city={city} />
 
       {/* Always-visible wind + humidity */}
       <GlassGroup spacing={spacing.sm} style={st.grid}>

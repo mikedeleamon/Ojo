@@ -780,6 +780,7 @@ const WeatherHUD = ({
                                 settings={settings}
                                 forecasts={forecasts}
                                 daily={daily}
+                                city={place?.name}
                             />
                         </GlassCard>
 
