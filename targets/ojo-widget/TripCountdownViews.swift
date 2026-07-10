@@ -13,13 +13,29 @@ private let tripCountdownGradient: [Color] = [
 ]
 
 extension View {
+  /// Home Screen families get the brand gradient; Lock Screen accessory families
+  /// get a CLEAR container background so the system's own vibrancy/tint shows.
+  ///
+  /// iOS 17 requires EVERY family — accessory included — to declare a
+  /// `containerBackground`; a family that renders without one shows WidgetKit's
+  /// "Please adopt the containerBackground API" error placeholder instead of the
+  /// content (which is exactly what the accessory families did before). Mirrors
+  /// OjoWidgetViews.swift's `ojoWidgetBackground`.
   @ViewBuilder
-  func tripCountdownBackground() -> some View {
-    let gradient = LinearGradient(colors: tripCountdownGradient, startPoint: .top, endPoint: .bottom)
-    if #available(iOS 17.0, *) {
-      containerBackground(for: .widget) { gradient.overlay(Color.black.opacity(0.16)) }
+  func tripCountdownBackground(family: WidgetFamily) -> some View {
+    if family == .accessoryCircular || family == .accessoryRectangular || family == .accessoryInline {
+      if #available(iOS 17.0, *) {
+        containerBackground(for: .widget) { Color.clear }
+      } else {
+        self
+      }
     } else {
-      background(gradient.overlay(Color.black.opacity(0.16)))
+      let gradient = LinearGradient(colors: tripCountdownGradient, startPoint: .top, endPoint: .bottom)
+      if #available(iOS 17.0, *) {
+        containerBackground(for: .widget) { gradient.overlay(Color.black.opacity(0.16)) }
+      } else {
+        background(gradient.overlay(Color.black.opacity(0.16)))
+      }
     }
   }
 }
@@ -47,26 +63,26 @@ struct TripCountdownWidgetView: View {
   let entry: TripCountdownProvider.Entry
 
   var body: some View {
-    // Lock Screen accessory families are composited with the system's own
-    // vibrancy/tint, so they skip the brand gradient (containerBackground is
-    // ignored there anyway) and use the default monochrome treatment.
+    // Every family routes through the same background modifier so each one
+    // declares a containerBackground (iOS 17 requires it — see below). Lock
+    // Screen families are composited with system vibrancy, so theirs is clear.
+    content
+      .widgetURL(URL(string: deepLink))
+      .tripCountdownBackground(family: family)
+  }
+
+  @ViewBuilder private var content: some View {
     switch family {
     case .accessoryCircular:
       TripCountdownCircularView(trip: entry.upcoming)
-        .widgetURL(URL(string: deepLink))
     case .accessoryRectangular:
       TripCountdownRectangularView(trip: entry.upcoming)
-        .widgetURL(URL(string: deepLink))
     default:
-      Group {
-        if let trip = entry.upcoming {
-          TripCountdownContent(trip: trip, family: family)
-        } else {
-          TripCountdownEmptyView()
-        }
+      if let trip = entry.upcoming {
+        TripCountdownContent(trip: trip, family: family)
+      } else {
+        TripCountdownEmptyView()
       }
-      .widgetURL(URL(string: deepLink))
-      .tripCountdownBackground()
     }
   }
 
