@@ -31,6 +31,11 @@ const syncPost = (entry: OutfitHistoryEntry) =>
     closetName:     entry.closetName,
     articleIds:     entry.articleIds,
     articleSummary: entry.articleSummary,
+    // ML-ranker instrumentation — omitted (not null) when absent so pre-existing
+    // entries and Trip Mode logs post the same shape they always did.
+    ...(entry.context   ? { context:   entry.context }   : {}),
+    ...(entry.engine    ? { engine:    entry.engine }    : {}),
+    ...(entry.negatives ? { negatives: entry.negatives } : {}),
   }, authHeaders()).catch(() => {});
 
 const syncDelete = (id: string) =>

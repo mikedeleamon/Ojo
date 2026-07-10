@@ -14,7 +14,7 @@
  * by replacing scoreOutfit() with a model inference call.
  */
 
-import { ClothingArticle, CurrentWeather, Forecast, Settings, OutfitOccasion, articleCategories } from '../types';
+import { ClothingArticle, CurrentWeather, Forecast, Settings, OutfitOccasion, WearContext, articleCategories } from '../types';
 import {
   articlePreferenceScore, colorPairingBonus, UserPreferenceProfile,
   PERSONALIZATION_THRESHOLD, LEARNING_THRESHOLD,
@@ -30,10 +30,6 @@ import type {
   PrecipIntensity,
   RecentlyWorn,
   AccessoryAlerts,
-  WearContext,
-  WornEngineInfo,
-  NegativeSignal,
-  NegativeSignalSource,
 } from './outfit/types';
 import {
   getWeatherBucket,
@@ -59,10 +55,6 @@ export type {
   PrecipIntensity,
   RecentlyWorn,
   Season,
-  WearContext,
-  WornEngineInfo,
-  NegativeSignal,
-  NegativeSignalSource,
 };
 export {
   getWeatherBucket,
@@ -732,6 +724,78 @@ const buildAccessoryAlerts = (slots: OutfitSlot[], ctx: NotesContext): Accessory
 
 // ─── Main: generate top-K ranked outfits ──────────────────────────────────────
 
+/** Bumped whenever scoring weights/logic change meaningfully, so training data
+ *  can distinguish which engine produced a logged score. */
+export const ENGINE_VERSION = 1;
+
+interface DerivedWeatherContext {
+  feelsLikeF:         number;
+  precipIntensity:    PrecipIntensity;
+  humidity:           number;
+  windMph:            number;
+  uvIndexText:        string;
+  isSnowing:          boolean;
+  uvHigh:             boolean;
+  effectiveFeelsLike: number;
+  bucket:             WeatherBucket;
+}
+
+const deriveWeatherContext = (
+  weather:   CurrentWeather,
+  settings:  Settings,
+  forecasts: Forecast[],
+): DerivedWeatherContext => {
+  const feelsLikeF       = weather.RealFeelTemperature.Imperial.Value;
+  const precipIntensity  = classifyPrecipitation(weather);
+  const humidity         = weather.RelativeHumidity;
+  const windMph          = weather.Wind.Speed.Imperial.Value;
+  const uvIndexText      = weather.UVIndexText ?? '';
+  const isSnowing        = /snow/i.test(weather.WeatherText ?? '');
+  const uvHigh           = UV_HIGH_LABELS.has(uvIndexText);
+
+  // Time-of-day warmth adjustment: in the morning (before noon) the user is
+  // dressing for the full day ahead, which may include cooler temps later. We
+  // blend the current feels-like with the forecast low so the ideal warmth
+  // leans warmer. By afternoon the current reading is representative.
+  const currentHour = new Date().getHours();
+  let effectiveFeelsLike = feelsLikeF;
+  if (forecasts.length > 0 && currentHour < 12) {
+    const feelsOffset = feelsLikeF - weather.Temperature.Imperial.Value;
+    const forecastTemps = forecasts.map(f => f.Temperature.Value + feelsOffset);
+    const forecastLow = Math.min(...forecastTemps);
+    // Blend factor: at 6 AM lean 40% toward the day's low; at 11 AM lean 10%
+    const blendFactor = Math.max(0.10, 0.40 - (currentHour - 6) * 0.05);
+    effectiveFeelsLike = feelsLikeF * (1 - blendFactor) + forecastLow * blendFactor;
+  }
+  const bucket = getWeatherBucket(effectiveFeelsLike, settings.hiTempThreshold, settings.lowTempThreshold);
+
+  return { feelsLikeF, precipIntensity, humidity, windMph, uvIndexText, isSnowing, uvHigh, effectiveFeelsLike, bucket };
+};
+
+/** The weather/settings snapshot to stamp on a wear-log entry, derived exactly
+ *  as generateOutfits derives its own scoring context (same bucket, same
+ *  morning warmth blend) so training data matches what the engine saw. */
+export const buildWearContext = (
+  weather:   CurrentWeather,
+  settings:  Settings,
+  forecasts: Forecast[] = [],
+): WearContext => {
+  const ctx = deriveWeatherContext(weather, settings, forecasts);
+  return {
+    feelsLikeF:      ctx.feelsLikeF,
+    bucket:          ctx.bucket,
+    precipIntensity: ctx.precipIntensity,
+    humidity:        ctx.humidity,
+    windMph:         ctx.windMph,
+    isSnowing:       ctx.isSnowing,
+    hourOfDay:       new Date().getHours(),
+    occasion:        settings.occasion,
+    styles:          settings.clothingStyles?.length
+      ? settings.clothingStyles
+      : settings.clothingStyle ? [settings.clothingStyle] : undefined,
+  };
+};
+
 export const generateOutfits = (
   articles:     ClothingArticle[],
   weather:      CurrentWeather,
@@ -758,30 +822,10 @@ export const generateOutfits = (
   if (articles.length === 0) return empty_result('empty_closet');
 
   // ── Weather context ───────────────────────────────────────────────────────
-  const feelsLikeF       = weather.RealFeelTemperature.Imperial.Value;
-  const precipIntensity  = classifyPrecipitation(weather);
-  const humidity         = weather.RelativeHumidity;
-  const windMph          = weather.Wind.Speed.Imperial.Value;
-  const uvIndexText      = weather.UVIndexText ?? '';
-  const isSnowing        = /snow/i.test(weather.WeatherText ?? '');
-  const uvHigh           = UV_HIGH_LABELS.has(uvIndexText);
-
-  // ── Time-of-day warmth adjustment ──────────────────────────────────────────
-  // In the morning (before noon) the user is dressing for the full day ahead,
-  // which may include cooler temps later. We blend the current feels-like with
-  // the forecast low so the ideal warmth leans warmer. By afternoon the current
-  // reading is representative — no adjustment needed.
-  const currentHour = new Date().getHours();
-  let effectiveFeelsLike = feelsLikeF;
-  if (forecasts.length > 0 && currentHour < 12) {
-    const feelsOffset = feelsLikeF - weather.Temperature.Imperial.Value;
-    const forecastTemps = forecasts.map(f => f.Temperature.Value + feelsOffset);
-    const forecastLow = Math.min(...forecastTemps);
-    // Blend factor: at 6 AM lean 40% toward the day's low; at 11 AM lean 10%
-    const blendFactor = Math.max(0.10, 0.40 - (currentHour - 6) * 0.05);
-    effectiveFeelsLike = feelsLikeF * (1 - blendFactor) + forecastLow * blendFactor;
-  }
-  const bucket      = getWeatherBucket(effectiveFeelsLike, settings.hiTempThreshold, settings.lowTempThreshold);
+  const {
+    feelsLikeF, precipIntensity, humidity, windMph,
+    uvIndexText, isSnowing, uvHigh, effectiveFeelsLike, bucket,
+  } = deriveWeatherContext(weather, settings, forecasts);
 
   // ── Phase 1: Hard filter → role bucketing → pre-rank per bucket ───────────
   const userGender = settings.gender ?? 'All';
@@ -1021,36 +1065,5 @@ export const generateOutfits = (
   results.sort((a, b) => b.score - a.score);
 
   return { results, status: 'ok' };
-};
-
-// ─── Wear instrumentation ─────────────────────────────────────────────────────
-// Captures ranker-training context alongside each worn outfit (OutfitHistoryEntry
-// .context/.engine/.negatives — see server/src/scripts/exportTrainingData.ts).
-// Bump ENGINE_VERSION whenever the scoring formula changes materially, so the
-// training export can weight or filter entries by which formula produced them.
-
-export const ENGINE_VERSION = 'v1';
-
-/**
- * Weather + preference snapshot at the moment an outfit is worn. Mirrors the
- * weather-derived values generateOutfits() computes internally, minus the
- * morning forecast-blend — there's no forecast to blend against at wear time,
- * only the live reading.
- */
-export const buildWearContext = (weather: CurrentWeather, settings: Settings): WearContext => {
-  const feelsLikeF = weather.RealFeelTemperature.Imperial.Value;
-  return {
-    feelsLikeF,
-    bucket:          getWeatherBucket(feelsLikeF, settings.hiTempThreshold, settings.lowTempThreshold),
-    precipIntensity: classifyPrecipitation(weather),
-    humidity:        weather.RelativeHumidity,
-    windMph:         weather.Wind.Speed.Imperial.Value,
-    isSnowing:       /snow/i.test(weather.WeatherText ?? ''),
-    hourOfDay:       new Date().getHours(),
-    occasion:        settings.occasion,
-    styles: settings.clothingStyles?.length
-      ? settings.clothingStyles
-      : [settings.clothingStyle ?? 'Casual'],
-  };
 };
 

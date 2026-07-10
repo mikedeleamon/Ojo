@@ -10,6 +10,13 @@ router.use(requireAuth);
 // Mirrors MAX_ENTRIES in the client's outfitHistory.ts.
 const MAX_ENTRIES = 2000;
 
+// Cap ranker training negatives per entry so the document stays small; the
+// client sends at most topK−1 (=2) today.
+const MAX_NEGATIVES = 5;
+
+const isPlainObject = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v);
+
 /** GET /api/history — entries + clear tombstone for the authenticated user */
 router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -31,6 +38,10 @@ router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
         closetName:     e.closetName,
         articleIds:     e.articleIds,
         articleSummary: e.articleSummary,
+        // ML-ranker instrumentation — omitted for entries that predate it
+        ...(e.context   ? { context:   e.context }   : {}),
+        ...(e.engine    ? { engine:    e.engine }    : {}),
+        ...(e.negatives?.length ? { negatives: e.negatives } : {}),
       })),
     });
   } catch (err) {
@@ -48,6 +59,22 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       return;
     }
 
+    // ML-ranker instrumentation: optional, validated loosely (shape, not values)
+    // and silently dropped when malformed — a bad context must never block the
+    // wear log itself. Mongoose sub-schema validation handles field types.
+    const context = isPlainObject(req.body.context) && typeof req.body.context.feelsLikeF === 'number'
+      ? req.body.context
+      : undefined;
+    const engine = isPlainObject(req.body.engine) && typeof req.body.engine.score === 'number'
+      ? req.body.engine
+      : undefined;
+    const negatives = Array.isArray(req.body.negatives)
+      ? req.body.negatives
+          .filter((n: unknown) =>
+            isPlainObject(n) && Array.isArray((n as { articleIds?: unknown }).articleIds))
+          .slice(0, MAX_NEGATIVES)
+      : undefined;
+
     const wornAtDate = new Date(wornAt);
     if (isNaN(wornAtDate.getTime())) {
       res.status(400).json({ error: 'wornAt must be a valid date' });
@@ -62,7 +89,13 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
 
     const entry = await OutfitHistory.findOneAndUpdate(
       { userId: req.userId, clientId: id },
-      { $setOnInsert: { userId: req.userId, clientId: id, wornAt: wornAtDate, closetId, closetName, articleIds: articleIds ?? [], articleSummary: articleSummary ?? '' } },
+      { $setOnInsert: {
+        userId: req.userId, clientId: id, wornAt: wornAtDate, closetId, closetName,
+        articleIds: articleIds ?? [], articleSummary: articleSummary ?? '',
+        ...(context   ? { context }   : {}),
+        ...(engine    ? { engine }    : {}),
+        ...(negatives?.length ? { negatives } : {}),
+      } },
       { upsert: true, new: true },
     );
     res.status(201).json({ id: entry.clientId });

@@ -269,12 +269,22 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         borderWidth: 1,
         borderColor: colors.glassBorder,
         alignItems: 'center' as const,
+        justifyContent: 'center' as const,
         backgroundColor: colors.glassBg,
+        overflow: 'hidden' as const,
+    },
+    woreThisTint: {
+        position: 'absolute' as const,
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
     },
     woreThisText: {
         fontFamily: fonts.body,
         fontSize: fontSizes.sm,
-        color: colors.textSecondary,
+        fontWeight: fontWeights.medium,
+        color: colors.textPrimary,
     },
     confirmCard: {
         gap: spacing.sm,

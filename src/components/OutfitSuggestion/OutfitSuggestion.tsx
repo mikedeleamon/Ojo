@@ -16,6 +16,7 @@ import Animated, {
     interpolate,
     Easing,
 } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import { View, Text, GlassCard, GlassGroup } from '../primitives';
 import { EmptyState } from '../shared';
 import OccasionChips from '../OccasionChips';
@@ -33,6 +34,8 @@ import { outfitShareLink } from '../../lib/share/deepLinks';
 import {
     generateOutfits,
     personalizedScoreLevel,
+    buildWearContext,
+    ENGINE_VERSION,
     OutfitRole,
     OutfitSlot,
     OutfitResult,
@@ -54,8 +57,11 @@ import {
     Settings,
     OutfitOccasion,
     OutfitHistoryEntry,
+    WearContext,
+    WearEngineMeta,
+    WearNegative,
 } from '../../types';
-import { spacing } from '../../theme/tokens';
+import { spacing, brandHeroTint } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 import {
     CSS_COLORS,
@@ -226,8 +232,9 @@ interface Props {
 }
 
 const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
-    const { colors } = useTheme();
+    const { colors, isDark } = useTheme();
     const styles = useMemo(() => makeStyles(colors), [colors]);
+    const heroTint = isDark ? brandHeroTint.dark : brandHeroTint.light;
     const { closets, loading, preferred, setPreferred, refresh } =
         useClosets();
     const reduceMotion = useReduceMotion();
@@ -521,6 +528,9 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
         closetId: string;
         closetName: string;
         result: OutfitResult | null;
+        context?: WearContext;
+        engine?: WearEngineMeta;
+        negatives?: WearNegative[];
     }) => {
         const articles = opts.slots.map((s) => s.article);
         if (articles.length === 0) return;
@@ -532,6 +542,9 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
             articleSummary: articles
                 .map((a) => a.name || a.clothingType)
                 .join(', '),
+            context: opts.context,
+            engine: opts.engine,
+            negatives: opts.negatives,
         });
         setHistory((prev) => [entry, ...prev]);
         setLoggedOutfit({ slots: opts.slots, score: opts.score, result: opts.result });
@@ -540,12 +553,30 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
 
     const handleWoreThis = () => {
         if (!preferred || !activeOutfit || activeOutfit.status !== 'ok') return;
+        // The outfits shown alongside the worn one are ranker training negatives:
+        // the user saw them and picked this one instead.
+        const negatives: WearNegative[] = outfits
+            .filter((o, i) => i !== safeIdx && o.status === 'ok' && o.slots.length > 0)
+            .slice(0, 5)
+            .map((o) => ({
+                articleIds: o.slots.map((s) => s.article._id),
+                score: o.score,
+                source: 'shown_not_worn' as const,
+            }));
         logOutfitAsWorn({
             slots: activeSlots,
             score: activeOutfit.score,
             closetId: preferred._id,
             closetName: preferred.name,
             result: activeOutfit,
+            context: buildWearContext(weather, effectiveSettings, forecasts),
+            engine: {
+                score: activeOutfit.score,
+                breakdown: activeOutfit.scoreBreakdown,
+                rank: safeIdx,
+                engineVersion: ENGINE_VERSION,
+            },
+            negatives: negatives.length > 0 ? negatives : undefined,
         });
     };
 
@@ -973,11 +1004,20 @@ const OutfitSuggestion = ({ weather, settings, forecasts }: Props) => {
                         </View>
                     )}
 
-                    {/* ── Wore this today ── */}
+                    {/* ── Wore this today (hero) ──
+                        Glass button with a whisper of the brand gradient laid
+                        over the glass — tinted glass, not a solid fill. */}
                     <Pressable
                         style={styles.woreThisBtn}
                         onPress={handleWoreThis}
                     >
+                        <LinearGradient
+                            colors={heroTint}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.woreThisTint}
+                            pointerEvents='none'
+                        />
                         <Text style={styles.woreThisText}>
                             Wore this today
                         </Text>

@@ -1,5 +1,5 @@
 import { GarmentType, DetectedColor, FabricGuess } from './services/clothingIdentifier.types';
-import type { WearContext, WornEngineInfo, NegativeSignal } from './lib/outfit/types';
+import type { WeatherBucket, PrecipIntensity, ScoreBreakdown } from './lib/outfit/types';
 export type { GarmentType, DetectedColor, FabricGuess };
 
 export type BodyZone = 'Head' | 'Neck' | 'Wrist' | 'Hand' | 'Waist' | 'Ankle' | 'Carried';
@@ -178,6 +178,40 @@ export interface NotificationSettings {
   tripModeMorningEnabled: boolean;
 }
 
+/** Weather + settings snapshot captured when an outfit is logged as worn.
+ *  Optional on entries: pre-instrumentation logs (and Trip Mode logs, where the
+ *  outfit wasn't generated from the current engine run) simply omit it. */
+export interface WearContext {
+  feelsLikeF:      number;
+  bucket:          WeatherBucket;
+  precipIntensity: PrecipIntensity;
+  humidity:        number;
+  windMph:         number;
+  isSnowing:       boolean;
+  /** Local hour (0–23) at log time. */
+  hourOfDay:       number;
+  occasion?:       string;
+  styles?:         string[];
+}
+
+/** What the engine thought of the worn outfit at generation time. */
+export interface WearEngineMeta {
+  score:         number;
+  breakdown:     ScoreBreakdown;
+  /** 0-based position among the outfits shown (0 = primary recommendation). */
+  rank:          number;
+  engineVersion: number;
+}
+
+/** An outfit the user saw alongside the worn one but did not pick — a training
+ *  negative for the ML style ranker. `swap_rejected` is reserved for the future
+ *  "Try This Instead" feature; nothing emits it yet. */
+export interface WearNegative {
+  articleIds: string[];
+  score:      number;
+  source:     'shown_not_worn' | 'swap_rejected';
+}
+
 export interface OutfitHistoryEntry {
   id:        string;
   wornAt:    string;
@@ -185,10 +219,10 @@ export interface OutfitHistoryEntry {
   closetName:string;
   articleIds:string[];
   articleSummary: string;
-  /** Ranker-training instrumentation — absent on entries logged before it existed. */
+  /** ML-ranker instrumentation — all optional; entries logged before 2026-07 lack them. */
   context?:   WearContext;
-  engine?:    WornEngineInfo;
-  negatives?: NegativeSignal[];
+  engine?:    WearEngineMeta;
+  negatives?: WearNegative[];
 }
 
 export interface Closet {
