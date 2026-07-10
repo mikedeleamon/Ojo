@@ -11,6 +11,7 @@ import {
     todayDayIndex,
     findDaySnapshot,
     computeDrift,
+    computeForecastDrift,
     toLocalISODate,
     DEFAULT_TRIP_MODE_RADIUS_MI,
 } from '../lib/tripMode';
@@ -20,6 +21,7 @@ import {
     activeOutfit,
     daysUntil,
     planArticleIds,
+    isInForecastWindow,
 } from '../views/TripFit/shared';
 import { generateOutfits } from '../lib/outfitEngine';
 import type {
@@ -38,6 +40,12 @@ export interface UpcomingTripInfo {
     /** Unique packable article count across the trip's planned days (0 while pending). */
     totalItems: number;
     packedItems: number;
+    /**
+     * Set when a fresh forecast for the arrival day has drifted from the one saved
+     * with the plan. Resolved asynchronously (best-effort) — null until then, and
+     * whenever the trip is pending / out of the forecast window / the forecasts agree.
+     */
+    driftNote: string | null;
 }
 
 export interface TripModeState {
@@ -234,7 +242,7 @@ export const useTripMode = (): TripModeState => {
     // Soonest saved trip that hasn't started yet. Independent of the async
     // GPS/weather resolution above — a pure function of `plans` + today's date,
     // so a countdown is available immediately without waiting on location.
-    const upcoming = useMemo<UpcomingTripInfo | null>(() => {
+    const upcomingBase = useMemo(() => {
         if (!enabled) return null;
         const next = plans
             .map((plan) => ({ plan, days: daysUntil(plan.startDate) }))
@@ -248,6 +256,53 @@ export const useTripMode = (): TripModeState => {
             packedItems: next.plan.checkedIds.length,
         };
     }, [plans, enabled]);
+
+    // Forecast-drift check for the upcoming trip: re-fetch the destination's
+    // daily forecast and compare the arrival day against the one saved with the
+    // plan. Only meaningful for a *planned* trip inside the forecast window —
+    // pending trips (no saved days / beyond the window) have nothing to drift
+    // from. Best-effort and keyed by plan id + saved-forecast timestamp so it
+    // runs once per plan snapshot, not on every render.
+    const [upcomingDrift, setUpcomingDrift] = useState<{ planId: string; note: string | null }>({
+        planId: '',
+        note: null,
+    });
+    const driftPlanId = upcomingBase?.plan.id ?? '';
+    const driftStartDate = upcomingBase?.plan.startDate ?? '';
+    const driftFetchedAt = upcomingBase?.plan.forecastFetchedAt ?? '';
+    const driftHasDays = (upcomingBase?.plan.days.length ?? 0) > 0;
+    useEffect(() => {
+        const plan = upcomingBase?.plan;
+        if (!plan || !driftHasDays || !isInForecastWindow(plan.startDate)) {
+            setUpcomingDrift({ planId: plan?.id ?? '', note: null });
+            return;
+        }
+        const arrival = plan.days.find((d) => d.date === plan.startDate) ?? plan.days[0];
+        let cancelled = false;
+        (async () => {
+            try {
+                const { data } = await api.get<DailyForecast[]>('/api/weather/daily', {
+                    params: { lat: plan.lat, lon: plan.lon },
+                    ...authHeaders(),
+                });
+                const fresh = (data ?? []).find((d) => d.date === arrival.date);
+                if (cancelled || !fresh) return;
+                setUpcomingDrift({ planId: plan.id, note: computeForecastDrift(arrival, fresh) });
+            } catch {
+                /* drift is optional — leave whatever was last resolved */
+            }
+        })();
+        return () => { cancelled = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [driftPlanId, driftStartDate, driftFetchedAt, driftHasDays]);
+
+    const upcoming = useMemo<UpcomingTripInfo | null>(() => {
+        if (!upcomingBase) return null;
+        return {
+            ...upcomingBase,
+            driftNote: upcomingDrift.planId === upcomingBase.plan.id ? upcomingDrift.note : null,
+        };
+    }, [upcomingBase, upcomingDrift]);
 
     return useMemo(
         () => ({ ...resolved, upcoming, loading: working, refresh }),

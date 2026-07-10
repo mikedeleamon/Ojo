@@ -10,6 +10,6 @@ struct OjoTripCountdownWidget: Widget {
     }
     .configurationDisplayName("Trip Countdown")
     .description("Days until your next trip, and how much of your packing list is done.")
-    .supportedFamilies([.systemSmall, .systemMedium])
+    .supportedFamilies([.systemSmall, .systemMedium, .accessoryCircular, .accessoryRectangular])
   }
 }

@@ -4,7 +4,7 @@
  * worn > trip > generated precedence they have to respect.
  */
 
-import type { CurrentWeather, DailyForecast, Settings } from '../../../types';
+import type { CurrentWeather, DailyForecast, SavedTripFitPlan, Settings } from '../../../types';
 import type { OutfitResult } from '../../outfit/types';
 import { buildWeatherBlock, buildWidgetInput, WidgetSyncData } from '../buildInput';
 
@@ -165,5 +165,57 @@ describe('buildWidgetInput variants', () => {
     expect(input.variants).toBeUndefined();
     expect(input.weather?.temp).toBe(72);
     expect(input.emptyReason).toBe('insufficient');
+  });
+});
+
+describe('buildWidgetInput upcoming trip', () => {
+  const upcomingPlan = {
+    id: 'trip-1',
+    destination: 'Lisbon',
+    startDate: '2026-08-01',
+    endDate: '2026-08-05',
+    days: [
+      { date: '2026-08-01', minTempF: 61, maxTempF: 78, dayPhrase: 'Clear', hasPrecipitation: false, articleIds: [] },
+      { date: '2026-08-02', minTempF: 60, maxTempF: 74, dayPhrase: 'Rain', hasPrecipitation: true, articleIds: [] },
+    ],
+    checkedIds: [],
+  } as unknown as SavedTripFitPlan;
+
+  const upcoming = (over: Record<string, unknown> = {}) => ({
+    plan: upcomingPlan,
+    daysUntil: 22,
+    totalItems: 12,
+    packedItems: 4,
+    ...over,
+  });
+
+  it('surfaces the arrival-day forecast peek (converted to the user unit) and passes drift through', () => {
+    const input = buildWidgetInput(
+      baseData({ upcoming: upcoming({ driftNote: 'Forecast colder than when you planned — add a warm layer.' }) }),
+    );
+    expect(input.upcomingTrip).toMatchObject({
+      planId: 'trip-1',
+      destination: 'Lisbon',
+      daysUntil: 22,
+      totalItems: 12,
+      packedItems: 4,
+      weather: { high: 78, low: 61, unit: 'F', condition: 'Clear', weatherKind: 'clear', precip: false },
+      driftNote: 'Forecast colder than when you planned — add a warm layer.',
+    });
+  });
+
+  it('converts the arrival forecast to metric', () => {
+    const input = buildWidgetInput(
+      baseData({ settings: metricSettings, upcoming: upcoming() }),
+    );
+    expect(input.upcomingTrip?.weather).toMatchObject({ high: 26, low: 16, unit: 'C' });
+  });
+
+  it('omits the weather peek for a pending trip with no saved days', () => {
+    const input = buildWidgetInput(
+      baseData({ upcoming: upcoming({ plan: { ...upcomingPlan, days: [] }, totalItems: 0 }) }),
+    );
+    expect(input.upcomingTrip?.weather).toBeUndefined();
+    expect(input.upcomingTrip?.driftNote).toBeUndefined();
   });
 });

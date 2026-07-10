@@ -95,6 +95,21 @@ struct WidgetSnapshot: Codable {
     let daysUntil: Int
     let totalItems: Int
     let packedItems: Int
+    /// Arrival-day forecast peek. Optional so pre-feature snapshots still decode.
+    let weather: TripWeather?
+    /// Short note when a fresh forecast has drifted from the saved plan; nil when they agree.
+    let driftNote: String?
+
+    /// Mirrors snapshot.types.ts `OjoWidgetUpcomingTripWeather`. Temps arrive
+    /// pre-converted to the user's unit; Swift only renders.
+    struct TripWeather: Codable {
+      let high: Int
+      let low: Int
+      let unit: String        // "F" | "C"
+      let condition: String?  // "Clear"
+      let weatherKind: String? // conditions.ts WeatherKind, for the SF Symbol picker
+      let precip: Bool
+    }
   }
 
   /// `time` is one of layeringEngine's 7 buckets (Early morning/Morning/Late

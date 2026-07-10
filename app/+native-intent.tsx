@@ -7,6 +7,7 @@
  *   ojo://trip/<id>  → "/account/tripfit?planId=<id>"   (opens the saved trip)
  *   ojo://trips      → "/account/tripfit"               (opens the trip library)
  *   ojo://closet/new → "/closet?new=1"                  (closet tab, create form open)
+ *   ojo://closet     → "/closet"                        (closet tab · closet gap nudge)
  *   ojo://recap      → "/account/recap"                 (weekly wardrobe recap)
  *
  * expo-router hands us the FULL incoming URL as `path` (which may be null).
@@ -41,6 +42,9 @@ export function redirectSystemPath({
 
     // New closet → closet tab with the create-closet form auto-opened
     if (normalized === '/closet/new') return '/closet?new=1';
+
+    // Closet tab (no create form) — used by the Closet Gap nudge
+    if (normalized === '/closet') return '/closet';
 
     // Weekly wardrobe recap (notification tap / share landing page)
     if (normalized === '/recap') return '/account/recap';

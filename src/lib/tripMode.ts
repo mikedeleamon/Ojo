@@ -137,3 +137,38 @@ export const computeDrift = (
   }
   return null;
 };
+
+/** A saved plan's forecast diverges from a fresh one by at least this (°F). */
+const FORECAST_DRIFT_TEMP_THRESHOLD_F = 10;
+
+/**
+ * Compare the forecast saved with a trip plan against a freshly-fetched forecast
+ * for the same (future) day, returning a short "your plan may be off" note — or
+ * null when they still roughly agree. Distinct from `computeDrift`, which
+ * compares a *logged* day against *live* current weather at the destination;
+ * this one powers the Trip Countdown widget, where the trip hasn't started and
+ * both readings are forecasts. Notes are unit-agnostic (no temperature value) so
+ * they read the same for Metric and Imperial users.
+ */
+export const computeForecastDrift = (
+  saved: Pick<TripFitDaySnapshot, 'minTempF' | 'maxTempF' | 'hasPrecipitation'>,
+  fresh: { minTempF: number; maxTempF: number; hasPrecipitation: boolean },
+): string | null => {
+  const savedMid = (saved.minTempF + saved.maxTempF) / 2;
+  const freshMid = (fresh.minTempF + fresh.maxTempF) / 2;
+  const diff = freshMid - savedMid;
+
+  if (fresh.hasPrecipitation && !saved.hasPrecipitation) {
+    return 'Rain now in the forecast — pack a layer or umbrella.';
+  }
+  if (diff >= FORECAST_DRIFT_TEMP_THRESHOLD_F) {
+    return 'Forecast warmer than when you planned — pack lighter.';
+  }
+  if (diff <= -FORECAST_DRIFT_TEMP_THRESHOLD_F) {
+    return 'Forecast colder than when you planned — add a warm layer.';
+  }
+  if (!fresh.hasPrecipitation && saved.hasPrecipitation) {
+    return 'Rain cleared from the forecast — you may not need rain gear.';
+  }
+  return null;
+};

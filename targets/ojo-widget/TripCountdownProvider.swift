@@ -16,7 +16,15 @@ struct TripCountdownProvider: TimelineProvider {
     TripCountdownEntry(
       date: Date(),
       upcoming: WidgetSnapshot.UpcomingTrip(
-        planId: "preview", destination: "Lisbon", daysUntil: 6, totalItems: 12, packedItems: 4
+        planId: "preview",
+        destination: "Lisbon",
+        daysUntil: 6,
+        totalItems: 12,
+        packedItems: 4,
+        weather: WidgetSnapshot.UpcomingTrip.TripWeather(
+          high: 78, low: 61, unit: "F", condition: "Clear", weatherKind: "clear", precip: false
+        ),
+        driftNote: "Forecast warmer than when you planned — pack lighter."
       )
     )
   }

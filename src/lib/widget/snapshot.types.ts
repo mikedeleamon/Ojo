@@ -57,6 +57,31 @@ export interface OjoWidgetUpcomingTrip {
   totalItems: number;
   /** SavedTripFitPlan.checkedIds.length */
   packedItems: number;
+  /**
+   * Arrival-day forecast pulled from the saved plan, pre-converted to the user's
+   * unit. Undefined for pending trips (beyond the forecast window, no saved days).
+   */
+  weather?: OjoWidgetUpcomingTripWeather;
+  /**
+   * Short, actionable note when a fresh forecast has drifted from the one saved
+   * with the plan (e.g. "Forecast colder than when you planned"). Undefined when
+   * they still agree, or drift couldn't be checked.
+   */
+  driftNote?: string;
+}
+
+/** Arrival-day forecast for the Trip Countdown widget's weather peek. */
+export interface OjoWidgetUpcomingTripWeather {
+  high: number;
+  low: number;
+  /** "F" | "C" — matches `high`/`low`. */
+  unit: string;
+  /** Short one-word condition, e.g. "Clear". */
+  condition?: string;
+  /** conditions.ts WeatherKind, for the widget's SF Symbol picker. */
+  weatherKind?: string;
+  /** Whether the arrival day's forecast calls for precipitation. */
+  precip: boolean;
 }
 
 export interface OjoWidgetSnapshotItem {

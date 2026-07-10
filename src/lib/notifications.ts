@@ -199,6 +199,7 @@ export const scheduleTripReminders = async (plan: TripReminderInput): Promise<vo
         body: remaining > 0
           ? `${remaining} item${remaining === 1 ? '' : 's'} still to pack — open your TripFit list.`
           : 'Review your TripFit packing list before you go.',
+        data: { url: `ojo://trip/${plan.id}` },
       },
       trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: weekDate },
     }).catch(() => {});
@@ -210,6 +211,7 @@ export const scheduleTripReminders = async (plan: TripReminderInput): Promise<vo
       content: {
         title: `Pack for ${plan.destination}!`,
         body: 'Your trip starts in 2 days. Check off your TripFit packing list.',
+        data: { url: `ojo://trip/${plan.id}` },
       },
       trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: twoDayDate },
     }).catch(() => {});
@@ -334,6 +336,7 @@ export const scheduleTripMorningNotifications = async (
       content: {
         title: `Good morning in ${plan.destination}! ☀️`,
         body: "Open Ojo to see the outfit you planned for today.",
+        data: { url: `ojo://trip/${plan.id}` },
       },
       trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: fireAt },
     }).catch(() => {});

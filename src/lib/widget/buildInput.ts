@@ -8,7 +8,7 @@ import type { CurrentWeather, DailyForecast, SavedTripFitPlan, Settings } from '
 import type { OutfitResult } from '../outfit/types';
 import { fToC } from '../units';
 import { classifyCondition } from '../weather/conditions';
-import { humanizeConditionTitle } from '../weather/humanizeCondition';
+import { humanizeConditionShort, humanizeConditionTitle } from '../weather/humanizeCondition';
 import { CLOSET_NEW_DEEP_LINK, OUTFIT_DEEP_LINK, tripDeepLink } from './deepLinks';
 import type {
   OjoWidgetUpcomingTrip,
@@ -155,6 +155,8 @@ export interface WidgetUpcomingTripData {
   daysUntil: number;
   totalItems: number;
   packedItems: number;
+  /** Fresh-vs-saved forecast drift for the arrival day, resolved by useTripMode. */
+  driftNote?: string | null;
 }
 
 export interface WidgetSyncData {
@@ -189,8 +191,32 @@ const emptyReasonFor = (
   return 'empty_closet'; // empty_closet, or no_preferred while closets exist
 };
 
+/**
+ * Arrival-day weather peek for the Trip Countdown widget, from the forecast
+ * saved with the plan (not a fresh fetch — that only happens for drift). Temps
+ * are pre-converted to the user's unit so Swift only renders. Undefined for
+ * pending trips whose day list is empty (saved beyond the forecast window).
+ */
+const upcomingTripWeatherFor = (
+  plan: SavedTripFitPlan,
+  settings: Settings,
+): OjoWidgetUpcomingTrip['weather'] => {
+  const arrival = plan.days.find((d) => d.date === plan.startDate) ?? plan.days[0];
+  if (!arrival) return undefined;
+  const isMetric = settings.temperatureScale === 'Metric';
+  return {
+    high: isMetric ? fToC(arrival.maxTempF) : Math.round(arrival.maxTempF),
+    low: isMetric ? fToC(arrival.minTempF) : Math.round(arrival.minTempF),
+    unit: isMetric ? 'C' : 'F',
+    condition: humanizeConditionShort(arrival.dayPhrase) || undefined,
+    weatherKind: classifyCondition(arrival.dayPhrase),
+    precip: arrival.hasPrecipitation,
+  };
+};
+
 const upcomingTripFor = (
   upcoming: WidgetUpcomingTripData | null,
+  settings: Settings,
 ): OjoWidgetUpcomingTrip | undefined =>
   upcoming
     ? {
@@ -199,6 +225,8 @@ const upcomingTripFor = (
         daysUntil: upcoming.daysUntil,
         totalItems: upcoming.totalItems,
         packedItems: upcoming.packedItems,
+        weather: upcomingTripWeatherFor(upcoming.plan, settings),
+        driftNote: upcoming.driftNote ?? undefined,
       }
     : undefined;
 
@@ -215,7 +243,7 @@ export function buildWidgetInput(data: WidgetSyncData): WidgetSnapshotInput {
   const weatherKind = weather ? classifyCondition(weather.WeatherText) : undefined;
   const isDay = weather?.IsDayTime;
   const weatherBlock = buildWeatherBlock(weather, settings, daily);
-  const upcomingTrip = upcomingTripFor(upcoming);
+  const upcomingTrip = upcomingTripFor(upcoming, settings);
 
   // What the user actually logged as worn today wins over everything else —
   // including Trip Mode and the generated suggestion. The widget should show

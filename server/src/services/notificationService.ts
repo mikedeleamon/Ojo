@@ -168,7 +168,11 @@ function buildWeatherChangeMessage(
 
 // ─── Send helpers ─────────────────────────────────────────────────────────────
 
-async function sendPush(token: string, msg: { title: string; body: string }): Promise<void> {
+async function sendPush(
+  token: string,
+  msg: { title: string; body: string },
+  url?: string,
+): Promise<void> {
   if (!Expo.isExpoPushToken(token)) {
     console.warn('[notifService] Invalid Expo push token:', token);
     return;
@@ -178,6 +182,9 @@ async function sendPush(token: string, msg: { title: string; body: string }): Pr
     sound: 'default',
     title: msg.title,
     body:  msg.body,
+    // `data.url` (an `ojo://…` deep link) is read on tap by NotificationDeepLinkRouter
+    // and mapped through the same +native-intent table the widget/local notifs use.
+    ...(url ? { data: { url } } : {}),
   };
   try {
     const chunks = expo.chunkPushNotifications([message]);
@@ -245,7 +252,7 @@ async function runMorningCheck(): Promise<void> {
         closets.flatMap(c => c.articles.map((a: any) => a.clothingType as string)),
       );
       const gapMsg = buildGapMessage(city, weather, articleTypes);
-      if (gapMsg) await sendPush(user.pushToken!, gapMsg);
+      if (gapMsg) await sendPush(user.pushToken!, gapMsg, 'ojo://closet');
     }
   }
 }
@@ -289,7 +296,7 @@ async function runAfternoonCheck(): Promise<void> {
 
     if (precipChanged || tempDropped) {
       const msg = buildWeatherChangeMessage(city, weather, scale);
-      await sendPush(user.pushToken!, msg);
+      await sendPush(user.pushToken!, msg, 'ojo://outfit');
     }
   }
 }

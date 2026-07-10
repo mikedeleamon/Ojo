@@ -4,6 +4,7 @@ import {
   todayDayIndex,
   findDaySnapshot,
   computeDrift,
+  computeForecastDrift,
 } from '../tripMode';
 import type {
   SavedTripFitPlan,
@@ -152,5 +153,32 @@ describe('computeDrift', () => {
 
   it('returns null when live weather roughly matches the plan', () => {
     expect(computeDrift(day(TODAY), weather(60))).toBeNull();
+  });
+});
+
+// ─── computeForecastDrift ──────────────────────────────────────────────────────
+
+describe('computeForecastDrift', () => {
+  const saved = { minTempF: 55, maxTempF: 65, hasPrecipitation: false }; // mid 60
+
+  it('flags a warmer fresh forecast', () => {
+    expect(computeForecastDrift(saved, { minTempF: 68, maxTempF: 82, hasPrecipitation: false })).toMatch(/warmer/);
+  });
+
+  it('flags a colder fresh forecast', () => {
+    expect(computeForecastDrift(saved, { minTempF: 40, maxTempF: 52, hasPrecipitation: false })).toMatch(/colder/);
+  });
+
+  it('flags rain that entered the forecast', () => {
+    expect(computeForecastDrift(saved, { minTempF: 56, maxTempF: 64, hasPrecipitation: true })).toMatch(/Rain now/);
+  });
+
+  it('flags rain that cleared from the forecast', () => {
+    const wet = { minTempF: 55, maxTempF: 65, hasPrecipitation: true };
+    expect(computeForecastDrift(wet, { minTempF: 56, maxTempF: 64, hasPrecipitation: false })).toMatch(/cleared/);
+  });
+
+  it('returns null when the fresh forecast still roughly agrees', () => {
+    expect(computeForecastDrift(saved, { minTempF: 57, maxTempF: 66, hasPrecipitation: false })).toBeNull();
   });
 });
