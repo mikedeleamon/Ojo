@@ -30,7 +30,9 @@ struct OjoProvider: TimelineProvider {
   }
 }
 
-private func nextMidnight() -> Date? {
+/// Shared by every provider whose data rolls over at the local day boundary
+/// (main widget, Tomorrow Prep, Layer Timeline).
+func nextMidnight() -> Date? {
   Calendar.current.nextDate(
     after: Date(),
     matching: DateComponents(hour: 0, minute: 0),

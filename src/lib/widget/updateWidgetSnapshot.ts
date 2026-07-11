@@ -60,6 +60,15 @@ export async function updateWidgetSnapshot(input: WidgetSnapshotInput): Promise<
   // variant-less input (empty mode / legacy caller) resolves its own.
   const resolved = variants?.[0]?.items ?? (await resolveItems(input.items));
 
+  // Tomorrow's outfit thumbnails must be pre-cached too — the Tomorrow Prep
+  // widget flips to them in the evening, long after the app last ran.
+  const tomorrow = input.tomorrow
+    ? {
+        ...input.tomorrow,
+        items: input.tomorrow.items ? await resolveItems(input.tomorrow.items) : undefined,
+      }
+    : undefined;
+
   const snapshot: OjoWidgetSnapshot = {
     mode: input.mode,
     updatedAt: new Date().toISOString(),
@@ -74,17 +83,23 @@ export async function updateWidgetSnapshot(input: WidgetSnapshotInput): Promise<
     alerts: input.alerts,
     uvIndexText: input.uvIndexText,
     timeline: input.timeline,
+    fullTimeline: input.fullTimeline,
     emptyReason: input.emptyReason,
     trip: input.trip,
     upcomingTrip: input.upcomingTrip,
+    tomorrow,
     deepLink: input.deepLink,
   };
 
   try {
     writeSnapshot(JSON.stringify(snapshot));
     // Drop any thumbnails from previous snapshots that today's no longer uses —
-    // keeping every variant's, not just the visible outfit's.
-    const keep = [...resolved, ...(variants ?? []).flatMap((v) => v.items)]
+    // keeping every variant's AND tomorrow's, not just the visible outfit's.
+    const keep = [
+      ...resolved,
+      ...(variants ?? []).flatMap((v) => v.items),
+      ...(tomorrow?.items ?? []),
+    ]
       .map((r) => r.thumb)
       .filter((t): t is string => t != null);
     pruneThumbs([...new Set(keep)]);

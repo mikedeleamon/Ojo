@@ -6,6 +6,9 @@ struct OjoWidgetBundle: WidgetBundle {
   var body: some Widget {
     OjoWidget()
     OjoTripCountdownWidget()
+    OjoTomorrowWidget()
+    OjoLayerTimelineWidget()
+    OjoUVSunsetWidget()
   }
 }
 

@@ -25,8 +25,9 @@ import { useReduceMotion } from '../../hooks/useReduceMotion';
 import { useTripMode } from '../../hooks/useTripMode';
 import { hapticSuccess } from '../../lib/haptics';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
-import { buildWidgetInput } from '../../lib/widget/buildInput';
+import { buildWidgetInput, tomorrowDailyFor } from '../../lib/widget/buildInput';
 import { updateWidgetSnapshot } from '../../lib/widget/updateWidgetSnapshot';
+import { buildTripWeather } from '../../views/TripFit/shared';
 import TripModeCard from '../TripMode/TripModeCard';
 import ShareToInstagramSheet from '../ShareCard/ShareToInstagramSheet';
 import TodayOutfitShareCard from '../ShareCard/TodayOutfitShareCard';
@@ -354,8 +355,13 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
     const hintFired = useRef(false);
 
     // ─── Pager ───────────────────────────────────────────────────────────────
+    // pagingEnabled snaps by the ScrollView's real frame width, so the card
+    // width must match it exactly — otherwise the mismatch leaks a sliver of the
+    // next card at the edge. We measure the frame via onLayout and use that;
+    // the window-based value is only a first-render fallback before layout.
     const { width: windowWidth } = useWindowDimensions();
-    const cardWidth = windowWidth - spacing.md * 4.1;
+    const [pagerWidth, setPagerWidth] = useState(0);
+    const cardWidth = pagerWidth || windowWidth - spacing.md * 4.1;
     const pagerRef = useRef<ScrollView>(null);
 
     useEffect(() => {
@@ -427,6 +433,28 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
         };
     }, [wornLogged, loggedOutfit]);
 
+    // Tomorrow's outfit for the Tomorrow Prep widget's evening flip — generated
+    // from tomorrow's daily forecast through the same synthetic-CurrentWeather
+    // path TripFit uses for future days (buildTripWeather). Weather-only (null
+    // outfit) when generation can't produce a wearable fit, so the widget can
+    // still show tomorrow's forecast. Null when tomorrow is outside the daily
+    // data (widget then falls back to today).
+    const tomorrowForWidget = useMemo(() => {
+        const day = tomorrowDailyFor(daily);
+        if (!day) return null;
+        if (!preferred) return { day, outfit: null };
+        const { results } = generateOutfits(
+            preferred.articles,
+            buildTripWeather(day),
+            effectiveSettings,
+            worn,
+            1,
+            profile,
+        );
+        const top = results[0];
+        return { day, outfit: top && top.slots.length > 0 ? top : null };
+    }, [daily, preferred, effectiveSettings, worn, profile]);
+
     // ─── Home-screen widget sync ──────────────────────────────────────────────
     // Mirror today's answer — the worn outfit if the user logged one, else the
     // Trip Mode outfit when active, else the top generated outfit — to the iOS
@@ -456,9 +484,11 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
                     locationConfirmed: tripMode.locationConfirmed,
                 },
                 upcoming: tripMode.upcoming,
+                tomorrow: tomorrowForWidget,
             }),
         );
     }, [
+        tomorrowForWidget,
         loading,
         outfits,
         status,
@@ -857,6 +887,10 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
                             showsHorizontalScrollIndicator={false}
                             scrollEventThrottle={16}
                             decelerationRate='fast'
+                            onLayout={(e) => {
+                                const w = e.nativeEvent.layout.width;
+                                if (w > 0 && w !== pagerWidth) setPagerWidth(w);
+                            }}
                             onMomentumScrollEnd={(e) => {
                                 const page = Math.round(
                                     e.nativeEvent.contentOffset.x / cardWidth,

@@ -342,7 +342,8 @@ struct WeatherCuesView: View {
 /// Maps a timeline step's `action` text to an icon by matching layeringEngine's
 /// small, fixed set of template prefixes (see buildTimeline in layeringEngine.ts)
 /// — keying off known app-authored copy, not open-ended text parsing.
-private func timelineActionIcon(_ action: String) -> String {
+/// Internal (not private): the Layer Timeline widget's rows use the same match.
+func timelineActionIcon(_ action: String) -> String {
   if action.hasPrefix("Remove")      { return "minus.circle.fill" }
   if action.hasPrefix("Add")         { return "plus.circle.fill" }
   if action.hasPrefix("Rain starts") { return "cloud.rain.fill" }

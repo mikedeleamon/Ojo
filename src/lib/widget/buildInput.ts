@@ -11,6 +11,7 @@ import { classifyCondition } from '../weather/conditions';
 import { humanizeConditionShort, humanizeConditionTitle } from '../weather/humanizeCondition';
 import { CLOSET_NEW_DEEP_LINK, OUTFIT_DEEP_LINK, tripDeepLink } from './deepLinks';
 import type {
+  OjoWidgetTomorrowInput,
   OjoWidgetUpcomingTrip,
   OjoWidgetWeather,
   WidgetAlertKind,
@@ -89,6 +90,15 @@ const todayDailyFor = (daily?: DailyForecast[]): DailyForecast | undefined => {
   return daily.find((d) => d.date === today) ?? daily[0];
 };
 
+/** Tomorrow's entry from the 10-day forecast — strict date match, no fallback (a wrong day labeled "Tomorrow" is worse than none). */
+export const tomorrowDailyFor = (daily?: DailyForecast[]): DailyForecast | undefined => {
+  if (!daily || daily.length === 0) return undefined;
+  const now = new Date();
+  // Calendar arithmetic (not +24h) so DST-shifted days can't skip or repeat a date.
+  const tomorrow = localISODate(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
+  return daily.find((d) => d.date === tomorrow);
+};
+
 /** "8:14 PM" from an ISO timestamp — manual format so it doesn't lean on Intl availability. */
 const formatSunset = (iso?: string): string | undefined => {
   if (!iso) return undefined;
@@ -141,6 +151,44 @@ const variantFromOutfit = (outfit: OutfitResult): WidgetOutfitVariantInput => ({
   ...widgetAlertsFor(outfit),
 });
 
+/** Tomorrow's resolved state for the Tomorrow Prep widget — the forecast day plus the outfit pre-generated for it (null when none could be built). */
+export interface WidgetTomorrowData {
+  day: DailyForecast;
+  outfit: OutfitResult | null;
+}
+
+/** Weekday label ("Saturday") for a local ISO date. Noon anchor sidesteps TZ off-by-one on date-only strings. */
+const dayNameFor = (isoDate: string): string =>
+  new Date(`${isoDate}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' });
+
+/**
+ * Tomorrow's forecast + outfit reshaped for the snapshot. The outfit half is
+ * omitted (not the whole block) when generation failed — the widget can still
+ * show tomorrow's weather with an "open Ojo" nudge.
+ */
+const tomorrowFor = (
+  tomorrow: WidgetTomorrowData | null | undefined,
+  settings: Settings,
+): OjoWidgetTomorrowInput | undefined => {
+  if (!tomorrow) return undefined;
+  const { day, outfit } = tomorrow;
+  const isMetric = settings.temperatureScale === 'Metric';
+  const hasOutfit = !!outfit && outfit.slots.length > 0;
+  return {
+    date: day.date,
+    dayName: dayNameFor(day.date),
+    high: isMetric ? fToC(day.maxTempF) : Math.round(day.maxTempF),
+    low: isMetric ? fToC(day.minTempF) : Math.round(day.minTempF),
+    unit: isMetric ? 'C' : 'F',
+    condition: humanizeConditionShort(day.dayPhrase) || undefined,
+    weatherKind: classifyCondition(day.dayPhrase),
+    rainChance: day.precipProbability,
+    headline: hasOutfit ? outfit.headline || "Tomorrow's outfit" : undefined,
+    items: hasOutfit ? itemsFromOutfit(outfit) : undefined,
+    layerNote: hasOutfit ? outfit.layering?.recommendation : undefined,
+  };
+};
+
 export interface WidgetTripData {
   active: boolean;
   plan: SavedTripFitPlan | null;
@@ -179,6 +227,8 @@ export interface WidgetSyncData {
   trip: WidgetTripData;
   /** Independent of `trip`/`mode` — powers the separate Trip Countdown widget. */
   upcoming: WidgetUpcomingTripData | null;
+  /** Tomorrow's forecast + pre-generated outfit — powers the Tomorrow Prep widget. Null/undefined when tomorrow is outside the forecast data. */
+  tomorrow?: WidgetTomorrowData | null;
 }
 
 /**
@@ -248,6 +298,10 @@ export function buildWidgetInput(data: WidgetSyncData): WidgetSnapshotInput {
   const isDay = weather?.IsDayTime;
   const weatherBlock = buildWeatherBlock(weather, settings, daily, city);
   const upcomingTrip = upcomingTripFor(upcoming, settings);
+  const tomorrow = tomorrowFor(data.tomorrow, settings);
+  /** Uncapped layer timeline for the Layer Timeline widget — mirrors widgetAlertsFor's capped `timeline`. */
+  const fullTimelineOf = (outfit: OutfitResult): WidgetTimelineStep[] | undefined =>
+    outfit.layering?.timeline;
 
   // What the user actually logged as worn today wins over everything else —
   // including Trip Mode and the generated suggestion. The widget should show
@@ -264,7 +318,9 @@ export function buildWidgetInput(data: WidgetSyncData): WidgetSnapshotInput {
       items: itemsFromOutfit(wornOutfit),
       variants: [variantFromOutfit(wornOutfit)],
       ...widgetAlertsFor(wornOutfit),
+      fullTimeline: fullTimelineOf(wornOutfit),
       upcomingTrip,
+      tomorrow,
       deepLink: OUTFIT_DEEP_LINK,
     };
   }
@@ -281,6 +337,7 @@ export function buildWidgetInput(data: WidgetSyncData): WidgetSnapshotInput {
       items: itemsFromOutfit(trip.outfit),
       variants: [variantFromOutfit(trip.outfit)],
       ...widgetAlertsFor(trip.outfit),
+      fullTimeline: fullTimelineOf(trip.outfit),
       trip: {
         destination: trip.plan.destination,
         dayIndex: trip.dayIndex,
@@ -289,6 +346,7 @@ export function buildWidgetInput(data: WidgetSyncData): WidgetSnapshotInput {
         locationConfirmed: trip.locationConfirmed,
       },
       upcomingTrip,
+      tomorrow,
       deepLink: tripDeepLink(trip.plan.id),
     };
   }
@@ -306,7 +364,9 @@ export function buildWidgetInput(data: WidgetSyncData): WidgetSnapshotInput {
       items: itemsFromOutfit(primary),
       variants: wearable.slice(0, MAX_WIDGET_VARIANTS).map(variantFromOutfit),
       ...widgetAlertsFor(primary),
+      fullTimeline: fullTimelineOf(primary),
       upcomingTrip,
+      tomorrow,
       deepLink: OUTFIT_DEEP_LINK,
     };
   }
@@ -327,6 +387,7 @@ export function buildWidgetInput(data: WidgetSyncData): WidgetSnapshotInput {
     alerts: [],
     emptyReason,
     upcomingTrip,
+    tomorrow,
     deepLink: emptyReason === 'no_closet' ? CLOSET_NEW_DEEP_LINK : OUTFIT_DEEP_LINK,
   };
 }

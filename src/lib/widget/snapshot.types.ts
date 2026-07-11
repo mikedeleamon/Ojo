@@ -122,6 +122,42 @@ export interface OjoWidgetWeather {
 }
 
 /**
+ * Tomorrow's forecast + pre-generated outfit for the Tomorrow Prep widget's
+ * evening flip. Written alongside today's snapshot so the widget can switch to
+ * tomorrow at ~6 PM without waking the app. `date` lets Swift verify the block
+ * is still actually tomorrow (a snapshot written yesterday evening would
+ * otherwise be shown as "tomorrow" after midnight).
+ */
+export interface OjoWidgetTomorrow {
+  /** Local ISO date ("2026-07-12") this block describes. */
+  date: string;
+  /** Weekday label for the header, e.g. "Saturday". */
+  dayName: string;
+  /** Tomorrow's high, pre-converted to the user's unit. */
+  high: number;
+  /** Tomorrow's low, pre-converted to the user's unit. */
+  low: number;
+  unit: 'F' | 'C';
+  /** Short humanized condition, e.g. "Rain". */
+  condition?: string;
+  /** conditions.ts WeatherKind for the gradient + icon. */
+  weatherKind?: WeatherKind;
+  /** Chance of precipitation tomorrow, 0–100. */
+  rainChance?: number;
+  /** Tomorrow's generated outfit headline. Absent when no outfit could be built. */
+  headline?: string;
+  /** Tomorrow's outfit items (cached thumbnails). Absent alongside `headline`. */
+  items?: OjoWidgetSnapshotItem[];
+  /** Layering recommendation for tomorrow's conditions. */
+  layerNote?: string;
+}
+
+/** Input-side tomorrow block — thumbnails are still remote URLs. */
+export interface OjoWidgetTomorrowInput extends Omit<OjoWidgetTomorrow, 'items'> {
+  items?: { id: string; role: string; imageUrl: string }[];
+}
+
+/**
  * One complete outfit the widget can render — the "Change fit" AppIntent cycles
  * through these without waking the app (the widget can't run the outfit
  * engine, so alternates must be pre-written). Index 0 is the primary
@@ -186,12 +222,21 @@ export interface OjoWidgetSnapshot {
   uvIndexText?: string;
   /** Same-day layer-change steps (layeringEngine's buildTimeline), capped for widget display. Only present on days with a real temperature swing or a precip start/stop — most days this is omitted. */
   timeline?: WidgetTimelineStep[];
+  /**
+   * The primary outfit's UNCAPPED layer timeline (up to layeringEngine's 5
+   * steps) — powers the dedicated Layer Timeline widget, which has room for
+   * the full day. `timeline` above stays capped for the main widget's strip.
+   * Present exactly when `timeline` is.
+   */
+  fullTimeline?: WidgetTimelineStep[];
   /** Present only when mode === 'empty' — which setup step the user is missing, so the empty state can be specific. */
   emptyReason?: WidgetEmptyReason;
   /** Present only when mode === 'trip'. */
   trip?: OjoWidgetTripInfo;
   /** The soonest saved trip that hasn't started yet, independent of `mode` — powers the separate Trip Countdown widget. */
   upcomingTrip?: OjoWidgetUpcomingTrip;
+  /** Tomorrow's forecast + outfit, independent of `mode` — powers the Tomorrow Prep widget's evening flip. */
+  tomorrow?: OjoWidgetTomorrow;
   /** Deep link opened on tap, e.g. "ojo://outfit" or "ojo://trip/<id>". */
   deepLink: string;
 }
@@ -216,8 +261,12 @@ export interface WidgetSnapshotInput {
   alerts: WidgetAlertKind[];
   uvIndexText?: string;
   timeline?: WidgetTimelineStep[];
+  /** Uncapped layer timeline for the Layer Timeline widget — see OjoWidgetSnapshot.fullTimeline. */
+  fullTimeline?: WidgetTimelineStep[];
   emptyReason?: WidgetEmptyReason;
   trip?: OjoWidgetTripInfo;
   upcomingTrip?: OjoWidgetUpcomingTrip;
+  /** Tomorrow's forecast + outfit for the Tomorrow Prep widget. Thumbnails still remote here. */
+  tomorrow?: OjoWidgetTomorrowInput;
   deepLink: string;
 }

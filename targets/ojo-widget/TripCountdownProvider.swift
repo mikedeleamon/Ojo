@@ -39,15 +39,8 @@ struct TripCountdownProvider: TimelineProvider {
 
   func getTimeline(in context: Context, completion: @escaping (Timeline<TripCountdownEntry>) -> Void) {
     let entry = TripCountdownEntry(date: Date(), upcoming: SnapshotStore.load()?.upcomingTrip)
+    // nextMidnight() is the shared helper in Provider.swift.
     let refreshAt = nextMidnight() ?? Date().addingTimeInterval(86_400)
     completion(Timeline(entries: [entry], policy: .after(refreshAt)))
   }
-}
-
-private func nextMidnight() -> Date? {
-  Calendar.current.nextDate(
-    after: Date(),
-    matching: DateComponents(hour: 0, minute: 0),
-    matchingPolicy: .nextTime
-  )
 }

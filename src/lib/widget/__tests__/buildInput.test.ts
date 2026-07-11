@@ -6,7 +6,7 @@
 
 import type { CurrentWeather, DailyForecast, SavedTripFitPlan, Settings } from '../../../types';
 import type { OutfitResult } from '../../outfit/types';
-import { buildWeatherBlock, buildWidgetInput, WidgetSyncData } from '../buildInput';
+import { buildWeatherBlock, buildWidgetInput, tomorrowDailyFor, WidgetSyncData } from '../buildInput';
 
 const weather: CurrentWeather = {
   WeatherText: 'PartlyCloudy',
@@ -218,5 +218,94 @@ describe('buildWidgetInput upcoming trip', () => {
     );
     expect(input.upcomingTrip?.weather).toBeUndefined();
     expect(input.upcomingTrip?.driftNote).toBeUndefined();
+  });
+});
+
+describe('buildWidgetInput tomorrow block', () => {
+  const localTomorrow = (): string => {
+    const now = new Date();
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  };
+
+  const tomorrowDay: DailyForecast = {
+    date: localTomorrow(),
+    minTempF: 58.3,
+    maxTempF: 74.2,
+    dayPhrase: 'Rain',
+    hasPrecipitation: true,
+    precipProbability: 70,
+  };
+
+  it('maps tomorrow forecast + outfit into the snapshot block (imperial)', () => {
+    const input = buildWidgetInput(
+      baseData({ tomorrow: { day: tomorrowDay, outfit: outfit('Tomorrow fit') } }),
+    );
+    expect(input.tomorrow).toMatchObject({
+      date: tomorrowDay.date,
+      high: 74,
+      low: 58,
+      unit: 'F',
+      weatherKind: 'rain',
+      rainChance: 70,
+      headline: 'Tomorrow fit',
+    });
+    expect(input.tomorrow?.dayName).toBe(
+      new Date(`${tomorrowDay.date}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' }),
+    );
+    expect(input.tomorrow?.items).toHaveLength(2);
+  });
+
+  it('converts tomorrow H/L to metric', () => {
+    const input = buildWidgetInput(
+      baseData({ settings: metricSettings, tomorrow: { day: tomorrowDay, outfit: outfit('Fit') } }),
+    );
+    expect(input.tomorrow).toMatchObject({ high: 23, low: 15, unit: 'C' });
+  });
+
+  it('keeps the weather half but omits the outfit half when no outfit was generated', () => {
+    const input = buildWidgetInput(baseData({ tomorrow: { day: tomorrowDay, outfit: null } }));
+    expect(input.tomorrow?.high).toBe(74);
+    expect(input.tomorrow?.headline).toBeUndefined();
+    expect(input.tomorrow?.items).toBeUndefined();
+    expect(input.tomorrow?.layerNote).toBeUndefined();
+  });
+
+  it('omits the block entirely when tomorrow data is absent', () => {
+    expect(buildWidgetInput(baseData()).tomorrow).toBeUndefined();
+    expect(buildWidgetInput(baseData({ tomorrow: null })).tomorrow).toBeUndefined();
+  });
+
+  it('rides along on the empty mode too', () => {
+    const input = buildWidgetInput(
+      baseData({
+        todayOutfits: [],
+        outfitStatus: 'empty_closet',
+        tomorrow: { day: tomorrowDay, outfit: null },
+      }),
+    );
+    expect(input.mode).toBe('empty');
+    expect(input.tomorrow?.date).toBe(tomorrowDay.date);
+  });
+});
+
+describe('tomorrowDailyFor', () => {
+  const localTomorrow = (): string => {
+    const now = new Date();
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  };
+
+  it('finds the strict calendar-tomorrow entry', () => {
+    const tm = { ...daily[0], date: localTomorrow() };
+    expect(tomorrowDailyFor([daily[0], tm])).toBe(tm);
+  });
+
+  it('returns undefined instead of falling back to a wrong day', () => {
+    expect(tomorrowDailyFor([daily[0]])).toBeUndefined();
+    expect(tomorrowDailyFor([])).toBeUndefined();
+    expect(tomorrowDailyFor(undefined)).toBeUndefined();
   });
 });

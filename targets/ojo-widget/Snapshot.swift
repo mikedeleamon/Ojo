@@ -38,6 +38,10 @@ struct WidgetSnapshot: Codable {
   /// few by the JS side. Only present on days with a real temp swing or a
   /// precip start/stop — most days this is nil, not just empty.
   let timeline: [TimelineStep]?
+  /// The UNCAPPED layer timeline (up to 5 steps) for the dedicated Layer
+  /// Timeline widget. Optional so older snapshots decode; that widget falls
+  /// back to `timeline` when absent.
+  let fullTimeline: [TimelineStep]?
   /// Present only when mode == .empty: "no_closet" | "empty_closet" |
   /// "insufficient" — which setup step the user is missing. Optional so older
   /// snapshots still decode.
@@ -46,6 +50,10 @@ struct WidgetSnapshot: Codable {
   /// The soonest saved trip that hasn't started yet — independent of `mode`;
   /// powers the separate Trip Countdown widget.
   let upcomingTrip: UpcomingTrip?
+  /// Tomorrow's forecast + pre-generated outfit — independent of `mode`;
+  /// powers the Tomorrow Prep widget's evening flip. Optional so older
+  /// snapshots decode.
+  let tomorrow: TomorrowBlock?
   let deepLink: String
 
   struct Item: Codable, Identifiable {
@@ -113,6 +121,25 @@ struct WidgetSnapshot: Codable {
     }
   }
 
+  /// Mirrors snapshot.types.ts `OjoWidgetTomorrow`. Temps arrive pre-converted
+  /// to the user's unit. The outfit half (`headline`/`items`/`layerNote`) is
+  /// absent when tomorrow's generation produced nothing wearable — the widget
+  /// then shows weather-only with an "open Ojo" nudge. `date` lets the view
+  /// verify the block still describes calendar-tomorrow before showing it.
+  struct TomorrowBlock: Codable {
+    let date: String        // local ISO "2026-07-12"
+    let dayName: String     // "Saturday"
+    let high: Int
+    let low: Int
+    let unit: String        // "F" | "C"
+    let condition: String?  // "Rain"
+    let weatherKind: String? // conditions.ts WeatherKind
+    let rainChance: Int?    // 0–100
+    let headline: String?
+    let items: [Item]?
+    let layerNote: String?
+  }
+
   /// `time` is one of layeringEngine's 7 buckets (Early morning/Morning/Late
   /// morning/Early afternoon/Afternoon/Evening/Night); `action` is free text
   /// from a small fixed set of templates — see TimelineStripView's icon match.
@@ -149,9 +176,13 @@ extension WidgetSnapshot {
       alerts: v.alerts,
       uvIndexText: v.uvIndexText,
       timeline: v.timeline,
+      // fullTimeline stays the PRIMARY outfit's — the Layer Timeline widget
+      // always tracks the top recommendation, not the cycled fit.
+      fullTimeline: fullTimeline,
       emptyReason: emptyReason,
       trip: trip,
       upcomingTrip: upcomingTrip,
+      tomorrow: tomorrow,
       deepLink: deepLink
     )
   }
@@ -189,9 +220,31 @@ extension WidgetSnapshot {
       TimelineStep(time: "Afternoon", action: "Remove your jacket — warming up"),
       TimelineStep(time: "Evening", action: "Add it back — sun is setting, cooling down"),
     ],
+    fullTimeline: [
+      TimelineStep(time: "Morning", action: "Keep your jacket on — crisp start"),
+      TimelineStep(time: "Afternoon", action: "Remove your jacket — warming up"),
+      TimelineStep(time: "Evening", action: "Add it back — sun is setting, cooling down"),
+    ],
     emptyReason: nil,
     trip: nil,
     upcomingTrip: nil,
+    tomorrow: TomorrowBlock(
+      date: "",
+      dayName: "Tomorrow",
+      high: 74,
+      low: 58,
+      unit: "F",
+      condition: "Partly Cloudy",
+      weatherKind: "partlyCloudy",
+      rainChance: 20,
+      headline: "Light layers",
+      items: [
+        Item(id: "1", role: "top", thumb: nil),
+        Item(id: "2", role: "bottom", thumb: nil),
+        Item(id: "3", role: "footwear", thumb: nil),
+      ],
+      layerNote: "Cooler start — bring a light jacket."
+    ),
     deepLink: "ojo://outfit"
   )
 
@@ -210,9 +263,11 @@ extension WidgetSnapshot {
     alerts: [],
     uvIndexText: nil,
     timeline: nil,
+    fullTimeline: nil,
     emptyReason: nil,
     trip: nil,
     upcomingTrip: nil,
+    tomorrow: nil,
     deepLink: "ojo://outfit"
   )
 }

@@ -322,13 +322,19 @@ const ArticleModal = ({ closetId, onClose, onSubmit, initialData, onDelete, init
   const runIdentification = async (localUri: string, width: number, height: number) => {
     setIdentifying(true);
     try {
-      // Crop to the upper-centre of the frame: full width minus 10% margins,
-      // but only the top 55% of height. This keeps the main garment (shirt,
-      // jacket, hat, etc.) in view while excluding incidental trousers / shoes
-      // that appear at the bottom of full-body product shots.
+      // Crop to a centred square covering 80% of the shorter edge. Whatever the
+      // user is photographing — a shirt, a hat, or a shoe held up to the camera —
+      // is almost always the centre of the frame, so a centred crop keeps the
+      // subject in view regardless of where it sits vertically. The previous
+      // "top 55% of height" crop was tuned for full-body product shots and
+      // deliberately excluded shoes, which made the classifier fall back to
+      // clothing classes (boots → shirt, loafers → dress) on single-item photos.
+      const side    = Math.min(width, height) * 0.8;
+      const originX = (width  - side) / 2;
+      const originY = (height - side) / 2;
       const cropped = await ImageManipulator.manipulateAsync(
         localUri,
-        [{ crop: { originX: width * 0.1, originY: height * 0.05, width: width * 0.8, height: height * 0.55 } }],
+        [{ crop: { originX, originY, width: side, height: side } }],
         { format: ImageManipulator.SaveFormat.JPEG },
       );
       const result = await identifyClothing(cropped.uri, { confidenceThreshold: 0.35, maxColors: 3 });

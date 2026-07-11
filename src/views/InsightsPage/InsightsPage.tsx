@@ -20,7 +20,7 @@ import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { useConfirm } from '../../components/ConfirmDialog';
 import { hapticSelection, hapticSuccess } from '../../lib/haptics';
 import { useTheme } from '../../theme/ThemeContext';
-import { spacing, fonts, fontSizes, weatherGradients } from '../../theme/tokens';
+import { spacing, fonts, fontSizes } from '../../theme/tokens';
 import { loadHistory } from '../../lib/outfitHistory';
 import {
   computeInsights,
@@ -243,12 +243,6 @@ export default function InsightsPage() {
   if (!data || data.health.totalArticles === 0) {
     return (
       <SafeAreaView style={styles.root} edges={['top']}>
-        <LinearGradient
-          colors={[colors.bgDefault, weatherGradients.default[1], colors.bgDefault]}
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-        />
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={[styles.scrollContent, { paddingBottom: tabPad }]}
@@ -314,14 +308,6 @@ export default function InsightsPage() {
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
-      {/* Subtle gradient background — same approach as MainPage */}
-      <LinearGradient
-        colors={[colors.bgDefault, weatherGradients.default[1], colors.bgDefault]}
-        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-      />
-
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: tabPad }]}
