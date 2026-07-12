@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
     ScrollView,
+    FlatList,
     TextInput,
     Pressable,
     Alert,
@@ -627,53 +628,69 @@ const ClosetView = ({
                 </GlassCard>
             )}
 
-            {/* ── Article list / tile grid ── */}
-            <ScrollView
-                contentContainerStyle={[
-                    viewMode === 'tile' ? styles.tileGrid : styles.articleList,
-                    tabClearance > 0 && { paddingBottom: tabClearance },
-                ]}
-            >
-                {!selected || selected.articles.length === 0 ? (
-                    <View style={styles.emptyState}>
-                        <HangerIcon size={36} color={colors.textMuted} />
-                        <Text style={styles.emptyTitle}>No articles yet</Text>
-                        <Pressable
-                            style={styles.addBtn}
-                            onPress={openAddChooser}
-                        >
-                            <Text style={styles.addBtnText}>Add your first piece</Text>
-                        </Pressable>
-                    </View>
-                ) : sortedArticles.length === 0 ? (
-                    <View style={styles.emptyState}>
-                        <Text style={styles.emptyTitle}>No matches</Text>
-                        <Pressable onPress={clearFilters}>
-                            <Text style={styles.clearFiltersText}>Clear filters</Text>
-                        </Pressable>
-                    </View>
-                ) : viewMode === 'tile' ? (
-                    sortedArticles.map((a) => (
+            {/* ── Article list / tile grid ──
+                FlatList (not a mapped ScrollView) so only on-screen article
+                images mount — large closets no longer render every thumbnail at
+                once. `key={viewMode}` forces a fresh list when the column count
+                changes between list (1) and tile (2). */}
+            <FlatList
+                key={viewMode}
+                data={sortedArticles}
+                keyExtractor={(a) => a._id}
+                numColumns={viewMode === 'tile' ? 2 : 1}
+                columnWrapperStyle={
+                    viewMode === 'tile' ? { gap: spacing.sm } : undefined
+                }
+                renderItem={({ item }) =>
+                    viewMode === 'tile' ? (
                         <TileArticleCard
-                            key={a._id}
-                            article={a}
+                            article={item}
                             tileWidth={tileWidth}
                             onEdit={handleEditArticle}
                             onRemove={handleRemoveArticle}
                         />
-                    ))
-                ) : (
-                    sortedArticles.map((a) => (
+                    ) : (
                         <SwipeableArticleCard
-                            key={a._id}
-                            article={a}
+                            article={item}
                             onEdit={handleEditArticle}
                             onRemove={handleRemoveArticle}
                         />
-                    ))
-                )}
-
-            </ScrollView>
+                    )
+                }
+                contentContainerStyle={[
+                    {
+                        padding: spacing.md,
+                        gap: spacing.sm,
+                        paddingBottom: tabClearance > 0 ? tabClearance : 96,
+                    },
+                    sortedArticles.length === 0 && { flexGrow: 1 },
+                ]}
+                showsVerticalScrollIndicator={false}
+                initialNumToRender={10}
+                maxToRenderPerBatch={10}
+                windowSize={7}
+                ListEmptyComponent={
+                    !selected || selected.articles.length === 0 ? (
+                        <View style={styles.emptyState}>
+                            <HangerIcon size={36} color={colors.textMuted} />
+                            <Text style={styles.emptyTitle}>No articles yet</Text>
+                            <Pressable
+                                style={styles.addBtn}
+                                onPress={openAddChooser}
+                            >
+                                <Text style={styles.addBtnText}>Add your first piece</Text>
+                            </Pressable>
+                        </View>
+                    ) : (
+                        <View style={styles.emptyState}>
+                            <Text style={styles.emptyTitle}>No matches</Text>
+                            <Pressable onPress={clearFilters}>
+                                <Text style={styles.clearFiltersText}>Clear filters</Text>
+                            </Pressable>
+                        </View>
+                    )
+                }
+            />
 
             {/* ── Floating action button — opens the add-article chooser ── */}
             {selected && !editingArticle && !addingManually && (
