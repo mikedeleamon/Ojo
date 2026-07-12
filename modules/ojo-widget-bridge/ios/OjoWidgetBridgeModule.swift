@@ -71,9 +71,16 @@ public class OjoWidgetBridgeModule: Module {
         return
       }
 
-      let task = URLSession.shared.dataTask(with: url) { data, _, error in
+      let task = URLSession.shared.dataTask(with: url) { data, response, error in
         if let error = error {
           promise.reject("DownloadFailed", error.localizedDescription)
+          return
+        }
+        // Surface non-2xx responses (e.g. R2 rate-limiting/404) distinctly from a
+        // genuinely corrupt image — both land in UIImage(data:) as a decode
+        // failure otherwise, which hides the real cause.
+        if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+          promise.reject("HTTPError", "HTTP \(http.statusCode) fetching \(remoteUrl)")
           return
         }
         guard let data = data, let image = UIImage(data: data) else {
