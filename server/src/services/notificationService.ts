@@ -237,13 +237,15 @@ async function runMorningCheck(): Promise<void> {
     const scale = user.settings?.temperatureScale ?? 'Imperial';
 
     // Morning brief (always when morningBriefEnabled)
-    // TODO: temporarily disabled
+    // TODO: temporarily disabled. When re-enabled, keep the `ojo://outfit` deep
+    // link so the tap lands on today's outfit (home) rather than dead-ending on
+    // whatever screen was last open.
     // const briefMsg = buildMorningMessage(
     //   city, weather, forecast, scale,
     //   ns?.tempSwingEnabled ?? false,
     //   ns?.tempSwingThresholdF ?? 20,
     // );
-    // await sendPush(user.pushToken!, briefMsg);
+    // await sendPush(user.pushToken!, briefMsg, 'ojo://outfit');
 
     // Closet gap nudge (optional, same morning window)
     if (ns?.closetGapEnabled) {
