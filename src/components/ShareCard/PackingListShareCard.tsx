@@ -3,6 +3,8 @@ import { StyleSheet } from 'react-native';
 import { View, Text } from '../primitives';
 import { ClothingArticle } from '../../types';
 import { PACKING_GROUPS, categoryKey } from '../../views/TripFit/shared';
+import { PackingCategoryIcon } from '../icons/PackingCategoryIcon';
+import SuitcaseIcon from '../icons/SuitcaseIcon';
 import ShareCardFrame from './ShareCardFrame';
 import cs from './shareCardCommon.styles';
 import { fonts, fontSizes } from '../../theme/tokens';
@@ -21,7 +23,7 @@ const styles = StyleSheet.create({
   },
   groupRow: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'center',
     gap: 8,
   },
   groupLabel: {
@@ -53,17 +55,17 @@ const PackingListShareCard = forwardRef<View, PackingListShareCardProps>(
         {dateRangeLabel ? <Text style={cs.subline}>{dateRangeLabel}</Text> : null}
 
         <View style={cs.weatherChip}>
+          <SuitcaseIcon size={14} color='#FFFFFF' />
           <Text style={cs.weatherChipText}>
-            🧳 {packingList.length} item{packingList.length !== 1 ? 's' : ''} packed
+            {packingList.length} item{packingList.length !== 1 ? 's' : ''} packed
           </Text>
         </View>
 
         <View style={styles.groupList}>
           {groups.map((g) => (
             <View key={g.key} style={styles.groupRow}>
-              <Text style={styles.groupLabel}>
-                {g.emoji} {g.label}
-              </Text>
+              <PackingCategoryIcon category={g.key} size={14} color='#FFFFFF' />
+              <Text style={styles.groupLabel}>{g.label}</Text>
               <Text style={styles.groupItems} numberOfLines={1} ellipsizeMode='tail'>
                 {g.items.map(itemLabel).join(', ')}
               </Text>

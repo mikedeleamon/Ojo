@@ -9,6 +9,7 @@ import { useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { View, Text, Image } from '../../components/primitives';
+import { HangerIcon } from '../../components/shared';
 import { RecapDay, RecapCard } from '../../lib/recapEngine';
 import { RECAP_PALETTE as P, recapSwatchHex } from '../../lib/recapVisuals';
 import { fonts } from '../../theme/tokens';
@@ -140,7 +141,9 @@ export const MvpCard = ({ card }: { card: RecapCard }) => {
               onError={() => setErrored(true)}
             />
           ) : (
-            <Text style={mv.tilePlaceholder}>👕</Text>
+            <View style={mv.tilePlaceholder}>
+              <HangerIcon size={40} color={P.mutedOnCream} decorative />
+            </View>
           )}
         </View>
       </View>
@@ -205,5 +208,5 @@ const mv = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
   },
   tileImg: { width: '86%', height: '86%' },
-  tilePlaceholder: { fontSize: 40, opacity: 0.5 },
+  tilePlaceholder: { opacity: 0.5 },
 });

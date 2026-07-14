@@ -14,12 +14,14 @@ import type { OutfitResult, OutfitRole } from '../../lib/outfit/types';
 /** WeatherKit's free daily forecast reaches ~10 days out. */
 export const FORECAST_WINDOW_DAYS = 10;
 
-export const PACKING_GROUPS: { key: string; label: string; emoji: string }[] = [
-    { key: 'top', label: 'Tops', emoji: '👕' },
-    { key: 'bottom', label: 'Bottoms', emoji: '👖' },
-    { key: 'outerwear', label: 'Outerwear', emoji: '🧥' },
-    { key: 'footwear', label: 'Footwear', emoji: '👟' },
-    { key: 'accessory', label: 'Accessories', emoji: '👜' },
+// Category icons live in PackingCategoryIcon (keyed by `key`, matching
+// categoryKey()'s output) — this list no longer carries an emoji field.
+export const PACKING_GROUPS: { key: string; label: string }[] = [
+    { key: 'top', label: 'Tops' },
+    { key: 'bottom', label: 'Bottoms' },
+    { key: 'outerwear', label: 'Outerwear' },
+    { key: 'footwear', label: 'Footwear' },
+    { key: 'accessory', label: 'Accessories' },
 ];
 
 // ─── Day-plan type ──────────────────────────────────────────────────────────────

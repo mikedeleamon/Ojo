@@ -117,6 +117,11 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         borderWidth: 1,
         borderColor: colors.glassBorder,
     },
+    shareForecastBtnRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
     shareForecastBtnText: {
         fontFamily: fonts.bodyMedium,
         fontSize: fontSizes.sm,

@@ -27,6 +27,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { View, Text, GlassCard } from '../primitives';
 import GearIcon from '../icons/GearIcon';
 import LocationsIcon from '../icons/LocationsIcon';
+import CameraIcon from '../icons/CameraIcon';
 import api from '../../api/client';
 import weatherConstants from '../../constants/weatherConstants';
 import WeatherIconDisplay from '../WeatherIconDisplay/WeatherIconDisplay';
@@ -794,9 +795,12 @@ const WeatherHUD = ({
                                 accessibilityRole='button'
                                 accessibilityLabel='Share forecast to Instagram'
                             >
-                                <Text style={st.shareForecastBtnText}>
-                                    📸  Share forecast
-                                </Text>
+                                <View style={st.shareForecastBtnRow}>
+                                    <CameraIcon size={15} color={colors.textSecondary} />
+                                    <Text style={st.shareForecastBtnText}>
+                                        Share forecast
+                                    </Text>
+                                </View>
                             </Pressable>
                         )}
 

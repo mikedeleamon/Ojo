@@ -12,6 +12,7 @@ import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { View, Text, GlassCard } from '../../components/primitives';
+import SuitcaseIcon from '../../components/icons/SuitcaseIcon';
 import { useTheme, ForceDarkPalette } from '../../theme/ThemeContext';
 import { fonts, fontSizes, radius, spacing, darkColors } from '../../theme/tokens';
 import { gradientFor } from '../../components/WeatherHUD/weatherPalette';
@@ -340,9 +341,12 @@ export default function TripLibrary({
                 {/* Multi-trip overlap insight */}
                 {overlap && (
                     <GlassCard glassStyle='clear' style={st.overlapCard}>
-                        <Text style={[st.overlapTitle, { color: colors.textPrimary }]}>
-                            🧳 {overlap.count} piece{overlap.count === 1 ? '' : 's'} do double duty
-                        </Text>
+                        <RNView style={st.overlapTitleRow}>
+                            <SuitcaseIcon size={14} color={colors.textPrimary} />
+                            <Text style={[st.overlapTitle, { color: colors.textPrimary }]}>
+                                {overlap.count} piece{overlap.count === 1 ? '' : 's'} do double duty
+                            </Text>
+                        </RNView>
                         <Text style={[st.overlapSub, { color: colors.textMuted }]}>
                             Shared across {overlap.names.slice(0, 3).join(', ')}
                             {overlap.names.length > 3 ? ' and more' : ''}. Pack versatile favorites
@@ -458,6 +462,7 @@ function makeStyles(colors: ReturnType<typeof useTheme>['colors']) {
         suggestionText: { fontFamily: fonts.bodyMedium, fontSize: fontSizes.sm, flex: 1 },
         suggestionCta: { fontFamily: fonts.bodySemiBold, fontSize: fontSizes.xs },
         overlapCard: { padding: spacing.md, borderRadius: radius.md, gap: 4 },
+        overlapTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
         overlapTitle: { fontFamily: fonts.bodySemiBold, fontSize: fontSizes.sm },
         overlapSub: { fontFamily: fonts.body, fontSize: fontSizes.xs },
         cardWrap: { borderRadius: radius.lg, overflow: 'hidden' },

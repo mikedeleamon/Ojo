@@ -16,6 +16,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { View, Text, GlassCard, GlassGroup } from '../../components/primitives';
 import OccasionChips from '../../components/OccasionChips';
 import { HangerIcon } from '../../components/shared';
+import CameraIcon from '../../components/icons/CameraIcon';
+import SuitcaseIcon from '../../components/icons/SuitcaseIcon';
+import { PackingCategoryIcon } from '../../components/icons/PackingCategoryIcon';
 import { useTheme, ForceDarkPalette } from '../../theme/ThemeContext';
 import {
     fonts,
@@ -210,11 +213,7 @@ const DayCard = ({
                         accessibilityLabel='Share this day to Instagram'
                         hitSlop={8}
                     >
-                        <Text
-                            style={[dayCardSt.replanIcon, { color: colors.textSecondary }]}
-                        >
-                            📸
-                        </Text>
+                        <CameraIcon size={16} color={colors.textSecondary} />
                     </Pressable>
                 </GlassCard>
             </GlassCard>
@@ -448,14 +447,21 @@ const GroupedPackingList = ({
 
     return (
         <RNView>
-            {PACKING_GROUPS.map(({ key, label, emoji }) => {
+            {PACKING_GROUPS.map(({ key, label }) => {
                 const items = unpGrouped[key];
                 if (!items?.length) return null;
                 return (
                     <RNView key={key}>
-                        <Text style={[groupSt.sectionHeader, { color: colors.textMuted }]}>
-                            {emoji} {label}
-                        </Text>
+                        <RNView style={groupSt.sectionHeaderRow}>
+                            <PackingCategoryIcon
+                                category={key}
+                                size={12}
+                                color={colors.textMuted}
+                            />
+                            <Text style={[groupSt.sectionHeader, { color: colors.textMuted }]}>
+                                {label}
+                            </Text>
+                        </RNView>
                         {items.map((a) => (
                             <PackingRow
                                 key={a._id}
@@ -495,12 +501,17 @@ const GroupedPackingList = ({
 };
 
 const groupSt = StyleSheet.create({
+    sectionHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingVertical: 8,
+    },
     sectionHeader: {
         fontFamily: fonts.bodySemiBold,
         fontSize: fontSizes.xs,
         textTransform: 'uppercase',
         letterSpacing: 0.8,
-        paddingVertical: 8,
     },
 });
 
@@ -1085,7 +1096,7 @@ export default function TripPlanner({
                 {/* Pending placeholder (saved, beyond window) */}
                 {isSaved && status === 'pending' && !loading && startISO && (
                     <GlassCard glassStyle='regular' style={st.pendingCard}>
-                        <Text style={st.pendingEmoji}>🧳</Text>
+                        <SuitcaseIcon size={40} color={colors.textMuted} strokeWidth={1.3} />
                         <Text style={[st.pendingTitle, { color: colors.textPrimary }]}>
                             Outfits unlock soon
                         </Text>
@@ -1387,7 +1398,6 @@ function makeStyles(colors: ReturnType<typeof useTheme>['colors']) {
             alignItems: 'center',
             gap: 6,
         },
-        pendingEmoji: { fontSize: 40, lineHeight: 46 },
         pendingTitle: { fontFamily: fonts.display, fontSize: fontSizes.lg },
         pendingSub: { fontFamily: fonts.body, fontSize: fontSizes.sm, textAlign: 'center' },
         errorInner: { padding: spacing.sm, backgroundColor: 'rgba(239,68,68,0.12)' },
