@@ -952,7 +952,7 @@ export const generateOutfits = (
   // score those. This bounds the expensive work to a constant regardless of
   // wardrobe size — the previous code scored the entire product (tens of
   // thousands of combos, multi-second on large closets).
-  const SCORE_BUDGET = 2500;
+  const SCORE_BUDGET = 3500;
 
   const candidates: OutfitSlot[][] = [];
   for (const core of coreCombos) {

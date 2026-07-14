@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { useFocusEffect } from 'expo-router';
 import {
     ScrollView,
@@ -18,7 +18,7 @@ import Animated, {
     interpolate,
     Easing,
 } from 'react-native-reanimated';
-import { View, Text, GlassCard } from '../primitives';
+import { View, Text, GlassCard, GlassGroup } from '../primitives';
 import { EmptyState } from '../shared';
 import OccasionChips from '../OccasionChips';
 import { useClosets } from '../../hooks/useClosets';
@@ -258,6 +258,21 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
     const [activeIdx, setActiveIdx] = useState(0);
     const [showBreakdown, setShowBreakdown] = useState(false);
     const [wornLogged, setWornLogged] = useState(false);
+    // Whether the confirmation panel's content has ever been needed. It stays
+    // false until the first "Wore this today", then stays true forever after
+    // (toggling wornLogged off via undo keeps the panel mounted rather than
+    // tearing it down). This defers mounting the confirm panel's ArticleThumb
+    // GlassCards until they're actually about to be shown — mounting them from
+    // first render, while the panel sits at opacity 0 (the pre-log default),
+    // is the same bug as the mini pill: iOS never properly initialises a
+    // GlassView's blur if it's created while invisible and left there, so the
+    // thumbnails stayed unrendered until something forced a relayout (leaving
+    // and returning the tab). useLayoutEffect (not useEffect) so this flips
+    // before paint — no frame where the panel is visible but empty.
+    const [confirmEverNeeded, setConfirmEverNeeded] = useState(false);
+    useLayoutEffect(() => {
+        if (wornLogged) setConfirmEverNeeded(true);
+    }, [wornLogged]);
     const [showShareSheet, setShowShareSheet] = useState(false);
     // The outfit captured by the "Logged for today" confirmation — either the
     // active generated outfit or the Trip Mode outfit, so the confirmation card
@@ -270,6 +285,11 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
         result: OutfitResult | null;
     } | null>(null);
     const [worn, setWorn] = useState<Map<string, number>>(new Map());
+    // Flip once each async load below actually resolves — lets the generation
+    // effect wait on real completion instead of guessing a delay (see the
+    // loading effect and the generation effect further down).
+    const [wornReady, setWornReady] = useState(false);
+    const [historyReady, setHistoryReady] = useState(false);
     const [removedByOutfit, setRemovedByOutfit] = useState<
         Map<number, Set<string>>
     >(new Map());
@@ -357,10 +377,14 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
     const pagerRef = useRef<ScrollView>(null);
 
     useEffect(() => {
-        recentlyWornWithAge(7).then(setWorn);
+        recentlyWornWithAge(7)
+            .then(setWorn)
+            .catch(() => {})
+            .finally(() => setWornReady(true));
         loadHistory()
             .then(setHistory)
-            .catch(() => {});
+            .catch(() => {})
+            .finally(() => setHistoryReady(true));
     }, []);
 
     useEffect(() => {
@@ -389,9 +413,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
     // closet, preference, or worn-status change — several as data settles on
     // load) froze taps and navigation for its full duration. Instead we compute
     // it in a deferred effect (runAfterInteractions) and keep the result in
-    // state: generation never blocks an in-flight tap/scroll/navigation, and
-    // rapid input changes cancel the pending run so only the latest inputs are
-    // generated (natural debounce) rather than each intermediate state.
+    // state, so generation never blocks an in-flight tap/scroll/navigation.
     const [gen, setGen] = useState<{
         outfits: OutfitResult[];
         status: ReturnType<typeof generateOutfits>['status'] | 'no_preferred';
@@ -404,6 +426,18 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
             setGenerating(false);
             return;
         }
+        // Hold until worn-history and outfit-history have actually finished
+        // loading (see the loading effect above) rather than generating
+        // immediately with their empty initial values. weather/worn/profile/
+        // forecasts each resolve from separate async sources; generating (and
+        // displaying) a result before they've all loaded meant the user saw
+        // the engine "think out loud" through 2-4 intermediate outfits as each
+        // one landed and re-triggered generation. Gating on real completion
+        // — instead of guessing a debounce delay — makes this correct
+        // regardless of how slow any one of those loads is, and doesn't add
+        // artificial latency to later, deliberate changes (e.g. tapping an
+        // occasion chip), since both flags are already true by then.
+        if (!wornReady || !historyReady) return;
         setGenerating(true);
         const task = InteractionManager.runAfterInteractions(() => {
             const { results, status } = generateOutfits(
@@ -419,7 +453,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
             setGenerating(false);
         });
         return () => task.cancel();
-    }, [preferred, weather, effectiveSettings, worn, forecasts, profile]);
+    }, [preferred, weather, effectiveSettings, worn, forecasts, profile, wornReady, historyReady]);
 
     const outfits = gen.outfits;
     const status = gen.status;
@@ -440,12 +474,17 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
 
     // Pager cards mount their ArticleThumb subtree lazily: only indices that
     // have actually been viewed. Starts with just the active index — the
-    // common case (never touching the pager) mounts exactly one card's worth
-    // of thumbs instead of pre-warming its neighbors up front. A neighbor is
-    // added the instant a drag begins (onScrollBeginDrag, below), before it's
-    // visible, so there's no pop-in when the swipe lands; once visited, an
-    // index stays mounted rather than thrashing as the user pages back and
-    // forth. Resets whenever a fresh generation replaces `outfits`.
+    // first paint mounts exactly one card's worth of thumbs. Neighbors are
+    // pre-warmed two ways: (1) idle, via runAfterInteractions, once the active
+    // card settles — the common case, since InteractionManager tasks usually
+    // run within tens of ms and land well before any swipe; (2) synchronously
+    // on onScrollBeginDrag, as a safety net — without it, a swipe that starts
+    // before the idle warm has fired showed a blank neighbor card once the
+    // page landed (worse than the alternative). setRenderedIdx no-ops when the
+    // neighbor is already warmed, so the safety net costs nothing in the
+    // common case where idle warming already ran. Once warmed, an index stays
+    // mounted rather than thrashing as the user pages back and forth. Resets
+    // whenever a fresh generation replaces `outfits`.
     const [renderedIdx, setRenderedIdx] = useState<Set<number>>(
         () => new Set([safeIdx]),
     );
@@ -453,19 +492,19 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
         setRenderedIdx(new Set([safeIdx]));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [outfits]);
-    useEffect(() => {
-        setRenderedIdx((prev) =>
-            prev.has(safeIdx) ? prev : new Set(prev).add(safeIdx),
-        );
-    }, [safeIdx]);
     const warmNeighbors = useCallback(() => {
         setRenderedIdx((prev) => {
             const next = new Set(prev);
+            next.add(safeIdx);
             if (safeIdx > 0) next.add(safeIdx - 1);
             if (safeIdx < outfits.length - 1) next.add(safeIdx + 1);
             return next.size === prev.size ? prev : next;
         });
     }, [safeIdx, outfits.length]);
+    useEffect(() => {
+        const task = InteractionManager.runAfterInteractions(warmNeighbors);
+        return () => task.cancel();
+    }, [warmNeighbors]);
 
     // The outfit the user logged as worn today, reshaped for the widget: the
     // actual worn slots (minus any removed items) but carrying the source
@@ -1005,10 +1044,11 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
                                 // points, and onMomentumScrollEnd page math all
                                 // stay correct — only visited cards (see
                                 // renderedIdx above) mount their ArticleThumb
-                                // subtree. The common case (no swiping) mounts
-                                // exactly one card's worth of thumbs; a
-                                // neighbor is pre-warmed the instant a drag
-                                // starts, before it's visible.
+                                // subtree. The active card mounts immediately;
+                                // neighbors are pre-warmed idly after settling,
+                                // with onScrollBeginDrag as a synchronous
+                                // fallback so a swipe that starts before the
+                                // idle warm fires never lands on a blank card.
                                 const isNearActive = renderedIdx.has(i);
                                 return (
                                     <View
@@ -1020,7 +1060,10 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
                                     >
                                         {isNearActive && (
                                             <>
-                                                <View style={styles.pagerCardArticles}>
+                                                <GlassGroup
+                                                    spacing={12}
+                                                    style={styles.pagerCardArticles}
+                                                >
                                                     {outfit.slots
                                                         .filter(
                                                             (s) =>
@@ -1046,7 +1089,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
                                                                 }
                                                             />
                                                         ))}
-                                                </View>
+                                                </GlassGroup>
                                                 <View style={styles.pagerCardFooter}>
                                                     <Text style={styles.pagerSubtitle}>
                                                         {outfitTabSubtitle(outfit)}
@@ -1171,58 +1214,65 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
                     style={[confirmAnimStyle, !wornLogged && styles.crossfadeInactive]}
                     pointerEvents={wornLogged ? 'auto' : 'none'}
                 >
-                    <View style={styles.confirmCard}>
-                        <Text style={styles.confirmTitle}>
-                            Logged for today
-                        </Text>
-
-                        <View style={styles.pagerCardArticles}>
-                            {confirmSlots.map((slot, j) => (
-                                <ArticleThumb
-                                    key={j}
-                                    article={slot.article}
-                                    role={slot.role}
-                                />
-                            ))}
-                        </View>
-
-                        <View style={styles.confirmStats}>
-                            <View style={styles.confirmStat}>
-                                <Text style={styles.confirmStatValue}>
-                                    {history.length}
+                    {confirmEverNeeded && (
+                        <>
+                            <View style={styles.confirmCard}>
+                                <Text style={styles.confirmTitle}>
+                                    Logged for today
                                 </Text>
-                                <Text style={styles.confirmStatLabel}>
-                                    outfits logged
-                                </Text>
+
+                                <GlassGroup
+                                    spacing={12}
+                                    style={styles.pagerCardArticles}
+                                >
+                                    {confirmSlots.map((slot, j) => (
+                                        <ArticleThumb
+                                            key={j}
+                                            article={slot.article}
+                                            role={slot.role}
+                                        />
+                                    ))}
+                                </GlassGroup>
+
+                                <View style={styles.confirmStats}>
+                                    <View style={styles.confirmStat}>
+                                        <Text style={styles.confirmStatValue}>
+                                            {history.length}
+                                        </Text>
+                                        <Text style={styles.confirmStatLabel}>
+                                            outfits logged
+                                        </Text>
+                                    </View>
+                                    {confirmScore > 0 && (
+                                        <View style={styles.confirmStat}>
+                                            <Text style={styles.confirmStatValue}>
+                                                {confirmScore}
+                                            </Text>
+                                            <Text style={styles.confirmStatLabel}>
+                                                outfit score
+                                            </Text>
+                                        </View>
+                                    )}
+                                    {repeatCount > 1 && (
+                                        <View style={styles.confirmStat}>
+                                            <Text style={styles.confirmStatValue}>
+                                                {repeatCount}x
+                                            </Text>
+                                            <Text style={styles.confirmStatLabel}>
+                                                worn this combo
+                                            </Text>
+                                        </View>
+                                    )}
+                                </View>
                             </View>
-                            {confirmScore > 0 && (
-                                <View style={styles.confirmStat}>
-                                    <Text style={styles.confirmStatValue}>
-                                        {confirmScore}
-                                    </Text>
-                                    <Text style={styles.confirmStatLabel}>
-                                        outfit score
-                                    </Text>
-                                </View>
-                            )}
-                            {repeatCount > 1 && (
-                                <View style={styles.confirmStat}>
-                                    <Text style={styles.confirmStatValue}>
-                                        {repeatCount}x
-                                    </Text>
-                                    <Text style={styles.confirmStatLabel}>
-                                        worn this combo
-                                    </Text>
-                                </View>
-                            )}
-                        </View>
-                    </View>
 
-                    <Pressable onPress={handleUndoLog} style={styles.confirmUndo}>
-                        <Text style={styles.confirmUndoText}>
-                            Wore something else?
-                        </Text>
-                    </Pressable>
+                            <Pressable onPress={handleUndoLog} style={styles.confirmUndo}>
+                                <Text style={styles.confirmUndoText}>
+                                    Wore something else?
+                                </Text>
+                            </Pressable>
+                        </>
+                    )}
                 </Animated.View>
             </View>
 
