@@ -1157,7 +1157,16 @@ export default function TripPlanner({
 
                         <Text style={st.sectionHeader}>Day-by-Day Outfits</Text>
 
-                        <GlassGroup spacing={12}>
+                        {/* Full-bleed: cancel the scroll container's horizontal
+                            padding so cards clip at the physical screen edges, not
+                            at an interior line spacing.md in from them (which left a
+                            dead margin where an out-scrolling card's content was cut
+                            off short of the edge). The content padding re-insets the
+                            first card so it still lines up with the section header,
+                            and because both the leading padding and every card shift
+                            by the same spacing.md, snapToInterval / page math are
+                            unchanged. */}
+                        <GlassGroup spacing={12} style={{ marginHorizontal: -spacing.md }}>
                             <ScrollView
                                 ref={pagerRef}
                                 horizontal
@@ -1167,7 +1176,10 @@ export default function TripPlanner({
                                 decelerationRate='normal'
                                 scrollEventThrottle={16}
                                 showsHorizontalScrollIndicator={false}
-                                contentContainerStyle={{ paddingVertical: spacing.xs }}
+                                contentContainerStyle={{
+                                    paddingVertical: spacing.xs,
+                                    paddingHorizontal: spacing.md,
+                                }}
                                 onMomentumScrollEnd={(e) => {
                                     const page = Math.round(
                                         e.nativeEvent.contentOffset.x / cardWidth,
