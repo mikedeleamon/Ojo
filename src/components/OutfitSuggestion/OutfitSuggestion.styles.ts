@@ -10,6 +10,11 @@ import {
 
 export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     root: { gap: spacing.sm },
+    // Cross-fade: the inactive panel is pulled out of flow so only the active
+    // panel drives the container's height (no per-frame height animation).
+    crossfadeInactive: { position: 'absolute', top: 0, left: 0, right: 0 },
+    // Space-reserving box shown while the first outfit generation runs off-thread.
+    generatingBox: { minHeight: 220, alignItems: 'center', justifyContent: 'center' },
     sectionLabel: {
         fontFamily: fonts.body,
         fontSize: fontSizes.xs,
@@ -266,25 +271,15 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         paddingVertical: 10,
         paddingHorizontal: spacing.md,
         borderRadius: radius.sm,
-        borderWidth: 1,
-        borderColor: colors.glassBorder,
         alignItems: 'center' as const,
         justifyContent: 'center' as const,
-        backgroundColor: colors.glassBg,
-        overflow: 'hidden' as const,
-    },
-    woreThisTint: {
-        position: 'absolute' as const,
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
+        backgroundColor: colors.saveBtnBg,
     },
     woreThisText: {
         fontFamily: fonts.body,
         fontSize: fontSizes.sm,
-        fontWeight: fontWeights.medium,
-        color: colors.textPrimary,
+        fontWeight: fontWeights.semibold,
+        color: colors.saveBtnText,
     },
     confirmCard: {
         gap: spacing.sm,

@@ -36,8 +36,30 @@ const resolveItems = async (
     })),
   );
 
-export async function updateWidgetSnapshot(input: WidgetSnapshotInput): Promise<void> {
-  if (!isWidgetBridgeAvailable()) return;
+// Signature of the last successfully written snapshot's *input* (which, unlike
+// the snapshot itself, has no updatedAt timestamp). Re-renders that resolve to
+// the same widget state — every tab focus used to — skip the whole pipeline:
+// no thumbnail work, no file write, and crucially no WidgetKit timeline reload.
+let lastWrittenSig: string | null = null;
+// Chain so overlapping calls run one at a time in order — a slow thumbnail
+// download from one call can't interleave its write with a newer call's.
+let writeChain: Promise<void> = Promise.resolve();
+
+export function updateWidgetSnapshot(input: WidgetSnapshotInput): Promise<void> {
+  if (!isWidgetBridgeAvailable()) return Promise.resolve();
+
+  const sig = JSON.stringify(input);
+  if (sig === lastWrittenSig) return Promise.resolve();
+
+  writeChain = writeChain
+    .then(() => doUpdate(input, sig))
+    .catch(() => {}); // contract: never throws
+  return writeChain;
+}
+
+async function doUpdate(input: WidgetSnapshotInput, sig: string): Promise<void> {
+  // Re-check after waiting in the chain — an identical call may have just landed.
+  if (sig === lastWrittenSig) return;
 
   // Every variant's thumbnails must be pre-cached — the "Change fit" intent
   // swaps variants without the app running, so nothing can be fetched later.
@@ -92,7 +114,8 @@ export async function updateWidgetSnapshot(input: WidgetSnapshotInput): Promise<
   };
 
   try {
-    writeSnapshot(JSON.stringify(snapshot));
+    await writeSnapshot(JSON.stringify(snapshot));
+    lastWrittenSig = sig;
     // Drop any thumbnails from previous snapshots that today's no longer uses —
     // keeping every variant's AND tomorrow's, not just the visible outfit's.
     const keep = [
@@ -102,7 +125,7 @@ export async function updateWidgetSnapshot(input: WidgetSnapshotInput): Promise<
     ]
       .map((r) => r.thumb)
       .filter((t): t is string => t != null);
-    pruneThumbs([...new Set(keep)]);
+    await pruneThumbs([...new Set(keep)]);
   } catch (e) {
     console.warn('[Ojo] updateWidgetSnapshot failed:', e);
   }
@@ -125,8 +148,11 @@ export async function clearWidgetSnapshot(): Promise<void> {
   };
 
   try {
-    writeSnapshot(JSON.stringify(snapshot));
-    pruneThumbs([]);
+    await writeSnapshot(JSON.stringify(snapshot));
+    // Forget the last-written signature so the next real snapshot (even one
+    // identical to a pre-clear state) is written rather than skipped.
+    lastWrittenSig = null;
+    await pruneThumbs([]);
   } catch (e) {
     console.warn('[Ojo] clearWidgetSnapshot failed:', e);
   }

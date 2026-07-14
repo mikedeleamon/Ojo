@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { StyleSheet, Modal, ScrollView, AccessibilityInfo, findNodeHandle, View as RNView } from 'react-native';
+import { StyleSheet, Modal, ScrollView, ActivityIndicator, AccessibilityInfo, findNodeHandle, View as RNView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { View, Text, Pressable, GlassCard, GlassGroup } from '../../components/primitives';
@@ -7,6 +7,7 @@ import { SETTINGS_CONFIG, SettingsAction } from './config';
 import SettingsSection from './components/SettingsSection';
 import { useSettings } from '../../hooks/useSettings';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
+import { useDeferredMount } from '../../hooks/useDeferredMount';
 import { clearAuth } from '../../lib/auth';
 import { spacing, radius, fonts, fontSizes, fontWeights } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
@@ -120,6 +121,10 @@ export default function SettingsScreen({ onLogout }: Props) {
     const nav = useAppNavigation();
     const { settings, refreshSettings } = useSettings();
     const [showLogout, setShowLogout] = useState(false);
+    // Let the push transition animate against a light screen, then mount the
+    // (native-glass-heavy) settings sections once it settles — so the tap feels
+    // instant instead of stalling on the synchronous glass mount.
+    const showBody = useDeferredMount();
 
     const logoutModalTitleRef = useRef<RNView>(null);
     useEffect(() => {
@@ -167,28 +172,34 @@ export default function SettingsScreen({ onLogout }: Props) {
                 <Text style={styles.title}>Account</Text>
             </View>
 
-            <ScrollView contentContainerStyle={styles.content}>
-                <View style={{ gap: spacing.md }}>
-                    {SETTINGS_CONFIG.map((section) => (
-                        <SettingsSection
-                            key={section.title}
-                            section={section}
-                            settings={settings}
-                            onAction={dispatch}
-                        />
-                    ))}
-                </View>
+            {showBody ? (
+                <ScrollView contentContainerStyle={styles.content}>
+                    <View style={{ gap: spacing.md }}>
+                        {SETTINGS_CONFIG.map((section) => (
+                            <SettingsSection
+                                key={section.title}
+                                section={section}
+                                settings={settings}
+                                onAction={dispatch}
+                            />
+                        ))}
+                    </View>
 
-                <GlassCard glassStyle="clear" style={styles.logoutBtn}>
-                    <Pressable
-                        onPress={() => setShowLogout(true)}
-                        accessibilityRole="button"
-                        style={styles.logoutBtnInner}
-                    >
-                        <Text style={styles.logoutText}>Log out</Text>
-                    </Pressable>
-                </GlassCard>
-            </ScrollView>
+                    <GlassCard glassStyle="clear" style={styles.logoutBtn}>
+                        <Pressable
+                            onPress={() => setShowLogout(true)}
+                            accessibilityRole="button"
+                            style={styles.logoutBtnInner}
+                        >
+                            <Text style={styles.logoutText}>Log out</Text>
+                        </Pressable>
+                    </GlassCard>
+                </ScrollView>
+            ) : (
+                <View style={{ flex: 1, alignItems: 'center', paddingTop: spacing.xl }}>
+                    <ActivityIndicator color={colors.textMuted} />
+                </View>
+            )}
 
             <Modal
                 visible={showLogout}

@@ -5,6 +5,7 @@ import {
     TextInput,
     Pressable,
     Alert,
+    RefreshControl,
     useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -50,7 +51,7 @@ interface Props {
     initialSelectedId?: string;
     /** Open the create-closet form on mount — set by the widget's no-closet deep link (ojo://closet/new). */
     autoCreate?: boolean;
-    onCreateCloset: (name: string) => Promise<void>;
+    onCreateCloset: (name: string) => Promise<unknown>;
     onRenameCloset: (id: string, name: string) => Promise<void>;
     onDeleteCloset: (id: string) => Promise<void>;
     onAddArticle: (closetId: string, data: ArticleFormData) => Promise<void>;
@@ -62,6 +63,8 @@ interface Props {
     onRemoveArticle: (closetId: string, articleId: string) => Promise<void>;
     onSetPreferred: (id: string) => Promise<void>;
     onTripFit?: () => void;
+    /** Pull-to-refresh handler; resolves when the refetch settles. */
+    onRefresh?: () => Promise<void>;
     /** Bottom padding so scroll content clears the floating pill tab bar */
     tabClearance?: number;
 }
@@ -78,6 +81,7 @@ const ClosetView = ({
     onRemoveArticle,
     onSetPreferred,
     onTripFit,
+    onRefresh,
     tabClearance = 0,
 }: Props) => {
     const { colors } = useTheme();
@@ -109,6 +113,17 @@ const ClosetView = ({
     const [showFilters, setShowFilters] = useState(false);
     const [wornAgeMap, setWornAgeMap] = useState<Map<string, number>>(new Map());
     const [sortBy, setSortBy] = useState<SortMode>('default');
+    const [refreshing, setRefreshing] = useState(false);
+
+    const handleRefresh = useCallback(async () => {
+        if (!onRefresh) return;
+        setRefreshing(true);
+        try {
+            await onRefresh();
+        } finally {
+            setRefreshing(false);
+        }
+    }, [onRefresh]);
 
     useFocusEffect(
         useCallback(() => {
@@ -669,6 +684,15 @@ const ClosetView = ({
                 initialNumToRender={10}
                 maxToRenderPerBatch={10}
                 windowSize={7}
+                refreshControl={
+                    onRefresh ? (
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={handleRefresh}
+                            tintColor={colors.textSecondary as string}
+                        />
+                    ) : undefined
+                }
                 ListEmptyComponent={
                     !selected || selected.articles.length === 0 ? (
                         <View style={styles.emptyState}>

@@ -151,6 +151,11 @@ export default function InsightsPage() {
   const ringAnim = useRef(new Animated.Value(0)).current;
   // Tracks whether we've painted at least once, so refreshes stay silent.
   const hasLoaded = useRef(false);
+  // Signature of the inputs behind the last computed insights. computeInsights
+  // is heavy (per-article stats across the whole wardrobe + history); a bare
+  // focus with nothing changed used to recompute it — and re-animate the ring
+  // from zero — on every tab visit. Skip when the inputs are byte-identical.
+  const lastSigRef = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     if (closetsLoading) return;
@@ -161,6 +166,7 @@ export default function InsightsPage() {
       // Empty wardrobe: skip the heavy compute and surface an empty state.
       if (closets.length === 0) {
         setData(null);
+        lastSigRef.current = 'empty';
         hasLoaded.current = true;
         return;
       }
@@ -168,9 +174,21 @@ export default function InsightsPage() {
         loadHistory(),
         loadDonationQueue(),
       ]);
+      setDonationQueue(queue);
+
+      // Inputs to computeInsights: the closets' articles, the history, and the
+      // time window. Cheap to fingerprint, expensive to recompute.
+      const sig = JSON.stringify({
+        c: closets.map((c) => [c._id, c.articles.length]),
+        w: windowDays,
+        h: history.length,
+        last: history[0]?.id ?? null,
+      });
+      if (sig === lastSigRef.current && hasLoaded.current) return;
+      lastSigRef.current = sig;
+
       const insights = await computeInsights(closets, history, windowDays);
       setData(insights);
-      setDonationQueue(queue);
       hasLoaded.current = true;
 
       // Animate the ring in — snap straight to the value under Reduce Motion.

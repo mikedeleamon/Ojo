@@ -542,8 +542,14 @@ const scoreCombo = (
  * Maximum articles per role bucket to consider during combination generation.
  * Pre-filtering by individual fabric score keeps the search space tractable
  * for large wardrobes while ensuring quality candidates are included.
+ *
+ * This is a *multiplied* dimension — the enumerated cross-product is roughly
+ * top×bottom×mid×outer×shoe×accessory, so the cost grows ~polynomially with
+ * this cap. 6 keeps the six most weather-appropriate items per role (ample for
+ * three diverse suggestions) while cutting the search space ~3× versus 8, which
+ * is what pushed generation into multi-second territory on large wardrobes.
  */
-const BUCKET_CAP = 8;
+const BUCKET_CAP = 6;
 
 const topNByFabric = (
   articles: ClothingArticle[],
@@ -805,6 +811,7 @@ export const generateOutfits = (
   profile:      UserPreferenceProfile = { colors: {}, fabrics: {}, categories: {}, colorPairs: {}, totalOutfits: 0 },
   forecasts:    Forecast[]           = [],
 ): { results: OutfitResult[]; status: OutfitStatus } => {
+  const __t0 = __DEV__ ? Date.now() : 0;
 
   // ── Early exits ──────────────────────────────────────────────────────────
   const empty_result = (status: OutfitStatus): { results: OutfitResult[]; status: OutfitStatus } => ({
@@ -868,19 +875,27 @@ export const generateOutfits = (
         ? midLayers.slice(0, 4)
         : [...midLayers.slice(0, 4), null];  // cool/warm: optional
 
+  // Outerwear and footwear are *multiplied* dimensions in the enumeration below,
+  // so they dominate the combinatorial cost on large closets (all outerwear × all
+  // shoes × every core × mid × accessory). Both lists are already fabric-sorted
+  // best-first, so we enumerate only the few most weather-appropriate of each.
+  const OPTIONAL_ENUM_CAP = 4;
+  const outerEnum = outerwears.slice(0, OPTIONAL_ENUM_CAP);
+  const shoeEnum  = footwears.slice(0, OPTIONAL_ENUM_CAP);
+
   // Outerwear: required in cool/cold/freezing; required if moderate+ rain;
   // optional if light rain; skip otherwise
   const outerOptions: (ClothingArticle | null)[] =
     bucket === 'cool' || bucket === 'cold' || bucket === 'freezing'
-      ? outerwears.length > 0 ? outerwears : [null]   // null → "missing" note
-      : (precipIntensity === 'heavy' || precipIntensity === 'moderate') && outerwears.length > 0
-        ? outerwears                                   // moderate+ rain → require
-        : precipIntensity === 'light' && outerwears.length > 0
-          ? [...outerwears, null]                      // light rain → optional
+      ? outerEnum.length > 0 ? outerEnum : [null]     // null → "missing" note
+      : (precipIntensity === 'heavy' || precipIntensity === 'moderate') && outerEnum.length > 0
+        ? outerEnum                                    // moderate+ rain → require
+        : precipIntensity === 'light' && outerEnum.length > 0
+          ? [...outerEnum, null]                       // light rain → optional
           : [null];                                    // no rain → skip
 
   const shoeOptions: (ClothingArticle | null)[] =
-    footwears.length > 0 ? footwears : [null];
+    shoeEnum.length > 0 ? shoeEnum : [null];
 
   // Accessory combos: up to 2 non-competing accessories (different body zones).
   // When UV is high, hats and caps float to the front to appear in top combos.
@@ -930,7 +945,16 @@ export const generateOutfits = (
     coreCombos = withFabricScore.slice(0, CORE_COMBO_KEEP).map(x => x.slots);
   }
 
-  // Full cross-product with midLayer × outerwear × footwear × accessory combos
+  // Enumerate the full cross-product into candidate slot arrays (cheap — no
+  // scoring yet). scoreCombo (colour harmony + preference + style + notes) is the
+  // hot path, so instead of scoring every candidate we cheap-score them all by
+  // fabric appropriateness, keep the best SCORE_BUDGET, and only expensively
+  // score those. This bounds the expensive work to a constant regardless of
+  // wardrobe size — the previous code scored the entire product (tens of
+  // thousands of combos, multi-second on large closets).
+  const SCORE_BUDGET = 2500;
+
+  const candidates: OutfitSlot[][] = [];
   for (const core of coreCombos) {
     for (const mid of midOptions) {
       for (const outer of outerOptions) {
@@ -943,12 +967,27 @@ export const generateOutfits = (
             for (const acc of accCombo) {
               slots.push({ role: 'accessory', article: acc });
             }
-
-            scored.push(scoreCombo(slots, bucket, effectiveFeelsLike, precipIntensity, humidity, windMph, isSnowing, settings, recentlyWorn, profile));
+            candidates.push(slots);
           }
         }
       }
     }
+  }
+
+  const toScore =
+    candidates.length > SCORE_BUDGET
+      ? candidates
+          .map(slots => ({
+            slots,
+            cheap: outfitFabricScore(slots, bucket, effectiveFeelsLike, precipIntensity, humidity, settings.humidityPreference, windMph, isSnowing),
+          }))
+          .sort((a, b) => b.cheap - a.cheap)
+          .slice(0, SCORE_BUDGET)
+          .map(x => x.slots)
+      : candidates;
+
+  for (const slots of toScore) {
+    scored.push(scoreCombo(slots, bucket, effectiveFeelsLike, precipIntensity, humidity, windMph, isSnowing, settings, recentlyWorn, profile));
   }
 
   // ── Phase 4: Sort → deduplicate → diversity filter → take top-K ──────────
@@ -1063,6 +1102,19 @@ export const generateOutfits = (
   });
 
   results.sort((a, b) => b.score - a.score);
+
+  if (__DEV__) {
+    const ms = Date.now() - __t0;
+    if (ms > 50) {
+      // eslint-disable-next-line no-console
+      console.log(
+        `[perf] generateOutfits: ${ms}ms — scored ${scored.length}/${candidates.length} ` +
+          `(articles=${articles.length}, cores=${coreCombos.length}, ` +
+          `mid=${midOptions.length}, outer=${outerOptions.length}, ` +
+          `shoe=${shoeOptions.length}, acc=${accCombos.length})`,
+      );
+    }
+  }
 
   return { results, status: 'ok' };
 };

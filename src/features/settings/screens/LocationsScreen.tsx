@@ -4,6 +4,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  ActivityIndicator,
   Animated,
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
@@ -18,6 +19,7 @@ import { gradientFor } from '../../../components/WeatherHUD/weatherPalette';
 import { useSettings } from '../../../hooks/useSettings';
 import { useActiveLocation } from '../../../context/ActiveLocationContext';
 import { useAppNavigation } from '../../../hooks/useAppNavigation';
+import { useDeferredMount } from '../../../hooks/useDeferredMount';
 import {
   spacing,
   radius,
@@ -209,6 +211,9 @@ export default function LocationsScreen() {
 
   const savedLocations = settings.savedLocations ?? [];
   const isMetric = settings.temperatureScale === 'Metric';
+  // The destination rows are native-glass + gradient + animated-icon heavy; mount
+  // them after the push transition settles so the screen slides in instantly.
+  const showRows = useDeferredMount();
 
   const scrollViewRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
 
@@ -366,8 +371,16 @@ export default function LocationsScreen() {
               Tap a place to show its weather on the main screen. "My Location"
               uses your device's current position.
             </Text>
-            {renderRow(CURRENT_LOCATION_ID, 'My Location')}
-            {savedLocations.map(l => renderRow(l.id, l.name, l))}
+            {showRows ? (
+              <>
+                {renderRow(CURRENT_LOCATION_ID, 'My Location')}
+                {savedLocations.map(l => renderRow(l.id, l.name, l))}
+              </>
+            ) : (
+              <View style={{ paddingVertical: spacing.xl, alignItems: 'center' }}>
+                <ActivityIndicator color={darkColors.textMuted} />
+              </View>
+            )}
           </View>
 
           <View style={st.section}>

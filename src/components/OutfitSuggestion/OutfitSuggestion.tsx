@@ -5,6 +5,8 @@ import {
     Image,
     Pressable,
     Linking,
+    ActivityIndicator,
+    InteractionManager,
     useWindowDimensions,
     Animated as RNAnimated,
     Easing as RNEasing,
@@ -16,8 +18,7 @@ import Animated, {
     interpolate,
     Easing,
 } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
-import { View, Text, GlassCard, GlassGroup } from '../primitives';
+import { View, Text, GlassCard } from '../primitives';
 import { EmptyState } from '../shared';
 import OccasionChips from '../OccasionChips';
 import { useClosets } from '../../hooks/useClosets';
@@ -27,6 +28,7 @@ import { hapticSuccess } from '../../lib/haptics';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { buildWidgetInput, tomorrowDailyFor } from '../../lib/widget/buildInput';
 import { updateWidgetSnapshot } from '../../lib/widget/updateWidgetSnapshot';
+import { isWidgetBridgeAvailable } from '../../lib/widget/native';
 import { buildTripWeather } from '../../views/TripFit/shared';
 import TripModeCard from '../TripMode/TripModeCard';
 import ShareToInstagramSheet from '../ShareCard/ShareToInstagramSheet';
@@ -63,7 +65,7 @@ import {
     WearEngineMeta,
     WearNegative,
 } from '../../types';
-import { spacing, brandHeroTint } from '../../theme/tokens';
+import { spacing } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 import {
     CSS_COLORS,
@@ -238,10 +240,9 @@ interface Props {
 }
 
 const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) => {
-    const { colors, isDark } = useTheme();
+    const { colors } = useTheme();
     const styles = useMemo(() => makeStyles(colors), [colors]);
-    const heroTint = isDark ? brandHeroTint.dark : brandHeroTint.light;
-    const { closets, loading, preferred, setPreferred, refresh } =
+    const { closets, loading, error: closetsError, preferred, setPreferred, refresh } =
         useClosets();
     const reduceMotion = useReduceMotion();
 
@@ -317,9 +318,14 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
         ) : null;
 
     // ─── Wore-today crossfade (UI-thread only via shared value) ───────────────
+    // Opacity-only cross-fade. The container is a plain View whose height
+    // follows whichever panel is *active* (in normal flow); the inactive panel
+    // is lifted out of flow (absolute) and faded. We no longer interpolate the
+    // container's `height` every frame — that animated a layout property on the
+    // JS/native layout path (janky), and collapsed the whole section to height
+    // 0 until the onLayout measurements landed, which briefly hid the outfit and
+    // made its buttons untappable (the "breaking functionality" you saw).
     const confirmProgress = useSharedValue(0); // 0 = carousel, 1 = confirmation
-    const [carouselHeight, setCarouselHeight] = useState(0);
-    const [confirmHeight, setConfirmHeight]   = useState(0);
 
     useEffect(() => {
         confirmProgress.value = withTiming(wornLogged ? 1 : 0, {
@@ -328,26 +334,12 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
         });
     }, [wornLogged, reduceMotion]);
 
-    const containerAnimStyle = useAnimatedStyle(() => {
-        const from = carouselHeight;
-        const to   = confirmHeight;
-        if (!from && !to) return {};
-        return {
-            height: interpolate(confirmProgress.value, [0, 1], [from, to]),
-            overflow: 'hidden' as const,
-        };
-    });
-
     const carouselAnimStyle = useAnimatedStyle(() => ({
         opacity: interpolate(confirmProgress.value, [0, 0.45, 1], [1, 0, 0]),
-        position: 'absolute' as const,
-        top: 0, left: 0, right: 0,
     }));
 
     const confirmAnimStyle = useAnimatedStyle(() => ({
         opacity: interpolate(confirmProgress.value, [0, 0.55, 1], [0, 0, 1]),
-        position: 'absolute' as const,
-        top: 0, left: 0, right: 0,
     }));
 
     // ─── #5: Swipe hint bounce (first render only) ──────────────────────────
@@ -392,19 +384,45 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
         setSettingPref(false);
     };
 
-    const { outfits, status } = useMemo(() => {
-        if (!preferred) return { outfits: [], status: 'no_preferred' as const };
-        const { results, status } = generateOutfits(
-            preferred.articles,
-            weather,
-            effectiveSettings,
-            worn,
-            3,
-            profile,
-            forecasts,
-        );
-        return { outfits: results, status };
+    // Outfit generation is the app's heaviest synchronous compute. As a useMemo
+    // it ran on the render/interaction thread, so every recompute (weather,
+    // closet, preference, or worn-status change — several as data settles on
+    // load) froze taps and navigation for its full duration. Instead we compute
+    // it in a deferred effect (runAfterInteractions) and keep the result in
+    // state: generation never blocks an in-flight tap/scroll/navigation, and
+    // rapid input changes cancel the pending run so only the latest inputs are
+    // generated (natural debounce) rather than each intermediate state.
+    const [gen, setGen] = useState<{
+        outfits: OutfitResult[];
+        status: ReturnType<typeof generateOutfits>['status'] | 'no_preferred';
+    }>({ outfits: [], status: 'no_preferred' });
+    const [generating, setGenerating] = useState(true);
+
+    useEffect(() => {
+        if (!preferred) {
+            setGen({ outfits: [], status: 'no_preferred' });
+            setGenerating(false);
+            return;
+        }
+        setGenerating(true);
+        const task = InteractionManager.runAfterInteractions(() => {
+            const { results, status } = generateOutfits(
+                preferred.articles,
+                weather,
+                effectiveSettings,
+                worn,
+                3,
+                profile,
+                forecasts,
+            );
+            setGen({ outfits: results, status });
+            setGenerating(false);
+        });
+        return () => task.cancel();
     }, [preferred, weather, effectiveSettings, worn, forecasts, profile]);
+
+    const outfits = gen.outfits;
+    const status = gen.status;
 
     // Feeds the in-app review prompt's eligibility count. recordSuccessfulOutfit
     // caps itself at once per calendar day, since this memo above recomputes on
@@ -439,20 +457,36 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
     // outfit) when generation can't produce a wearable fit, so the widget can
     // still show tomorrow's forecast. Null when tomorrow is outside the daily
     // data (widget then falls back to today).
-    const tomorrowForWidget = useMemo(() => {
+    //
+    // This is a *second* full generateOutfits and it's purely for the widget, so
+    // it must never run on the synchronous render path — that doubled the JS-
+    // thread cost every time weather/closets settled. Computed after interactions
+    // (so it can't stall taps/navigation) and skipped entirely when the native
+    // widget bridge isn't present (nothing consumes it then).
+    const [tomorrowForWidget, setTomorrowForWidget] =
+        useState<{ day: DailyForecast; outfit: OutfitResult | null } | null>(null);
+
+    useEffect(() => {
+        if (!isWidgetBridgeAvailable()) return;
         const day = tomorrowDailyFor(daily);
-        if (!day) return null;
-        if (!preferred) return { day, outfit: null };
-        const { results } = generateOutfits(
-            preferred.articles,
-            buildTripWeather(day),
-            effectiveSettings,
-            worn,
-            1,
-            profile,
-        );
-        const top = results[0];
-        return { day, outfit: top && top.slots.length > 0 ? top : null };
+        if (!day) { setTomorrowForWidget(null); return; }
+        if (!preferred) { setTomorrowForWidget({ day, outfit: null }); return; }
+        const task = InteractionManager.runAfterInteractions(() => {
+            const { results } = generateOutfits(
+                preferred.articles,
+                buildTripWeather(day),
+                effectiveSettings,
+                worn,
+                1,
+                profile,
+            );
+            const top = results[0];
+            setTomorrowForWidget({
+                day,
+                outfit: top && top.slots.length > 0 ? top : null,
+            });
+        });
+        return () => task.cancel();
     }, [daily, preferred, effectiveSettings, worn, profile]);
 
     // ─── Home-screen widget sync ──────────────────────────────────────────────
@@ -664,6 +698,22 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
 
     if (loading) return null;
 
+    // A failed fetch with nothing cached is an error, not an empty wardrobe —
+    // the "No closet yet" pitch here would gaslight users who have closets.
+    if (closetsError && closets.length === 0)
+        return (
+            <EmptyState
+                icon={<HangerIcon size={32} />}
+                title="Couldn't load your closet"
+                body={closetsError}
+                action={
+                    <Pressable style={styles.ctaBtn} onPress={refresh}>
+                        <Text style={styles.ctaBtnText}>Retry</Text>
+                    </Pressable>
+                }
+            />
+        );
+
     if (closets.length === 0)
         return (
             <EmptyState
@@ -708,6 +758,22 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
                             </Text>
                         </Pressable>
                     ))}
+                </View>
+            </View>
+        );
+
+    // First generation hasn't produced results yet — show a spinner rather than
+    // a blank/empty state. Regenerations keep the previous outfit on screen
+    // (outfits stays non-empty), so this only appears on the very first compute.
+    if (generating && outfits.length === 0)
+        return (
+            <View style={styles.root}>
+                <PreferredBadge
+                    name={preferred.name}
+                    onPress={() => nav.push('/(tabs)/closet')}
+                />
+                <View style={styles.generatingBox}>
+                    <ActivityIndicator color={colors.textMuted} />
                 </View>
             </View>
         );
@@ -813,15 +879,14 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
             </View>
             )}
 
-            {/* ── Crossfade container — both panels always mounted ── */}
-            <Animated.View style={containerAnimStyle}>
+            {/* ── Crossfade container — both panels always mounted. The active
+                panel sits in normal flow and sizes the container; the inactive
+                one is absolutely positioned so it never affects layout. ── */}
+            <View>
                 {/* ── Interactive panel: trip banner + generated suggestion ── */}
                 <Animated.View
-                    style={carouselAnimStyle}
+                    style={[carouselAnimStyle, wornLogged && styles.crossfadeInactive]}
                     pointerEvents={wornLogged ? 'none' : 'auto'}
-                    onLayout={(e) =>
-                        setCarouselHeight(e.nativeEvent.layout.height)
-                    }
                 >
                     {/* Trip banner and the generated suggestion are mutually
                         exclusive — opening "other ideas" hides the banner. */}
@@ -913,10 +978,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
                                             { width: cardWidth },
                                         ]}
                                     >
-                                        <GlassGroup
-                                            spacing={12}
-                                            style={styles.pagerCardArticles}
-                                        >
+                                        <View style={styles.pagerCardArticles}>
                                             {outfit.slots
                                                 .filter(
                                                     (s) =>
@@ -942,7 +1004,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
                                                         }
                                                     />
                                                 ))}
-                                        </GlassGroup>
+                                        </View>
                                         <View style={styles.pagerCardFooter}>
                                             <Text style={styles.pagerSubtitle}>
                                                 {outfitTabSubtitle(outfit)}
@@ -1047,20 +1109,11 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
                         </View>
                     )}
 
-                    {/* ── Wore this today (hero) ──
-                        Glass button with a whisper of the brand gradient laid
-                        over the glass — tinted glass, not a solid fill. */}
+                    {/* ── Wore this today (hero) ── flat solid button. */}
                     <Pressable
                         style={styles.woreThisBtn}
                         onPress={handleWoreThis}
                     >
-                        <LinearGradient
-                            colors={heroTint}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={styles.woreThisTint}
-                            pointerEvents='none'
-                        />
                         <Text style={styles.woreThisText}>
                             Wore this today
                         </Text>
@@ -1071,21 +1124,15 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
 
                 {/* ── Confirmation panel ── */}
                 <Animated.View
-                    style={confirmAnimStyle}
+                    style={[confirmAnimStyle, !wornLogged && styles.crossfadeInactive]}
                     pointerEvents={wornLogged ? 'auto' : 'none'}
-                    onLayout={(e) =>
-                        setConfirmHeight(e.nativeEvent.layout.height)
-                    }
                 >
                     <View style={styles.confirmCard}>
                         <Text style={styles.confirmTitle}>
                             Logged for today
                         </Text>
 
-                        <GlassGroup
-                            spacing={12}
-                            style={styles.pagerCardArticles}
-                        >
+                        <View style={styles.pagerCardArticles}>
                             {confirmSlots.map((slot, j) => (
                                 <ArticleThumb
                                     key={j}
@@ -1093,7 +1140,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
                                     role={slot.role}
                                 />
                             ))}
-                        </GlassGroup>
+                        </View>
 
                         <View style={styles.confirmStats}>
                             <View style={styles.confirmStat}>
@@ -1133,7 +1180,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
                         </Text>
                     </Pressable>
                 </Animated.View>
-            </Animated.View>
+            </View>
 
             <ShareToInstagramSheet
                 visible={showShareSheet}

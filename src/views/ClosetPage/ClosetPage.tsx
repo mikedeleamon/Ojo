@@ -1,5 +1,5 @@
 import { useMemo, useCallback } from 'react';
-import { StyleSheet } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
@@ -34,6 +34,7 @@ export default function ClosetPage() {
     root:        { flex: 1, backgroundColor: colors.bgDefault },
     errorBanner: { margin: spacing.md, padding: spacing.sm, backgroundColor: colors.errorBg, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.errorBorder },
     errorText:   { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.errorText },
+    errorRetry:  { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.errorText, marginTop: 2, textDecorationLine: 'underline' },
     emptyState:  { alignItems: 'center', paddingHorizontal: spacing.xl, paddingTop: spacing.xl, gap: spacing.sm },
     emptyTitle:  { fontFamily: fonts.display, fontSize: fontSizes.xl, color: colors.textPrimary, textAlign: 'center' },
     emptyDesc:   { fontFamily: fonts.body, fontSize: fontSizes.base, color: colors.textSecondary, textAlign: 'center', lineHeight: fontSizes.base * 1.6 },
@@ -41,7 +42,7 @@ export default function ClosetPage() {
   }), [colors]);
 
   const {
-    closets, loading, error, refresh,
+    closets, loading, error, refresh, hardRefresh,
     createCloset, renameCloset, deleteCloset,
     addArticle, editArticle, removeArticle, setPreferred,
   } = useClosets();
@@ -55,9 +56,15 @@ export default function ClosetPage() {
   return (
     <SafeAreaView style={st.root} edges={['top']}>
       {error ? (
-        <View style={st.errorBanner}>
+        <Pressable
+          style={st.errorBanner}
+          onPress={refresh}
+          accessibilityRole='button'
+          accessibilityLabel='Closet failed to load. Tap to retry.'
+        >
           <Text style={st.errorText}>{error}</Text>
-        </View>
+          <Text style={st.errorRetry}>Tap to retry</Text>
+        </Pressable>
       ) : null}
 
       {closets.length === 0 ? (
@@ -84,6 +91,7 @@ export default function ClosetPage() {
         onRemoveArticle={removeArticle}
         onSetPreferred={setPreferred}
         onTripFit={() => push('/account/tripfit')}
+        onRefresh={hardRefresh}
         tabClearance={tabPad}
       />
     </SafeAreaView>

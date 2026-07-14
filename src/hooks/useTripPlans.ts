@@ -9,6 +9,13 @@ import {
 } from '../lib/notifications';
 import { tripFitStatus } from '../views/TripFit/shared';
 
+// Launch-scoped guard: the morning-notification reconciliation below only needs
+// to run once per app process. useTripPlans mounts on several screens (via
+// useTripMode on Home, TripFit, etc.), and each mount used to re-schedule every
+// plan's notifications — redundant native calls on every navigation to those
+// screens. Mutations (upsert/remove) still (re)schedule their own plan directly.
+let reconciledThisLaunch = false;
+
 interface UseTripPlansResult {
     plans: SavedTripFitPlan[];
     loading: boolean;
@@ -36,13 +43,17 @@ export function useTripPlans(): UseTripPlansResult {
         loadPlans()
             .then((p) => {
                 if (!cancelled) setPlans(p);
-                // Reconcile Trip Mode morning nudges each launch: scheduling is
-                // idempotent (cancels-then-reschedules) and self-gates on the
+                // Reconcile Trip Mode morning nudges once per launch: scheduling
+                // is idempotent (cancels-then-reschedules) and self-gates on the
                 // local pref + permission, so this also retro-schedules trips
-                // saved before the feature/toggle was enabled.
-                for (const plan of p) {
-                    if (tripFitStatus(plan) !== 'completed') {
-                        scheduleTripMorningNotifications(plan).catch(() => {});
+                // saved before the feature/toggle was enabled. Gated so remounts
+                // on other screens don't repeat the native scheduling calls.
+                if (!reconciledThisLaunch) {
+                    reconciledThisLaunch = true;
+                    for (const plan of p) {
+                        if (tripFitStatus(plan) !== 'completed') {
+                            scheduleTripMorningNotifications(plan).catch(() => {});
+                        }
                     }
                 }
             })

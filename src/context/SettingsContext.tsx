@@ -71,13 +71,24 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
     const [settings, setSettings] = useState<Settings>(defaults);
     const [settingsReady, setSettingsReady] = useState(false);
 
+    // Keep the settings object's identity stable when a revalidation returns
+    // the same values. Settings feed effect deps across the app (outfit
+    // generation, the widget sync, screen-local form state), so a fresh-but-
+    // equal object from every Account-screen focus used to cascade into
+    // re-renders and state resets everywhere.
+    const applySettings = useCallback((next: Settings) => {
+        setSettings((prev) =>
+            JSON.stringify(prev) === JSON.stringify(next) ? prev : next,
+        );
+    }, []);
+
     useEffect(() => {
         let cancelled = false;
 
         const init = async () => {
             const cached = await readCache();
             if (cached && !cancelled) {
-                setSettings(normalize(cached));
+                applySettings(normalize(cached));
                 setSettingsReady(true);
             }
 
@@ -94,7 +105,7 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
                 );
                 const fresh = normalize({ ...defaults, ...(cached ?? {}), ...data });
                 if (!cancelled) {
-                    setSettings(fresh);
+                    applySettings(fresh);
                     setSettingsReady(true);
                 }
                 await writeCache(fresh);
@@ -138,7 +149,7 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
 
     const refreshSettings = useCallback(async () => {
         const cached = await readCache();
-        if (cached) setSettings(cached);
+        if (cached) applySettings(normalize(cached));
 
         const token = getToken();
         if (!token) return;
@@ -149,7 +160,7 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
                 authHeaders(),
             );
             const fresh = normalize({ ...defaults, ...(cached ?? {}), ...data });
-            setSettings(fresh);
+            applySettings(fresh);
             await writeCache(fresh);
         } catch (err: unknown) {
             console.warn(

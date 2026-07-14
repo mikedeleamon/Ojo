@@ -7,6 +7,7 @@ import { useActiveLocation } from '../../context/ActiveLocationContext';
 import { getCurrentLocation, formatCoords } from '../../lib/location';
 import { CURRENT_LOCATION_ID } from '../../lib/savedLocations';
 import { getAllSnapshots, setSnapshot } from '../../lib/weatherCache';
+import { refreshClosets } from '../../hooks/useClosets';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { ForceDarkPalette } from '../../theme/ThemeContext';
 import { darkColors } from '../../theme/tokens';
@@ -61,7 +62,13 @@ export default function MainPage() {
     : (gpsLocation || settings.location);
   const seed = snapshots[activeId] ?? null;
 
-  const handleRefresh = useCallback(() => setRefreshKey(k => k + 1), []);
+  // Pull-to-refresh on Home refetches weather (refreshKey) AND force-refreshes
+  // the closet cache, so the outfit suggestion below the fold reflects any
+  // wardrobe edits made on another device without waiting for the focus timer.
+  const handleRefresh = useCallback(() => {
+    setRefreshKey(k => k + 1);
+    void refreshClosets();
+  }, []);
 
   // Persist each fresh payload to the cache and the in-memory mirror.
   const handleSnapshot = useCallback((snap: WeatherSnapshot) => {

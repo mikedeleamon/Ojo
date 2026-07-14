@@ -568,7 +568,7 @@ export default function CameraPage() {
   const [raw,       setRaw]       = useState<ImageData | null>(null);
   const [cropped,   setCropped]   = useState<ImageData | null>(null);
 
-  const { closets, loading: closetsLoading, addArticle } = useClosets();
+  const { closets, loading: closetsLoading, addArticle, createCloset } = useClosets();
   // Prefer the closet the user launched from (passed by the Closet tab's add
   // chooser); fall back to the preferred/first closet for the global Add tab.
   const targetCloset = useMemo(
@@ -656,8 +656,12 @@ export default function CameraPage() {
 
   const handleModalSubmit = useCallback(
     async (data: ArticleFormData) => {
-      if (!targetCloset) return;
-      await addArticle(targetCloset._id, data);
+      // First-ever item with no closet yet: create a default closet on the fly
+      // instead of silently dropping the save (the old dead end — the form
+      // just did nothing). Errors propagate to ArticleModal's inline error.
+      const closetId =
+        targetCloset?._id ?? (await createCloset('My Closet'))._id;
+      await addArticle(closetId, data);
       setCropped(null);
       setRaw(null);
       // Atomically dismiss the modal AND land on Closet so the user sees
@@ -666,7 +670,7 @@ export default function CameraPage() {
       // re-focus and re-push the modal.
       router.dismissTo('/(tabs)/closet');
     },
-    [targetCloset, addArticle, router],
+    [targetCloset, addArticle, createCloset, router],
   );
 
   // ─── Guards ─────────────────────────────────────────────────────────────────

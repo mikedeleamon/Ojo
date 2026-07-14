@@ -22,12 +22,14 @@ import { requireOptionalNativeModule } from 'expo-modules-core';
 export const WIDGET_APP_GROUP = 'group.com.ojostudio.ojo';
 
 interface OjoWidgetBridgeNative {
-  /** Atomically write snapshot JSON to the App Group + reload WidgetKit timelines. */
-  writeSnapshot(json: string): void;
+  /** Atomically write snapshot JSON to the App Group + reload WidgetKit
+   *  timelines. Async — the write and reload run on a native background queue
+   *  so they never stall the JS thread. */
+  writeSnapshot(json: string): Promise<void>;
   /** Download + downscale one thumbnail; resolves to its container-relative path. */
   cacheThumb(remoteUrl: string): Promise<string>;
   /** Delete cached thumbnails whose relative paths aren't in keepPaths. */
-  pruneThumbs(keepPaths: string[]): void;
+  pruneThumbs(keepPaths: string[]): Promise<void>;
 }
 
 const Native =
@@ -38,8 +40,8 @@ const Native =
 /** True only when the native bridge is linked (iOS dev-client / release build). */
 export const isWidgetBridgeAvailable = (): boolean => Native != null;
 
-export const writeSnapshot = (json: string): void => {
-  Native?.writeSnapshot(json);
+export const writeSnapshot = async (json: string): Promise<void> => {
+  await Native?.writeSnapshot(json);
 };
 
 /**
@@ -58,6 +60,11 @@ export const cacheThumb = async (remoteUrl: string): Promise<string | null> => {
   }
 };
 
-export const pruneThumbs = (keepPaths: string[]): void => {
-  Native?.pruneThumbs(keepPaths);
+/** Best-effort cleanup — never throws; a failed prune just leaves stale thumbs. */
+export const pruneThumbs = async (keepPaths: string[]): Promise<void> => {
+  try {
+    await Native?.pruneThumbs(keepPaths);
+  } catch (e) {
+    console.warn('[Ojo] widget pruneThumbs failed:', e);
+  }
 };

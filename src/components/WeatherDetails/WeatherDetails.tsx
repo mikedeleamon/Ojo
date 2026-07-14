@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
-import { StyleSheet, Pressable } from 'react-native';
+import { ActivityIndicator, StyleSheet, Pressable } from 'react-native';
 import { Svg, Path } from 'react-native-svg';
 import { View, Text, GlassCard, GlassGroup } from '../primitives';
 import OutfitSuggestion from '../OutfitSuggestion/OutfitSuggestion';
+import { useDeferredMount } from '../../hooks/useDeferredMount';
 import { CurrentWeather, DailyForecast, Forecast, Settings } from '../../types';
 import { type ColorTokens, fonts, fontSizes, fontWeights, spacing, radius } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
@@ -11,6 +12,9 @@ interface Props { weather: CurrentWeather; settings: Settings; forecasts: Foreca
 
 const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   root:       { gap: spacing.md },
+  // Reserves vertical space while the outfit engine mounts a beat after the HUD
+  // paints, so the content below (share button, attribution) doesn't jump.
+  outfitPlaceholder: { minHeight: 160, alignItems: 'center', justifyContent: 'center' },
   toggle:     { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingVertical: 6 },
   toggleText: { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.textSecondary },
   grid:       { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
@@ -37,6 +41,8 @@ const WeatherDetails = ({ weather, settings, forecasts, daily, city }: Props) =>
   const st = useMemo(() => makeStyles(colors), [colors]);
   const [expanded, setExpanded] = useState(false);
   const isMetric = settings.temperatureScale === 'Metric';
+  // Defer the (heavy, below-the-fold) outfit engine until the HUD has painted.
+  const showOutfit = useDeferredMount();
 
   const Stat = ({ label, value }: { label: string; value: string }) => (
     <GlassCard style={st.stat}>
@@ -71,7 +77,13 @@ const WeatherDetails = ({ weather, settings, forecasts, daily, city }: Props) =>
 
   return (
     <View style={st.root}>
-      <OutfitSuggestion weather={weather} settings={settings} forecasts={forecasts} daily={daily} city={city} />
+      {showOutfit ? (
+        <OutfitSuggestion weather={weather} settings={settings} forecasts={forecasts} daily={daily} city={city} />
+      ) : (
+        <View style={st.outfitPlaceholder}>
+          <ActivityIndicator color={colors.textMuted} />
+        </View>
+      )}
 
       {/* Always-visible wind + humidity */}
       <GlassGroup spacing={spacing.sm} style={st.grid}>

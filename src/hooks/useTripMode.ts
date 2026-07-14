@@ -5,7 +5,7 @@ import { authHeaders } from '../lib/auth';
 import { useTripPlans } from './useTripPlans';
 import { useClosets } from './useClosets';
 import { useSettings } from './useSettings';
-import { getCurrentLocation } from '../lib/location';
+import { getCurrentLocation, type Coords } from '../lib/location';
 import {
     selectActiveTrip,
     todayDayIndex,
@@ -67,6 +67,22 @@ export interface TripModeState {
     upcoming: UpcomingTripInfo | null;
     refresh: () => void;
 }
+
+// ─── GPS fix cache ─────────────────────────────────────────────────────────────
+// The resolution effect below re-runs whenever plans/closets/settings change or
+// the app foregrounds, and each run requested a fresh device fix (up to an 8s
+// GPS acquisition + a permission prompt on first use). During an active trip the
+// user's position barely moves between these, so a fix is reused for a few
+// minutes. Kept module-level so it's shared across remounts, not per-hook.
+const GPS_TTL_MS = 3 * 60_000;
+let gpsFix: { at: number; value: Coords | null } | null = null;
+
+const getCachedLocation = async (timeoutMs: number): Promise<Coords | null> => {
+  if (gpsFix && Date.now() - gpsFix.at < GPS_TTL_MS) return gpsFix.value;
+  const value = await getCurrentLocation(timeoutMs).catch(() => null);
+  gpsFix = { at: Date.now(), value };
+  return value;
+};
 
 const INACTIVE = {
     active: false as const,
@@ -141,7 +157,7 @@ export const useTripMode = (): TripModeState => {
                 return;
             }
 
-            const gps = await getCurrentLocation(8000).catch(() => null);
+            const gps = await getCachedLocation(8000);
             const sel = selectActiveTrip(
                 plans,
                 todayISO,

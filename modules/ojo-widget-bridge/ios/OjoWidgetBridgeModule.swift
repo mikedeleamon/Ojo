@@ -31,7 +31,10 @@ public class OjoWidgetBridgeModule: Module {
     // Atomically write the widget snapshot JSON into the App Group container and
     // reload WidgetKit timelines. Throws (→ JS rejection) if the container is
     // unavailable, which almost always means the App Group entitlement is missing.
-    Function("writeSnapshot") { (json: String) throws -> Void in
+    // AsyncFunction so the file write + timeline reload run on a background
+    // queue — as a sync Function they executed on the JS thread, and every
+    // snapshot write froze button taps and navigation for the duration.
+    AsyncFunction("writeSnapshot") { (json: String) throws -> Void in
       let container = try appGroupContainer()
       let fileURL = container.appendingPathComponent(SNAPSHOT_FILE)
       guard let data = json.data(using: .utf8) else {
@@ -106,8 +109,10 @@ public class OjoWidgetBridgeModule: Module {
     // ── pruneThumbs ──────────────────────────────────────────────────────────
     // Best-effort cleanup: remove any cached thumbnail whose relative path isn't
     // in `keepPaths`, so the container doesn't grow unbounded as the closet
-    // changes. Silent no-op if the container is unavailable.
-    Function("pruneThumbs") { (keepPaths: [String]) -> Void in
+    // changes. Silent no-op if the container is unavailable. AsyncFunction for
+    // the same reason as writeSnapshot — directory enumeration + deletes must
+    // not run on the JS thread.
+    AsyncFunction("pruneThumbs") { (keepPaths: [String]) -> Void in
       guard let container = try? appGroupContainer() else { return }
       let thumbsDir = container.appendingPathComponent(THUMBS_DIR, isDirectory: true)
       let keep = Set(keepPaths.map { ($0 as NSString).lastPathComponent })
