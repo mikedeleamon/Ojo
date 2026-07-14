@@ -11,11 +11,11 @@ import {
 import Animated, {
     useSharedValue,
     useAnimatedProps,
-    useAnimatedStyle,
     useAnimatedScrollHandler,
     useAnimatedReaction,
     useAnimatedRef,
     runOnJS,
+    FadeIn,
     withTiming,
     Easing as REasing,
 } from 'react-native-reanimated';
@@ -481,26 +481,20 @@ const WeatherHUD = ({
     }, [scrollRef, scrollY]));
 
 
-    // The mini pill's native glass (GlassCard → GlassView) now stays mounted
-    // permanently — only its opacity crosses the UI thread, driven straight off
-    // scrollY. It used to conditionally mount/unmount on crossing the scroll
-    // threshold, so iOS re-initialised a fresh UIVisualEffectView every time the
-    // user scrolled past the hero — a stutter mid-scroll. A boolean mirror of
-    // the same threshold still drives pointerEvents/accessibility (so the
-    // invisible pill can't eat taps or grab VoiceOver focus while faded out);
-    // that's a cheap JS bridge, not a native mount.
-    const [miniInteractive, setMiniInteractive] = useState(false);
+    // Bridges scroll position → JS-side visibility flag so the GlassCard pill is
+    // conditionally MOUNTED (not just faded). This matters: iOS only samples a
+    // UIVisualEffectView's backdrop when it's created while visible — a pill kept
+    // mounted at opacity 0 from first paint renders with no blur until a later
+    // relayout (leaving/returning the tab). Mounting fresh at opacity 1 when it
+    // crosses the threshold, with FadeIn handling the fade, initialises the blur
+    // correctly every time.
+    const [miniVisible, setMiniVisible] = useState(false);
     const [showShareSheet, setShowShareSheet] = useState(false);
-
-    const miniAnimStyle = useAnimatedStyle(() => {
-        const visible = heroBottomY > 0 && scrollY.value > heroBottomY - 40;
-        return { opacity: withTiming(visible ? 1 : 0, { duration: 200 }) };
-    });
 
     useAnimatedReaction(
         () => heroBottomY > 0 && scrollY.value > heroBottomY - 40,
         (current, previous) => {
-            if (current !== previous) runOnJS(setMiniInteractive)(current);
+            if (current !== previous) runOnJS(setMiniVisible)(current);
         },
         [heroBottomY],
     );
@@ -853,41 +847,40 @@ const WeatherHUD = ({
                         ) : (
                             <View style={st.locationsBtnPlaceholder} />
                         )}
-                        <Animated.View
-                            style={[st.miniWrap, miniAnimStyle]}
-                            pointerEvents={miniInteractive ? 'box-none' : 'none'}
-                            importantForAccessibility={
-                                miniInteractive ? 'auto' : 'no-hide-descendants'
-                            }
-                        >
-                            <Pressable
-                                onPress={scrollToTop}
-                                accessibilityLabel='Scroll to top'
-                                accessibilityRole='button'
-                                accessibilityElementsHidden={!miniInteractive}
-                                style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+                        {miniVisible && (
+                            <Animated.View
+                                entering={FadeIn.duration(200)}
+                                style={st.miniWrap}
+                                pointerEvents='box-none'
                             >
-                                <GlassCard
-                                    glassStyle='regular'
-                                    style={st.miniPill}
+                                <Pressable
+                                    onPress={scrollToTop}
+                                    accessibilityLabel='Scroll to top'
+                                    accessibilityRole='button'
+                                    style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
                                 >
-                                    <WeatherIconDisplay
-                                        condition={weather.WeatherText}
-                                        isDay={weather.IsDayTime}
-                                        size='small'
-                                        animate
-                                        latitude={place?.lat}
-                                    />
-                                    <Text
-                                        style={st.miniCity}
-                                        numberOfLines={1}
+                                    <GlassCard
+                                        glassStyle='regular'
+                                        style={st.miniPill}
                                     >
-                                        {place?.name}
-                                    </Text>
-                                    <Text style={st.miniTemp}>{tempVal}°</Text>
-                                </GlassCard>
-                            </Pressable>
-                        </Animated.View>
+                                        <WeatherIconDisplay
+                                            condition={weather.WeatherText}
+                                            isDay={weather.IsDayTime}
+                                            size='small'
+                                            animate
+                                            latitude={place?.lat}
+                                        />
+                                        <Text
+                                            style={st.miniCity}
+                                            numberOfLines={1}
+                                        >
+                                            {place?.name}
+                                        </Text>
+                                        <Text style={st.miniTemp}>{tempVal}°</Text>
+                                    </GlassCard>
+                                </Pressable>
+                            </Animated.View>
+                        )}
                         <GlassCard glassStyle='clear' style={st.gearBtn}>
                             <Pressable
                                 onPress={() => nav.push('/account')}

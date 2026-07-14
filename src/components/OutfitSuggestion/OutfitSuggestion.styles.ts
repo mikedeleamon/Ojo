@@ -169,8 +169,6 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         gap: 10,
         backgroundColor: colors.glassBg,
         borderRadius: radius.sm,
-        borderWidth: 1,
-        borderColor: colors.glassBorder,
         padding: 8,
         flex: 1,
         minWidth: 140,

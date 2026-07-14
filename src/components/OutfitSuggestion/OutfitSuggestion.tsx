@@ -438,6 +438,35 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
     const safeIdx = Math.min(activeIdx, Math.max(0, outfits.length - 1));
     const activeOutfit: OutfitResult | null = outfits[safeIdx] ?? null;
 
+    // Pager cards mount their ArticleThumb subtree lazily: only indices that
+    // have actually been viewed. Starts with just the active index — the
+    // common case (never touching the pager) mounts exactly one card's worth
+    // of thumbs instead of pre-warming its neighbors up front. A neighbor is
+    // added the instant a drag begins (onScrollBeginDrag, below), before it's
+    // visible, so there's no pop-in when the swipe lands; once visited, an
+    // index stays mounted rather than thrashing as the user pages back and
+    // forth. Resets whenever a fresh generation replaces `outfits`.
+    const [renderedIdx, setRenderedIdx] = useState<Set<number>>(
+        () => new Set([safeIdx]),
+    );
+    useEffect(() => {
+        setRenderedIdx(new Set([safeIdx]));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [outfits]);
+    useEffect(() => {
+        setRenderedIdx((prev) =>
+            prev.has(safeIdx) ? prev : new Set(prev).add(safeIdx),
+        );
+    }, [safeIdx]);
+    const warmNeighbors = useCallback(() => {
+        setRenderedIdx((prev) => {
+            const next = new Set(prev);
+            if (safeIdx > 0) next.add(safeIdx - 1);
+            if (safeIdx < outfits.length - 1) next.add(safeIdx + 1);
+            return next.size === prev.size ? prev : next;
+        });
+    }, [safeIdx, outfits.length]);
+
     // The outfit the user logged as worn today, reshaped for the widget: the
     // actual worn slots (minus any removed items) but carrying the source
     // outfit's headline/layering/accessoryAlerts so the widget can still show
@@ -956,6 +985,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
                                 const w = e.nativeEvent.layout.width;
                                 if (w > 0 && w !== pagerWidth) setPagerWidth(w);
                             }}
+                            onScrollBeginDrag={warmNeighbors}
                             onMomentumScrollEnd={(e) => {
                                 const page = Math.round(
                                     e.nativeEvent.contentOffset.x / cardWidth,
@@ -970,6 +1000,16 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
                                 const cardRemovedIds =
                                     removedByOutfit.get(i) ??
                                     new Set<string>();
+                                // Every card keeps its fixed-width slot so the
+                                // ScrollView's total content size, paging snap
+                                // points, and onMomentumScrollEnd page math all
+                                // stay correct — only visited cards (see
+                                // renderedIdx above) mount their ArticleThumb
+                                // subtree. The common case (no swiping) mounts
+                                // exactly one card's worth of thumbs; a
+                                // neighbor is pre-warmed the instant a drag
+                                // starts, before it's visible.
+                                const isNearActive = renderedIdx.has(i);
                                 return (
                                     <View
                                         key={i}
@@ -978,38 +1018,42 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
                                             { width: cardWidth },
                                         ]}
                                     >
-                                        <View style={styles.pagerCardArticles}>
-                                            {outfit.slots
-                                                .filter(
-                                                    (s) =>
-                                                        !cardRemovedIds.has(
-                                                            s.article._id,
-                                                        ),
-                                                )
-                                                .map((slot, j) => (
-                                                    <ArticleThumb
-                                                        key={j}
-                                                        article={slot.article}
-                                                        role={slot.role}
-                                                        onRemove={
-                                                            REMOVABLE_ROLES.includes(
-                                                                slot.role,
-                                                            )
-                                                                ? () =>
-                                                                      handleRemoveSlot(
-                                                                          i,
-                                                                          slot.article._id,
-                                                                      )
-                                                                : undefined
-                                                        }
-                                                    />
-                                                ))}
-                                        </View>
-                                        <View style={styles.pagerCardFooter}>
-                                            <Text style={styles.pagerSubtitle}>
-                                                {outfitTabSubtitle(outfit)}
-                                            </Text>
-                                        </View>
+                                        {isNearActive && (
+                                            <>
+                                                <View style={styles.pagerCardArticles}>
+                                                    {outfit.slots
+                                                        .filter(
+                                                            (s) =>
+                                                                !cardRemovedIds.has(
+                                                                    s.article._id,
+                                                                ),
+                                                        )
+                                                        .map((slot, j) => (
+                                                            <ArticleThumb
+                                                                key={j}
+                                                                article={slot.article}
+                                                                role={slot.role}
+                                                                onRemove={
+                                                                    REMOVABLE_ROLES.includes(
+                                                                        slot.role,
+                                                                    )
+                                                                        ? () =>
+                                                                              handleRemoveSlot(
+                                                                                  i,
+                                                                                  slot.article._id,
+                                                                              )
+                                                                        : undefined
+                                                                }
+                                                            />
+                                                        ))}
+                                                </View>
+                                                <View style={styles.pagerCardFooter}>
+                                                    <Text style={styles.pagerSubtitle}>
+                                                        {outfitTabSubtitle(outfit)}
+                                                    </Text>
+                                                </View>
+                                            </>
+                                        )}
                                     </View>
                                 );
                             })}
