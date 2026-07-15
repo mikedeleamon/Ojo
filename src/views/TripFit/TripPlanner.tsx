@@ -138,8 +138,12 @@ const DayCard = ({
     const articles = outfit.slots.map(
         (s: { article: ClothingArticle }) => s.article,
     );
+    // Four thumbs across the card's content box: the page slot, less the card's
+    // outer gutter (spacing.xs a side), less the GlassCard's own padding
+    // (spacing.md a side), less the three gaps between the thumbs. Dropping any
+    // of those terms overflows the row and wraps the fourth thumb.
     const thumbSize = Math.floor(
-        (cardWidth - spacing.md * 2 - spacing.xs * 3) / 4,
+        (cardWidth - spacing.xs * 2 - spacing.md * 2 - spacing.xs * 3) / 4,
     );
 
     const translateY = animValue.interpolate({
@@ -553,7 +557,13 @@ export default function TripPlanner({
     const reduceMotion = useReduceMotion();
     const { width: windowWidth } = useWindowDimensions();
 
-    const cardWidth = windowWidth - spacing.md * 4.1;
+    // One card per page: a card must be exactly as wide as the pager's frame, or
+    // snapToInterval lands each card off-centre and leaks a clipped sliver of the
+    // next one at the edge. The frame is the screen minus st.scroll's horizontal
+    // padding (spacing.md a side); we measure it via onLayout and only fall back
+    // to that derivation before the first layout lands.
+    const [pagerWidth, setPagerWidth] = useState(0);
+    const cardWidth = pagerWidth || windowWidth - spacing.md * 2;
 
     // ── Form state ──
     const [destination, setDestination] = useState(
@@ -1157,16 +1167,7 @@ export default function TripPlanner({
 
                         <Text style={st.sectionHeader}>Day-by-Day Outfits</Text>
 
-                        {/* Full-bleed: cancel the scroll container's horizontal
-                            padding so cards clip at the physical screen edges, not
-                            at an interior line spacing.md in from them (which left a
-                            dead margin where an out-scrolling card's content was cut
-                            off short of the edge). The content padding re-insets the
-                            first card so it still lines up with the section header,
-                            and because both the leading padding and every card shift
-                            by the same spacing.md, snapToInterval / page math are
-                            unchanged. */}
-                        <GlassGroup spacing={12} style={{ marginHorizontal: -spacing.md }}>
+                        <GlassGroup spacing={12}>
                             <ScrollView
                                 ref={pagerRef}
                                 horizontal
@@ -1176,9 +1177,13 @@ export default function TripPlanner({
                                 decelerationRate='normal'
                                 scrollEventThrottle={16}
                                 showsHorizontalScrollIndicator={false}
-                                contentContainerStyle={{
-                                    paddingVertical: spacing.xs,
-                                    paddingHorizontal: spacing.md,
+                                contentContainerStyle={{ paddingVertical: spacing.xs }}
+                                // snapToInterval snaps by cardWidth, so a card has to
+                                // be exactly this frame's width. Measure the frame
+                                // rather than deriving it — see cardWidth.
+                                onLayout={(e) => {
+                                    const w = e.nativeEvent.layout.width;
+                                    if (w > 0 && w !== pagerWidth) setPagerWidth(w);
                                 }}
                                 onMomentumScrollEnd={(e) => {
                                     const page = Math.round(
