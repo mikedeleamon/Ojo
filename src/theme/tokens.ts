@@ -127,11 +127,13 @@ export const weatherGradients = {
 // All values in pixels / dp (dp === px for RN purposes at 1x)
 
 export const spacing = {
-  xs:  6,
-  sm:  12,
-  md:  20,
-  lg:  32,
-  xl:  48,
+  xs:     6,
+  xsPlus: 8,   // between xs/sm — tight within-group spacing (icon+label rows, compact cards)
+  sm:     12,
+  smPlus: 16,  // between sm/md — grouped-section spacing without the full md jump
+  md:     20,
+  lg:     32,
+  xl:     48,
 } as const;
 
 // ─── Border radii ─────────────────────────────────────────────────────────────

@@ -770,33 +770,37 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
     // the "No closet yet" pitch here would gaslight users who have closets.
     if (closetsError && closets.length === 0)
         return (
-            <EmptyState
-                icon={<HangerIcon size={32} />}
-                title="Couldn't load your closet"
-                body={closetsError}
-                action={
-                    <Pressable style={styles.ctaBtn} onPress={refresh}>
-                        <Text style={styles.ctaBtnText}>Retry</Text>
-                    </Pressable>
-                }
-            />
+            <View style={styles.root}>
+                <EmptyState
+                    icon={<HangerIcon size={32} />}
+                    title="Couldn't load your closet"
+                    body={closetsError}
+                    action={
+                        <Pressable style={styles.ctaBtn} onPress={refresh}>
+                            <Text style={styles.ctaBtnText}>Retry</Text>
+                        </Pressable>
+                    }
+                />
+            </View>
         );
 
     if (closets.length === 0)
         return (
-            <EmptyState
-                icon={<HangerIcon size={32} />}
-                title='No closet yet'
-                body="Create a closet, photograph your clothes with the camera, and Ojo will suggest the best outfits for today's weather."
-                action={
-                    <Pressable
-                        style={styles.ctaBtn}
-                        onPress={() => nav.push('/(tabs)/closet')}
-                    >
-                        <Text style={styles.ctaBtnText}>Set up closet</Text>
-                    </Pressable>
-                }
-            />
+            <View style={styles.root}>
+                <EmptyState
+                    icon={<HangerIcon size={32} />}
+                    title='No closet yet'
+                    body="Create a closet, photograph your clothes with the camera, and Ojo will suggest the best outfits for today's weather."
+                    action={
+                        <Pressable
+                            style={styles.ctaBtn}
+                            onPress={() => nav.push('/(tabs)/closet')}
+                        >
+                            <Text style={styles.ctaBtnText}>Set up closet</Text>
+                        </Pressable>
+                    }
+                />
+            </View>
         );
 
     if (!preferred)
@@ -967,6 +971,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
                             style={styles.breakdownToggle}
                             onPress={() => setShowOtherIdeas((v) => !v)}
                             accessibilityRole='button'
+                            hitSlop={8}
                         >
                             <Text style={styles.breakdownToggleText}>
                                 {showOtherIdeas
@@ -977,7 +982,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
                     )}
 
                     {showGenerated && (
-                      <>
+                      <View style={styles.panelContent}>
                     {/* ── Occasion quick-switch ── */}
                     <OccasionChips
                         active={occasionOverride}
@@ -989,23 +994,16 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
                         }}
                     />
 
-                    {/* #2 — Headline above pager. The block's bottom margin sits
-                        under the subtext when present, else under the headline. */}
-                    <Text
-                        style={[
-                            styles.headline,
-                            !whyExplanation && styles.textBlockBottom,
-                        ]}
-                    >
-                        {activeOutfit.headline}
-                    </Text>
-
-                    {/* #10 — Why this outfit explanation */}
-                    {whyExplanation && (
-                        <Text style={[styles.whyText, styles.textBlockBottom]}>
-                            {whyExplanation}
+                    {/* #2 — Headline + #10 why-explanation as one title/caption
+                        unit; the panel's rhythm applies around the group. */}
+                    <View style={styles.headlineGroup}>
+                        <Text style={styles.headline}>
+                            {activeOutfit.headline}
                         </Text>
-                    )}
+                        {whyExplanation && (
+                            <Text style={styles.whyText}>{whyExplanation}</Text>
+                        )}
+                    </View>
 
                     {/* ── Outfit pager with #5 swipe hint bounce ── */}
                     <RNAnimated.View
@@ -1127,6 +1125,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
                             <Pressable
                                 onPress={handleResetOutfit}
                                 style={styles.resetLink}
+                                hitSlop={8}
                             >
                                 <Text style={styles.resetLinkText}>
                                     Reset outfit
@@ -1147,6 +1146,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
                     <Pressable
                         style={styles.breakdownToggle}
                         onPress={() => setShowBreakdown((v) => !v)}
+                        hitSlop={8}
                     >
                         <Text style={styles.breakdownToggleText}>
                             {showBreakdown ? 'Hide breakdown' : 'Score breakdown'}
@@ -1191,9 +1191,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
 
                     {/* ── Layering recommendation ── */}
                     {showLayering && filteredLayering && (
-                        <View style={styles.layeringSpacer}>
-                            <LayeringSection layering={filteredLayering} />
-                        </View>
+                        <LayeringSection layering={filteredLayering} />
                     )}
 
                     {/* ── Wore this today (hero) ── flat solid button. */}
@@ -1205,7 +1203,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
                             Wore this today
                         </Text>
                     </Pressable>
-                      </>
+                      </View>
                     )}
                 </Animated.View>
 
@@ -1266,7 +1264,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
                                 </View>
                             </View>
 
-                            <Pressable onPress={handleUndoLog} style={styles.confirmUndo}>
+                            <Pressable onPress={handleUndoLog} style={styles.confirmUndo} hitSlop={8}>
                                 <Text style={styles.confirmUndoText}>
                                     Wore something else?
                                 </Text>

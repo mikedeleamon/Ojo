@@ -10,6 +10,11 @@ import {
 
 export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     root: { gap: spacing.sm },
+    // Uniform rhythm for the generated-suggestion panel (occasion chips through
+    // "Wore this today") — every section lands on the same gap regardless of
+    // which optional blocks (gap card, breakdown, notes, layering) render that
+    // day, instead of each one carrying its own ad-hoc margin.
+    panelContent: { gap: spacing.sm },
     // Cross-fade: the inactive panel is pulled out of flow so only the active
     // panel drives the container's height (no per-frame height animation).
     crossfadeInactive: { position: 'absolute', top: 0, left: 0, right: 0 },
@@ -90,7 +95,6 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     },
     pagerCard: {
         gap: spacing.sm,
-        paddingBottom: 4,
     },
     pagerCardArticles: {
         flexDirection: 'row',
@@ -132,12 +136,15 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         borderRadius: 3,
         backgroundColor: colors.textPrimary,
     },
+    // Headline + why-text read as one title/caption unit (proximity), so they
+    // get a tight internal gap — the panel's rhythm (spacing.sm) applies around
+    // the pair, not between them.
+    headlineGroup: { gap: 2 },
     headline: {
         fontFamily: fonts.body,
         fontSize: fontSizes.sm,
         color: colors.textSecondary,
         lineHeight: fontSizes.sm * 1.5,
-        marginTop: spacing.sm,
     },
     whyText: {
         fontFamily: fonts.body,
@@ -146,9 +153,6 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         color: colors.textMuted,
         lineHeight: fontSizes.xs * 1.5,
     },
-    // Bottom margin for the headline/subtext block — sits under the subtext when
-    // present, otherwise under the headline.
-    textBlockBottom: { marginBottom: spacing.sm },
     dotsRow: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -166,10 +170,10 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     articleCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
+        gap: spacing.xsPlus,
         backgroundColor: colors.glassBg,
         borderRadius: radius.sm,
-        padding: 8,
+        padding: spacing.xsPlus,
         flex: 1,
         minWidth: 140,
     },
@@ -255,8 +259,6 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         width: 24,
         textAlign: 'right',
     },
-    // Separates the layering section from the score breakdown / notes above it.
-    layeringSpacer: { marginTop: spacing.sm },
     notesList: { gap: 4 },
     note: {
         fontFamily: fonts.body,
@@ -265,8 +267,11 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         lineHeight: fontSizes.xs * 1.5,
     },
     woreThisBtn: {
-        marginTop: 4,
-        paddingVertical: 10,
+        // Extra weight before the commit action: panelContent's gap (spacing.sm)
+        // plus this margin totals spacing.md (20) above the button, vs. the
+        // uniform spacing.sm between every other section.
+        marginTop: spacing.xsPlus,
+        paddingVertical: 14, // ~44pt tall — meets the minimum tap-target size
         paddingHorizontal: spacing.md,
         borderRadius: radius.sm,
         alignItems: 'center' as const,
@@ -325,12 +330,13 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         textDecorationLine: 'underline' as const,
     },
     ctaBtn: {
-        paddingVertical: 10,
+        // No marginTop — EmptyState's own container already gaps (spacing.sm)
+        // before the action slot; an added margin here just double-counted it.
+        paddingVertical: 14, // ~44pt tall — meets the minimum tap-target size
         paddingHorizontal: spacing.md,
         backgroundColor: colors.saveBtnBg,
         borderRadius: radius.sm,
         alignItems: 'center',
-        marginTop: 4,
     },
     ctaBtnText: {
         fontFamily: fonts.body,
@@ -338,7 +344,9 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         fontWeight: fontWeights.semibold,
         color: colors.saveBtnText,
     },
-    closetPicker: { gap: 8, marginTop: 4 },
+    // No marginTop — root's own gap (spacing.sm) already separates this from
+    // the EmptyState above it.
+    closetPicker: { gap: 8 },
     closetPickBtn: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -365,8 +373,8 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         borderRadius: radius.sm,
         borderWidth: 1,
         borderColor: 'rgba(250,204,21,0.28)',
-        padding: 12,
-        gap: 8,
+        padding: spacing.sm,
+        gap: spacing.xsPlus,
     },
     gapDismiss: {
         position: 'absolute',

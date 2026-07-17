@@ -13,8 +13,10 @@ interface Props { weather: CurrentWeather; settings: Settings; forecasts: Foreca
 const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   root:       { gap: spacing.md },
   // Reserves vertical space while the outfit engine mounts a beat after the HUD
-  // paints, so the content below (share button, attribution) doesn't jump.
-  outfitPlaceholder: { minHeight: 160, alignItems: 'center', justifyContent: 'center' },
+  // paints, so the content below (share button, attribution) doesn't jump. Matched
+  // to OutfitSuggestion's own generatingBox (its first-generation loading state)
+  // so mounting doesn't itself cause a second jump right after this one.
+  outfitPlaceholder: { minHeight: 220, alignItems: 'center', justifyContent: 'center' },
   toggle:     { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingVertical: 6 },
   toggleText: { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.textSecondary },
   grid:       { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
