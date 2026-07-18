@@ -32,16 +32,25 @@ const SAMPLE_SIZE = 32; // 32×32 = 1024 pixel samples
 export async function extractColorsFromImage(
   imageUri: string,
   maxColors = 3,
+  /** Pass the cutout when a caller (e.g. clothingIdentifier) already ran
+   *  segmentGarment, so it isn't computed a second time for the same photo.
+   *  Leave undefined to have this function segment itself, as before. */
+  precomputedMaskedUri?: string | null,
 ): Promise<DetectedColor[]> {
   try {
-    const maskedUri = await segmentGarment(imageUri);
-    // Diagnostic: `bridge=absent` here means the native module isn't linked
-    // into the build (Podfile.lock missing OjoVisionBridge) — every photo
-    // then silently uses the heuristic crop, so segmentation is never tested.
-    console.log(
-      `[Ojo][vision] bridge=${isVisionBridgeAvailable() ? 'linked' : 'absent'} `
-      + `segment=${maskedUri ? 'cutout' : 'null'}`,
-    );
+    let maskedUri: string | null;
+    if (precomputedMaskedUri !== undefined) {
+      maskedUri = precomputedMaskedUri;
+    } else {
+      maskedUri = await segmentGarment(imageUri);
+      // Diagnostic: `bridge=absent` here means the native module isn't linked
+      // into the build (Podfile.lock missing OjoVisionBridge) — every photo
+      // then silently uses the heuristic crop, so segmentation is never tested.
+      console.log(
+        `[Ojo][vision] bridge=${isVisionBridgeAvailable() ? 'linked' : 'absent'} `
+        + `segment=${maskedUri ? 'cutout' : 'null'}`,
+      );
+    }
 
     if (maskedUri) {
       const colors = await extractFromMaskedImage(maskedUri, maxColors);

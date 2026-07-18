@@ -16,7 +16,8 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import { loadTensorflowModel } from 'react-native-fast-tflite';
 import type { TensorflowModel } from 'react-native-fast-tflite';
 import { extractColorsFromImage } from './colorExtractor';
-import { base64ToBytes, parsePNGPixels } from './pngDecoder';
+import { base64ToBytes, parsePNGPixelsRGBA, compositeOnBackground } from './pngDecoder';
+import { segmentGarment, isVisionBridgeAvailable } from '../lib/vision/native';
 
 import type {
   ClothingIdentificationResult,
@@ -155,11 +156,17 @@ async function imageToTensor(
     const bytes = base64ToBytes(resized.base64);
     console.log(`[Ojo] imageToTensor: decoded ${bytes.length} bytes, first 8: [${bytes.slice(0, 8).join(',')}]`);
 
-    const pixels = parsePNGPixels(bytes);
-    if (pixels.length === 0) {
-      console.error('[Ojo] imageToTensor: parsePNGPixels returned 0 pixels');
+    // RGBA + composite-onto-white rather than a plain RGB decode: when
+    // imageUri is a segmented cutout, its "background" is transparent, and
+    // dropping alpha (the old parsePNGPixels path) would hand the classifier
+    // whatever incidental RGB value sits under those transparent pixels. This
+    // is a no-op for an ordinary opaque photo (alpha=255 everywhere).
+    const rgba = parsePNGPixelsRGBA(bytes);
+    if (rgba.length === 0) {
+      console.error('[Ojo] imageToTensor: parsePNGPixelsRGBA returned 0 pixels');
       return null;
     }
+    const pixels = compositeOnBackground(rgba, 255);
 
     console.log(`[Ojo] imageToTensor: ${pixels.length} pixels decoded, building tensor`);
     return buildTensor(pixels, inputShape);
@@ -337,10 +344,29 @@ export async function identifyClothing(
   let confidence = 0;
   const rawLabels: RawLabel[] = [];
 
-  // ── Step 0: Get image dimensions for shape heuristics ─────────
+  // ── Step 0: Segment once, reuse for the classifier AND colors ──
+  // Previously the classifier ran on the raw photo — whatever hand,
+  // background, or wall came with it — while colorExtractor separately
+  // segmented the same photo for its own use. The classifier never
+  // benefited from the cutout it was already paying to compute. Segmenting
+  // once here and feeding the result to imageToTensor gives the classifier
+  // the same tight, background-free crop humans would use to identify it.
+  const maskedUri = await segmentGarment(imageUri);
+  console.log(
+    `[Ojo][vision] bridge=${isVisionBridgeAvailable() ? 'linked' : 'absent'} `
+    + `segment=${maskedUri ? 'cutout' : 'null'}`,
+  );
+  const classifierInput = maskedUri ?? imageUri;
+  console.log(`[Ojo] classifier input: ${maskedUri ? 'segmented cutout' : 'raw photo (no cutout)'}`);
+
+  // ── Step 0b: Image dimensions for shape heuristics ─────────────
+  // Aspect ratio of the CUTOUT reflects the garment's actual shape (wide vs
+  // tall). The raw photo's aspect ratio only reflects how the user framed
+  // the shot — e.g. a portrait phone photo of a shoe is still tall overall —
+  // so it was never a reliable footwear signal even when the heuristic fired.
   let aspectRatio = 1.0;
   try {
-    const info = await ImageManipulator.manipulateAsync(imageUri, []);
+    const info = await ImageManipulator.manipulateAsync(classifierInput, []);
     if (info.width && info.height) {
       aspectRatio = info.width / info.height;
     }
@@ -349,7 +375,7 @@ export async function identifyClothing(
   // ── Step 1: TFLite inference ──────────────────────────────────
   const model = await getModel();
   const inputShape = model?.inputs[0]?.shape ?? [1, MODEL_SIZE, MODEL_SIZE, 3];
-  const tensor = model ? await imageToTensor(imageUri, inputShape) : null;
+  const tensor = model ? await imageToTensor(classifierInput, inputShape) : null;
 
   if (!model)  console.error('[Ojo] identifyClothing: model is null — check load errors above');
   if (!tensor) console.error('[Ojo] identifyClothing: tensor is null — check imageToTensor errors above');
@@ -388,8 +414,8 @@ export async function identifyClothing(
     }
   }
 
-  // ── Step 2: Dominant colors ───────────────────────────────────
-  const colors = await extractColorsFromImage(imageUri, cfg.maxColors);
+  // ── Step 2: Dominant colors (reuse the Step 0 cutout — no re-segmenting) ──
+  const colors = await extractColorsFromImage(imageUri, cfg.maxColors, maskedUri);
 
   // ── Step 3: Color-informed garment refinement ─────────────────
   // Upgrade generic "pants" to "jeans" only on an explicitly denim color name.

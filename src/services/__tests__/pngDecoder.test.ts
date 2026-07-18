@@ -1,5 +1,5 @@
 import { deflate } from 'pako';
-import { parsePNGPixels, parsePNGPixelsRGBA } from '../pngDecoder';
+import { parsePNGPixels, parsePNGPixelsRGBA, compositeOnBackground } from '../pngDecoder';
 
 // ─── Minimal synthetic PNG builder (test-only) ───────────────────────────────
 // Builds an uncompressed-filter (type 0), 8-bit RGBA PNG from raw pixel
@@ -75,7 +75,7 @@ describe('PNG pixel parsing', () => {
   ];
   const png = buildRGBAPng(2, 2, pixels);
 
-  it('parsePNGPixels decodes RGB and drops alpha — the existing classifier path', () => {
+  it('parsePNGPixels decodes RGB and drops alpha — used by the heuristic-crop color path', () => {
     expect(parsePNGPixels(png)).toEqual([
       [255, 0, 0],
       [0, 255, 0],
@@ -91,5 +91,27 @@ describe('PNG pixel parsing', () => {
   it('returns [] for garbage input rather than throwing', () => {
     expect(parsePNGPixels(new Uint8Array([1, 2, 3]))).toEqual([]);
     expect(parsePNGPixelsRGBA(new Uint8Array([1, 2, 3]))).toEqual([]);
+  });
+});
+
+describe('compositeOnBackground — the classifier path for segmented cutouts', () => {
+  it('is a no-op for fully opaque pixels regardless of background color', () => {
+    const opaque: Array<[number, number, number, number]> = [[255, 0, 0, 255], [10, 20, 30, 255]];
+    expect(compositeOnBackground(opaque, 255)).toEqual([[255, 0, 0], [10, 20, 30]]);
+    expect(compositeOnBackground(opaque, 0)).toEqual([[255, 0, 0], [10, 20, 30]]);
+  });
+
+  it('fully transparent pixels become exactly the background color', () => {
+    expect(compositeOnBackground([[123, 45, 67, 0]], 255)).toEqual([[255, 255, 255]]);
+    expect(compositeOnBackground([[123, 45, 67, 0]], 0)).toEqual([[0, 0, 0]]);
+  });
+
+  it('blends half-alpha pixels proportionally toward the background', () => {
+    // alpha=128/255 ≈ 0.502 → r=0*0.502 + 255*0.498 ≈ 127, g stays 255 (full green channel)
+    expect(compositeOnBackground([[0, 255, 0, 128]], 255)).toEqual([[127, 255, 127]]);
+  });
+
+  it('defaults to a white background', () => {
+    expect(compositeOnBackground([[0, 0, 0, 0]])).toEqual([[255, 255, 255]]);
   });
 });

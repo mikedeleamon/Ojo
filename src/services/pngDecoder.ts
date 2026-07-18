@@ -143,6 +143,26 @@ export function parsePNGPixelsRGBA(bytes: Uint8Array): Array<[number, number, nu
   return pixels;
 }
 
+/** Alpha-composite RGBA pixels onto a flat background (white by default).
+ *  A segmented cutout's "background" is transparent, not any particular RGB
+ *  value, so blending it out here (rather than just dropping alpha) avoids
+ *  handing the classifier whatever incidental color sits under a
+ *  fully-transparent pixel. A no-op for already-opaque images (alpha=255
+ *  everywhere), so it's safe to apply unconditionally to any decoded PNG. */
+export function compositeOnBackground(
+  pixels: Array<[number, number, number, number]>,
+  bg = 255,
+): Array<[number, number, number]> {
+  return pixels.map(([r, g, b, a]) => {
+    const t = a / 255;
+    return [
+      Math.round(r * t + bg * (1 - t)),
+      Math.round(g * t + bg * (1 - t)),
+      Math.round(b * t + bg * (1 - t)),
+    ];
+  });
+}
+
 function paeth(a: number, b: number, c: number): number {
   const p = a + b - c;
   const pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c);
