@@ -240,6 +240,7 @@
 				XX074B8811C1CF8E8A3D74XX /* Frameworks */,
 				XXE45443DC38DCFE1DB622XX /* Sources */,
 				XXFA5A8CCDD805DF7AEF9CXX /* Resources */,
+				4B51E92249B14596414066FF /* Sync CFBundleVersion with host app */,
 			);
 			buildRules = (
 			);
@@ -314,6 +315,25 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		4B51E92249B14596414066FF /* Sync CFBundleVersion with host app */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Sync CFBundleVersion with host app";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "HOST_VERSION=$(/usr/libexec/PlistBuddy -c \"Print CFBundleVersion\" \"${SRCROOT}/Ojo/Info.plist\")\nWIDGET_PLIST=\"${TARGET_BUILD_DIR}/${INFOPLIST_PATH}\"\n/usr/libexec/PlistBuddy -c \"Set :CFBundleVersion ${HOST_VERSION}\" \"${WIDGET_PLIST}\" || /usr/libexec/PlistBuddy -c \"Add :CFBundleVersion string ${HOST_VERSION}\" \"${WIDGET_PLIST}\"\n";
+		};
 		00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
