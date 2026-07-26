@@ -17,6 +17,13 @@ export interface IArticle extends Document {
   purchasePrice?: number;
   imageUrl?: string;
   createdAt?: Date;
+  /** The classifier's original guess, preserved alongside the (possibly
+   *  user-corrected) clothingType — without this, "the user fixed a
+   *  misdetection" is indistinguishable from "the AI happened to be right,"
+   *  and the training-data flywheel this enables has nothing to read.
+   *  Already whitelisted in routes/closets.ts; was silently dropped here. */
+  detectedGarmentType?: string;
+  identificationConfidence?: number;
 }
 
 export interface ICloset extends Document {
@@ -42,6 +49,8 @@ const articleSchema = new Schema<IArticle>({
   merchant:         { type: String },
   purchasePrice:    { type: Number },
   imageUrl:         { type: String },
+  detectedGarmentType:      { type: String },
+  identificationConfidence: { type: Number },
 }, { timestamps: true });
 
 const closetSchema = new Schema<ICloset>({
