@@ -116,6 +116,25 @@ export const cancelWeeklyRecap = async (): Promise<void> => {
   await Notifications.cancelScheduledNotificationAsync(WEEKLY_RECAP_ID).catch(() => {});
 };
 
+// Weekly recap uses a fixed identifier + repeating WEEKLY trigger, so once
+// scheduled it keeps firing with whatever content it was given — it's only
+// ever refreshed when the user revisits and saves Notification Settings.
+// Anyone who enabled it before recap deep-linking shipped (`data.url` added
+// alongside the recap page) is stuck forever on stale copy that doesn't
+// navigate on tap. Call this once per launch to self-heal by re-applying the
+// current schedule for anyone who already has it enabled.
+export const reconcileWeeklyRecap = async (): Promise<void> => {
+  if (!getToken()) return;
+  try {
+    const { data } = await axios.get('/api/notifications/settings', authHeaders());
+    if (data?.weeklyRecapEnabled) {
+      await scheduleWeeklyRecap(data.weeklyRecapDay ?? 0);
+    }
+  } catch {
+    // Best-effort — NotificationsScreen still refreshes it on next save.
+  }
+};
+
 // ─── UTC conversion helper ────────────────────────────────────────────────────
 // Convert a user's chosen local hour (0–23) to UTC hour for server storage.
 

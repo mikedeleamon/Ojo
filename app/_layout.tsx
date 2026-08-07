@@ -17,8 +17,14 @@ import { ConfirmProvider } from '../src/components/ConfirmDialog';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { isOnboardingComplete, isOnboardingPending } from '../src/lib/onboarding';
 import { recordAppOpen } from '../src/services/reviewManager';
+import { reconcileWeeklyRecap } from '../src/lib/notifications';
 
 SplashScreen.preventAutoHideAsync();
+
+// Launch-scoped guard mirroring useTripPlans' reconcile pattern — AuthGate's
+// effect can re-run on every segment change, but the recap re-schedule only
+// needs to happen once per app process.
+let weeklyRecapReconciledThisLaunch = false;
 
 // ─── Splash ──────────────────────────────────────────────────────────────────
 function CustomSplash() {
@@ -64,6 +70,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     }
 
     if (isLoggedIn) {
+      if (!weeklyRecapReconciledThisLaunch) {
+        weeklyRecapReconciledThisLaunch = true;
+        reconcileWeeklyRecap().catch(() => {});
+      }
+
       // Onboarding is shown only when it was explicitly requested by completing
       // the sign-up form (the `pending` flag) and hasn't been finished yet.
       // Users signed in from remembered credentials or the login screen have no
