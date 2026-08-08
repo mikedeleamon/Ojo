@@ -17,6 +17,7 @@ import tripsRoutes from './routes/trips';
 import tripFitRoutes from './routes/tripfit';
 import shareRoutes from './routes/share';
 import { startNotificationService } from './services/notificationService';
+import { weatherStats, resetWeatherStats } from './lib/weatherKit';
 
 const app = express();
 app.disable('x-powered-by');
@@ -46,6 +47,10 @@ app.get('/health', (_req: Request, res: Response) => {
       rssMb: Math.round(mem.rss / 1024 / 1024),
       heapUsedMb: Math.round(mem.heapUsed / 1024 / 1024),
     },
+    // Read-only peek at the WeatherKit counters. Deliberately does NOT reset
+    // them — that's owned by the periodic logger, and resetting here would
+    // corrupt the per-interval numbers whenever a monitor polls /health.
+    weather: weatherStats(),
     timestamp: new Date().toISOString(),
   });
 });
@@ -136,12 +141,17 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-// ─── Memory telemetry ─────────────────────────────────────────────────────────
+// ─── Memory + WeatherKit telemetry ────────────────────────────────────────────
 // Periodic log line so Railway's log view shows real RSS/heap growth over time.
 // This is the data to base tier-upgrade decisions on: sustained RSS climbing
 // toward your instance's RAM ceiling (or OOM restarts) is the true upgrade
 // signal, not raw user count. Interval is unref'd so it never keeps the process
 // alive on its own.
+//
+// The [weather] line rides the same cadence. `upstream` is the only counter that
+// costs money (WeatherKit bills per HTTP request); `hits` and `coalesced` are
+// requests that were served without one. Counters reset after each emit, so the
+// numbers are per-interval, not cumulative.
 function startMemoryLogging(intervalMs = 15 * 60 * 1000): void {
   const log = () => {
     const mem = process.memoryUsage();
@@ -150,6 +160,13 @@ function startMemoryLogging(intervalMs = 15 * 60 * 1000): void {
       `heapUsed=${Math.round(mem.heapUsed / 1024 / 1024)}MB ` +
       `uptime=${Math.round(process.uptime())}s`
     );
+
+    const w = weatherStats();
+    console.log(
+      `[weather] upstream=${w.upstreamCalls} l1=${w.l1Hits} l2=${w.l2Hits} ` +
+      `coalesced=${w.coalesced} windowMins=${Math.round(intervalMs / 60000)}`
+    );
+    resetWeatherStats();
   };
   log(); // emit once at boot for a baseline
   setInterval(log, intervalMs).unref();

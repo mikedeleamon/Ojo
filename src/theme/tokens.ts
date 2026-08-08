@@ -102,6 +102,29 @@ export const weatherGradients = {
   clearNight:   ['#020617', '#0C1445', '#1D2B6B'],   // deep midnight
   hot:          ['#7C2D12', '#C2410C', '#FBBF24'],   // scorched amber-gold
 
+  // ── Time-of-day sky (clear/sunny only) ────────────────────────────────────
+  // Blended by solar elevation in lib/weather/skyGradient, so the sky moves
+  // continuously through the day instead of snapping on the IsDayTime boolean.
+  // Stops read top → bottom of screen: zenith, mid-sky, horizon.
+  //
+  // Each twilight band has an evening and a morning variant, because they don't
+  // look alike in reality. Daytime convection lifts dust and pollution into the
+  // lower atmosphere, so evening air is aerosol-heavy and scatters long
+  // wavelengths hard — deep saturated reds. Overnight the air stabilises and
+  // particulates settle out, so dawn light passes through cleaner air and skews
+  // softer, cooler and pinker. The same asymmetry turns evening blue hour
+  // violet (residual warmth over the ozone Chappuis band) while morning blue
+  // hour stays a purer, cooler blue.
+  //
+  // Evening (sun descending):
+  goldenHour:   ['#0C4A8A', '#E8834A', '#FCD34D'],   // low sun, warm gold horizon
+  sunset:       ['#1E1B4B', '#C2410C', '#F59E0B'],   // civil twilight, burnt orange
+  blueHour:     ['#0B1026', '#1E3A8A', '#7C3AED'],   // nautical twilight, violet
+  // Morning (sun ascending) — paler, cooler, rosier counterparts:
+  dawnGold:     ['#0E5BA8', '#EFA184', '#F9E29A'],   // clean blue, peach, pale lemon
+  dawn:         ['#1B2C63', '#C85A7C', '#F5A98D'],   // civil twilight, rose + coral
+  dawnBlue:     ['#070C1F', '#153A82', '#3B7DD8'],   // nautical twilight, cool blue
+
   // ── Clouds ────────────────────────────────────────────────────────────────
   partlyCloudy: ['#334155', '#475569', '#64748B'],
   cloudy:       ['#1F2937', '#374151', '#4B5563'],

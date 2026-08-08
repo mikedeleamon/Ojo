@@ -61,6 +61,9 @@ import { flattenHsl, hslToHex, lerpHslFlat } from './colorMath';
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 import { gradientFor, footerBgFor } from './weatherPalette';
 import { isClearNight, isThunderstorm } from '../../lib/weather/conditions';
+import { solarPosition, type SolarPosition } from '../../lib/solarPosition';
+import { rainAngleFor } from '../../lib/weather/windSlant';
+import BackdropLayer from './BackdropLayer';
 import LastUpdated from './LastUpdated';
 import { fToC } from '../../lib/units';
 import { humanizeCondition } from '../../lib/weather/humanizeCondition';
@@ -266,8 +269,16 @@ const WeatherHUD = ({
     }, [location, refreshKey]);
 
     // ── Fetch weather (WeatherKit via server proxy) ────────────────────────────
+    // `cancelled` (same idiom as the geocode effect above) guards against a
+    // fetch for a superseded `place` resolving AFTER a newer one and clobbering
+    // fresh data with stale — MainPage's refresh sequencing closes the specific
+    // GPS-refresh race that motivated this, but nothing here depends on THAT
+    // fix: this is the general "ignore a stale response" guard, so any other
+    // path that makes `place` change twice in quick succession stays correct
+    // too. Only the fetch instance for the CURRENT `place` ever writes state.
     useEffect(() => {
         if (!place) return;
+        let cancelled = false;
         const params = { params: { lat: place.lat, lon: place.lon } };
         Promise.all([
             api.get<CurrentWeather>(weatherConstants.GET_CURRENT, params),
@@ -275,6 +286,7 @@ const WeatherHUD = ({
             api.get<DailyForecast[]>(weatherConstants.GET_DAILY, params),
         ])
             .then(([wRes, fRes, dRes]) => {
+                if (cancelled) return;
                 const w = wRes.data;
                 if (!w) throw new Error('Empty response');
 
@@ -307,6 +319,7 @@ const WeatherHUD = ({
                 }
             })
             .catch((err) => {
+                if (cancelled) return;
                 const status = err?.response?.status;
                 setError(
                     status === 429
@@ -315,11 +328,18 @@ const WeatherHUD = ({
                 );
             })
             .finally(() => {
+                // A superseded fetch skips the flush/spinner-clear entirely — that's
+                // left to the newer fetch's own finally(), which always runs (its
+                // `cancelled` only flips true if a THIRD place comes in behind it).
+                if (cancelled) return;
                 flushPending();
                 isRefreshRef.current = false;
                 setLoading(false);
                 setRefreshing(false);
             });
+        return () => {
+            cancelled = true;
+        };
     }, [place]);
 
     // ── Animated gradient color interpolation ───────────────────────────────────
@@ -347,14 +367,44 @@ const WeatherHUD = ({
 
     const loadingOpacity = useRef(new RNAnimated.Value(1)).current;
 
+    // ── Solar elevation (drives the time-of-day sky) ──────────────────────────
+    // Recomputed on a 60s timer rather than continuously: the sun moves ~0.25°
+    // per minute, so this is finer than the gradient can express, and it keeps
+    // the animation event-driven. Feeding it from a per-frame shared value would
+    // keep the gradient worklet alive forever instead of only during the ~2s
+    // transitions — turning a free change into a permanent per-frame cost.
+    const [sun, setSun] = useState<SolarPosition | undefined>(undefined);
+
+    useEffect(() => {
+        if (!place) return;
+        const update = () => setSun(solarPosition(place.lat, place.lon));
+        update();
+        const timer = setInterval(update, 60_000);
+        return () => clearInterval(timer);
+    }, [place?.lat, place?.lon]);
+
     // Compute target gradient from weather data. Memoised so the dependency
     // array gets a stable reference (was `.join(',')` on every render).
+    //
+    // Keyed on the *joined colours*, not the elevation: between stops the
+    // palette is identical for long stretches (all of midday, all of night), and
+    // without this a new array every 60s would retrigger a 2s hue sweep each
+    // minute for no visible change.
+    // `sun` is a fresh object each tick, but the memo below keys on the joined
+    // colours, so that identity churn never reaches the gradient animation.
+    const rawGradient = weather
+        ? gradientFor(
+              weather.WeatherText,
+              weather.IsDayTime,
+              sun?.elevationDeg,
+              sun?.isRising,
+          )
+        : DEFAULT_GRADIENT;
+    const gradientKey = rawGradient.join(',');
     const targetGradient = useMemo(
-        () =>
-            weather
-                ? gradientFor(weather.WeatherText, weather.IsDayTime)
-                : DEFAULT_GRADIENT,
-        [weather?.WeatherText, weather?.IsDayTime, DEFAULT_GRADIENT],
+        () => rawGradient,
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [gradientKey],
     );
 
     const prevTargetRef = useRef<readonly string[]>(DEFAULT_GRADIENT);
@@ -563,6 +613,24 @@ const WeatherHUD = ({
     const isClearNightBg = !!weather && isClearNight(weather.WeatherText, weather.IsDayTime);
     const isStormBg = !!weather && isThunderstorm(weather.WeatherText);
 
+    // Precipitation slant from the reported wind. Gust is preferred when present
+    // — it's what makes a squall look like a squall rather than steady drizzle.
+    // Both fields are optional (older cached snapshots predate them), and
+    // rainAngleFor falls back to the previous fixed rightward drift.
+    const rainAngle = useMemo(
+        () =>
+            rainAngleFor(
+                weather?.Wind.Gust?.Imperial.Value ??
+                    weather?.Wind.Speed.Imperial.Value,
+                weather?.Wind.Direction,
+            ),
+        [
+            weather?.Wind.Gust?.Imperial.Value,
+            weather?.Wind.Speed.Imperial.Value,
+            weather?.Wind.Direction,
+        ],
+    );
+
     // ── Error state (#9: retry + check settings) ──────────────────────────────
     if (error && !weather)
         return (
@@ -590,48 +658,32 @@ const WeatherHUD = ({
             animatedProps={animatedGradientProps}
             style={st.root}
         >
-            {/* Full-screen star field — absolute layer behind all content */}
-            {isClearNightBg && (
-                <View
-                    style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                    }}
-                    pointerEvents='none'
-                >
-                    <ClearNightIconMoon
-                        fullWidth
-                        fullHeight
-                        showMoon={false}
-                    />
-                </View>
-            )}
+            {/* Full-screen star field — absolute layer behind all content.
+                BackdropLayer cross-fades instead of mounting/unmounting, so a
+                condition change no longer costs a commit + re-rasterization on
+                the frame the weather updates. */}
+            <BackdropLayer visible={isClearNightBg}>
+                <ClearNightIconMoon
+                    fullWidth
+                    fullHeight
+                    showMoon={false}
+                />
+            </BackdropLayer>
 
-            {/* Full-screen storm backdrop — falling rain + occasional sheet flash */}
-            {isStormBg && (
-                <View
-                    style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                    }}
-                    pointerEvents='none'
-                >
-                    <StormIconLightning
-                        fullWidth
-                        fullHeight
-                        showCloud={false}
-                        showBolts={false}
-                        showRain
-                        showFlash
-                    />
-                </View>
-            )}
+            {/* Full-screen storm backdrop — falling rain + occasional sheet flash.
+                rainAngle now tracks the reported wind, so the slant matches the
+                conditions instead of being a fixed 0.12 everywhere. */}
+            <BackdropLayer visible={isStormBg}>
+                <StormIconLightning
+                    fullWidth
+                    fullHeight
+                    showCloud={false}
+                    showBolts={false}
+                    showRain
+                    showFlash
+                    rainAngle={rainAngle}
+                />
+            </BackdropLayer>
 
             {/* Transparent loading spinner — sits over the animating gradient.
                 Suppressed when a parent owns the loading gate (showInlineLoader). */}

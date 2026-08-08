@@ -58,9 +58,21 @@ export interface CurrentWeather {
     Imperial: { Value: number; Unit: string };
     Metric: { Value: number; Unit: string };
   };
-  Wind: { Speed: { Imperial: { Value: number }; Metric: { Value: number } } };
+  // Gust / Direction / CloudCover / Visibility are optional: snapshots cached
+  // by older clients (weatherCache in AsyncStorage) predate them, and WeatherKit
+  // occasionally omits a field. Consumers must treat "absent" as "unknown"
+  // rather than zero — 0% cloud and 0 mph gusts are meaningful values.
+  Wind: {
+    Speed: { Imperial: { Value: number }; Metric: { Value: number } };
+    Gust?: { Imperial: { Value: number }; Metric: { Value: number } };
+    /** Degrees, direction the wind blows FROM (meteorological convention). */
+    Direction?: number;
+  };
   RelativeHumidity: number;
   UVIndexText: string;
+  /** Sky covered by cloud, 0–100. */
+  CloudCover?: number;
+  Visibility?: { Imperial: { Value: number }; Metric: { Value: number } };
   // AQI / pollen are not provided by Apple WeatherKit. Kept optional so the
   // outfit engine and UI keep compiling; values are always undefined today
   // (and can be backfilled by a secondary provider later without a refactor).

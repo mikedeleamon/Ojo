@@ -47,12 +47,17 @@ export default function MainPage() {
 
   // Resolve GPS only while My Location is the active destination. Saved cities
   // use their stored query directly (no device location needed).
+  //
+  // NOT keyed on refreshKey: a pull-to-refresh resolves its own fresh fix in
+  // handleRefresh below, sequenced BEFORE refreshKey bumps (see the race this
+  // avoids there). This effect covers the other triggers — mount, switching
+  // INTO My Location, or the settings fallback changing.
   useEffect(() => {
     if (!settingsReady || activeId !== CURRENT_LOCATION_ID) return;
     getCurrentLocation(8000).then(coords => {
       setGpsLocation(coords ? formatCoords(coords.lat, coords.lng) : settings.location);
     });
-  }, [settingsReady, settings.location, activeId, refreshKey]);
+  }, [settingsReady, settings.location, activeId]);
 
   // For saved cities, pass stored coordinates as a "lat,lng" string so
   // geocodeCity skips the CLGeocoder network call entirely (parseLatLng fast
@@ -65,10 +70,27 @@ export default function MainPage() {
   // Pull-to-refresh on Home refetches weather (refreshKey) AND force-refreshes
   // the closet cache, so the outfit suggestion below the fold reflects any
   // wardrobe edits made on another device without waiting for the focus timer.
+  //
+  // In My Location mode, GPS is re-resolved BEFORE refreshKey bumps. WeatherHUD
+  // keys its fetch off [location, refreshKey] — if refreshKey bumped first, it
+  // would fire immediately against whatever `gpsLocation` was already in state
+  // (the PREVIOUS fix), kicking off a real fetch for stale coordinates. That
+  // fetch and the corrected one (triggered once gpsLocation actually updates)
+  // then race in WeatherHUD, and on an unlucky response order the stale one
+  // resolving last silently overwrites fresh data — while the UI still reads
+  // "Just now". Saved cities have no such race: their coords are already known
+  // synchronously, so they bump immediately.
   const handleRefresh = useCallback(() => {
-    setRefreshKey(k => k + 1);
+    if (activeId === CURRENT_LOCATION_ID) {
+      getCurrentLocation(8000).then(coords => {
+        setGpsLocation(coords ? formatCoords(coords.lat, coords.lng) : settings.location);
+        setRefreshKey(k => k + 1);
+      });
+    } else {
+      setRefreshKey(k => k + 1);
+    }
     void refreshClosets();
-  }, []);
+  }, [activeId, settings.location]);
 
   // Persist each fresh payload to the cache and the in-memory mirror.
   const handleSnapshot = useCallback((snap: WeatherSnapshot) => {

@@ -1,4 +1,5 @@
 import { weatherGradients } from '../../theme/tokens';
+import { skyGradientFor } from './skyGradient';
 
 /**
  * Single source of truth for interpreting Apple WeatherKit `conditionCode`
@@ -157,10 +158,34 @@ const KIND_STYLES: Record<WeatherKind, KindStyle> = {
 export const iconTypeFor = (condition: string, isDay: boolean): WeatherIconType =>
     KIND_STYLES[classifyCondition(condition)].icon(isDay);
 
+/**
+ * Conditions whose background IS the sky, so time of day should drive it.
+ * Rain/cloud/storm palettes carry the condition's identity instead, and would
+ * lose it if repainted by solar elevation.
+ */
+const SKY_DOMINATED = new Set<WeatherKind>(['clear', 'sunny']);
+
+/**
+ * @param solarElevationDeg Optional sun elevation (see lib/solarPosition). When
+ *   omitted the result is exactly the static palette — callers that don't have
+ *   coordinates (forecast tiles, trip cards) are unaffected, and the returned
+ *   array keeps its stable identity.
+ * @param isRising Sun climbing toward noon, which selects the dawn palettes
+ *   over the dusk ones. Only meaningful alongside `solarElevationDeg`; defaults
+ *   to false (evening) so three-argument callers are unchanged.
+ */
 export const gradientFor = (
     condition: string,
     isDay: boolean,
-): readonly string[] => KIND_STYLES[classifyCondition(condition)].gradient(isDay);
+    solarElevationDeg?: number,
+    isRising = false,
+): readonly string[] => {
+    const kind = classifyCondition(condition);
+    if (solarElevationDeg !== undefined && SKY_DOMINATED.has(kind)) {
+        return skyGradientFor(solarElevationDeg, isRising);
+    }
+    return KIND_STYLES[kind].gradient(isDay);
+};
 
 export const footerBgFor = (condition: string, isDay: boolean): string =>
     KIND_STYLES[classifyCondition(condition)].footerBg(isDay);
