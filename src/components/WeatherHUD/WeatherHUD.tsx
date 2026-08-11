@@ -661,8 +661,13 @@ const WeatherHUD = ({
             {/* Full-screen star field — absolute layer behind all content.
                 BackdropLayer cross-fades instead of mounting/unmounting, so a
                 condition change no longer costs a commit + re-rasterization on
-                the frame the weather updates. */}
-            <BackdropLayer visible={isClearNightBg}>
+                the frame the weather updates.
+
+                `depth` sets the parallax rate. Stars are effectively at infinity
+                so they barely drift; storm rain is right in front of you and
+                tracks the scroll hard. Moving both at one rate is what makes
+                cheap parallax read as a flat sticker sliding around. */}
+            <BackdropLayer visible={isClearNightBg} scrollY={scrollY} depth={0.3}>
                 <ClearNightIconMoon
                     fullWidth
                     fullHeight
@@ -673,7 +678,7 @@ const WeatherHUD = ({
             {/* Full-screen storm backdrop — falling rain + occasional sheet flash.
                 rainAngle now tracks the reported wind, so the slant matches the
                 conditions instead of being a fixed 0.12 everywhere. */}
-            <BackdropLayer visible={isStormBg}>
+            <BackdropLayer visible={isStormBg} scrollY={scrollY} depth={1}>
                 <StormIconLightning
                     fullWidth
                     fullHeight
