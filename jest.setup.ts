@@ -1,3 +1,10 @@
+// React Native injects __DEV__ at build time; a bare ts-jest run has no bundler
+// to do that. The outfit engine reads it for its perf logging (outfitEngine.ts),
+// so without this any test that actually invokes generateOutfits throws
+// ReferenceError before reaching a single assertion. False = production
+// behaviour: no timing work, no console noise in test output.
+(globalThis as { __DEV__?: boolean }).__DEV__ = false;
+
 jest.mock('expo-secure-store', () => ({
   getItemAsync: jest.fn(async () => null),
   setItemAsync: jest.fn(async () => {}),

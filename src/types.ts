@@ -178,6 +178,35 @@ export const articleCategories = (a: ClothingArticle | ArticleFormData): string[
   return [];
 };
 
+/**
+ * What to call an article anywhere it's shown to the user.
+ *
+ * `name` is optional on the form, and most people never fill it in — so the
+ * fallback is what almost every closet actually displays. Falling back to the
+ * bare type gave a closet of six identical "Shirt" rows; qualifying it with the
+ * color ("Sky Blue Shirt") tells them apart without making anyone type a name.
+ *
+ * Deliberately computed at read time rather than baked into `name` on save:
+ * editing the color of an unnamed article should re-title it, and an article
+ * the user *did* name must never be silently rewritten.
+ */
+export const articleDisplayName = (
+  a: Pick<ClothingArticle, 'name' | 'clothingType' | 'color'> | undefined | null,
+): string => {
+  if (!a) return 'Item';
+
+  const name = a.name?.trim();
+  if (name) return name;
+
+  const type  = a.clothingType?.trim();
+  const color = a.color?.trim();
+
+  // 'Multi' is the picker's "no single color" option — "Multi Shirt" reads as
+  // a typo, so a multicolor article just falls back to its bare type.
+  if (type && color && color !== 'Multi') return `${color} ${type}`;
+  return type || color || 'Item';
+};
+
 export interface NotificationSettings {
   morningBriefEnabled:    boolean;
   morningBriefHourUTC:    number;   // 0–23 in UTC

@@ -1,11 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import {
-    Animated,
-    Easing,
-    StyleSheet,
-    useWindowDimensions,
-    View,
-} from 'react-native';
+import { Animated, Easing, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Svg, { Path, Polygon, Rect } from 'react-native-svg';
 import {
     CLOUD_D,
@@ -14,43 +8,69 @@ import {
     BOLT_RIGHT_PTS,
 } from './StormIcon';
 import { useReduceMotion } from '../../hooks/useReduceMotion';
+import {
+    nativeLoop,
+    stepped,
+    steppedDuration,
+} from '../../lib/animation/nativeLoop';
 
 // ─── Bolt strike configurations ─────────────────────────────────────────────
 // Each bolt has its own opacity loop with a unique strike pattern. Cycles are
 // coprime so the three never lock into a repeating rhythm.
+//
+// The pattern is a list of [durationMs, opacity] holds, starting dark: the long
+// gap, then flash / dark / flash / dark. Cuts between holds are instantaneous —
+// that staccato is the whole character of lightning.
+//
+// It used to be nine chained `Animated.timing` legs, four of them `duration: 0`.
+// `Animated.loop` can't drive a sequence natively (see lib/animation/nativeLoop),
+// so every strike cost nine round-trips through the JS thread inside ~250 ms and
+// the snap timings landed wherever JS got to them. As one interpolation over a
+// single looping progress value, the native driver plays the whole pattern.
 
 const BOLT_CONFIGS = [
     {
         id: 'left',
         points: BOLT_LEFT_PTS,
         startDelay: 0,
-        flash1: 60,
-        gap1: 40,
-        flash2: 70,
-        gap2: 30,
-        longGap: 5200,
+        pattern: [
+            [5200, 0],
+            [60, 1],
+            [40, 0],
+            [70, 1],
+            [30, 0],
+        ],
     },
     {
         id: 'center',
         points: BOLT_CENTER_PTS,
         startDelay: 1700,
-        flash1: 80,
-        gap1: 50,
-        flash2: 60,
-        gap2: 40,
-        longGap: 6600,
+        pattern: [
+            [6600, 0],
+            [80, 1],
+            [50, 0],
+            [60, 1],
+            [40, 0],
+        ],
     },
     {
         id: 'right',
         points: BOLT_RIGHT_PTS,
         startDelay: 3400,
-        flash1: 70,
-        gap1: 30,
-        flash2: 50,
-        gap2: 40,
-        longGap: 7700,
+        pattern: [
+            [7700, 0],
+            [70, 1],
+            [30, 0],
+            [50, 1],
+            [40, 0],
+        ],
     },
-] as const;
+] as const satisfies readonly {
+    id: string;
+    points: string;
+    startDelay: number;
+    pattern: readonly (readonly [number, number])[];
+}[];
 
 // ─── Rain group configurations ──────────────────────────────────────────────
 // Each group is one Animated.View loop translating an SVG of stacked streaks.
@@ -65,8 +85,14 @@ const RAIN_GROUPS = [
 ] as const;
 
 const DROPS_PER_GROUP = 6;
-const STREAK_WIDTH = 3;   // viewBox units
-const STREAK_HEIGHT = 36; // viewBox units
+
+// Streak dimensions in POINTS. The rain SVG is given a viewBox in points (see
+// RainLayer) rather than the component's 1280-unit artwork space, which the
+// full-screen canvas scaled by ~0.14: a 3-unit-wide streak came out 0.42 pt
+// across — a sub-pixel hairline that aliases and shimmers as it translates,
+// which is its own source of visible chop independent of frame rate.
+const STREAK_WIDTH = 1.5;
+const STREAK_HEIGHT = 14;
 
 // ─── Bolt component ──────────────────────────────────────────────────────────
 // A single bolt polygon wrapped in an Animated.View whose opacity is driven by
@@ -81,48 +107,35 @@ interface BoltProps {
     height: number;
     polygonTransform: string;
     startDelay: number;
-    flash1: number;
-    gap1: number;
-    flash2: number;
-    gap2: number;
-    longGap: number;
+    pattern: readonly (readonly [number, number])[];
     animate: boolean;
 }
 
 function Bolt({
     points, fill, vbW, vbH, width, height, polygonTransform,
-    startDelay, flash1, gap1, flash2, gap2, longGap, animate,
+    startDelay, pattern, animate,
 }: BoltProps) {
-    const opacity = useRef(new Animated.Value(animate ? 0 : 1)).current;
+    const progress = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
-        if (!animate) {
-            opacity.setValue(1);
-            return;
-        }
-        opacity.setValue(0);
-        // Strike sequence: snap-on (flash) → snap-off (gap) ×2, then long dark gap.
-        // `duration: 0` toggles produce the harsh on/off of real lightning while
-        // staying fully native-driver compatible.
-        const loop = Animated.loop(
-            Animated.sequence([
-                Animated.timing(opacity, { toValue: 1, duration: 0,      useNativeDriver: true }),
-                Animated.timing(opacity, { toValue: 1, duration: flash1, useNativeDriver: true }),
-                Animated.timing(opacity, { toValue: 0, duration: 0,      useNativeDriver: true }),
-                Animated.timing(opacity, { toValue: 0, duration: gap1,   useNativeDriver: true }),
-                Animated.timing(opacity, { toValue: 1, duration: 0,      useNativeDriver: true }),
-                Animated.timing(opacity, { toValue: 1, duration: flash2, useNativeDriver: true }),
-                Animated.timing(opacity, { toValue: 0, duration: 0,      useNativeDriver: true }),
-                Animated.timing(opacity, { toValue: 0, duration: gap2,   useNativeDriver: true }),
-                Animated.timing(opacity, { toValue: 0, duration: longGap, useNativeDriver: true }),
-            ]),
-        );
+        if (!animate) return;
+        progress.setValue(0);
+        const loop = nativeLoop(progress, steppedDuration(pattern));
+        // The start delay staggers the three bolts. It fires once per mount —
+        // the strike pattern itself never touches the JS thread again.
         const timer = setTimeout(() => loop.start(), startDelay);
         return () => {
             clearTimeout(timer);
             loop.stop();
         };
-    }, [animate, opacity, startDelay, flash1, gap1, flash2, gap2, longGap]);
+    }, [animate, progress, startDelay, pattern]);
+
+    // Static icon: the bolt is simply drawn. Animated: the pattern starts on a
+    // dark hold, so a bolt waiting out its startDelay is correctly invisible.
+    const opacity = useMemo(
+        () => (animate ? progress.interpolate(stepped(pattern)) : 1),
+        [animate, progress, pattern],
+    );
 
     return (
         <Animated.View
@@ -145,8 +158,6 @@ interface RainLayerProps {
     duration: number;
     startDelay: number;
     fill: string;
-    vbW: number;
-    vbH: number;
     width: number;
     height: number;
     rainAngle: number;
@@ -154,10 +165,13 @@ interface RainLayerProps {
 }
 
 function RainLayer({
-    xOffsets, duration, startDelay, fill, vbW, vbH, width, height, rainAngle, animate,
+    xOffsets, duration, startDelay, fill, width, height, rainAngle, animate,
 }: RainLayerProps) {
     const progress = useRef(new Animated.Value(0)).current;
-    const segmentH = vbH / DROPS_PER_GROUP;
+    // The rain SVG's viewBox is the layer in points, so STREAK_WIDTH/HEIGHT and
+    // everything derived here are already in the units they render at — no
+    // scale factor between what's written and what lands on screen.
+    const segmentH = height / DROPS_PER_GROUP;
 
     useEffect(() => {
         if (!animate) {
@@ -165,17 +179,10 @@ function RainLayer({
             return;
         }
         progress.setValue(0);
-        const loop = Animated.loop(
-            // Linear easing keeps the fall at constant velocity. The default
-            // ease-in-out makes each one-segment cycle accelerate then decelerate,
-            // which reads as a stutter/pulse rather than continuous rainfall.
-            Animated.timing(progress, {
-                toValue: 1,
-                duration,
-                easing: Easing.linear,
-                useNativeDriver: true,
-            }),
-        );
+        // Linear, so the fall holds a constant velocity: an ease-in-out cycle
+        // accelerates then decelerates once per segment, which reads as a
+        // stutter rather than as rain.
+        const loop = nativeLoop(progress, duration);
         const timer = setTimeout(() => loop.start(), startDelay);
         return () => {
             clearTimeout(timer);
@@ -187,11 +194,11 @@ function RainLayer({
     // Y travels one segment (drops slot back to start), X travels rainAngle * segment.
     const translateY = progress.interpolate({
         inputRange: [0, 1],
-        outputRange: [0, segmentH * (height / vbH)],
+        outputRange: [0, segmentH],
     });
     const translateX = progress.interpolate({
         inputRange: [0, 1],
-        outputRange: [0, rainAngle * segmentH * (width / vbW)],
+        outputRange: [0, rainAngle * segmentH],
     });
 
     // Pre-stack DROPS_PER_GROUP+1 streaks per column, starting one segment ABOVE
@@ -201,7 +208,7 @@ function RainLayer({
     const streaks = useMemo(() => {
         const result: { x: number; y: number; key: string }[] = [];
         xOffsets.forEach((xf, ci) => {
-            const cx = xf * vbW;
+            const cx = xf * width;
             for (let i = -1; i < DROPS_PER_GROUP; i++) {
                 result.push({
                     x: cx - STREAK_WIDTH / 2,
@@ -211,7 +218,7 @@ function RainLayer({
             }
         });
         return result;
-    }, [xOffsets, vbW, segmentH]);
+    }, [xOffsets, width, segmentH]);
 
     return (
         <Animated.View
@@ -224,7 +231,7 @@ function RainLayer({
             shouldRasterizeIOS
             renderToHardwareTextureAndroid
         >
-            <Svg viewBox={`0 0 ${vbW} ${vbH}`} width={width} height={height}>
+            <Svg viewBox={`0 0 ${width} ${height}`} width={width} height={height}>
                 {streaks.map((s) => (
                     <Rect
                         key={s.key}
@@ -250,29 +257,44 @@ interface SheetFlashProps {
     animate: boolean;
 }
 
+/**
+ * One strike: bright, near-dark, bright again, then a slow decay. Expressed as
+ * a single interpolated timing rather than four chained ones, so a strike costs
+ * one JS round-trip instead of four and its shape can't be stretched by a busy
+ * JS thread mid-flash.
+ */
+const FLASH_MS = 400;
+const FLASH_CURVE = {
+    inputRange: [0, 50 / FLASH_MS, 110 / FLASH_MS, 180 / FLASH_MS, 1],
+    outputRange: [0, 0.35, 0.05, 0.3, 0],
+};
+
 function SheetFlash({ animate }: SheetFlashProps) {
-    const opacity = useRef(new Animated.Value(0)).current;
+    const progress = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
         if (!animate) {
-            opacity.setValue(0);
+            progress.setValue(0);
             return;
         }
         let cancelled = false;
         let timer: ReturnType<typeof setTimeout> | null = null;
         let currentAnim: Animated.CompositeAnimation | null = null;
 
+        // The randomized gap is the point of this effect, so scheduling stays on
+        // a JS timer — but it runs once per strike, ~every 4.5–9 s.
         const scheduleNext = () => {
             if (cancelled) return;
             const gap = 4500 + Math.random() * 4500;
             timer = setTimeout(() => {
                 if (cancelled) return;
-                currentAnim = Animated.sequence([
-                    Animated.timing(opacity, { toValue: 0.35, duration: 50,  useNativeDriver: true }),
-                    Animated.timing(opacity, { toValue: 0.05, duration: 60,  useNativeDriver: true }),
-                    Animated.timing(opacity, { toValue: 0.30, duration: 70,  useNativeDriver: true }),
-                    Animated.timing(opacity, { toValue: 0,    duration: 220, useNativeDriver: true }),
-                ]);
+                progress.setValue(0);
+                currentAnim = Animated.timing(progress, {
+                    toValue: 1,
+                    duration: FLASH_MS,
+                    easing: Easing.linear,
+                    useNativeDriver: true,
+                });
                 currentAnim.start(({ finished }) => {
                     if (finished && !cancelled) scheduleNext();
                 });
@@ -284,9 +306,11 @@ function SheetFlash({ animate }: SheetFlashProps) {
             cancelled = true;
             if (timer) clearTimeout(timer);
             if (currentAnim) currentAnim.stop();
-            opacity.setValue(0);
+            progress.setValue(0);
         };
-    }, [animate, opacity]);
+    }, [animate, progress]);
+
+    const opacity = progress.interpolate(FLASH_CURVE);
 
     return (
         <Animated.View
@@ -368,11 +392,7 @@ export default function StormIconLightning({
                     height={height}
                     polygonTransform={`translate(${offsetX}, ${offsetY})`}
                     startDelay={b.startDelay}
-                    flash1={b.flash1}
-                    gap1={b.gap1}
-                    flash2={b.flash2}
-                    gap2={b.gap2}
-                    longGap={b.longGap}
+                    pattern={b.pattern}
                     animate={animateOn}
                 />
             ))}
@@ -385,8 +405,6 @@ export default function StormIconLightning({
                     duration={g.duration}
                     startDelay={g.startDelay}
                     fill={color}
-                    vbW={vbW}
-                    vbH={vbH}
                     width={width}
                     height={height}
                     rainAngle={rainAngle}

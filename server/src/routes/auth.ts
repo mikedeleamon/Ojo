@@ -11,6 +11,12 @@ import {
 } from '../lib/passwordReset';
 import { verifyAppleIdentityToken } from '../lib/appleAuth';
 import { verifyGoogleIdToken } from '../lib/googleAuth';
+import { validateBirthday, isAgeVerified } from '../lib/age';
+import { deleteManyFromR2 } from '../lib/r2';
+import Closet from '../models/Closet';
+import OutfitHistory from '../models/OutfitHistory';
+import Trip from '../models/Trip';
+import TripFitPlan from '../models/TripFitPlan';
 
 const router = Router();
 
@@ -41,6 +47,10 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       token: signToken(user.id, user.tokenVersion),
       user: { id: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email },
       settings: user.settings,
+      // Accounts created before the age gate carry an empty birthday. Flagging
+      // them here sends the app to the gate on the next launch instead of
+      // silently grandfathering an unverified account.
+      needsAgeVerification: !isAgeVerified(user.birthday),
     });
   } catch (err) {
     console.error('[auth] login error:', err);
@@ -59,6 +69,19 @@ router.post('/signup', async (req: Request, res: Response): Promise<void> => {
       res.status(400).json({ error: 'Password must be at least 8 characters' });
       return;
     }
+
+    // Age gate. The app validates the same rules before submitting, but this is
+    // the check that counts — the endpoint is reachable without it. An underage
+    // date is refused here so no personal information is ever written.
+    const age = validateBirthday(birthday);
+    if (!age.ok) {
+      res.status(age.reason === 'underage' ? 403 : 400).json({
+        error: age.message,
+        code:  age.reason === 'underage' ? 'UNDERAGE' : 'INVALID_BIRTHDAY',
+      });
+      return;
+    }
+
     const existing = await User.findOne({ $or: [{ email: email.toLowerCase() }, { username }] });
     if (existing) {
       res.status(409).json({ error: 'Email or username already in use' });
@@ -71,12 +94,14 @@ router.post('/signup', async (req: Request, res: Response): Promise<void> => {
       username,
       email: email.toLowerCase(),
       password: hashed,
-      birthday: birthday ?? '',
+      birthday: String(birthday).trim(),
+      ageVerifiedAt: new Date(),
     });
     res.status(201).json({
       token: signToken(user.id, user.tokenVersion),
       user: { id: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email },
       settings: user.settings,
+      needsAgeVerification: false,
     });
   } catch (err) {
     console.error('[auth] signup error:', err);
@@ -163,6 +188,7 @@ router.post('/reset-password', async (req: Request, res: Response): Promise<void
       token: signToken(user.id, user.tokenVersion),
       user: { id: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email },
       settings: user.settings,
+      needsAgeVerification: !isAgeVerified(user.birthday),
     });
   } catch (err) {
     console.error('[auth] reset-password error:', err);
@@ -258,6 +284,10 @@ router.post('/apple', async (req: Request, res: Response): Promise<void> => {
       user:  { id: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email },
       settings: user.settings,
       isNewUser,
+      // Neither Apple nor Google returns a date of birth, so a brand-new OAuth
+      // account has never cleared the age gate. The app must collect one via
+      // POST /api/auth/verify-age before any data route will answer.
+      needsAgeVerification: !isAgeVerified(user.birthday),
     });
   } catch (err) {
     console.error('[auth] apple sign-in error:', err);
@@ -351,9 +381,79 @@ router.post('/google', async (req: Request, res: Response): Promise<void> => {
       user:  { id: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email },
       settings: user.settings,
       isNewUser,
+      // Neither Apple nor Google returns a date of birth, so a brand-new OAuth
+      // account has never cleared the age gate. The app must collect one via
+      // POST /api/auth/verify-age before any data route will answer.
+      needsAgeVerification: !isAgeVerified(user.birthday),
     });
   } catch (err) {
     console.error('[auth] google sign-in error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/auth/verify-age
+ * Body: { birthday }  — "MM/DD/YYYY"
+ *
+ * The age gate for accounts that never passed through the sign-up form: every
+ * Apple/Google sign-up (neither provider returns a date of birth) and every
+ * account created before the gate existed.
+ *
+ * On a valid adult date this stamps `ageVerifiedAt` and the account unlocks.
+ *
+ * On an underage date the account and everything attached to it is deleted.
+ * That is deliberate, not punitive: once a user tells us they are under 13,
+ * COPPA does not allow us to keep holding their personal information, and the
+ * account only exists because Apple/Google let them create one without ever
+ * being asked. Erasure here mirrors DELETE /api/user/me exactly.
+ */
+router.post('/verify-age', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { birthday } = req.body ?? {};
+    const age = validateBirthday(birthday);
+
+    if (!age.ok && age.reason !== 'underage') {
+      res.status(400).json({ error: age.message, code: 'INVALID_BIRTHDAY' });
+      return;
+    }
+
+    if (!age.ok) {
+      // Under 13 — purge the account rather than retain it.
+      const closets = await Closet.find({ userId: req.userId }).select('articles.imageUrl').lean();
+      const imageUrls = closets.flatMap(c => (c.articles ?? []).map(a => a.imageUrl));
+
+      await Promise.all([
+        User.findByIdAndDelete(req.userId),
+        Closet.deleteMany({ userId: req.userId }),
+        OutfitHistory.deleteMany({ userId: req.userId }),
+        Trip.deleteMany({ userId: req.userId }),
+        TripFitPlan.deleteMany({ userId: req.userId }),
+      ]);
+
+      res.status(403).json({ error: age.message, code: 'UNDERAGE_ACCOUNT_DELETED' });
+
+      // After the response, for the same reason as DELETE /api/user/me: a slow
+      // or unavailable R2 must not turn a completed deletion into a 500.
+      deleteManyFromR2(imageUrls).catch(err =>
+        console.error('[auth] R2 cleanup error after underage deletion:', err),
+      );
+      return;
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.userId,
+      { $set: { birthday: String(birthday).trim(), ageVerifiedAt: new Date() } },
+      { new: true },
+    );
+    if (!user) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    res.json({ needsAgeVerification: false });
+  } catch (err) {
+    console.error('[auth] verify-age error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

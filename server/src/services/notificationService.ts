@@ -4,17 +4,25 @@
  * Server-side push notification delivery.
  *
  * Tier 1 — server-sent (requires weather API + closet data):
- *   • Morning Outfit Brief     — daily at user's configured local time
  *   • Weather Change Alert     — 2pm UTC check; fires when afternoon precip
  *                                moves in unexpectedly
- *   • Temperature Swing Warning — embedded in morning brief when swing >= threshold
- *   • Closet Gap Nudge         — fires after morning brief when a gap is detected
+ *   • Closet Gap Nudge         — fires in the user's morning window when the
+ *                                forecast calls for gear their closet lacks
  *
  * Tier 2 — client-scheduled locally (history lives in AsyncStorage):
- *   • Weekly Wardrobe Recap    — scheduled by NotificationsScreen via expo-notifications
+ *   • Weekly Wardrobe Recap    — scheduled by NotificationsScreen
+ *   • Morning Outfit Brief     — scheduled by useMorningBriefScheduler
+ *   • Temperature Swing Warning — folded into the brief's copy, client-side
+ *
+ * The Morning Outfit Brief used to send from here and no longer does. It needs
+ * the outfit engine (src/lib/outfitEngine.ts) and the user's closet to say
+ * anything worth reading, and both live on the client — a server-side brief
+ * could only ever describe the weather while calling itself an outfit brief.
+ * Do not re-add a brief push here without removing the client scheduler first,
+ * or users get two notifications every morning.
  *
  * Cron schedule (all UTC):
- *   0 * * * *   — hourly morning brief check
+ *   0 * * * *   — hourly morning pass (snapshot + gap nudge)
  *   0 14 * * *  — afternoon weather change check
  */
 
@@ -22,7 +30,7 @@ import cron from 'node-cron';
 import { Expo, ExpoPushMessage } from 'expo-server-sdk';
 import User from '../models/User';
 import Closet from '../models/Closet';
-import { getCurrent, getHourly } from '../lib/weatherKit';
+import { getCurrent } from '../lib/weatherKit';
 
 const expo = new Expo();
 
@@ -31,11 +39,6 @@ interface WeatherSnapshot {
   hasPrecipitation: boolean;
   weatherText: string;
   windMph: number;
-}
-
-interface ForecastHour {
-  tempF: number;
-  hasPrecipitation: boolean;
 }
 
 async function getCurrentWeather(lat: number, lon: number): Promise<WeatherSnapshot | null> {
@@ -53,21 +56,6 @@ async function getCurrentWeather(lat: number, lon: number): Promise<WeatherSnaps
   }
 }
 
-async function getHourlyForecast(lat: number, lon: number): Promise<ForecastHour[]> {
-  try {
-    const hours = await getHourly(lat, lon);
-    // Hourly Temperature.Value is °F (already converted upstream). Precipitation
-    // chance lives on the raw WeatherKit payload — we approximate it via the
-    // condition code instead, treating Rain/Snow/* codes as "has precip".
-    return hours.map((h) => ({
-      tempF:            h.Temperature.Value,
-      hasPrecipitation: /rain|snow|drizzle|sleet|hail|storm|shower|flurr/i.test(h.IconPhrase),
-    }));
-  } catch {
-    return [];
-  }
-}
-
 // ─── Message builders ─────────────────────────────────────────────────────────
 
 function tempLabel(tempF: number, scale: string): string {
@@ -76,44 +64,6 @@ function tempLabel(tempF: number, scale: string): string {
     return `${c}°C`;
   }
   return `${Math.round(tempF)}°F`;
-}
-
-function buildMorningMessage(
-  city:         string,
-  weather:      WeatherSnapshot,
-  forecast:     ForecastHour[],
-  scale:        string,
-  swingEnabled: boolean,
-  swingThresh:  number,
-): { title: string; body: string } {
-  const temp     = tempLabel(weather.tempF, scale);
-  const cityName = city.split(',')[0].trim();
-
-  const high = forecast.length ? Math.max(...forecast.map(f => f.tempF)) : weather.tempF;
-  const low  = forecast.length ? Math.min(...forecast.map(f => f.tempF)) : weather.tempF;
-  const swingF = high - low;
-
-  let tip = '';
-  const text = weather.weatherText.toLowerCase();
-
-  if (/snow/.test(text))         tip = 'Snow expected — bundle up.';
-  else if (weather.hasPrecipitation) tip = 'Rain in the forecast — grab a jacket.';
-  else if (weather.tempF < 32)   tip = "It's freezing — full winter gear today.";
-  else if (weather.tempF < 50)   tip = 'Cold day — layers are key.';
-  else if (weather.tempF > 88)   tip = "Heat alert — keep it light and breathable.";
-  else if (weather.tempF > 75)   tip = 'Warm out — light fabrics recommended.';
-  else                           tip = 'Check your outfit suggestion in the app.';
-
-  let body = `${temp} and ${weather.weatherText} in ${cityName}. ${tip}`;
-
-  if (swingEnabled && swingF >= swingThresh) {
-    const swingLabel = scale === 'Metric'
-      ? `${Math.round(swingF * 5 / 9)}°C`
-      : `${Math.round(swingF)}°F`;
-    body += ` ${swingLabel} swing today — dress in layers you can remove.`;
-  }
-
-  return { title: 'Morning Outfit Brief', body };
 }
 
 function buildGapMessage(
@@ -206,10 +156,27 @@ async function sendPush(
 async function runMorningCheck(): Promise<void> {
   const currentUTCHour = new Date().getUTCHours();
 
+  // Selection is no longer keyed on morningBriefEnabled. That flag used to gate
+  // this whole pass, which meant the closet gap nudge silently required the
+  // brief to be on — two independent toggles, one secretly depending on the
+  // other. The brief itself now lives client-side (src/lib/notifications.ts ·
+  // scheduleMorningBriefs), so there is nothing here for it to gate.
+  //
+  // Both consumers of this pass are selected: the gap nudge sends from here, and
+  // weather-change users need `lastMorningSnapshot` written even though their
+  // push goes out in runAfternoonCheck — without the snapshot that check has no
+  // baseline to compare against and degrades to "is it raining right now".
+  //
+  // `morningBriefHourUTC` stays the timing source: it's the hour the user chose
+  // to hear from Ojo in the morning, so the nudge rides along with it rather
+  // than introducing a second hour setting nobody set.
   const users = await User.find({
-    pushToken:                               { $exists: true, $ne: null },
-    'notificationSettings.morningBriefEnabled': true,
+    pushToken: { $exists: true, $ne: null },
     'notificationSettings.morningBriefHourUTC': currentUTCHour,
+    $or: [
+      { 'notificationSettings.closetGapEnabled':  true },
+      { 'notificationSettings.weatherChangeEnabled': true },
+    ],
   }).lean();
 
   if (users.length === 0) return;
@@ -223,10 +190,7 @@ async function runMorningCheck(): Promise<void> {
     // coords yet) get skipped until they re-save their location.
     if (!city || typeof lat !== 'number' || typeof lon !== 'number') continue;
 
-    const [weather, forecast] = await Promise.all([
-      getCurrentWeather(lat, lon),
-      getHourlyForecast(lat, lon),
-    ]);
+    const weather = await getCurrentWeather(lat, lon);
     if (!weather) continue;
 
     await User.findByIdAndUpdate(user._id, {
@@ -234,18 +198,6 @@ async function runMorningCheck(): Promise<void> {
     });
 
     const ns = user.notificationSettings;
-    const scale = user.settings?.temperatureScale ?? 'Imperial';
-
-    // Morning brief (always when morningBriefEnabled)
-    // TODO: temporarily disabled. When re-enabled, keep the `ojo://outfit` deep
-    // link so the tap lands on today's outfit (home) rather than dead-ending on
-    // whatever screen was last open.
-    // const briefMsg = buildMorningMessage(
-    //   city, weather, forecast, scale,
-    //   ns?.tempSwingEnabled ?? false,
-    //   ns?.tempSwingThresholdF ?? 20,
-    // );
-    // await sendPush(user.pushToken!, briefMsg, 'ojo://outfit');
 
     // Closet gap nudge (optional, same morning window)
     if (ns?.closetGapEnabled) {

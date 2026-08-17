@@ -101,6 +101,9 @@ export default function LegalWebViewScreen({ doc, onClose }: Props) {
                   {sub.body.map((para, i) => (
                     <Text key={i} style={styles.para}>{para}</Text>
                   ))}
+                  {sub.bullets?.map((item, i) => (
+                    <Text key={i} style={styles.bullet}>· {item}</Text>
+                  ))}
                 </View>
               ))}
             </View>

@@ -5,6 +5,7 @@ import {
     RefreshControl,
     Pressable,
     Linking,
+    AppState,
     Animated as RNAnimated,
     Easing as RNEasing,
 } from 'react-native';
@@ -111,6 +112,14 @@ const tempAtTime = (target: number, sorted: Forecast[]): number | null => {
         return first.Temperature.Value;
     return last.Temperature.Value;
 };
+
+// ─── Wall-clock helpers ───────────────────────────────────────────────────────
+// Forecast hours land on UTC hour boundaries, so bucketing by whole hours since
+// the epoch identifies "which hour is this" without any timezone reasoning.
+
+const HOUR_MS = 3_600_000;
+const hourBucketOf = (t: string | number): number =>
+    Math.floor(new Date(t).getTime() / HOUR_MS);
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -268,6 +277,33 @@ const WeatherHUD = ({
         };
     }, [location, refreshKey]);
 
+    // ── Keep the view on the wall clock ────────────────────────────────────────
+    // The fetch below is keyed on `place`, which only changes on mount, a city
+    // switch or a pull-to-refresh. Nothing else re-ran it, so a screen left
+    // mounted — open on the desk, or backgrounded and resumed, since RN keeps
+    // MainPage alive — kept rendering the same twelve timestamps indefinitely:
+    // the hourly strip appeared frozen at whatever hour the app was opened.
+    //
+    // Bucketing rather than a plain interval is what makes this cheap: the
+    // 60s tick calls setState with an unchanged value for 59 of every 60
+    // minutes and React bails out, so exactly one re-fetch happens per hour —
+    // the rate at which the data can actually change.
+    const [hourBucket, setHourBucket] = useState(() => hourBucketOf(Date.now()));
+
+    useEffect(() => {
+        const sync = () => setHourBucket(hourBucketOf(Date.now()));
+        const timer = setInterval(sync, 60_000);
+        // Timers are suspended while backgrounded, so a resume can't wait for
+        // the next tick to notice that hours have passed.
+        const sub = AppState.addEventListener('change', (next) => {
+            if (next === 'active') sync();
+        });
+        return () => {
+            clearInterval(timer);
+            sub.remove();
+        };
+    }, []);
+
     // ── Fetch weather (WeatherKit via server proxy) ────────────────────────────
     // `cancelled` (same idiom as the geocode effect above) guards against a
     // fetch for a superseded `place` resolving AFTER a newer one and clobbering
@@ -340,7 +376,11 @@ const WeatherHUD = ({
         return () => {
             cancelled = true;
         };
-    }, [place]);
+        // `hourBucket` re-runs this silently once an hour: nothing here sets
+        // `loading`, and a failure only reaches the UI when there's no weather
+        // to show, so a background refresh can't flash a spinner or an error
+        // over good data.
+    }, [place, hourBucket]);
 
     // ── Animated gradient color interpolation ───────────────────────────────────
     // The "from" and "to" gradients live in shared values; a single progress
@@ -796,7 +836,7 @@ const WeatherHUD = ({
                                     showsHorizontalScrollIndicator={false}
                                     contentContainerStyle={st.forecastStrip}
                                 >
-                                    {stripItems.map((item, i) =>
+                                    {stripItems.map((item) =>
                                         item.kind === 'forecast' ? (
                                             <MinimizedWeatherDisplay
                                                 key={`f-${item.time}`}
@@ -819,7 +859,16 @@ const WeatherHUD = ({
                                                               .Unit
                                                 }
                                                 isDay={item.data.IsDaylight}
-                                                isNow={i === 0}
+                                                // Derived from the clock, not
+                                                // from position: index 0 is only
+                                                // "now" while the data is fresh,
+                                                // and mislabelling a past hour
+                                                // "Now" is what hid the staleness.
+                                                isNow={
+                                                    hourBucketOf(
+                                                        item.data.DateTime,
+                                                    ) === hourBucket
+                                                }
                                             />
                                         ) : (
                                             <SunEventTile
@@ -842,6 +891,7 @@ const WeatherHUD = ({
                                 forecasts={forecasts}
                                 daily={daily}
                                 city={place?.name}
+                                coords={place ?? undefined}
                             />
                         </GlassCard>
 

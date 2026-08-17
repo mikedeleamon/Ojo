@@ -6,6 +6,7 @@ import OutfitHistory from '../models/OutfitHistory';
 import Trip from '../models/Trip';
 import TripFitPlan from '../models/TripFitPlan';
 import { signToken } from '../lib/jwt';
+import { deleteManyFromR2 } from '../lib/r2';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 
 const router = Router();
@@ -15,7 +16,14 @@ router.get('/me', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const user = await User.findById(req.userId).select('username email');
     if (!user) { res.status(404).json({ error: 'User not found' }); return; }
-    res.json({ username: user.username, email: user.email });
+    // Surfaced here so a cold start with a remembered token still learns it has
+    // to run the age gate — the login response that would have carried the flag
+    // happened on some earlier launch.
+    res.json({
+      username: user.username,
+      email: user.email,
+      needsAgeVerification: !req.ageVerified,
+    });
   } catch (err) {
     console.error('[user] me error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -85,6 +93,12 @@ router.put('/password', async (req: AuthRequest, res: Response): Promise<void> =
 
 router.delete('/me', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    // Read the image URLs *before* the closets are deleted. They are the only
+    // record of which R2 objects belong to this user, so once the documents are
+    // gone the images are unreachable and would sit in the bucket forever.
+    const closets = await Closet.find({ userId: req.userId }).select('articles.imageUrl').lean();
+    const imageUrls = closets.flatMap(c => (c.articles ?? []).map(a => a.imageUrl));
+
     await Promise.all([
       User.findByIdAndDelete(req.userId),
       Closet.deleteMany({ userId: req.userId }),
@@ -93,6 +107,13 @@ router.delete('/me', async (req: AuthRequest, res: Response): Promise<void> => {
       TripFitPlan.deleteMany({ userId: req.userId }),
     ]);
     res.sendStatus(204);
+
+    // The account is already gone, which is what the user asked for. Purging
+    // object storage happens after the response so a slow or unavailable R2
+    // can't turn a successful deletion into a 500.
+    deleteManyFromR2(imageUrls).catch(err =>
+      console.error('[user] R2 cleanup error after account deletion:', err),
+    );
   } catch (err) {
     console.error('[user] delete error:', err);
     res.status(500).json({ error: 'Internal server error' });

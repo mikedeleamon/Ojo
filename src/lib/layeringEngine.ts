@@ -18,7 +18,7 @@
  *  - Gracefully degrades when metadata (fabricType, forecasts) is absent
  */
 
-import { ClothingArticle, CurrentWeather, Forecast, Settings } from '../types';
+import { ClothingArticle, CurrentWeather, Forecast, Settings, articleDisplayName } from '../types';
 import type { OutfitSlot } from './outfit/types';
 import { extractLayers } from './layering/extractLayers';
 import { deriveDayRange } from './layering/dayRange';
@@ -162,8 +162,8 @@ const buildTimeline = (
   if (!hasTempSwing && precipTransitions.length === 0) return undefined;
 
   const primaryLayer = outer ?? mid;
-  const primaryName  = primaryLayer!.article.name || primaryLayer!.article.clothingType;
-  const outerName    = outer?.article.name || outer?.article.clothingType;
+  const primaryName  = articleDisplayName(primaryLayer!.article);
+  const outerName    = outer ? articleDisplayName(outer.article) : undefined;
 
   const steps: { time: string; action: string }[] = [];
 
@@ -258,11 +258,11 @@ const buildRecommendation = (ctx: RecommendationInput): string => {
   } = ctx;
 
   // ── Name helpers ──────────────────────────────────────────────────────────
-  const baseName       = base?.article.name       || base?.article.clothingType       || 'base layer';
-  const midName        = activeMid?.article.name   || activeMid?.article.clothingType;
-  const outerName      = activeOuter?.article.name || activeOuter?.article.clothingType;
-  const extraMidName   = extraMid?.article.name    || extraMid?.article.clothingType;
-  const extraOuterName = extraOuter?.article.name  || extraOuter?.article.clothingType;
+  const baseName       = base       ? articleDisplayName(base.article)       : 'base layer';
+  const midName        = activeMid  ? articleDisplayName(activeMid.article)  : undefined;
+  const outerName      = activeOuter ? articleDisplayName(activeOuter.article) : undefined;
+  const extraMidName   = extraMid   ? articleDisplayName(extraMid.article)   : undefined;
+  const extraOuterName = extraOuter ? articleDisplayName(extraOuter.article) : undefined;
 
   const isFullBody = base?.role === 'fullBody';
   const overWord   = isFullBody ? 'paired with' : 'over';  // "Hoodie over T-Shirt" vs "Hoodie paired with Dress"

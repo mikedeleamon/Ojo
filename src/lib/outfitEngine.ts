@@ -14,7 +14,7 @@
  * by replacing scoreOutfit() with a model inference call.
  */
 
-import { ClothingArticle, CurrentWeather, Forecast, Settings, OutfitOccasion, WearContext, articleCategories } from '../types';
+import { ClothingArticle, CurrentWeather, Forecast, Settings, OutfitOccasion, WearContext, articleCategories, articleDisplayName } from '../types';
 import {
   articlePreferenceScore, colorPairingBonus, UserPreferenceProfile,
   PERSONALIZATION_THRESHOLD, LEARNING_THRESHOLD,
@@ -651,7 +651,7 @@ const buildNotes = (
       s.article.fabricType === 'Cotton' || s.article.fabricType === 'Linen' || s.article.fabricType === 'Wool',
     );
     if (hasAllergies && naturalFabricSlots.length > 0) {
-      const names = naturalFabricSlots.map(s => s.article.name || s.article.clothingType).join(' & ');
+      const names = naturalFabricSlots.map(s => articleDisplayName(s.article)).join(' & ');
       notes.push(`High pollen today — natural fabrics like ${names.split(' & ')[0]}'s fabric can trap allergens. Machine-washable synthetics are easier to clean after outdoor exposure.`);
     } else if (hasAllergies) {
       notes.push('High pollen today — shower and change clothes after spending time outdoors.');
@@ -670,7 +670,7 @@ const buildNotes = (
       const fabric = slot.article.fabricType ?? '';
       const warning = RAIN_FRAGILE[fabric];
       if (warning) {
-        const name = slot.article.name || slot.article.clothingType;
+        const name = articleDisplayName(slot.article);
         if (ctx.precipIntensity === 'heavy' || ctx.precipIntensity === 'moderate') {
           notes.push(`⚠ Your ${name} (${fabric}) can be ${warning} — strongly consider swapping it today.`);
         } else {
@@ -681,7 +681,7 @@ const buildNotes = (
     // Leather gets a softer warning (water-resistant but can stain over time)
     const leatherItems = slots.filter(s => s.article.fabricType === 'Leather');
     if (leatherItems.length > 0 && (ctx.precipIntensity === 'heavy' || ctx.precipIntensity === 'moderate')) {
-      const names = leatherItems.map(s => s.article.name || s.article.clothingType).join(' & ');
+      const names = leatherItems.map(s => articleDisplayName(s.article)).join(' & ');
       notes.push(`Your ${names} (Leather) can water-stain in heavy rain — treat with protectant or swap.`);
     }
   }
@@ -690,7 +690,7 @@ const buildNotes = (
   if (breakdown.color < 55) {
     const worst = findClashingArticle(slots);
     if (worst) {
-      const name = worst.article.name || worst.article.clothingType;
+      const name = articleDisplayName(worst.article);
       notes.push(`Color harmony is low (${breakdown.color}/100) — consider swapping the ${name}.`);
     }
   }
@@ -709,7 +709,7 @@ const buildNotes = (
     s => s.article.fabricType && DRY_CLEAN_FABRICS.has(s.article.fabricType),
   );
   if (dryCleanItems.length > 0) {
-    const names = dryCleanItems.map(s => s.article.name || s.article.clothingType).join(' & ');
+    const names = dryCleanItems.map(s => articleDisplayName(s.article)).join(' & ');
     notes.push(`Dry-clean recommended for: ${names}.`);
   }
 

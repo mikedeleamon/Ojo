@@ -1,6 +1,5 @@
 import type {
     DailyForecast,
-    CurrentWeather,
     ClothingArticle,
     SavedTripFitPlan,
     TripFitDaySnapshot,
@@ -37,26 +36,10 @@ export const activeOutfit = (p: DayPlan): OutfitResult =>
 
 // ─── Weather / formatting helpers ───────────────────────────────────────────────
 
-export function buildTripWeather(day: DailyForecast): CurrentWeather {
-    const midF = (day.minTempF + day.maxTempF) / 2;
-    return {
-        WeatherText: day.dayPhrase,
-        HasPrecipitation: day.hasPrecipitation,
-        PrecipitationType: day.hasPrecipitation ? 'Rain' : null,
-        IsDayTime: true,
-        Temperature: {
-            Imperial: { Value: midF, Unit: 'F' },
-            Metric: { Value: (midF - 32) * (5 / 9), Unit: 'C' },
-        },
-        RealFeelTemperature: {
-            Imperial: { Value: midF, Unit: 'F' },
-            Metric: { Value: (midF - 32) * (5 / 9), Unit: 'C' },
-        },
-        Wind: { Speed: { Imperial: { Value: 5 }, Metric: { Value: 8 } } },
-        RelativeHumidity: 60,
-        UVIndexText: 'Moderate',
-    };
-}
+// Moved to lib/outfit/dayOutfit so the Morning Outfit Brief scheduler can reach
+// it — src/lib never imports from src/views, and this is now shared by both.
+// Re-exported under the original name so trip call sites read unchanged.
+export { synthesizeDayWeather as buildTripWeather } from '../../lib/outfit/dayOutfit';
 
 export function fmtDate(iso: string): string {
     return new Date(iso + 'T12:00:00').toLocaleDateString('en-US', {

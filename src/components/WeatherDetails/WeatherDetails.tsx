@@ -4,11 +4,11 @@ import { Svg, Path } from 'react-native-svg';
 import { View, Text, GlassCard, GlassGroup } from '../primitives';
 import OutfitSuggestion from '../OutfitSuggestion/OutfitSuggestion';
 import { useDeferredMount } from '../../hooks/useDeferredMount';
-import { CurrentWeather, DailyForecast, Forecast, Settings } from '../../types';
+import { CurrentWeather, DailyForecast, Forecast, LocationCoords, Settings } from '../../types';
 import { type ColorTokens, fonts, fontSizes, fontWeights, spacing, radius } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 
-interface Props { weather: CurrentWeather; settings: Settings; forecasts: Forecast[]; daily?: DailyForecast[]; city?: string; }
+interface Props { weather: CurrentWeather; settings: Settings; forecasts: Forecast[]; daily?: DailyForecast[]; city?: string; coords?: LocationCoords; }
 
 const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   root:       { gap: spacing.md },
@@ -38,7 +38,7 @@ const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   pillValue: { fontFamily: fonts.body, fontSize: fontSizes.xs, fontWeight: fontWeights.semibold },
 });
 
-const WeatherDetails = ({ weather, settings, forecasts, daily, city }: Props) => {
+const WeatherDetails = ({ weather, settings, forecasts, daily, city, coords }: Props) => {
   const { colors } = useTheme();
   const st = useMemo(() => makeStyles(colors), [colors]);
   const [expanded, setExpanded] = useState(false);
@@ -80,7 +80,7 @@ const WeatherDetails = ({ weather, settings, forecasts, daily, city }: Props) =>
   return (
     <View style={st.root}>
       {showOutfit ? (
-        <OutfitSuggestion weather={weather} settings={settings} forecasts={forecasts} daily={daily} city={city} />
+        <OutfitSuggestion weather={weather} settings={settings} forecasts={forecasts} daily={daily} city={city} coords={coords} />
       ) : (
         <View style={st.outfitPlaceholder}>
           <ActivityIndicator color={colors.textMuted} />

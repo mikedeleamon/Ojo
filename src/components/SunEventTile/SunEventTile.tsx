@@ -2,13 +2,19 @@ import { memo, useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 import { Text, GlassCard } from '../primitives';
 import SunriseSunsetIcon from '../WeatherIcons/SunriseSunsetIcon';
-import { ColorTokens, fonts, fontSizes, radius, spacing } from '../../theme/tokens';
+import {
+    ColorTokens,
+    fonts,
+    fontSizes,
+    radius,
+    spacing,
+} from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 
 interface Props {
-    time:        string;   // ISO timestamp of the sunrise / sunset moment
-    temperature: number;   // already converted to the user's preferred unit
-    tempUnit:    string;   // 'F' | 'C'
+    time: string; // ISO timestamp of the sunrise / sunset moment
+    temperature: number; // already converted to the user's preferred unit
+    tempUnit: string; // 'F' | 'C'
 }
 
 const formatExactTime = (iso: string) =>
@@ -18,39 +24,48 @@ const formatExactTime = (iso: string) =>
         hour12: true,
     });
 
-const makeStyles = (colors: ColorTokens) => StyleSheet.create({
-    card: {
-        alignItems:        'center',
-        gap:               6,
-        paddingVertical:   spacing.sm,
-        paddingHorizontal: spacing.sm,
-        backgroundColor:   colors.glassBg,
-        borderRadius:      radius.md,
-        borderWidth:       1,
-        borderColor:       colors.glassBorder,
-        minWidth:          64,
-    },
-    time: {
-        fontFamily: fonts.body,
-        fontSize:   11,
-        fontWeight: '700' as const,
-        color:      colors.textPrimary,
-    },
-    temp: {
-        fontFamily: fonts.body,
-        fontSize:   fontSizes.xs,
-        color:      colors.textPrimary,
-    },
-});
+const makeStyles = (colors: ColorTokens) =>
+    StyleSheet.create({
+        card: {
+            alignItems: 'center',
+            gap: 6,
+            paddingVertical: spacing.sm,
+            paddingHorizontal: spacing.sm,
+            backgroundColor: colors.glassBg,
+            borderRadius: radius.md,
+            borderWidth: 1,
+            borderColor: colors.glassBorder,
+            minWidth: 64,
+        },
+        time: {
+            fontFamily: fonts.body,
+            fontSize: 11,
+            fontWeight: '700' as const,
+            color: colors.textPrimary,
+        },
+        temp: {
+            fontFamily: fonts.body,
+            fontSize: fontSizes.xs,
+            color: colors.textPrimary,
+        },
+    });
 
 const SunEventTile = ({ time, temperature, tempUnit }: Props) => {
     const { colors } = useTheme();
     const styles = useMemo(() => makeStyles(colors), [colors]);
     return (
-        <GlassCard glassStyle="clear" style={styles.card}>
+        // disableGlass can be used as for the same reason as the forecast tiles it sits
+        // between: see MinimizedWeatherDisplay. see commented example below. The native glass effect is disabled because the backdrop is moving (the sky) and the native glass effect re-blurred its backdrop on every frame the sky moved. The card style already carries the translucent bg + border the fallback path uses, so the tiles look the same either way — at 64 pt wide the material was barely legible regardless. To avoid the performance hit, we disable the native glass effect and just use the fallback style by uncommenting the following line:
+        // <GlassCard disableGlass style={styles.card}>
+        <GlassCard
+            glassStyle='clear'
+            style={styles.card}
+        >
             <Text style={styles.time}>{formatExactTime(time)}</Text>
             <SunriseSunsetIcon size={36} />
-            <Text style={styles.temp}>{temperature}° {tempUnit}</Text>
+            <Text style={styles.temp}>
+                {temperature}° {tempUnit}
+            </Text>
         </GlassCard>
     );
 };

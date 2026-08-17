@@ -2,6 +2,7 @@ import { forwardRef } from 'react';
 import { Image } from 'react-native';
 import { View, Text } from '../primitives';
 import { ArticleInsight } from '../../lib/insightsEngine';
+import { articleDisplayName } from '../../types';
 import ShareCardFrame from './ShareCardFrame';
 import { CARD_WIDTH } from './ShareCardFrame.styles';
 import cs from './shareCardCommon.styles';
@@ -20,7 +21,7 @@ function tileSize(count: number) {
 }
 
 const articleLabel = (insight: ArticleInsight): string =>
-  insight.article.name || insight.article.clothingType || 'Item';
+  articleDisplayName(insight.article);
 
 const DonationListShareCard = forwardRef<View, DonationListShareCardProps>(
   ({ items }, ref) => {

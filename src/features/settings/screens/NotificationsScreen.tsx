@@ -23,11 +23,14 @@ import {
   cancelWeeklyRecap,
   cancelTripPackingReminder,
   cancelAllTripMorningNotifications,
+  cancelMorningBriefs,
+  getBriefPreview,
   TRIP_PACKING_PREF_KEY,
   TRIP_MODE_MORNING_PREF_KEY,
   localHourToUTC,
   utcHourToLocal,
   PermissionStatus,
+  type BriefDay,
 } from '../../../lib/notifications';
 import { storage } from '../../../lib/storage';
 import { hapticSuccess } from '../../../lib/haptics';
@@ -92,6 +95,29 @@ const makeLocalStyles = (colors: ColorTokens, isDark: boolean) => StyleSheet.cre
     flexDirection: 'row',
     flexWrap:      'wrap',
     gap:           6,
+  },
+  // Extra breathing room above so the preview reads as a separate beat from the
+  // hour picker rather than a caption on it.
+  previewLabel: { paddingTop: 4 },
+  preview: {
+    backgroundColor: colors.glassBg,
+    borderWidth:     1,
+    borderColor:     colors.glassBorder,
+    borderRadius:    radius.md,
+    padding:         spacing.sm,
+    gap:             3,
+  },
+  previewTitle: {
+    fontFamily: fonts.body,
+    fontSize:   fontSizes.sm,
+    fontWeight: fontWeights.medium,
+    color:      colors.textPrimary,
+  },
+  previewBody: {
+    fontFamily: fonts.body,
+    fontSize:   fontSizes.sm - 1,
+    color:      colors.textSecondary,
+    lineHeight: (fontSizes.sm - 1) * 1.55,
   },
   permBanner: {
     backgroundColor: isDark ? 'rgba(250, 204, 21, 0.08)' : 'rgba(250, 204, 21, 0.18)',
@@ -179,6 +205,10 @@ export default function NotificationsScreen() {
   const [error,       setError]       = useState('');
   const [localHour,   setLocalHour]   = useState(7);
   const [ns,          setNs]          = useState<NotificationSettings>(NOTIF_DEFAULTS);
+  // Copy for the next scheduled brief, written by the scheduler on the home
+  // screen. Read rather than recomputed: this screen has no weather or closet
+  // context, and wiring it up just to render a preview would be the wrong trade.
+  const [preview,     setPreview]     = useState<BriefDay | null>(null);
   const savingRotate = useSpinAnimation(1_500);
 
   const set = useCallback(
@@ -193,12 +223,14 @@ export default function NotificationsScreen() {
       const perm = await getPermissionStatus();
       if (!cancelled) setPermission(perm);
       try {
-        const [{ data }, localTripPacking, localTripMorning] = await Promise.all([
+        const [{ data }, localTripPacking, localTripMorning, briefPreview] = await Promise.all([
           axios.get('/api/notifications/settings', authHeaders()),
           storage.getItem(TRIP_PACKING_PREF_KEY),
           storage.getItem(TRIP_MODE_MORNING_PREF_KEY),
+          getBriefPreview(),
         ]);
         if (!cancelled) {
+          setPreview(briefPreview);
           const merged = { ...NOTIF_DEFAULTS, ...data };
           // tripPackingEnabled + tripModeMorningEnabled are stored locally — the
           // local value wins if present.
@@ -256,16 +288,19 @@ export default function NotificationsScreen() {
     setError('');
     setSaved(false);
     try {
+      // The Morning Brief is scheduled on-device now, so it needs notification
+      // permission but not a push token — only the server-sent alerts do.
       const needsToken =
-        ns.morningBriefEnabled ||
         ns.weatherChangeEnabled ||
         ns.closetGapEnabled;
 
-      if (needsToken && permission !== 'granted') {
+      const needsPermission = needsToken || ns.morningBriefEnabled;
+
+      if (needsPermission && permission !== 'granted') {
         const status = await requestPermission();
         setPermission(status);
         if (status !== 'granted') {
-          setError('Push notification permission is required to enable these alerts.');
+          setError('Notification permission is required to enable these alerts.');
           return;
         }
       }
@@ -282,6 +317,16 @@ export default function NotificationsScreen() {
         await scheduleWeeklyRecap(ns.weeklyRecapDay);
       } else {
         await cancelWeeklyRecap();
+      }
+
+      // Turning the brief off must take effect now — the scheduled window would
+      // otherwise keep firing for up to a week. Turning it on can't be honoured
+      // here: the copy needs weather and closet data this screen doesn't have,
+      // so useMorningBriefScheduler fills the window on the next home-screen
+      // visit. That's also why the preview clears rather than repopulating.
+      if (!ns.morningBriefEnabled) {
+        await cancelMorningBriefs();
+        setPreview(null);
       }
 
       await storage.setItem(TRIP_PACKING_PREF_KEY, ns.tripPackingEnabled ? 'true' : 'false');
@@ -342,7 +387,7 @@ export default function NotificationsScreen() {
             <Row st={st}>
               <RowLabel st={st}
                 title="Morning Outfit Brief"
-                subtitle="Daily weather summary and outfit tip sent each morning."
+                subtitle="What to wear, and the weather that decided it. Built from your closet each morning."
               />
               <Switch
                 value={ns.morningBriefEnabled}
@@ -361,6 +406,22 @@ export default function NotificationsScreen() {
                   onSelect={setLocalHour}
                   labelFn={HOUR_LABEL}
                 />
+
+                {/* Shows the copy actually queued for the next brief, so the
+                    promise in the subtitle is verifiable before committing to a
+                    week of them. Quoted rather than dressed up as a fake lock
+                    screen — the fidelity is in the words, not the chrome. */}
+                <Text style={[st.subLabel, st.previewLabel]}>Next brief</Text>
+                {preview ? (
+                  <View style={st.preview}>
+                    <Text style={st.previewTitle}>{preview.title}</Text>
+                    <Text style={st.previewBody}>{preview.body}</Text>
+                  </View>
+                ) : (
+                  <Text style={s.hint}>
+                    Your first brief is ready once Ojo next loads your weather.
+                  </Text>
+                )}
               </View>
             )}
           </GlassCard>
@@ -529,8 +590,9 @@ export default function NotificationsScreen() {
         </Pressable>
 
         <Text style={[s.hint, { textAlign: 'center' }]}>
-          Morning Brief and Alerts require a push notification permission.{'\n'}
-          Weekly Recap is scheduled locally on your device.
+          All notifications need permission to reach you.{'\n'}
+          Morning Brief and Weekly Recap are prepared on your device — open Ojo
+          now and then to keep them current.
         </Text>
 
       </ScrollView>

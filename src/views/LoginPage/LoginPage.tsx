@@ -16,6 +16,7 @@ import { getAuthErrorMessage, saveAuth } from '../../lib/auth';
 import { isAppleSignInAvailable, signInWithApple } from '../../lib/appleSignIn';
 import { isGoogleSignInAvailable, signInWithGoogle } from '../../lib/googleSignIn';
 import { markOnboardingPending } from '../../lib/onboarding';
+import { setAgeVerificationNeeded } from '../../lib/ageGate';
 import GoogleGlyph from '../../components/icons/GoogleGlyph';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { spacing, radius, fonts, fontSizes } from '../../theme/tokens';
@@ -110,11 +111,16 @@ export default function LoginPage({ onLogin }: Props) {
         }
         setLoading(true);
         try {
-            const { data } = await axios.post<AuthState & { settings: Settings }>(
+            const { data } = await axios.post<
+                AuthState & { settings: Settings; needsAgeVerification?: boolean }
+            >(
                 '/api/auth/login',
                 { identifier, password },
             );
             await saveAuth(data.token, data.user);
+            // Accounts predating the age gate carry no usable date of birth;
+            // AuthGate routes them to the gate instead of the tabs.
+            await setAgeVerificationNeeded(data.needsAgeVerification === true);
             onLogin?.();
         } catch (err: unknown) {
             setError(getAuthErrorMessage(err));

@@ -46,6 +46,7 @@ import type {
     Settings,
     SavedTripFitPlan,
 } from '../../types';
+import { articleDisplayName } from '../../types';
 import {
     PACKING_GROUPS,
     FORECAST_WINDOW_DAYS,
@@ -396,7 +397,7 @@ const PackingRow = ({
                     isChecked && packSt.checkedName,
                 ]}
             >
-                {article.name || article.clothingType}
+                {articleDisplayName(article)}
             </Text>
             <Text style={[packSt.meta, { color: colors.textMuted }]}>
                 {[article.clothingType, article.color].filter(Boolean).join(' · ')}

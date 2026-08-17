@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, View, Easing } from 'react-native';
+import { useEffect, useMemo, useRef } from 'react';
+import { Animated, StyleSheet, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useReduceMotion } from '../../hooks/useReduceMotion';
+import { nativeLoop, pingPong } from '../../lib/animation/nativeLoop';
 
 // ─── Path data ───────────────────────────────────────────────────────────────
 
@@ -72,32 +73,26 @@ function SparkleLayer({ d, size, color, tx, ty, duration, delay, animate }: Spar
             progress.setValue(0);
             return;
         }
-        const half = duration / 2;
-        const loop = Animated.loop(
-            Animated.sequence([
-                Animated.timing(progress, {
-                    toValue: 1,
-                    duration: half,
-                    easing: Easing.inOut(Easing.sin),
-                    useNativeDriver: true,
-                }),
-                Animated.timing(progress, {
-                    toValue: 0,
-                    duration: half,
-                    easing: Easing.inOut(Easing.sin),
-                    useNativeDriver: true,
-                }),
-            ]),
-        );
+        progress.setValue(0);
+        const loop = nativeLoop(progress, duration);
         const timer = setTimeout(() => loop.start(), delay);
         return () => {
             clearTimeout(timer);
             loop.stop();
         };
-    }, [animate, tx, ty, duration, delay, progress]);
+    }, [animate, duration, delay, progress]);
 
-    const translateX = progress.interpolate({ inputRange: [0, 1], outputRange: [0, tx * scale] });
-    const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [0, ty * scale] });
+    // Drift out and back over one cycle. The cosine sampling reproduces the
+    // Easing.inOut(sin) pair this replaces, but as a single interpolation over
+    // one looping progress value — which the native driver can actually loop.
+    const translateX = useMemo(
+        () => progress.interpolate(pingPong(0, tx * scale)),
+        [progress, tx, scale],
+    );
+    const translateY = useMemo(
+        () => progress.interpolate(pingPong(0, ty * scale)),
+        [progress, ty, scale],
+    );
 
     return (
         <Animated.View

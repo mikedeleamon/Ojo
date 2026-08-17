@@ -39,6 +39,15 @@ client.interceptors.response.use(
       await handleSessionExpired();
     }
 
+    // The account owes us a date of birth and the server is refusing its data
+    // routes until it gets one. This is the backstop for a cold start with a
+    // remembered token, where no auth response carried the flag. Setting it
+    // here routes the user to the age gate on the next navigation.
+    if (status === 403 && (err.response?.data as any)?.code === 'AGE_VERIFICATION_REQUIRED') {
+      const { setAgeVerificationNeeded } = await import('../lib/ageGate');
+      await setAgeVerificationNeeded(true);
+    }
+
     return Promise.reject(err);
   },
 );

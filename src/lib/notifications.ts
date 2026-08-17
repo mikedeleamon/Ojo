@@ -361,3 +361,148 @@ export const scheduleTripMorningNotifications = async (
     }).catch(() => {});
   }
 };
+
+// ─── Morning Outfit Brief ─────────────────────────────────────────────────────
+// A rolling window of per-day DATE triggers at the user's chosen local hour,
+// each carrying copy built from that day's forecast and the outfit the engine
+// generated for it.
+//
+// Why DATE-per-day and not a repeating DAILY trigger: a repeating trigger
+// freezes its content at schedule time, so it could only ever say something
+// generic — which is exactly the failure that got the server-side brief disabled
+// (see lib/morningBrief.ts). Discrete days cost us N pending notifications and
+// buy real, day-specific copy.
+//
+// The cost of that choice: the window only advances while the app is open, so a
+// user who never opens Ojo eventually runs out. BRIEF_WINDOW_DAYS is the size of
+// that grace period. Every home-screen sync re-schedules the whole window, so in
+// normal use the near days are always freshly generated.
+//
+// iOS caps pending local notifications at 64. Budget: 7 here + up to 14 Trip Mode
+// + 2 per trip plan + 1 recap.
+
+export const BRIEF_WINDOW_DAYS = 7;
+
+const BRIEF_PREFIX = 'ojo_morningbrief_';
+const briefNotifId = (dateISO: string) => `${BRIEF_PREFIX}${dateISO}`;
+
+/** Copy for the next brief, so Notification Settings can show a preview without
+ *  needing weather or closet context of its own. */
+export const BRIEF_PREVIEW_KEY = 'ojo_morning_brief_preview';
+
+export interface BriefDay {
+  /** Local calendar date, yyyy-mm-dd — must match DailyForecast.date. */
+  dateISO: string;
+  title: string;
+  body: string;
+}
+
+export interface ScheduleBriefsInput {
+  enabled: boolean;
+  /** 0–23 local. Convert from the stored UTC hour with utcHourToLocal. */
+  localHour: number;
+  days: BriefDay[];
+}
+
+/** Cancel every scheduled Morning Outfit Brief. */
+export const cancelMorningBriefs = async (): Promise<void> => {
+  await cancelByPrefix(BRIEF_PREFIX);
+  await storage.removeItem(BRIEF_PREVIEW_KEY).catch(() => {});
+};
+
+/**
+ * (Re)schedule the rolling brief window.
+ *
+ * Always cancels first, so calling this on every sync replaces the window rather
+ * than stacking duplicates on top of it.
+ *
+ * Returns the number scheduled, which is what the on-device check in the plan
+ * asserts against; callers are free to ignore it.
+ */
+export const scheduleMorningBriefs = async ({
+  enabled,
+  localHour,
+  days,
+}: ScheduleBriefsInput): Promise<number> => {
+  await cancelByPrefix(BRIEF_PREFIX);
+
+  if (!enabled) {
+    await storage.removeItem(BRIEF_PREVIEW_KEY).catch(() => {});
+    return 0;
+  }
+
+  // A local notification needs permission just as much as a push does — it just
+  // doesn't need a push token.
+  const { status } = await Notifications.getPermissionsAsync();
+  if (status !== 'granted') return 0;
+
+  const hour = Number.isInteger(localHour) ? Math.min(Math.max(localHour, 0), 23) : 7;
+  const now = new Date();
+  let scheduled = 0;
+  let firstUpcoming: BriefDay | null = null;
+
+  for (const day of days.slice(0, BRIEF_WINDOW_DAYS)) {
+    const fireAt = new Date(day.dateISO + 'T00:00:00');
+    if (isNaN(fireAt.getTime())) continue;
+    fireAt.setHours(hour, 0, 0, 0);
+    // Today's brief is already past by the time most syncs run; skip rather than
+    // firing it immediately, which would read as a bug.
+    if (fireAt <= now) continue;
+
+    await Notifications.scheduleNotificationAsync({
+      identifier: briefNotifId(day.dateISO),
+      content: {
+        title: day.title,
+        body: day.body,
+        // Lands on the home tab (today's outfit) rather than wherever the app
+        // was last left. Mapped by app/+native-intent.tsx.
+        data: { url: 'ojo://outfit' },
+      },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: fireAt },
+    }).catch(() => {});
+
+    if (!firstUpcoming) firstUpcoming = day;
+    scheduled++;
+  }
+
+  if (firstUpcoming) {
+    await storage
+      .setItem(BRIEF_PREVIEW_KEY, JSON.stringify(firstUpcoming))
+      .catch(() => {});
+  }
+
+  return scheduled;
+};
+
+/** The next brief's copy, for the Notification Settings preview. */
+export const getBriefPreview = async (): Promise<BriefDay | null> => {
+  try {
+    const raw = await storage.getItem(BRIEF_PREVIEW_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return typeof parsed?.title === 'string' && typeof parsed?.body === 'string'
+      ? (parsed as BriefDay)
+      : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Drop the window if the feature was turned off on another device (settings sync
+ * through the server, notifications don't). Without this, disabling the brief on
+ * one phone leaves the other still firing a week of already-scheduled copy.
+ *
+ * Only ever cancels. Re-scheduling needs weather and closet data that only the
+ * home screen has — useMorningBriefScheduler refills the window on next sync.
+ */
+export const reconcileMorningBriefs = async (): Promise<void> => {
+  if (!getToken()) return;
+  try {
+    const { data } = await axios.get('/api/notifications/settings', authHeaders());
+    if (!data?.morningBriefEnabled) await cancelMorningBriefs();
+  } catch {
+    // Best-effort — leave the existing window alone rather than cancelling on a
+    // transient network failure.
+  }
+};

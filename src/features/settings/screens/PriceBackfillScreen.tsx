@@ -14,7 +14,7 @@ import { HangerIcon } from '../../../components/shared';
 import Loading from '../../../components/Loading/Loading';
 import { useClosets } from '../../../hooks/useClosets';
 import { hapticSuccess } from '../../../lib/haptics';
-import { ClothingArticle, ArticleFormData, articleCategories } from '../../../types';
+import { ClothingArticle, ArticleFormData, articleCategories, articleDisplayName } from '../../../types';
 import { spacing, radius, fonts, fontSizes, fontWeights } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/ThemeContext';
 import { ColorTokens } from '../../../theme/tokens';
@@ -136,7 +136,7 @@ export default function PriceBackfillScreen() {
                     </View>
                     <View style={st.info}>
                       <Text style={st.name} numberOfLines={1}>
-                        {article.name || article.clothingType || 'Item'}
+                        {articleDisplayName(article)}
                       </Text>
                       <Text style={st.sub} numberOfLines={1}>
                         {[article.clothingType, article.color].filter(Boolean).join(' · ') ||
@@ -154,7 +154,7 @@ export default function PriceBackfillScreen() {
                         onChangeText={v => setPrices(p => ({ ...p, [article._id]: v }))}
                         onSubmitEditing={() => save(row)}
                         returnKeyType="done"
-                        accessibilityLabel={`Price for ${article.name || article.clothingType}`}
+                        accessibilityLabel={`Price for ${articleDisplayName(article)}`}
                       />
                     </View>
                     <Pressable
@@ -162,7 +162,7 @@ export default function PriceBackfillScreen() {
                       onPress={() => save(row)}
                       disabled={!valid || isSaving}
                       accessibilityRole="button"
-                      accessibilityLabel={`Save price for ${article.name || article.clothingType}`}
+                      accessibilityLabel={`Save price for ${articleDisplayName(article)}`}
                     >
                       {isSaving ? (
                         <ActivityIndicator size="small" color={colors.saveBtnText} />

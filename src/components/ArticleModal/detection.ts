@@ -96,23 +96,36 @@ export const GARMENT_TO_FORM_TYPE: Partial<Record<GarmentType, string>> = {
   'watch':             'Watch',
 };
 
-/** Maps detected color names (from colorUtils) → the form's COLORS list. */
+/**
+ * Maps detected color names (from colorUtils) → the form's COLORS list.
+ * Every entry in colorUtils' COLOR_TABLE must appear here — colorUtils.test.ts
+ * has no visibility into this file, so an unmapped name silently falls through
+ * to the raw detected string and won't match any picker chip.
+ */
 export const DETECTED_COLOR_TO_FORM: Record<string, string> = {
   'white': 'White', 'off-white': 'Cream', 'cream': 'Cream',
   'light gray': 'Grey', 'gray': 'Grey', 'charcoal': 'Grey', 'dark gray': 'Grey',
   'black': 'Black',
   'navy': 'Navy', 'dark blue': 'Navy', 'blue': 'Blue', 'light blue': 'Sky Blue',
   'sky blue': 'Sky Blue', 'cobalt': 'Cobalt', 'denim blue': 'Blue',
+  'slate blue': 'Navy', 'dusty blue': 'Sky Blue', 'periwinkle': 'Periwinkle',
   'teal': 'Teal', 'turquoise': 'Teal',
-  'forest green': 'Green', 'olive': 'Olive', 'green': 'Green', 'mint': 'Mint', 'sage': 'Sage',
+  'forest green': 'Green', 'hunter green': 'Green', 'olive': 'Olive',
+  'green': 'Green', 'mint': 'Mint', 'sage': 'Sage', 'seafoam': 'Mint',
   'red': 'Red', 'crimson': 'Crimson', 'burgundy': 'Burgundy', 'wine': 'Burgundy',
-  'coral': 'Coral', 'orange': 'Orange', 'rust': 'Rust',
+  'maroon': 'Burgundy',
+  'coral': 'Coral', 'salmon': 'Coral', 'orange': 'Orange', 'peach': 'Peach',
+  'rust': 'Rust', 'terracotta': 'Rust',
   'tan': 'Beige', 'camel': 'Beige', 'khaki': 'Khaki', 'beige': 'Beige',
-  'brown': 'Brown', 'chocolate': 'Brown',
-  'yellow': 'Yellow', 'mustard': 'Yellow',
+  'taupe': 'Beige', 'brown': 'Brown', 'chocolate': 'Brown',
+  'yellow': 'Yellow', 'mustard': 'Yellow', 'gold': 'Gold',
   'pink': 'Pink', 'hot pink': 'Hot Pink', 'blush': 'Blush', 'mauve': 'Pink',
+  'dusty rose': 'Dusty Rose',
   'purple': 'Purple', 'lavender': 'Lavender', 'plum': 'Plum',
-  'gold': 'Gold', 'silver': 'Silver',
+  // 'silver' is no longer detectable from a photo (it was a near-duplicate of
+  // light gray and kept winning); kept here so articles saved before that
+  // change still map their stored detectedColors to a real picker value.
+  'silver': 'Silver',
 };
 
 /** Extracts the best-matching form fabric from a detected fabric string. */

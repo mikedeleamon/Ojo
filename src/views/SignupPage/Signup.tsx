@@ -1,28 +1,22 @@
 import { useState, useMemo } from 'react';
-import {
-    StyleSheet,
-    Platform,
-    Modal,
-    TouchableOpacity,
-    Keyboard,
-} from 'react-native';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StyleSheet } from 'react-native';
 import { View, Text, Pressable } from '../../components/primitives';
 import {
     AuthScaffold,
     AuthField,
     AuthStatus,
     AuthButton,
+    BirthdayField,
     makeAuthStyles,
 } from '../../components/auth';
 import axios from '../../api/client';
 import { AuthState, Settings } from '../../types';
 import { getErrorMessage, saveAuth } from '../../lib/auth';
 import { markOnboardingPending } from '../../lib/onboarding';
+import { setAgeVerificationNeeded } from '../../lib/ageGate';
 import { validatePassword } from '../../lib/passwordPolicy';
+import { validateBirthday } from '../../lib/age';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
-import { spacing, fonts, fontSizes, fontWeights } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 import LegalConsentNotice from '../../components/LegalConsentNotice';
 
@@ -31,25 +25,6 @@ import LegalConsentNotice from '../../components/LegalConsentNotice';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,20}$/;
 const NAME_RE = /^[a-zA-Z\s'\-]{2,50}$/;
-
-/** Auto-insert slashes as the user types: 01 → 01/ → 01/15 → 01/15/2000 */
-function formatBirthday(raw: string): string {
-    const digits = raw.replace(/\D/g, '').slice(0, 8);
-    if (digits.length <= 2) return digits;
-    if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-    return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
-}
-
-function parseBirthday(val: string): Date | null {
-    const parts = val.split('/');
-    if (parts.length !== 3) return null;
-    const [mm, dd, yyyy] = parts.map(Number);
-    if (!mm || !dd || !yyyy || String(yyyy).length !== 4) return null;
-    const d = new Date(yyyy, mm - 1, dd);
-    // Catch invalid combos like Feb 30
-    if (d.getMonth() !== mm - 1 || d.getDate() !== dd) return null;
-    return d;
-}
 
 function validateField(
     key: keyof FormState,
@@ -79,15 +54,11 @@ function validateField(
             if (val !== all.password) return "Passwords don't match";
             return undefined;
         case 'birthday': {
-            if (!val) return 'Required';
-            const date = parseBirthday(val);
-            if (!date) return 'Enter a valid date (MM/DD/YYYY)';
-            if (date > new Date()) return 'Birthday cannot be in the future';
-            const ageYears =
-                (Date.now() - date.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
-            if (ageYears < 13) return 'You must be at least 13 years old to sign up';
-            if (ageYears > 120) return 'Enter a valid birthday';
-            return undefined;
+            // Same rules the server enforces — see lib/age.ts. This is for
+            // immediate feedback only; /api/auth/signup re-checks and refuses
+            // an underage date regardless of what happens here.
+            const result = validateBirthday(val);
+            return result.ok ? undefined : result.message;
         }
         default:
             return undefined;
@@ -113,46 +84,15 @@ interface Props {
 /* ─── Component ──────────────────────────────────────────────────────────── */
 
 export default function SignupPage({ onLogin }: Props) {
-    const { colors, isDark } = useTheme();
-    const insets = useSafeAreaInsets();
+    const { colors } = useTheme();
     const styles = useMemo(() => makeAuthStyles(colors), [colors]);
 
-    // Date-picker bottom sheet styles — unique to this screen.
     const local = useMemo(
         () =>
             StyleSheet.create({
                 title: { fontSize: 32, letterSpacing: -0.02 * 32 },
-                pickerOverlay: {
-                    flex: 1,
-                    justifyContent: 'flex-end',
-                    backgroundColor: 'rgba(0,0,0,0.45)',
-                },
-                pickerSheet: {
-                    backgroundColor: colors.bgDefault,
-                    borderTopLeftRadius: 16,
-                    borderTopRightRadius: 16,
-                    paddingBottom: insets.bottom + spacing.sm,
-                },
-                pickerHeader: {
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    paddingHorizontal: spacing.md,
-                    paddingVertical: spacing.sm,
-                    borderBottomWidth: StyleSheet.hairlineWidth,
-                    borderBottomColor: colors.glassBorder,
-                },
-                pickerHeaderBtn: {
-                    fontFamily: fonts.body,
-                    fontSize: fontSizes.base,
-                    color: colors.textSecondary,
-                },
-                pickerHeaderBtnDone: {
-                    color: colors.textPrimary,
-                    fontWeight: fontWeights.semibold,
-                },
             }),
-        [colors, insets.bottom],
+        [],
     );
 
     const nav = useAppNavigation();
@@ -172,8 +112,6 @@ export default function SignupPage({ onLogin }: Props) {
     const [touched, setTouched] = useState<Set<keyof FormState>>(new Set());
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
-    const [showDatePicker, setShowDatePicker] = useState(false);
-    const [pickerDate, setPickerDate] = useState<Date>(new Date(2000, 0, 1));
 
     /* ── Field helpers ─────────────────────────────────────────────────────── */
 
@@ -202,37 +140,13 @@ export default function SignupPage({ onLogin }: Props) {
 
     /* ── Birthday ──────────────────────────────────────────────────────────── */
 
-    const handleBirthdayChange = (text: string) => {
-        setField('birthday', formatBirthday(text));
-    };
-
-    const openDatePicker = () => {
-        Keyboard.dismiss();
-        const existing = parseBirthday(form.birthday);
-        setPickerDate(existing ?? new Date(2000, 0, 1));
-        setShowDatePicker(true);
-    };
-
-    const applyPickerDate = (date: Date) => {
-        const mm = String(date.getMonth() + 1).padStart(2, '0');
-        const dd = String(date.getDate()).padStart(2, '0');
-        const yyyy = String(date.getFullYear());
-        const formatted = `${mm}/${dd}/${yyyy}`;
+    // BirthdayField hands the committed value straight back, so validation reads
+    // it directly rather than going through handleBlur — which would see the
+    // pre-update `form` when the commit came from the picker.
+    const handleBirthdayCommit = (formatted: string) => {
         setTouched(t => new Set(t).add('birthday'));
-        setForm(f => ({ ...f, birthday: formatted }));
         const err = validateField('birthday', formatted, { ...form, birthday: formatted });
         setFieldErrors(e => ({ ...e, birthday: err }));
-    };
-
-    const handlePickerChange = (event: DateTimePickerEvent, date?: Date) => {
-        if (Platform.OS === 'android') {
-            setShowDatePicker(false);
-            if (event.type === 'dismissed' || !date) return;
-            applyPickerDate(date);
-        } else {
-            // iOS spinner: update live, commit on Done
-            if (date) setPickerDate(date);
-        }
     };
 
     /* ── Submit ────────────────────────────────────────────────────────────── */
@@ -267,6 +181,10 @@ export default function SignupPage({ onLogin }: Props) {
                 },
             );
             await saveAuth(data.token, data.user);
+            // The form collects a date of birth and the server validated it, so
+            // this account is already through the age gate. Recording that keeps
+            // a stale flag from a previous account on this device out of the way.
+            await setAgeVerificationNeeded(false);
             // Completing the sign-up form is the only thing that triggers
             // first-run onboarding; AuthGate reads this flag to redirect.
             await markOnboardingPending();
@@ -309,25 +227,11 @@ export default function SignupPage({ onLogin }: Props) {
                     error={errorFor('lastName')}
                 />
 
-                <AuthField
-                    label="Date of birth"
-                    placeholder="MM/DD/YYYY"
-                    keyboardType="number-pad"
-                    maxLength={10}
+                <BirthdayField
                     value={form.birthday}
-                    onChangeText={handleBirthdayChange}
-                    onBlur={() => handleBlur('birthday')}
+                    onChange={v => setField('birthday', v)}
+                    onCommit={handleBirthdayCommit}
                     error={errorFor('birthday')}
-                    suffix={
-                        <Pressable
-                            style={styles.inputSuffix}
-                            onPress={openDatePicker}
-                            accessibilityRole="button"
-                            accessibilityLabel="Open date picker"
-                        >
-                            <Text style={styles.inputSuffixText}>Pick</Text>
-                        </Pressable>
-                    }
                 />
 
                 <AuthField
@@ -404,72 +308,6 @@ export default function SignupPage({ onLogin }: Props) {
                     </Pressable>
                 </View>
             </AuthScaffold>
-
-            {/* ── iOS date picker bottom sheet ──────────────────────────────── */}
-            {Platform.OS === 'ios' && (
-                <Modal
-                    visible={showDatePicker}
-                    transparent
-                    animationType="slide"
-                    onRequestClose={() => setShowDatePicker(false)}
-                >
-                    {/* Outer: tap overlay to dismiss */}
-                    <TouchableOpacity
-                        style={local.pickerOverlay}
-                        activeOpacity={1}
-                        onPress={() => setShowDatePicker(false)}
-                    >
-                        {/* Inner: absorb taps so they don't reach the overlay */}
-                        <TouchableOpacity
-                            style={local.pickerSheet}
-                            activeOpacity={1}
-                            onPress={() => { /* intentionally empty */ }}
-                        >
-                            <View style={local.pickerHeader}>
-                                <Pressable onPress={() => setShowDatePicker(false)}>
-                                    <Text style={local.pickerHeaderBtn}>Cancel</Text>
-                                </Pressable>
-                                <Pressable
-                                    onPress={() => {
-                                        applyPickerDate(pickerDate);
-                                        setShowDatePicker(false);
-                                    }}
-                                >
-                                    <Text
-                                        style={[
-                                            local.pickerHeaderBtn,
-                                            local.pickerHeaderBtnDone,
-                                        ]}
-                                    >
-                                        Done
-                                    </Text>
-                                </Pressable>
-                            </View>
-                            <DateTimePicker
-                                value={pickerDate}
-                                mode="date"
-                                display="spinner"
-                                maximumDate={new Date()}
-                                minimumDate={new Date(1900, 0, 1)}
-                                onChange={handlePickerChange}
-                                textColor={isDark ? '#FFFFFF' : '#000000'}
-                            />
-                        </TouchableOpacity>
-                    </TouchableOpacity>
-                </Modal>
-            )}
-
-            {/* ── Android date picker — renders as system dialog ─────────────── */}
-            {Platform.OS === 'android' && showDatePicker && (
-                <DateTimePicker
-                    value={pickerDate}
-                    mode="date"
-                    display="default"
-                    maximumDate={new Date()}
-                    minimumDate={new Date(1900, 0, 1)}
-                    onChange={handlePickerChange}
-                />
-            )}
         </>
     );
 }

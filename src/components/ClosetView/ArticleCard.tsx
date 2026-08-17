@@ -8,7 +8,7 @@ import { useConfirm } from '../ConfirmDialog';
 import { useTheme } from '../../theme/ThemeContext';
 import { fonts, fontSizes, fontWeights, radius } from '../../theme/tokens';
 import type { ClothingArticle } from '../../types';
-import { articleCategories } from '../../types';
+import { articleCategories, articleDisplayName } from '../../types';
 import { CSS_COLORS } from '../../lib/colors/cssColors';
 import {
     METALLIC_GRADIENTS,
@@ -84,7 +84,7 @@ export const ArticleCard = memo(({
                         style={styles.articleName}
                         numberOfLines={1}
                     >
-                        {article.name || article.clothingType}
+                        {articleDisplayName(article)}
                     </Text>
                     <Text
                         style={styles.articleMeta}
@@ -138,7 +138,7 @@ export const TileArticleCard = memo(({
     const confirmDelete = async () => {
         const ok = await confirm({
             title: 'Remove article?',
-            message: article.name || article.clothingType,
+            message: articleDisplayName(article),
             confirmLabel: 'Remove',
             destructive: true,
         });
@@ -151,7 +151,7 @@ export const TileArticleCard = memo(({
                 style={styles.tileCardInner}
                 onPress={() => onEdit(article)}
                 onLongPress={confirmDelete}
-                accessibilityLabel={`Edit ${article.name || article.clothingType}. Long press to delete.`}
+                accessibilityLabel={`Edit ${articleDisplayName(article)}. Long press to delete.`}
                 accessibilityRole='button'
             >
                 <View style={styles.tileImg}>
@@ -177,7 +177,7 @@ export const TileArticleCard = memo(({
                         style={styles.tileName}
                         numberOfLines={1}
                     >
-                        {article.name || article.clothingType}
+                        {articleDisplayName(article)}
                     </Text>
                     <View style={styles.tileMetaRow}>
                         <Text

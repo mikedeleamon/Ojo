@@ -16,8 +16,9 @@ import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import { ConfirmProvider } from '../src/components/ConfirmDialog';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { isOnboardingComplete, isOnboardingPending } from '../src/lib/onboarding';
+import { isAgeVerificationNeeded } from '../src/lib/ageGate';
 import { recordAppOpen } from '../src/services/reviewManager';
-import { reconcileWeeklyRecap } from '../src/lib/notifications';
+import { reconcileWeeklyRecap, reconcileMorningBriefs } from '../src/lib/notifications';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -25,6 +26,13 @@ SplashScreen.preventAutoHideAsync();
 // effect can re-run on every segment change, but the recap re-schedule only
 // needs to happen once per app process.
 let weeklyRecapReconciledThisLaunch = false;
+
+// Same guard for the Morning Outfit Brief. This one only ever *cancels* — it
+// catches the case where the brief was switched off on another device, since
+// settings sync through the server but scheduled notifications don't. Refilling
+// the window needs weather and closet data, so that stays with
+// useMorningBriefScheduler on the home screen.
+let morningBriefReconciledThisLaunch = false;
 
 // ─── Splash ──────────────────────────────────────────────────────────────────
 function CustomSplash() {
@@ -59,35 +67,57 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     const inAuthGroup    = segs[0] === '(auth)';
     const onResetScreen  = segs[1] === 'reset-password';
     const onOnboarding   = segs[1] === 'onboarding';
+    const onAgeGate      = segs[1] === 'verify-age';
 
     // Reset-password deep link must always reach its screen, even for users
     // who are already signed in.
     if (onResetScreen) return;
 
-    if (!isLoggedIn && !inAuthGroup) {
+    // `onAgeGate` is called out explicitly because the gate offers a sign-out.
+    // Every other (auth) screen is already somewhere a signed-out user belongs,
+    // but the gate is not — without this it would keep rendering after logout
+    // and the button would look broken.
+    if (!isLoggedIn && (!inAuthGroup || onAgeGate)) {
       router.replace('/(auth)/login');
       return;
     }
 
     if (isLoggedIn) {
-      if (!weeklyRecapReconciledThisLaunch) {
-        weeklyRecapReconciledThisLaunch = true;
-        reconcileWeeklyRecap().catch(() => {});
-      }
+      Promise.all([
+        isAgeVerificationNeeded(),
+        isOnboardingPending(),
+        isOnboardingComplete(),
+      ]).then(([needsAge, pending, done]) => {
+        // The age gate outranks everything else. The server refuses every data
+        // route until it's satisfied, so there is nothing for onboarding or the
+        // tabs to load until this clears.
+        if (needsAge) {
+          if (!onAgeGate) router.replace('/(auth)/verify-age');
+          return;
+        }
 
-      // Onboarding is shown only when it was explicitly requested by completing
-      // the sign-up form (the `pending` flag) and hasn't been finished yet.
-      // Users signed in from remembered credentials or the login screen have no
-      // pending flag, so they skip straight to the tabs.
-      Promise.all([isOnboardingPending(), isOnboardingComplete()]).then(
-        ([pending, done]) => {
-          if (pending && !done && !onOnboarding) {
-            router.replace('/(auth)/onboarding');
-          } else if ((!pending || done) && inAuthGroup && !onOnboarding) {
-            router.replace('/(tabs)');
-          }
-        },
-      );
+        // Deferred until past the gate so an unverified account doesn't spend
+        // every launch firing requests the server is going to 403.
+        if (!weeklyRecapReconciledThisLaunch) {
+          weeklyRecapReconciledThisLaunch = true;
+          reconcileWeeklyRecap().catch(() => {});
+        }
+
+        if (!morningBriefReconciledThisLaunch) {
+          morningBriefReconciledThisLaunch = true;
+          reconcileMorningBriefs().catch(() => {});
+        }
+
+        // Onboarding is shown only when it was explicitly requested by completing
+        // the sign-up form (the `pending` flag) and hasn't been finished yet.
+        // Users signed in from remembered credentials or the login screen have no
+        // pending flag, so they skip straight to the tabs.
+        if (pending && !done && !onOnboarding) {
+          router.replace('/(auth)/onboarding');
+        } else if ((!pending || done) && inAuthGroup && !onOnboarding) {
+          router.replace('/(tabs)');
+        }
+      });
     }
   }, [isReady, isLoggedIn, segments]);
 

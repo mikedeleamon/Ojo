@@ -37,6 +37,48 @@ describe('rgbToColorName', () => {
     const { name } = rgbToColorName(45, 62, 110);
     expect(name).not.toBe('black');
   });
+
+  // ── Regression: muted fabric must not collapse to a neutral ──────────────
+  //
+  // Real garments photographed in real light sit at chroma ~10–25, nowhere near
+  // the saturation of a CSS color keyword. Under plain Lab-Euclidean distance
+  // every one of these landed on whichever gray shared its lightness, because
+  // neutral anchors cover the whole L* axis at chroma 0 while the chromatic
+  // anchors were all fully saturated. That is the "everything in my closet is
+  // grey" bug — these cases must keep resolving to a hue.
+  const NEUTRALS = new Set(['white', 'off-white', 'light gray', 'gray', 'charcoal', 'dark gray', 'black']);
+
+  it.each([
+    ['sky blue shirt shot indoors', 150, 180, 200],
+    ['washed-out dusty blue',       110, 130, 155],
+    ['light-wash denim',            125, 145, 170],
+    ['muted olive tee',             110, 115, 90 ],
+    ['forest green in shadow',      45,  70,  55 ],
+    ['lavender sweater',            175, 160, 200],
+    ['dusty rose top',              190, 150, 150],
+    ['dark brown boot',             75,  55,  42 ],
+  ] as const)('names %s by its hue, not as a neutral', (_label, r, g, b) => {
+    expect(NEUTRALS.has(rgbToColorName(r, g, b).name)).toBe(false);
+  });
+
+  // The flip side: genuinely neutral garments must still read as neutral, so
+  // the chroma-aware distance isn't just inventing hues everywhere.
+  it.each([
+    ['gray',       140, 140, 142],
+    ['light gray', 190, 190, 190],
+    ['black',      38,  34,  30 ],
+    ['white',      245, 245, 245],
+  ] as const)('still names a true %s correctly', (expected, r, g, b) => {
+    expect(rgbToColorName(r, g, b).name).toBe(expected);
+  });
+
+  it('picks a plausible hue family for common garment colors', () => {
+    expect(rgbToColorName(150, 180, 200).name).toBe('sky blue');
+    expect(rgbToColorName(110, 115, 90).name).toBe('olive');
+    expect(rgbToColorName(50, 90, 200).name).toBe('blue');
+    expect(rgbToColorName(20, 140, 90).name).toBe('green');
+    expect(rgbToColorName(185, 150, 110).name).toBe('camel');
+  });
 });
 
 describe('nearestColorNameFromLab', () => {

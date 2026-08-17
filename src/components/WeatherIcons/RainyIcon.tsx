@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useReduceMotion } from '../../hooks/useReduceMotion';
+import { nativeLoop, pingPong } from '../../lib/animation/nativeLoop';
 
 // ─── Path data ────────────────────────────────────────────────────────────────
 
@@ -47,36 +48,30 @@ interface DropLayerProps {
 }
 
 function DropLayer({ d, size, color, amplitude, duration, delay, animate }: DropLayerProps) {
-    const translateY = useRef(new Animated.Value(0)).current;
+    const progress = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
         if (!animate) {
-            translateY.setValue(0);
+            progress.setValue(0);
             return;
         }
-        const half = duration / 2;
-        const loop = Animated.loop(
-            Animated.sequence([
-                // Fall down — translateY stays ≥ 0, never above the rest position.
-                Animated.timing(translateY, {
-                    toValue: amplitude,
-                    duration: half,
-                    useNativeDriver: true,
-                }),
-                // Return up to rest.
-                Animated.timing(translateY, {
-                    toValue: 0,
-                    duration: half,
-                    useNativeDriver: true,
-                }),
-            ]),
-        );
+        progress.setValue(0);
+        const loop = nativeLoop(progress, duration);
         const timer = setTimeout(() => loop.start(), delay);
         return () => {
             clearTimeout(timer);
             loop.stop();
         };
-    }, [animate, amplitude, duration, delay, translateY]);
+    }, [animate, duration, delay, progress]);
+
+    // Fall then return: 0 at rest, +amplitude at mid-cycle, back to 0. Sampled
+    // off a cosine so translateY stays ≥ 0 throughout and never carries the
+    // stem tips up into the cloud. One looping progress value rather than a
+    // two-leg sequence, which `Animated.loop` can only drive from JS.
+    const translateY = useMemo(
+        () => progress.interpolate(pingPong(0, amplitude)),
+        [progress, amplitude],
+    );
 
     return (
         <Animated.View

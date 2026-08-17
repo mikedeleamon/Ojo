@@ -1,15 +1,8 @@
-import { useMemo } from 'react';
-import { useWindowDimensions } from 'react-native';
+import { useEffect, useMemo, useRef } from 'react';
+import { Animated, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Svg, { Path, G } from 'react-native-svg';
-import Animated, {
-    useSharedValue,
-    useAnimatedProps,
-    useFrameCallback,
-    SharedValue,
-} from 'react-native-reanimated';
 import { useReduceMotion } from '../../hooks/useReduceMotion';
-
-const AnimatedPath = Animated.createAnimatedComponent(Path);
+import { nativeLoop, pingPong } from '../../lib/animation/nativeLoop';
 
 // ─── Path data ───────────────────────────────────────────────────────────────
 
@@ -185,50 +178,114 @@ function getGeneratedStars(vbW: number, vbH: number, count: number) {
     }));
 }
 
-// ─── Animated star ───────────────────────────────────────────────────────────
-// All stars derive their opacity from a single shared `clock` value (ms since
-// mount, driven by a single useFrameCallback). This replaces the previous
-// per-star setup of useSharedValue + withDelay(withRepeat(withSequence(...)))
-// — mounting 40 of those simultaneously was a significant chunk of the
-// MainPage mount cost.
+// ─── Star layers ─────────────────────────────────────────────────────────────
+//
+// Stars are partitioned into a few layers whose opacity animates at the VIEW
+// level, rather than each star animating its own opacity inside the SVG.
+//
+// The per-path version looked free — one useFrameCallback clock, per-star
+// `useAnimatedProps`, all on the UI thread. But react-native-svg invalidates
+// upward: setting any prop on a child node calls `invalidate`, which walks to
+// the containing RNSVGSvgView and calls `setNeedsDisplay` (RNSVGNode.mm →
+// RNSVGSvgView.mm). Ten stars meant ten invalidations per frame, so the whole
+// icon was re-rasterized through `drawRect:` on the main thread every frame —
+// and this icon animates precisely when the sticky mini pill is mounted, i.e.
+// while the user is scrolling.
+//
+// Animating an enclosing view's opacity never touches the SVG at all: its
+// rasterized contents are reused and CoreAnimation composites them at a new
+// alpha. The cost is a few extra layers, which at 36 pt is nothing.
 
-interface TwinklingStarProps {
-    d: string;
+const STAR_LAYERS = 3;
+const LAYER_CONFIGS = [
+    { delay: 0, duration: 3100 },
+    { delay: 900, duration: 3900 },
+    { delay: 1900, duration: 2700 },
+] as const;
+
+/** Opacity floor of the twinkle, matching the previous per-star curve. */
+const TWINKLE_RANGE = pingPong(1, 0.15);
+
+interface StarLayerProps {
+    /** Illustrator stars, drawn inside the centring transform. */
+    illustrator: { id: string; d: string }[];
+    /** Generated stars, already positioned in canvas coordinates. */
+    generated: { id: string; d: string }[];
+    groupTransform: string;
+    vbW: number;
+    vbH: number;
+    width: number;
+    height: number;
+    fill: string;
     delay: number;
     duration: number;
-    fill: string;
     animate: boolean;
-    clock: SharedValue<number>;
 }
 
-function TwinklingStar({
-    d,
+function StarLayer({
+    illustrator,
+    generated,
+    groupTransform,
+    vbW,
+    vbH,
+    width,
+    height,
+    fill,
     delay,
     duration,
-    fill,
     animate,
-    clock,
-}: TwinklingStarProps) {
-    const animatedProps = useAnimatedProps(() => {
-        'worklet';
-        if (!animate) return { opacity: 1 };
-        const half = duration * 0.5;
-        const t = (clock.value + delay) % duration;
-        // Triangle wave 1 → 0.15 → 1, with cubic ease-in-out per half to match
-        // the perceptual feel of withTiming's default easing.
-        const p = t < half ? t / half : (t - half) / half;
-        const eased = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
-        const opacity = t < half ? 1 - 0.85 * eased : 0.15 + 0.85 * eased;
-        return { opacity };
-    });
+}: StarLayerProps) {
+    const progress = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        if (!animate) {
+            progress.setValue(0);
+            return;
+        }
+        progress.setValue(0);
+        const loop = nativeLoop(progress, duration);
+        const timer = setTimeout(() => loop.start(), delay);
+        return () => {
+            clearTimeout(timer);
+            loop.stop();
+        };
+    }, [animate, delay, duration, progress]);
+
+    // Resting progress (0) maps to full opacity, so a non-animating layer
+    // renders as a still star rather than a dimmed one.
+    const opacity = useMemo(
+        () => progress.interpolate(TWINKLE_RANGE),
+        [progress],
+    );
 
     return (
-        <AnimatedPath
-            animatedProps={animatedProps}
-            fill={fill}
-            fillRule='evenodd'
-            d={d}
-        />
+        <Animated.View
+            style={[StyleSheet.absoluteFill, { opacity }]}
+            pointerEvents='none'
+        >
+            <Svg viewBox={`0 0 ${vbW} ${vbH}`} width={width} height={height}>
+                {illustrator.length > 0 && (
+                    <G transform={groupTransform}>
+                        {illustrator.map((star) => (
+                            <Path
+                                key={star.id}
+                                fill={fill}
+                                fillRule='evenodd'
+                                d={star.d}
+                            />
+                        ))}
+                    </G>
+                )}
+                {generated.map((star) => (
+                    <Path
+                        key={star.id}
+                        fill={fill}
+                        fillRule='evenodd'
+                        d={star.d}
+                    />
+                ))}
+            </Svg>
+        </Animated.View>
     );
 }
 
@@ -289,69 +346,58 @@ export default function ClearNightIcon({
         [moonPhase],
     );
 
-    const illustratorStars = STARS.slice(0, Math.min(starCount, STARS.length));
-    const extraCount = Math.max(0, starCount - STARS.length);
-    // Recompute generated star paths whenever either canvas dimension changes.
-    const generatedStars = useMemo(
-        () => getGeneratedStars(vbW, vbH, extraCount),
-        [vbW, vbH, extraCount],
-    );
+    const width = fullWidth ? screenWidth : size;
+    const height = fullHeight ? screenHeight : size;
 
-    // Single UI-thread clock driving every star's twinkle. One useFrameCallback
-    // replaces 40 withRepeat schedules; stars derive their phase from
-    // (clock + delay) % duration.
-    const clock = useSharedValue(0);
-    useFrameCallback((frameInfo) => {
-        'worklet';
-        clock.value = frameInfo.timeSinceFirstFrame ?? 0;
-    }, animateStars);
+    const extraCount = Math.max(0, starCount - STARS.length);
+    // Round-robin the stars across the layers so each layer spans the whole
+    // canvas rather than one region — sharing an opacity is then unobtrusive.
+    const layers = useMemo(() => {
+        const illustratorStars = STARS.slice(0, Math.min(starCount, STARS.length));
+        const generatedStars = getGeneratedStars(vbW, vbH, extraCount);
+        const out = Array.from({ length: STAR_LAYERS }, () => ({
+            illustrator: [] as { id: string; d: string }[],
+            generated: [] as { id: string; d: string }[],
+        }));
+        illustratorStars.forEach((s, i) => out[i % STAR_LAYERS].illustrator.push(s));
+        generatedStars.forEach((s, i) => out[i % STAR_LAYERS].generated.push(s));
+        return out;
+    }, [starCount, extraCount, vbW, vbH]);
 
     return (
-        <Svg
-            viewBox={`0 0 ${vbW} ${vbH}`}
-            width={fullWidth ? screenWidth : size}
-            height={fullHeight ? screenHeight : size}
-            accessibilityLabel='Clear night'
-        >
-            {/* Moon disc — mirrored independently so Southern Hemisphere
-                observers see the correct lit limb without flipping the stars. */}
+        <View style={{ width, height }} accessibilityLabel='Clear night'>
+            {/* Moon disc — static, and mirrored independently so Southern
+                Hemisphere observers see the correct lit limb without flipping
+                the stars. */}
             {moonD.length > 0 && (
-                <G
-                    transform={
-                        mirrorDisc
-                            ? `translate(${offsetX}, ${offsetY}) translate(${MOON_CX}, ${MOON_CY}) scale(-1, 1) translate(${-MOON_CX}, ${-MOON_CY})`
-                            : `translate(${offsetX}, ${offsetY})`
-                    }
-                >
-                    <Path fill={color} d={moonD} />
-                </G>
+                <Svg viewBox={`0 0 ${vbW} ${vbH}`} width={width} height={height}>
+                    <G
+                        transform={
+                            mirrorDisc
+                                ? `translate(${offsetX}, ${offsetY}) translate(${MOON_CX}, ${MOON_CY}) scale(-1, 1) translate(${-MOON_CX}, ${-MOON_CY})`
+                                : `translate(${offsetX}, ${offsetY})`
+                        }
+                    >
+                        <Path fill={color} d={moonD} />
+                    </G>
+                </Svg>
             )}
-            {/* Illustrator stars — always in original positions, not mirrored */}
-            <G transform={`translate(${offsetX}, ${offsetY})`}>
-                {illustratorStars.map((star) => (
-                    <TwinklingStar
-                        key={star.id}
-                        d={star.d}
-                        delay={star.delay}
-                        duration={star.duration}
-                        fill={color}
-                        animate={animateStars}
-                        clock={clock}
-                    />
-                ))}
-            </G>
-            {/* Generated stars spread across the full canvas width */}
-            {generatedStars.map((star) => (
-                <TwinklingStar
-                    key={star.id}
-                    d={star.d}
-                    delay={star.delay}
-                    duration={star.duration}
+            {layers.map((layer, i) => (
+                <StarLayer
+                    key={i}
+                    illustrator={layer.illustrator}
+                    generated={layer.generated}
+                    groupTransform={`translate(${offsetX}, ${offsetY})`}
+                    vbW={vbW}
+                    vbH={vbH}
+                    width={width}
+                    height={height}
                     fill={color}
-                    animate={!reduceMotion}
-                    clock={clock}
+                    delay={LAYER_CONFIGS[i].delay}
+                    duration={LAYER_CONFIGS[i].duration}
+                    animate={animateStars}
                 />
             ))}
-        </Svg>
+        </View>
     );
 }

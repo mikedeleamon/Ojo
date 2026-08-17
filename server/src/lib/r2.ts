@@ -51,3 +51,35 @@ export async function deleteFromR2(url: string): Promise<void> {
     console.error('[r2] delete error:', err);
   }
 }
+
+/**
+ * Bulk cleanup for the paths that drop many articles at once — deleting a
+ * closet, or deleting an account. Without this the objects those articles
+ * pointed at stay in the bucket forever, which the Privacy Policy says they
+ * won't.
+ *
+ * Runs a few deletes at a time rather than all at once so a large closet
+ * doesn't open hundreds of concurrent connections. Skips legacy `data:` URLs,
+ * which were stored inline and never had an R2 object. Never throws:
+ * deleteFromR2 logs and swallows its own failures, so one bad key can't
+ * abandon the rest of the batch.
+ */
+export async function deleteManyFromR2(
+  urls: (string | undefined | null)[],
+  concurrency = 8,
+): Promise<void> {
+  const queue = urls.filter(
+    (u): u is string => typeof u === 'string' && u.length > 0 && !u.startsWith('data:'),
+  );
+  if (queue.length === 0) return;
+
+  let cursor = 0;
+  const workers = Array.from(
+    { length: Math.min(concurrency, queue.length) },
+    async () => {
+      // Safe without a lock: the increment never yields to the event loop.
+      while (cursor < queue.length) await deleteFromR2(queue[cursor++]);
+    },
+  );
+  await Promise.all(workers);
+}

@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { AxiosError } from 'axios';
-import { getCurrent, getHourly, getDaily } from '../lib/weatherKit';
+import { getCurrent, getHourly, getDaily, HOURLY_WINDOW_H } from '../lib/weatherKit';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 
 const router = Router();
@@ -41,11 +41,24 @@ router.get('/current', async (req: AuthRequest, res: Response): Promise<void> =>
   }
 });
 
+// `?hours=` opts into the wider window the bundle already carries. It defaults
+// to 12 so existing clients — and today's outfit run, which feeds this array
+// straight into buildTimeline — see exactly what they saw before. The Morning
+// Outfit Brief asks for more so it can build tomorrow morning's timeline.
+const DEFAULT_HOURS = 12;
+
+function parseHours(raw: unknown): number {
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1) return DEFAULT_HOURS;
+  return Math.min(n, HOURLY_WINDOW_H);
+}
+
 router.get('/hourly', async (req: AuthRequest, res: Response): Promise<void> => {
   const coords = parseCoords(req);
   if (!coords) { res.status(400).json({ error: 'lat and lon required' }); return; }
   try {
-    res.json(await getHourly(coords.lat, coords.lon));
+    const hours = req.query.hours === undefined ? DEFAULT_HOURS : parseHours(req.query.hours);
+    res.json(await getHourly(coords.lat, coords.lon, hours));
   } catch (err) {
     handleWeatherError(err, res, 'hourly');
   }

@@ -28,14 +28,30 @@ interface GlassCardProps extends ViewProps {
    *  as the background colour (fallback path). Use for cases where the default
    *  glass bg is too subtle, e.g. on a light-coloured page. */
   tintColor?:  string;
+  /**
+   * Render the translucent fallback surface even where the native glass
+   * material is available.
+   *
+   * A native glass view re-samples and re-blurs whatever sits behind it on
+   * every frame that content changes, and a blur is several GPU passes. That is
+   * affordable for a handful of surfaces over a static background; it is not
+   * affordable for a dozen of them over an animating one. The hourly strip put
+   * fourteen glass tiles above the full-screen star field and storm rain, so
+   * every twinkle invalidated all fourteen at once — the single largest cost in
+   * those scenes, and the reason they were the only ones that stuttered.
+   *
+   * Use this for surfaces that are numerous, small, or sit above a moving
+   * backdrop. Real glass is worth keeping for the few large, prominent ones.
+   */
+  disableGlass?: boolean;
   children?:   React.ReactNode;
 }
 
 const GlassCard = forwardRef<View, GlassCardProps>(
-  ({ style, glassStyle = 'regular', tintColor, children, ...rest }, ref) => {
+  ({ style, glassStyle = 'regular', tintColor, disableGlass = false, children, ...rest }, ref) => {
     const { colors, isDark } = useTheme();
 
-    if (LIQUID_GLASS) {
+    if (LIQUID_GLASS && !disableGlass) {
       // Strip properties that would muddy the native glass material
       const {
         backgroundColor: _bg,

@@ -35,6 +35,7 @@ import {
   addToDonationQueue,
   removeFromDonationQueue,
 } from '../../lib/donationQueue';
+import { articleDisplayName } from '../../types';
 import { makeStyles } from './InsightsPage.styles';
 import {
   METALLIC_GRADIENTS,
@@ -60,9 +61,7 @@ const DONATION_PREVIEW = 4;
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const articleLabel = (insight: ArticleInsight): string =>
-  insight.article.name ||
-  insight.article.clothingType ||
-  'Item';
+  articleDisplayName(insight.article);
 
 const shopUrl = (message: string): string => {
   const query = encodeURIComponent(message.split('—')[0].trim());

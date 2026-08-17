@@ -55,6 +55,11 @@ export interface IUser extends Document {
   email: string;
   password: string;
   birthday: string;
+  // When the account last cleared the minimum-age gate (see lib/age.ts). Unset
+  // on accounts created before the gate existed and on every OAuth sign-up,
+  // since neither Apple nor Google returns a date of birth — those users are
+  // re-prompted before they can reach any data route.
+  ageVerifiedAt?: Date;
   settings: ISettings;
   pushToken?: string;
   notificationSettings: INotificationSettings;
@@ -127,7 +132,12 @@ const userSchema = new Schema<IUser>({
   username:             { type: String, required: true, unique: true },
   email:                { type: String, required: true, unique: true },
   password:             { type: String, required: true },
+  // Not `required` at the schema level on purpose: accounts predating the age
+  // gate hold '' and must stay loadable so their owners can be re-prompted (or
+  // delete themselves). The gate is enforced in routes/auth.ts and the
+  // requireAgeVerified middleware, where the error messages can be specific.
   birthday:             { type: String, default: '' },
+  ageVerifiedAt:        { type: Date },
   settings:             { type: settingsSchema, default: () => ({}) },
   pushToken:            { type: String },
   notificationSettings: { type: notificationSettingsSchema, default: () => ({}) },

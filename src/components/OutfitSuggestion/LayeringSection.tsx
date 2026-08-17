@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { View, Text, GlassCard } from '../primitives';
+import { articleDisplayName } from '../../types';
 import type { OutfitSlot } from '../../lib/outfit/types';
 import type { LayeringResult } from '../../lib/layering/types';
 import { useTheme } from '../../theme/ThemeContext';
@@ -35,7 +36,7 @@ const LayerRow = ({
     const { colors } = useTheme();
     const layerStyles = useMemo(() => makeLayerStyles(colors), [colors]);
     if (!slot) return null;
-    const name = slot.article.name || slot.article.clothingType;
+    const name = articleDisplayName(slot.article);
     const dotColor = slot.article.color ? CSS_COLORS[slot.article.color] : null;
     return (
         <View style={layerStyles.layerRow}>

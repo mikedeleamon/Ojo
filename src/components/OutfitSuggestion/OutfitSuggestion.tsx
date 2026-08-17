@@ -24,6 +24,7 @@ import OccasionChips from '../OccasionChips';
 import { useClosets } from '../../hooks/useClosets';
 import { useReduceMotion } from '../../hooks/useReduceMotion';
 import { useTripMode } from '../../hooks/useTripMode';
+import { useMorningBriefScheduler } from '../../hooks/useMorningBriefScheduler';
 import { hapticSuccess } from '../../lib/haptics';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { buildWidgetInput, tomorrowDailyFor } from '../../lib/widget/buildInput';
@@ -58,6 +59,7 @@ import {
     CurrentWeather,
     DailyForecast,
     Forecast,
+    LocationCoords,
     Settings,
     OutfitOccasion,
     OutfitHistoryEntry,
@@ -65,6 +67,7 @@ import {
     WearEngineMeta,
     WearNegative,
 } from '../../types';
+import { articleDisplayName } from '../../types';
 import { spacing } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 import {
@@ -130,7 +133,7 @@ const ArticleThumb = ({
                     style={styles.articleName}
                     numberOfLines={1}
                 >
-                    {article.name || article.clothingType}
+                    {articleDisplayName(article)}
                 </Text>
                 {article.fabricType ? (
                     <Text style={styles.articleMeta}>{article.fabricType}</Text>
@@ -237,9 +240,12 @@ interface Props {
     daily?: DailyForecast[];
     /** Active city display name — shown in the widget header. */
     city?: string;
+    /** Coordinates behind `daily`. Only used to fetch the wider hourly window the
+     *  Morning Outfit Brief needs; the on-screen weather is already resolved. */
+    coords?: LocationCoords;
 }
 
-const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) => {
+const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }: Props) => {
     const { colors } = useTheme();
     const styles = useMemo(() => makeStyles(colors), [colors]);
     const { closets, loading, error: closetsError, preferred, setPreferred, refresh } =
@@ -611,6 +617,24 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
         tripMode.locationConfirmed,
     ]);
 
+    // ─── Morning Outfit Brief ─────────────────────────────────────────────────
+    // Same settled data as the widget sync above, feeding the rolling window of
+    // local morning notifications. Generates its own outfits (one per upcoming
+    // day) rather than reusing `tomorrowForWidget`, which is a single day and is
+    // gated on the widget bridge being present — the brief has to work on devices
+    // that never installed a widget.
+    useMorningBriefScheduler({
+        daily,
+        articles: preferred?.articles ?? [],
+        settings: effectiveSettings,
+        worn,
+        profile,
+        city,
+        lat: coords?.lat,
+        lon: coords?.lon,
+        ready: !loading,
+    });
+
     useEffect(() => {
         if (!activeOutfit || activeOutfit.notes.length === 0) return;
         recordGapsFromNotes(activeOutfit.notes)
@@ -681,7 +705,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city }: Props) 
             closetName: opts.closetName,
             articleIds: articles.map((a) => a._id),
             articleSummary: articles
-                .map((a) => a.name || a.clothingType)
+                .map((a) => articleDisplayName(a))
                 .join(', '),
             context: opts.context,
             engine: opts.engine,

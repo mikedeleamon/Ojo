@@ -16,6 +16,7 @@ import historyRoutes from './routes/history';
 import tripsRoutes from './routes/trips';
 import tripFitRoutes from './routes/tripfit';
 import shareRoutes from './routes/share';
+import { requireAuth, requireAgeVerified } from './middleware/auth';
 import { startNotificationService } from './services/notificationService';
 import { weatherStats, resetWeatherStats } from './lib/weatherKit';
 
@@ -126,13 +127,23 @@ app.use('/api/auth', (req, res, next) => {
   if (req.path === '/refresh') return refreshLimiter(req, res, next);
   return authLimiter(req, res, next);
 }, authRoutes);
-app.use('/api/weather',       weatherLimiter, weatherRoutes);
+// Everything that stores or returns personal data sits behind the minimum-age
+// gate. requireAuth is mounted here so requireAgeVerified has a resolved
+// account to read; it is idempotent, so the routers that also mount it
+// internally don't pay for a second lookup.
+//
+// /api/user and /api/auth are intentionally NOT gated — an unverified user
+// still needs to reach POST /api/auth/verify-age to escape the state, and to
+// view or delete their account if they'd rather not supply a date of birth.
+const gated = [requireAuth, requireAgeVerified];
+
+app.use('/api/weather',       weatherLimiter, ...gated, weatherRoutes);
 app.use('/api/user',          generalLimiter, userRoutes);
-app.use('/api/closets',       generalLimiter, closetRoutes);
-app.use('/api/notifications', generalLimiter, notificationRoutes);
-app.use('/api/history',       generalLimiter, historyRoutes);
-app.use('/api/trips',         generalLimiter, tripsRoutes);
-app.use('/api/tripfit',       generalLimiter, tripFitRoutes);
+app.use('/api/closets',       generalLimiter, ...gated, closetRoutes);
+app.use('/api/notifications', generalLimiter, ...gated, notificationRoutes);
+app.use('/api/history',       generalLimiter, ...gated, historyRoutes);
+app.use('/api/trips',         generalLimiter, ...gated, tripsRoutes);
+app.use('/api/tripfit',       generalLimiter, ...gated, tripFitRoutes);
 app.use('/s',                 generalLimiter, shareRoutes);
 
 // ─── Global error handler ─────────────────────────────────────────────────────

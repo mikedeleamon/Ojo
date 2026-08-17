@@ -29,6 +29,7 @@ import WeatherCache from '../models/WeatherCache';
 
 const WEATHERKIT_BASE = 'https://weatherkit.apple.com/api/v1/weather';
 const TOKEN_REFRESH_MS = 50 * 60 * 1_000; // WeatherKit allows up to 60 min — refresh a bit early
+const HOUR_MS          = 60 * 60 * 1_000;
 const DATA_TTL_MS      = 30 * 60 * 1_000; // L2 (Mongo) — the real freshness window
 const L1_TTL_MS        = 60 * 1_000;      // L1 (in-process) — just absorbs the hot path
 const L2_TIMEOUT_MS    = 2_000;           // Cap Mongo latency; on timeout we fall through
@@ -272,6 +273,22 @@ async function l2Set(key: string, payload: NormalisedBundle): Promise<void> {
 
 const BUNDLE: DataSet[] = ['currentWeather', 'forecastHourly', 'forecastDaily'];
 
+// How far ahead to ask for hourly data. Without an explicit `hourlyEnd`, Apple
+// returns its default window (~24 h) — enough for today, but NOT enough to reach
+// the back half of tomorrow. The Morning Outfit Brief is scheduled the evening
+// before it fires, so building tomorrow-morning's layering timeline needs hours
+// that sit 24-36 h out from schedule time.
+//
+// This does NOT add billable calls: Apple bills per HTTP request, and this is
+// the same single bundled request carrying a wider window (Developer Forums
+// thread 750791). It does grow the cached payload in both L1 and L2.
+//
+// The cache key is deliberately NOT bumped for this. A stale narrow entry is
+// valid-but-short rather than wrong-shaped, and it ages out within DATA_TTL_MS
+// (30 min); bumping would flush every location at once and cost a burst of real
+// calls to buy back 30 minutes.
+export const HOURLY_WINDOW_H = 36;
+
 /** Concurrent misses for the same key share one promise — covering the L2 read
  *  as well as the upstream fetch, so three parallel callers cost one Mongo read
  *  and at most one WeatherKit call. */
@@ -316,9 +333,19 @@ async function fetchBundle(
 
       upstreamCalls++;
       const { data } = await wk.get<WKResponse>(`/${language}/${sLat}/${sLon}`, {
-        params: { dataSets: BUNDLE.join(',') },
+        params: {
+          dataSets: BUNDLE.join(','),
+          hourlyEnd: new Date(Date.now() + HOURLY_WINDOW_H * HOUR_MS).toISOString(),
+        },
         headers: { Authorization: `Bearer ${getAuthToken()}` },
       });
+
+      if (process.env.WEATHER_DEBUG_HOURS === '1') {
+        console.log(
+          `[weatherKit] hourly window: requested ${HOURLY_WINDOW_H}h, ` +
+          `received ${data?.forecastHourly?.hours?.length ?? 0} hours`,
+        );
+      }
 
       const bundle = normaliseBundle(data);
       // Failures are deliberately not cached — the next request should retry.
@@ -517,9 +544,39 @@ export async function getCurrent(lat: number, lon: number): Promise<NormalisedCu
   return (await fetchBundle(lat, lon)).current;
 }
 
-/** Returns up to `hours` (default 12) of hourly forecast starting now. */
+/** Returns up to `hours` of hourly forecast starting with the hour currently in
+ *  progress, capped at what the upstream window actually carries
+ *  (`HOURLY_WINDOW_H`).
+ *
+ *  The default stays 12 on purpose. Today's outfit run feeds this straight into
+ *  `buildTimeline`, which reads the whole array — widening the default would
+ *  silently change today's layering advice for every existing caller. Consumers
+ *  that genuinely need the longer window (the Morning Outfit Brief) opt in. */
 export async function getHourly(lat: number, lon: number, hours = 12): Promise<NormalisedHour[]> {
-  return (await fetchBundle(lat, lon)).hourly.slice(0, hours);
+  const bundle = await fetchBundle(lat, lon);
+
+  // The window is anchored to THIS request, not to the fetch that filled the
+  // cache. Two things make that necessary:
+  //
+  //   1. forecastHourly opens with the hour containing the payload's generation
+  //      time (currentWeather.asOf), which already trails the request — a live
+  //      16:02Z call with asOf 15:58Z returns 15:00Z at index 0, so index 0 is
+  //      an elapsed hour before the response even leaves Apple.
+  //   2. The bundle is then served from cache for up to DATA_TTL_MS.
+  //
+  // Slicing from index 0 combined those into a window pinned to whenever the
+  // cache was filled — first tile up to ~1.5h stale (and still labelled "Now" by
+  // the client), reaching only +10h in a strip that promises 12. Trimming on
+  // read keeps it correct for the whole TTL: the cached array holds ~25 hours
+  // and we only ever surface 12.
+  const now = Date.now();
+  const upcoming = bundle.hourly.filter((h) => {
+    const start = new Date(h.DateTime).getTime();
+    // Each entry covers [start, start + 1h), so the hour in progress is "now".
+    return Number.isFinite(start) && start + HOUR_MS > now;
+  });
+
+  return upcoming.slice(0, hours);
 }
 
 /** Returns up to 10 days. */

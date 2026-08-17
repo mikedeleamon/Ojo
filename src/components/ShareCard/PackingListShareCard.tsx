@@ -1,7 +1,7 @@
 import { forwardRef } from 'react';
 import { StyleSheet } from 'react-native';
 import { View, Text } from '../primitives';
-import { ClothingArticle } from '../../types';
+import { ClothingArticle, articleDisplayName } from '../../types';
 import { PACKING_GROUPS, categoryKey } from '../../views/TripFit/shared';
 import { PackingCategoryIcon } from '../icons/PackingCategoryIcon';
 import SuitcaseIcon from '../icons/SuitcaseIcon';
@@ -39,7 +39,7 @@ const styles = StyleSheet.create({
   },
 });
 
-const itemLabel = (a: ClothingArticle): string => a.name || a.clothingType || 'Item';
+const itemLabel = (a: ClothingArticle): string => articleDisplayName(a);
 
 const PackingListShareCard = forwardRef<View, PackingListShareCardProps>(
   ({ destination, packingList, dateRangeLabel }, ref) => {

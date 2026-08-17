@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import Closet from '../models/Closet';
 import { requireAuth, AuthRequest } from '../middleware/auth';
-import { uploadToR2, deleteFromR2 } from '../lib/r2';
+import { uploadToR2, deleteFromR2, deleteManyFromR2 } from '../lib/r2';
 
 const router = Router();
 router.use(requireAuth);
@@ -45,8 +45,17 @@ router.put('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
 
 router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    await Closet.findOneAndDelete({ _id: req.params.id, userId: req.userId });
+    // findOneAndDelete hands back the deleted document, so the articles' image
+    // URLs are still available here — the same R2 cleanup the single-article
+    // delete does, applied to every article the closet held.
+    const closet = await Closet.findOneAndDelete({ _id: req.params.id, userId: req.userId });
     res.sendStatus(204);
+
+    if (closet) {
+      deleteManyFromR2(closet.articles.map(a => a.imageUrl)).catch(err =>
+        console.error('[closets] R2 cleanup error:', err),
+      );
+    }
   } catch (err) {
     console.error('[closets] delete error:', err);
     res.status(500).json({ error: 'Internal server error' });

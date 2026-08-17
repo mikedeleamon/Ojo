@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { Animated, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Animated, useWindowDimensions, View, type ViewStyle } from 'react-native';
 import Svg, { Path, G } from 'react-native-svg';
 import { useReduceMotion } from '../../hooks/useReduceMotion';
+import { nativeLoop, pingPong } from '../../lib/animation/nativeLoop';
 
 // ─── Moon geometry ────────────────────────────────────────────────────────────
 
@@ -51,164 +52,192 @@ function moonPhasePath(cx: number, cy: number, r: number, phase: number): string
     }
 }
 
-// ─── Generated sparkle geometry ─────────────────────────────────────────────
+// ─── Star field ─────────────────────────────────────────────────────────────
+//
+// Stars are plain leaf Views — a background colour and a corner radius — not
+// SVG. The SVG version cost five full-screen RNSVGSvgView layers to draw six
+// dots apiece, and each one was expensive twice over:
+//
+//   • RNSVGSvgView renders through `drawRect:` (see its `contentMode =
+//     UIViewContentModeRedraw`), so every layer carried a full-screen
+//     CPU-rasterized backing store — roughly 12 MB each at @3x, ~60 MB for the
+//     field, to paint 31 dots.
+//   • Each layer animated its own opacity while holding sublayers, so
+//     CoreAnimation had to render the subtree into an offscreen buffer and
+//     composite it every frame (`allowsGroupOpacity`) — five full-screen
+//     offscreen passes per frame, on top of whatever the glass surfaces above
+//     were already costing.
+//
+// A leaf view with a solid background and a corner radius has no sublayers and
+// no backing store: CoreAnimation fills a rounded rect directly, and animating
+// its opacity is pure compositing. Thirty-one of them cost less than one of the
+// layers they replace, and each star can now carry its own brightness and
+// phase instead of six of them blinking in unison.
 
-function generateSparkle(cx: number, cy: number, r: number): string {
-    const w = r * 0.12;
-    return [
-        `M ${cx},${(cy - r).toFixed(2)}`,
-        `L ${(cx + w).toFixed(2)},${(cy - w).toFixed(2)}`,
-        `L ${(cx + r).toFixed(2)},${cy}`,
-        `L ${(cx + w).toFixed(2)},${(cy + w).toFixed(2)}`,
-        `L ${cx},${(cy + r).toFixed(2)}`,
-        `L ${(cx - w).toFixed(2)},${(cy + w).toFixed(2)}`,
-        `L ${(cx - r).toFixed(2)},${cy}`,
-        `L ${(cx - w).toFixed(2)},${(cy - w).toFixed(2)}`,
-        'Z',
-    ].join(' ');
-}
-
-// xf/yf are 0–1 fractions of the viewBox so paths recompute for any canvas size.
-// Middle-band seeds (yf 0.35–0.66) stay outside xf 0.38–0.62 to clear the moon.
-const EXTRA_STAR_SEEDS: {
-    xf: number;
-    yf: number;
-    r: number;
-}[] = [
+/**
+ * Star seeds. `xf`/`yf` are 0–1 fractions of the canvas; `d` is the diameter in
+ * **points**.
+ *
+ * These used to be radii in viewBox units, which the full-screen canvas scaled
+ * by ~0.14 (the viewBox was sized `screenWidth / size * 1280` ≈ 2860 units wide
+ * but rendered at ~400 pt). An eight-segment sparkle path authored at r=14 came
+ * out under 4 pt across — all of that geometry rasterized into something the
+ * size of a full stop. Sizing in points instead means what is written here is
+ * what lands on screen.
+ *
+ * Middle-band seeds (yf 0.35–0.66) stay outside xf 0.38–0.62 to clear the moon.
+ */
+const STAR_SEEDS: { xf: number; yf: number; d: number }[] = [
     // ── Top strip ──────────────────────────────────────────────────────────
-    { xf: 0.02, yf: 0.02, r: 14 },
-    { xf: 0.18, yf: 0.012, r: 12 },
-    { xf: 0.35, yf: 0.027, r: 16 },
-    { xf: 0.5, yf: 0.014, r: 14 },
-    { xf: 0.65, yf: 0.023, r: 18 },
-    { xf: 0.82, yf: 0.016, r: 12 },
-    { xf: 0.98, yf: 0.022, r: 16 },
+    { xf: 0.02, yf: 0.02, d: 3.5 },
+    { xf: 0.18, yf: 0.012, d: 3 },
+    { xf: 0.35, yf: 0.027, d: 4.5 },
+    { xf: 0.5, yf: 0.014, d: 3.5 },
+    { xf: 0.65, yf: 0.023, d: 5 },
+    { xf: 0.82, yf: 0.016, d: 3 },
+    { xf: 0.98, yf: 0.022, d: 4.5 },
     // ── Upper ──────────────────────────────────────────────────────────────
-    { xf: 0.02, yf: 0.125, r: 15 },
-    { xf: 0.12, yf: 0.156, r: 12 },
-    { xf: 0.25, yf: 0.07, r: 16 },
-    { xf: 0.75, yf: 0.078, r: 14 },
-    { xf: 0.88, yf: 0.172, r: 18 },
-    { xf: 0.97, yf: 0.133, r: 14 },
+    { xf: 0.02, yf: 0.125, d: 4 },
+    { xf: 0.12, yf: 0.156, d: 3 },
+    { xf: 0.25, yf: 0.07, d: 4.5 },
+    { xf: 0.75, yf: 0.078, d: 3.5 },
+    { xf: 0.88, yf: 0.172, d: 5 },
+    { xf: 0.97, yf: 0.133, d: 3.5 },
     // ── Middle sides ───────────────────────────────────────────────────────
-    { xf: 0.02, yf: 0.352, r: 16 },
-    { xf: 0.08, yf: 0.5, r: 14 },
-    { xf: 0.15, yf: 0.609, r: 12 },
-    { xf: 0.25, yf: 0.406, r: 15 },
-    { xf: 0.75, yf: 0.391, r: 15 },
-    { xf: 0.85, yf: 0.563, r: 14 },
-    { xf: 0.92, yf: 0.352, r: 16 },
-    { xf: 0.98, yf: 0.5, r: 18 },
+    { xf: 0.02, yf: 0.352, d: 4.5 },
+    { xf: 0.08, yf: 0.5, d: 3.5 },
+    { xf: 0.15, yf: 0.609, d: 3 },
+    { xf: 0.25, yf: 0.406, d: 4 },
+    { xf: 0.75, yf: 0.391, d: 4 },
+    { xf: 0.85, yf: 0.563, d: 3.5 },
+    { xf: 0.92, yf: 0.352, d: 4.5 },
+    { xf: 0.98, yf: 0.5, d: 5 },
     // ── Lower ──────────────────────────────────────────────────────────────
-    { xf: 0.03, yf: 0.684, r: 16 },
-    { xf: 0.2, yf: 0.719, r: 14 },
-    { xf: 0.5, yf: 0.703, r: 20 },
-    { xf: 0.8, yf: 0.734, r: 16 },
-    { xf: 0.97, yf: 0.684, r: 18 },
+    { xf: 0.03, yf: 0.684, d: 4.5 },
+    { xf: 0.2, yf: 0.719, d: 3.5 },
+    { xf: 0.5, yf: 0.703, d: 5.5 },
+    { xf: 0.8, yf: 0.734, d: 4.5 },
+    { xf: 0.97, yf: 0.684, d: 5 },
     // ── Bottom strip ───────────────────────────────────────────────────────
-    { xf: 0.07, yf: 0.813, r: 18 },
-    { xf: 0.3, yf: 0.875, r: 14 },
-    { xf: 0.5, yf: 0.836, r: 22 },
-    { xf: 0.72, yf: 0.875, r: 16 },
-    { xf: 0.93, yf: 0.813, r: 20 },
+    { xf: 0.07, yf: 0.813, d: 5 },
+    { xf: 0.3, yf: 0.875, d: 3.5 },
+    { xf: 0.5, yf: 0.836, d: 6 },
+    { xf: 0.72, yf: 0.875, d: 4.5 },
+    { xf: 0.93, yf: 0.813, d: 5.5 },
 ];
 
-function getGeneratedStars(vbW: number, vbH: number, count: number) {
-    return EXTRA_STAR_SEEDS.slice(0, count).map((s, i) => ({
-        id: `gen-${i}`,
-        d: generateSparkle(Math.round(s.xf * vbW), Math.round(s.yf * vbH), s.r),
-    }));
-}
+const STAR_MIN_D = 3;
+const STAR_MAX_D = 6;
 
-// ─── Star layer ──────────────────────────────────────────────────────────────
-// Stars partitioned into NUM_GROUPS layers, each rendered in its own <Svg>
-// wrapped in an Animated.View. Opacity is animated with useNativeDriver:true,
-// so the entire twinkle runs on the native main thread (CoreAnimation on iOS)
-// with zero JS/UI-thread work per frame — no contention with scroll gestures.
-// react-native-svg's SMIL <Animate> element isn't actually implemented natively
-// (see issue #833), so this is the only "fire-and-forget" path that twinkles.
-
-const NUM_GROUPS = 5;
-const GROUP_CONFIGS = [
-    { delay: 0, duration: 3200 },
-    { delay: 700, duration: 3800 },
-    { delay: 1400, duration: 2800 },
-    { delay: 2100, duration: 4200 },
-    { delay: 2800, duration: 3400 },
+/**
+ * Twinkle phases. Stars share an opacity value with every Nth star, so the
+ * whole field costs this many animation drivers rather than 31 — but the
+ * durations are mutually near-coprime, so the groups never settle into a
+ * visible rhythm the way five groups on round-numbered durations did.
+ */
+const PHASE_CONFIGS = [
+    { delay: 0, duration: 3100 },
+    { delay: 520, duration: 3700 },
+    { delay: 1180, duration: 2900 },
+    { delay: 1740, duration: 4300 },
+    { delay: 2360, duration: 3300 },
+    { delay: 2810, duration: 4700 },
 ] as const;
 
-interface StarLayerProps {
-    stars: { id: string; d: string }[];
-    vbW: number;
-    vbH: number;
-    width: number;
-    height: number;
-    fill: string;
-    delay: number;
-    duration: number;
-    animate: boolean;
+/** Opacity floor of the twinkle. */
+const TWINKLE_MIN = 0.15;
+const TWINKLE_RANGE = pingPong(1, TWINKLE_MIN);
+
+/**
+ * Per-star baseline brightness, folded into the fill colour rather than the
+ * animated opacity so the two multiply. Bigger stars read as nearer/brighter.
+ */
+function baseAlpha(d: number): number {
+    const t = (d - STAR_MIN_D) / (STAR_MAX_D - STAR_MIN_D);
+    return 0.55 + 0.45 * t;
 }
 
-function StarLayer({
-    stars,
-    vbW,
-    vbH,
-    width,
-    height,
-    fill,
-    delay,
-    duration,
-    animate,
-}: StarLayerProps) {
-    const opacity = useRef(new Animated.Value(1)).current;
+/** Appends an alpha channel to a 6-digit hex colour; other formats pass through. */
+function withAlpha(color: string, alpha: number): string {
+    if (!/^#[0-9a-f]{6}$/i.test(color)) return color;
+    return (
+        color +
+        Math.round(Math.max(0, Math.min(1, alpha)) * 255)
+            .toString(16)
+            .padStart(2, '0')
+    );
+}
+
+/** One natively-looped 0→1 progress value per phase, mapped to a twinkle. */
+function useTwinklePhases(animate: boolean) {
+    const ref = useRef<Animated.Value[] | null>(null);
+    if (ref.current === null) {
+        ref.current = PHASE_CONFIGS.map(() => new Animated.Value(0));
+    }
+    const values = ref.current;
 
     useEffect(() => {
         if (!animate) {
-            opacity.setValue(1);
+            values.forEach((v) => v.setValue(0));
             return;
         }
-        const half = duration / 2;
-        const loop = Animated.loop(
-            Animated.sequence([
-                Animated.timing(opacity, {
-                    toValue: 0.15,
-                    duration: half,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(opacity, {
-                    toValue: 1,
-                    duration: half,
-                    useNativeDriver: true,
-                }),
-            ]),
+        const loops = values.map((v, i) => {
+            v.setValue(0);
+            return nativeLoop(v, PHASE_CONFIGS[i].duration);
+        });
+        // The start delay is the one piece that stays on a JS timer, but it
+        // fires once per mount rather than once per swing.
+        const timers = loops.map((loop, i) =>
+            setTimeout(() => loop.start(), PHASE_CONFIGS[i].delay),
         );
-        const timer = setTimeout(() => loop.start(), delay);
         return () => {
-            clearTimeout(timer);
-            loop.stop();
+            timers.forEach(clearTimeout);
+            loops.forEach((loop) => loop.stop());
         };
-    }, [animate, delay, duration, opacity]);
+    }, [animate, values]);
+
+    // progress 0 (the resting value) maps to full opacity, so a non-animating
+    // field renders as a still sky rather than a dimmed one.
+    return useMemo(
+        () => values.map((v) => v.interpolate(TWINKLE_RANGE)),
+        [values],
+    );
+}
+
+interface StarFieldProps {
+    width: number;
+    height: number;
+    color: string;
+    animate: boolean;
+}
+
+function StarField({ width, height, color, animate }: StarFieldProps) {
+    const opacities = useTwinklePhases(animate);
+
+    const boxes = useMemo<ViewStyle[]>(
+        () =>
+            STAR_SEEDS.map((s) => ({
+                position: 'absolute',
+                left: s.xf * width - s.d / 2,
+                top: s.yf * height - s.d / 2,
+                width: s.d,
+                height: s.d,
+                borderRadius: s.d / 2,
+                backgroundColor: withAlpha(color, baseAlpha(s.d)),
+            })),
+        [width, height, color],
+    );
 
     return (
-        <Animated.View
-            style={[StyleSheet.absoluteFill, { opacity }]}
-            pointerEvents='none'
-        >
-            <Svg
-                viewBox={`0 0 ${vbW} ${vbH}`}
-                width={width}
-                height={height}
-            >
-                {stars.map((star) => (
-                    <Path
-                        key={star.id}
-                        fill={fill}
-                        fillRule='evenodd'
-                        d={star.d}
-                    />
-                ))}
-            </Svg>
-        </Animated.View>
+        <>
+            {boxes.map((box, i) => (
+                <Animated.View
+                    key={i}
+                    style={[box, { opacity: opacities[i % opacities.length] }]}
+                    pointerEvents='none'
+                />
+            ))}
+        </>
     );
 }
 
@@ -223,8 +252,8 @@ interface ClearNightIconProps {
     fullHeight?: boolean;
     /** Run the twinkle animation. Defaults to true. */
     animate?: boolean;
-    /** Render the generated sparkle stars. Pass false when a separate full-screen
-     *  star layer is already behind the content. */
+    /** Render the star field. Pass false when a separate full-screen star layer
+     *  is already behind the content. */
     showStars?: boolean;
     /** Render the moon disc. Pass false on the background star layer so only
      *  one moon appears (the hero instance). */
@@ -271,21 +300,6 @@ export default function ClearNightIcon({
         [moonPhase],
     );
 
-    const allStars = useMemo(
-        () => (showStars ? getGeneratedStars(vbW, vbH, 100) : []),
-        [vbW, vbH, showStars],
-    );
-    // Round-robin partition so each group spans every sky band rather than one
-    // vertical slice — the shared-opacity grouping is then visually unobtrusive.
-    const groups = useMemo(() => {
-        const g: { id: string; d: string }[][] = Array.from(
-            { length: NUM_GROUPS },
-            () => [],
-        );
-        allStars.forEach((s, i) => g[i % NUM_GROUPS].push(s));
-        return g;
-    }, [allStars]);
-
     return (
         <View
             style={{ width, height }}
@@ -314,21 +328,14 @@ export default function ClearNightIcon({
                     </G>
                 </Svg>
             )}
-            {showStars &&
-                groups.map((stars, gi) => (
-                    <StarLayer
-                        key={gi}
-                        stars={stars}
-                        vbW={vbW}
-                        vbH={vbH}
-                        width={width}
-                        height={height}
-                        fill={color}
-                        delay={GROUP_CONFIGS[gi].delay}
-                        duration={GROUP_CONFIGS[gi].duration}
-                        animate={animateStars}
-                    />
-                ))}
+            {showStars && (
+                <StarField
+                    width={width}
+                    height={height}
+                    color={color}
+                    animate={animateStars}
+                />
+            )}
         </View>
     );
 }

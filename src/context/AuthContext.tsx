@@ -12,6 +12,7 @@ import { loadHistory } from '../lib/outfitHistory';
 import { clearWidgetSnapshot } from '../lib/widget/updateWidgetSnapshot';
 import { resetClosetsCache } from '../hooks/useClosets';
 import { resetOnboardingCache } from '../lib/onboarding';
+import { resetAgeGateCache } from '../lib/ageGate';
 
 interface AuthState {
   isReady: boolean;
@@ -76,6 +77,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Onboarding's "done" flag is keyed by userId; clearing the in-memory
     // mirror forces the next account to read its own state fresh from storage.
     resetOnboardingCache();
+    // Same reason: the next account must not inherit this account's age-gate
+    // state, in either direction.
+    resetAgeGateCache();
     // Wipe the widget so a signed-out device doesn't keep showing the last
     // user's outfit/trip. No-ops off-iOS / without the native bridge.
     void clearWidgetSnapshot();
