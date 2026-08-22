@@ -120,6 +120,7 @@ export const PRIVACY_POLICY: LegalDocument = {
         'Sign in with Apple (optional) — if you choose to sign in with Apple, Apple returns a stable identifier for your account and, on your first sign-in only, your name and email address. If you use Apple\'s "Hide My Email," we receive a private relay address instead of your real one, and that is all we ever see.',
         'Google Sign-In (optional) — if you choose to sign in with Google, Google returns your email address and basic profile information so we can create and authenticate your account. We do not request access to your Gmail, contacts, or any other Google data.',
         'Resend — transactional email provider used to deliver account emails such as password resets. It receives your email address and the contents of that message. We do not send marketing email.',
+        'Sentry — error and crash reporting. When the App or our API hits an error, Sentry receives the error itself, your device model, OS version, and app version, so we can find and fix it. We have switched off the features that would send more than that: it does not receive your IP address, it does not record your screen or your session, and it does not receive your console logs. It never receives your closet images, your outfit history, or the contents of your account.',
       ],
       subsections: [
         {

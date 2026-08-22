@@ -20,20 +20,68 @@ const PUBLIC_URL = (process.env.R2_PUBLIC_URL ?? `https://pub-${process.env.R2_A
 // Images use UUIDs so they never change — safe to cache for 1 year
 const CACHE_CONTROL = 'public, max-age=31536000, immutable';
 
+// ─── Upload validation ────────────────────────────────────────────────────────
+
+/**
+ * The only types that may be written to the bucket, and the only source of the
+ * stored file extension — it is looked up here, never taken from the data URI.
+ *
+ * This bucket is served publicly over a CDN, so anything that lands in it is
+ * live web content on our own domain. Trusting the client's declared type meant
+ * `data:text/html;base64,…` was stored as `<uuid>.html` and served back as
+ * `text/html`: arbitrary page hosting for anyone with an account, and signup is
+ * open to everyone.
+ *
+ * SVG is deliberately absent. It is an image type, but it executes inline
+ * script, which is the exact problem this table exists to prevent.
+ */
+const ALLOWED_TYPES: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png':  'png',
+  'image/webp': 'webp',
+};
+
+/**
+ * Decoded-size ceiling. express.json already caps the request body at 10mb of
+ * base64 (~7.5 MB decoded), so this is a backstop for any future caller that
+ * doesn't come through that route, not the primary limit. The app uploads
+ * ImageManipulator JPEGs, which are a small fraction of this.
+ */
+const MAX_BYTES = 8 * 1024 * 1024;
+
+/** Client-fixable upload problems, so routes can answer 400 instead of 500. */
+export class UploadValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UploadValidationError';
+  }
+}
+
 export async function uploadToR2(base64: string, fileName?: string): Promise<string> {
   const matches = base64.match(/^data:([^;]+);base64,(.+)$/);
-  if (!matches) throw new Error('Invalid base64 format');
+  if (!matches) throw new UploadValidationError('Invalid base64 data URI');
 
-  const [, mimeType, data] = matches;
+  const [, declaredType, data] = matches;
+  const mimeType = declaredType.trim().toLowerCase();
+
+  const ext = ALLOWED_TYPES[mimeType];
+  if (!ext) throw new UploadValidationError(`Unsupported image type: ${mimeType}`);
+
   const buffer = Buffer.from(data, 'base64');
-  const ext = mimeType.split('/')[1] ?? 'jpg';
-  const key = `articles/${fileName ?? uuid()}.${ext}`;
+  if (buffer.length === 0)         throw new UploadValidationError('Image data is empty');
+  if (buffer.length > MAX_BYTES)   throw new UploadValidationError('Image is larger than 8 MB');
+
+  // No caller passes fileName today, but it lands directly in the object key,
+  // so it is constrained here rather than trusted — a future caller handing
+  // this "../.." should not be able to write outside the articles/ prefix.
+  const safeName = fileName ? fileName.replace(/[^a-zA-Z0-9_-]/g, '') : '';
+  const key = `articles/${safeName || uuid()}.${ext}`;
 
   await r2.send(new PutObjectCommand({
     Bucket:       BUCKET,
     Key:          key,
     Body:         buffer,
-    ContentType:  mimeType,
+    ContentType:  mimeType,   // guaranteed to be a key of ALLOWED_TYPES
     CacheControl: CACHE_CONTROL,
   }));
 

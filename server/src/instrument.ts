@@ -16,6 +16,31 @@ import * as Sentry from '@sentry/node';
 
 const DSN = process.env.SENTRY_DSN;
 
+/**
+ * Coordinates reach Sentry two different ways here, and only one of them is a
+ * query string:
+ *
+ *   inbound   /api/weather/current?lat=…&lon=…   raw client coordinates
+ *   outbound  weatherkit.apple.com/api/v1/weather/en/40.71/-74.01
+ *
+ * The outbound pair is already snapped to the ~1 km cache grid by
+ * lib/weatherKit.ts, but it sits in the URL *path*, where stripping a query
+ * string accomplishes nothing. Both get handled. Mirrors src/lib/sentryScrub.ts
+ * on the client; kept separate because the two packages don't share a tsconfig.
+ */
+const stripQuery = (url: string): string => {
+  const cut = url.search(/[?#]/);
+  return cut === -1 ? url : url.slice(0, cut);
+};
+
+const redactWeatherKitPath = (url: string): string =>
+  url.replace(
+    /(weatherkit\.apple\.com\/api\/v1\/weather\/[^/]+)\/-?\d+(?:\.\d+)?\/-?\d+(?:\.\d+)?/,
+    '$1/<lat>/<lon>',
+  );
+
+const scrubUrl = (url: string): string => redactWeatherKitPath(stripQuery(url));
+
 if (DSN) {
   Sentry.init({
     dsn: DSN,
@@ -32,7 +57,18 @@ if (DSN) {
     // are what we actually need at launch; turn this up deliberately later.
     tracesSampleRate: 0,
 
+    beforeBreadcrumb(breadcrumb) {
+      const url = breadcrumb.data?.url;
+      if (typeof url === 'string' && breadcrumb.data) {
+        breadcrumb.data.url = scrubUrl(url);
+      }
+      return breadcrumb;
+    },
+
     beforeSend(event) {
+      if (typeof event.request?.url === 'string') {
+        event.request.url = scrubUrl(event.request.url);
+      }
       const headers = event.request?.headers;
       if (headers) {
         for (const k of Object.keys(headers)) {

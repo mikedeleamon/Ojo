@@ -20,6 +20,7 @@ import { isAgeVerificationNeeded } from '../src/lib/ageGate';
 import { recordAppOpen } from '../src/services/reviewManager';
 import { reconcileWeeklyRecap, reconcileMorningBriefs } from '../src/lib/notifications';
 import * as Sentry from '@sentry/react-native';
+import { scrubBreadcrumb, scrubEvent } from '../src/lib/sentryScrub';
 
 // Crash and error reporting. Off in development so local work doesn't burn
 // quota or bury real production events.
@@ -48,6 +49,12 @@ Sentry.init({
   // session is not something to enable casually.
   replaysSessionSampleRate: 0,
   replaysOnErrorSampleRate: 0,
+
+  // Coordinates travel as query params on the weather and trip endpoints, and
+  // Sentry records request URLs verbatim. Both hooks strip query strings — see
+  // src/lib/sentryScrub.ts for why a crash report never needs that precision.
+  beforeBreadcrumb: scrubBreadcrumb,
+  beforeSend: scrubEvent,
 });
 
 SplashScreen.preventAutoHideAsync();

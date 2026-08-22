@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import Closet from '../models/Closet';
 import { requireAuth, AuthRequest } from '../middleware/auth';
-import { uploadToR2, deleteFromR2, deleteManyFromR2 } from '../lib/r2';
+import { uploadToR2, deleteFromR2, deleteManyFromR2, UploadValidationError } from '../lib/r2';
 
 const router = Router();
 router.use(requireAuth);
@@ -87,13 +87,19 @@ router.put('/:id/preferred', async (req: AuthRequest, res: Response): Promise<vo
 router.post('/:closetId/upload-image', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { base64 } = req.body;
-    if (!base64 || !base64.startsWith('data:')) {
+    if (typeof base64 !== 'string' || !base64.startsWith('data:')) {
       res.status(400).json({ error: 'Valid base64 data URI is required' });
       return;
     }
     const imageUrl = await uploadToR2(base64);
     res.json({ imageUrl });
   } catch (err) {
+    // Type and size rejections are the caller's to fix, not server faults —
+    // answering 500 for them hid a wide-open upload behind a generic error.
+    if (err instanceof UploadValidationError) {
+      res.status(400).json({ error: err.message });
+      return;
+    }
     console.error('[closets] upload-image error:', err);
     res.status(500).json({ error: 'Image upload failed' });
   }

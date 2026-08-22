@@ -1,128 +1,145 @@
 import { Router, Request, Response } from 'express';
 import { Types } from 'mongoose';
 import { requireAuth, AuthRequest } from '../middleware/auth';
-import { getGmailAuthUrl, exchangeCode, syncGmailTrips, verifyState } from '../lib/gmailParser';
+// DISABLED (see note below):
+// import { getGmailAuthUrl, exchangeCode, syncGmailTrips, verifyState } from '../lib/gmailParser';
 import User from '../models/User';
 import Trip from '../models/Trip';
 
 const router = Router();
 
-// ─── Gmail OAuth (public — no auth middleware) ────────────────────────────────
-
-/**
- * GET /api/trips/gmail/connect
- * App calls this to get the Google consent URL, then opens it in expo-web-browser.
- * Requires the user's JWT so we know who to link the token to.
- */
-router.get('/gmail/connect', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    // Pass userId as OAuth state so the callback can credit the right user
-    const url = getGmailAuthUrl(req.userId!);
-    res.json({ url });
-  } catch (err) {
-    console.error('[trips] connect error:', err);
-    res.status(500).json({ error: 'Failed to generate auth URL' });
-  }
-});
-
-/**
- * GET /api/trips/gmail/callback
- * Google redirects here after the user consents.
- * Stores the refresh token, then redirects to the app deep link.
- */
-router.get('/gmail/callback', async (req: Request, res: Response): Promise<void> => {
-  const { code, state, error } = req.query as Record<string, string>;
-  const errorRedirect = `${process.env.APP_DEEP_LINK_SCHEME ?? 'ojo'}://gmail-connected?status=error`;
-
-  if (error || !code || !state) {
-    res.redirect(errorRedirect);
-    return;
-  }
-
-  // Verify the HMAC-signed state so an attacker cannot pair a stolen `code`
-  // with a victim's userId.
-  const userId = verifyState(state);
-  if (!userId) {
-    console.error('[trips] callback: invalid state signature');
-    res.redirect(errorRedirect);
-    return;
-  }
-
-  try {
-    const refreshToken = await exchangeCode(code);
-    await User.findByIdAndUpdate(userId, {
-      googleRefreshToken:     refreshToken,
-      googleConnectedAt:      new Date(),
-    });
-
-    // Kick off initial sync in the background (don't await)
-    syncGmailTrips(userId).catch(err =>
-      console.error('[trips] initial sync error:', err)
-    );
-
-    res.redirect(`${process.env.APP_DEEP_LINK_SCHEME ?? 'ojo'}://gmail-connected?status=ok`);
-  } catch (err) {
-    console.error('[trips] callback error:', err);
-    res.redirect(errorRedirect);
-  }
-});
-
-/**
- * GET /api/trips/gmail/status
- * Returns whether Gmail is connected for the current user.
- */
-router.get('/gmail/status', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const user = await User.findById(req.userId)
-      .select('googleRefreshToken googleConnectedAt')
-      .lean();
-
-    res.json({
-      connected: !!user?.googleRefreshToken,
-      connectedAt: user?.googleConnectedAt ?? null,
-    });
-  } catch (err) {
-    console.error('[trips] status error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-/**
- * DELETE /api/trips/gmail/disconnect
- * Revokes Gmail access and removes the stored token.
- */
-router.delete('/gmail/disconnect', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    await User.findByIdAndUpdate(req.userId, {
-      $unset: { googleRefreshToken: '', googleConnectedAt: '' },
-    });
-    res.sendStatus(204);
-  } catch (err) {
-    console.error('[trips] disconnect error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+// ─────────────────────────────────────────────────────────────────────────────
+// DISABLED: Gmail OAuth + airline-confirmation scanning (Smart Trip Planner).
+//
+// Commented out rather than deleted so the work survives for a future release.
+// Two reasons it can't ship as-is:
+//
+//   1. src/config/legal.ts §5 tells users, verbatim: "We do not request access
+//      to your Gmail, contacts, or any other Google data." These routes are the
+//      opposite of that, and they were live and reachable in production.
+//   2. gmail.readonly is a Google RESTRICTED scope. Production use requires a
+//      security assessment and app verification first.
+//
+// Before re-enabling: complete Google's verification, update §5 and §2.1 of the
+// privacy policy to describe what is read and why, and update the App Store
+// privacy labels. There is no client UI for this yet — nothing else regresses.
+// ─────────────────────────────────────────────────────────────────────────────
+// // ─── Gmail OAuth (public — no auth middleware) ────────────────────────────────
+//
+// /**
+//  * GET /api/trips/gmail/connect
+//  * App calls this to get the Google consent URL, then opens it in expo-web-browser.
+//  * Requires the user's JWT so we know who to link the token to.
+//  */
+// router.get('/gmail/connect', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+//   try {
+//     // Pass userId as OAuth state so the callback can credit the right user
+//     const url = getGmailAuthUrl(req.userId!);
+//     res.json({ url });
+//   } catch (err) {
+//     console.error('[trips] connect error:', err);
+//     res.status(500).json({ error: 'Failed to generate auth URL' });
+//   }
+// });
+//
+// /**
+//  * GET /api/trips/gmail/callback
+//  * Google redirects here after the user consents.
+//  * Stores the refresh token, then redirects to the app deep link.
+//  */
+// router.get('/gmail/callback', async (req: Request, res: Response): Promise<void> => {
+//   const { code, state, error } = req.query as Record<string, string>;
+//   const errorRedirect = `${process.env.APP_DEEP_LINK_SCHEME ?? 'ojo'}://gmail-connected?status=error`;
+//
+//   if (error || !code || !state) {
+//     res.redirect(errorRedirect);
+//     return;
+//   }
+//
+//   // Verify the HMAC-signed state so an attacker cannot pair a stolen `code`
+//   // with a victim's userId.
+//   const userId = verifyState(state);
+//   if (!userId) {
+//     console.error('[trips] callback: invalid state signature');
+//     res.redirect(errorRedirect);
+//     return;
+//   }
+//
+//   try {
+//     const refreshToken = await exchangeCode(code);
+//     await User.findByIdAndUpdate(userId, {
+//       googleRefreshToken:     refreshToken,
+//       googleConnectedAt:      new Date(),
+//     });
+//
+//     // Kick off initial sync in the background (don't await)
+//     syncGmailTrips(userId).catch(err =>
+//       console.error('[trips] initial sync error:', err)
+//     );
+//
+//     res.redirect(`${process.env.APP_DEEP_LINK_SCHEME ?? 'ojo'}://gmail-connected?status=ok`);
+//   } catch (err) {
+//     console.error('[trips] callback error:', err);
+//     res.redirect(errorRedirect);
+//   }
+// });
+//
+// /**
+//  * GET /api/trips/gmail/status
+//  * Returns whether Gmail is connected for the current user.
+//  */
+// router.get('/gmail/status', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+//   try {
+//     const user = await User.findById(req.userId)
+//       .select('googleRefreshToken googleConnectedAt')
+//       .lean();
+//
+//     res.json({
+//       connected: !!user?.googleRefreshToken,
+//       connectedAt: user?.googleConnectedAt ?? null,
+//     });
+//   } catch (err) {
+//     console.error('[trips] status error:', err);
+//     res.status(500).json({ error: 'Internal server error' });
+//   }
+// });
+//
+// /**
+//  * DELETE /api/trips/gmail/disconnect
+//  * Revokes Gmail access and removes the stored token.
+//  */
+// router.delete('/gmail/disconnect', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+//   try {
+//     await User.findByIdAndUpdate(req.userId, {
+//       $unset: { googleRefreshToken: '', googleConnectedAt: '' },
+//     });
+//     res.sendStatus(204);
+//   } catch (err) {
+//     console.error('[trips] disconnect error:', err);
+//     res.status(500).json({ error: 'Internal server error' });
+//   }
+// });
 
 // ─── All routes below require auth ───────────────────────────────────────────
 router.use(requireAuth);
 
-/**
- * POST /api/trips/gmail/sync
- * Manually trigger a Gmail scan (app calls this after connect, or on pull-to-refresh).
- */
-router.post('/gmail/sync', async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const result = await syncGmailTrips(req.userId!);
-    res.json(result); // { added, skipped, errors }
-  } catch (err: any) {
-    if (err?.message?.includes('no refresh token')) {
-      res.status(400).json({ error: 'Gmail not connected' });
-    } else {
-      console.error('[trips] sync error:', err);
-      res.status(500).json({ error: 'Sync failed' });
-    }
-  }
-});
+// /**
+//  * POST /api/trips/gmail/sync
+//  * Manually trigger a Gmail scan (app calls this after connect, or on pull-to-refresh).
+//  */
+// router.post('/gmail/sync', async (req: AuthRequest, res: Response): Promise<void> => {
+//   try {
+//     const result = await syncGmailTrips(req.userId!);
+//     res.json(result); // { added, skipped, errors }
+//   } catch (err: any) {
+//     if (err?.message?.includes('no refresh token')) {
+//       res.status(400).json({ error: 'Gmail not connected' });
+//     } else {
+//       console.error('[trips] sync error:', err);
+//       res.status(500).json({ error: 'Sync failed' });
+//     }
+//   }
+// });
 
 /**
  * GET /api/trips
