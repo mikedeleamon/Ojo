@@ -49,10 +49,13 @@ android/app/build/
 .env
 .env.*
 !.env.example
-# sentry.properties holds auth.token. The Sentry Expo plugin reads the token
-# from the SENTRY_AUTH_TOKEN EAS secret during a build, so the file itself must
-# never ride along in the upload:
-#   eas secret:create --scope project --name SENTRY_AUTH_TOKEN --type string
+# sentry.properties holds auth.token, so it must never ride along in the upload.
+# Because it is excluded (and EAS does not re-run prebuild when ios/ exists),
+# sentry-cli on the builder gets ALL of its config from env instead:
+#   - SENTRY_AUTH_TOKEN -> EAS env var, "secret" visibility, per environment
+#   - SENTRY_ORG / SENTRY_PROJECT / SENTRY_URL -> eas.json build profile "env"
+# Drop the org/project from eas.json and the build dies in the "Bundle React
+# Native code and images" phase with "A project ID or slug is required".
 sentry.properties
 ios/sentry.properties
 android/sentry.properties
