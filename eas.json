@@ -20,7 +20,10 @@
         "APP_ENV": "preview",
         "EXPO_PUBLIC_API_URL": "https://ojo-production-0f30.up.railway.app",
         "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "555153415751-ejhgihp9r6tgkssuj8qhchess3blbmml.apps.googleusercontent.com",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "555153415751-fvl7meivgou05m8pqtc4kipmudo89qms.apps.googleusercontent.com"
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "555153415751-fvl7meivgou05m8pqtc4kipmudo89qms.apps.googleusercontent.com",
+        "SENTRY_ORG": "ojo-studio-llc",
+        "SENTRY_PROJECT": "react-native",
+        "SENTRY_URL": "https://sentry.io/"
       }
     },
     "production": {
@@ -29,7 +32,10 @@
         "APP_ENV": "production",
         "EXPO_PUBLIC_API_URL": "https://ojo-production-0f30.up.railway.app",
         "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "555153415751-ejhgihp9r6tgkssuj8qhchess3blbmml.apps.googleusercontent.com",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "555153415751-fvl7meivgou05m8pqtc4kipmudo89qms.apps.googleusercontent.com"
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "555153415751-fvl7meivgou05m8pqtc4kipmudo89qms.apps.googleusercontent.com",
+        "SENTRY_ORG": "ojo-studio-llc",
+        "SENTRY_PROJECT": "react-native",
+        "SENTRY_URL": "https://sentry.io/"
       }
     }
   },
@@ -42,7 +48,7 @@
         "appleTeamId": "37L8H5D9PQ"
       },
       "android": {
-        "track": "production"
+        "track": "internal"
       }
     }
   },
