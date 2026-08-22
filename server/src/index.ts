@@ -2,6 +2,12 @@ import path from 'path';
 import dotenv from 'dotenv';
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
+// Must stay here: after dotenv (it reads SENTRY_DSN) and before express,
+// mongoose, and the routes, so Sentry can instrument them as they load.
+// tsconfig targets commonjs, so this emitted require() runs in source order.
+import './instrument';
+
+import * as Sentry from '@sentry/node';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
@@ -147,6 +153,11 @@ app.use('/api/tripfit',       generalLimiter, ...gated, tripFitRoutes);
 app.use('/s',                 generalLimiter, shareRoutes);
 
 // ─── Global error handler ─────────────────────────────────────────────────────
+// Sentry's handler goes first: it reports the error and calls next(), so ours
+// still runs and still owns the response shape clients see. No-ops when
+// SENTRY_DSN is unset.
+Sentry.setupExpressErrorHandler(app);
+
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err);
   res.status(500).json({ error: 'Internal server error' });
@@ -187,7 +198,13 @@ connectDB().then(() => {
   app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   startNotificationService();
   startMemoryLogging();
-}).catch((err) => {
+}).catch(async (err) => {
   console.error('Failed to connect to MongoDB:', err);
+  // "The API never came up" is the one alert worth waking up for, and it's the
+  // one Sentry would otherwise miss: this rejection is caught, so it never
+  // reaches the unhandled-rejection integration. flush() before exiting or the
+  // event dies with the process.
+  Sentry.captureException(err, { tags: { phase: 'boot' } });
+  await Sentry.flush(2000).catch(() => {});
   process.exit(1);
 });

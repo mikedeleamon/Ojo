@@ -76,3 +76,10 @@ coverage/
 # Hermes & React Native artifacts
 hermes-engine/
 react-native/
+
+.env.local
+
+# Sentry — contains auth.token, must never be committed
+sentry.properties
+ios/sentry.properties
+android/sentry.properties

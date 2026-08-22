@@ -2,12 +2,15 @@
  * Root-level error boundary. Renders a recoverable fallback when any child
  * throws during render, instead of letting the app crash to a blank screen.
  *
- * Kept dep-free (no theme/context) so it can render even when the crash
- * happened inside a provider higher up the tree.
+ * The render path stays dep-free (no theme/context) so it can draw even when
+ * the crash happened inside a provider higher up the tree. Sentry is imported
+ * but only touched in componentDidCatch, never during render, so a broken
+ * provider still can't stop the fallback from appearing.
  */
 
 import { Component, ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import * as Sentry from '@sentry/react-native';
 
 interface Props { children: ReactNode; }
 interface State { error: Error | null; }
@@ -20,7 +23,14 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: { componentStack?: string | null }) {
-    // Replace with Sentry.captureException once Sentry is wired up.
+    // These are the crashes Apple never sees. A render error caught here does
+    // not terminate the process, so it produces no native crash report — the
+    // user just gets the fallback below. Sentry is the only way we hear about
+    // it, which is why this reports before it logs.
+    Sentry.captureException(error, {
+      contexts: { react: { componentStack: info?.componentStack ?? undefined } },
+      tags: { boundary: 'root' },
+    });
     console.error('[ErrorBoundary]', error, info?.componentStack);
   }
 

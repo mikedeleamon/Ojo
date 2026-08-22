@@ -19,6 +19,36 @@ import { isOnboardingComplete, isOnboardingPending } from '../src/lib/onboarding
 import { isAgeVerificationNeeded } from '../src/lib/ageGate';
 import { recordAppOpen } from '../src/services/reviewManager';
 import { reconcileWeeklyRecap, reconcileMorningBriefs } from '../src/lib/notifications';
+import * as Sentry from '@sentry/react-native';
+
+// Crash and error reporting. Off in development so local work doesn't burn
+// quota or bury real production events.
+//
+// What we send is deliberately narrow: it matches what the privacy policy
+// already declares in src/config/legal.ts §2.2 — device info, app version,
+// and error reports, nothing more. The wizard's defaults collected more than
+// that, and each one is off for a specific reason noted below. Turning any of
+// them on means updating the policy and the App Store privacy labels first.
+Sentry.init({
+  dsn: 'https://06b067cae6dd4e7ec877a2b838d5ee7a@o4511952303423488.ingest.us.sentry.io/4511952313712640',
+
+  enabled: !__DEV__,
+  environment: __DEV__ ? 'development' : 'production',
+
+  // Would attach IP addresses and user context to every event. The policy's
+  // "Information We Do NOT Collect" section doesn't carve out room for it.
+  sendDefaultPii: false,
+
+  // Would forward console output. This app logs enough user-adjacent detail
+  // that it isn't safe to ship off-device wholesale.
+  enableLogs: false,
+
+  // Session Replay records the screen — closet photos, name, email, city.
+  // Undeclared, and this app gates to 13+ under COPPA, so replay of a minor's
+  // session is not something to enable casually.
+  replaysSessionSampleRate: 0,
+  replaysOnErrorSampleRate: 0,
+});
 
 SplashScreen.preventAutoHideAsync();
 
@@ -160,7 +190,7 @@ function NotificationDeepLinkRouter() {
 }
 
 // ─── Root layout ─────────────────────────────────────────────────────────────
-export default function RootLayout() {
+export default Sentry.wrap(function RootLayout() {
   const [fontsLoaded, setFontsLoaded] = useState(false);
 
   // Counts cold starts only (this effect runs once per process launch, not
@@ -229,7 +259,7 @@ export default function RootLayout() {
       </GestureHandlerRootView>
     </ErrorBoundary>
   );
-}
+});
 
 function ThemedStatusBar() {
   const { isDark } = useTheme();
