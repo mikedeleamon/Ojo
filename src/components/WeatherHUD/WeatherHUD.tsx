@@ -61,6 +61,7 @@ import { flattenHsl, hslToHex, lerpHslFlat } from './colorMath';
 // bypassing the JS thread (and React reconciliation) entirely.
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 import { gradientFor, footerBgFor } from './weatherPalette';
+import { accentFromGradient } from '../../lib/weather/accentColor';
 import { isClearNight, isThunderstorm } from '../../lib/weather/conditions';
 import { solarPosition, type SolarPosition } from '../../lib/solarPosition';
 import { rainAngleFor } from '../../lib/weather/windSlant';
@@ -164,7 +165,7 @@ const WeatherHUD = ({
     const { colors } = useTheme();
     const st = useMemo(() => makeStyles(colors), [colors]);
     const reduceMotion = useReduceMotion();
-    const { setFooterBg } = useWeatherTheme();
+    const { setFooterBg, setAccent } = useWeatherTheme();
     const { top: topInset } = useSafeAreaInsets();
     const tabPad = useTabBarPadding();
     const nav = useAppNavigation();
@@ -446,6 +447,17 @@ const WeatherHUD = ({
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [gradientKey],
     );
+
+    // Publish the tab-bar accent off the same memoised gradient. Deliberately
+    // *not* driven from the animated gradient above: `tintColor` is a native
+    // UITabBarController property, so a per-frame value would mean a bridge
+    // round trip and a native re-tint every frame of the 2s sweep. Keying on
+    // `targetGradient` instead makes it one discrete update per palette change,
+    // which is a snap rather than a crossfade — and the right trade, since the
+    // tab bar needs to stay legible more than it needs to animate.
+    useEffect(() => {
+        setAccent(accentFromGradient(targetGradient));
+    }, [targetGradient, setAccent]);
 
     const prevTargetRef = useRef<readonly string[]>(DEFAULT_GRADIENT);
 
