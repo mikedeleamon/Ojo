@@ -47,6 +47,14 @@ app.get('/health', (_req: Request, res: Response) => {
   const mem = process.memoryUsage();
   res.json({
     status: 'ok',
+    // Railway injects these at build time from the triggering commit. Ground
+    // truth for "what did Railway actually build," independent of whatever
+    // the dashboard's deployment list claims — added while chasing a deploy
+    // that looked ACTIVE on a fresh commit but kept serving old route
+    // behavior. undefined (not Railway, or an older build pre-dating this
+    // field) prints as null rather than throwing.
+    gitCommit: process.env.RAILWAY_GIT_COMMIT_SHA ?? null,
+    gitCommitMessage: process.env.RAILWAY_GIT_COMMIT_MESSAGE ?? null,
     uptimeSeconds: Math.round(process.uptime()),
     db: DB_STATE[mongoose.connection.readyState] ?? 'unknown',
     dbName: mongoose.connection.name ?? 'unknown',
