@@ -173,6 +173,9 @@ export const radius = {
 
 export const fonts = {
   display:        'DMSerifDisplay',
+  // Scoped to the Home hero (city name + big temperature) and its sticky
+  // mini-header mirror. Everything else stays on `display`.
+  hero:           'Fraunces-SemiBold',  // 600, opsz 72
   body:           'Outfit',           // 400 Regular
   bodyLight:      'Outfit-Light',     // 300
   bodyRegular:    'Outfit-Regular',   // 400

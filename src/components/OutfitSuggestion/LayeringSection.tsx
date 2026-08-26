@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { View, Text, GlassCard } from '../primitives';
+import { usePerfFlags } from '../../lib/debug/perfFlags';
 import { articleDisplayName } from '../../types';
 import type { OutfitSlot } from '../../lib/outfit/types';
 import type { LayeringResult } from '../../lib/layering/types';
@@ -57,6 +58,7 @@ const LayerRow = ({
 
 export const LayeringSection = ({ layering }: { layering: LayeringResult }) => {
     const { colors } = useTheme();
+    const perf = usePerfFlags();
     const layerStyles = useMemo(() => makeLayerStyles(colors), [colors]);
     const hasLayers =
         layering.layers.base || layering.layers.mid || layering.layers.outer;
@@ -68,7 +70,15 @@ export const LayeringSection = ({ layering }: { layering: LayeringResult }) => {
             </View>
 
             {hasLayers && (
-                <GlassCard style={layerStyles.layerStack}>
+                // Not glass by default: it sits inside the outfit card, which
+                // is no longer a glass surface either, so this would blur the
+                // animated sky directly. The style already carries the
+                // translucent bg + border the fallback path draws, so it looks
+                // the same. See lib/debug/perfFlags.
+                <GlassCard
+                    style={layerStyles.layerStack}
+                    disableGlass={!perf.outfitInnerGlass}
+                >
                     {LAYER_TIERS.map(({ key, label }) => (
                         <LayerRow
                             key={key}

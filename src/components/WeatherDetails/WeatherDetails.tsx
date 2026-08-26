@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, memo } from 'react';
 import { ActivityIndicator, StyleSheet, Pressable } from 'react-native';
 import { Svg, Path } from 'react-native-svg';
 import { View, Text, GlassCard, GlassGroup } from '../primitives';
@@ -124,4 +124,14 @@ const WeatherDetails = ({ weather, settings, forecasts, daily, city, coords }: P
   );
 };
 
-export default WeatherDetails;
+// Memoised: WeatherHUD re-renders whenever `miniVisible` flips (which happens
+// mid-scroll, driven from the scroll worklet via runOnJS) and whenever the 60s
+// solar tick produces a new `sun` object. Without this, each of those
+// re-rendered this entire subtree — including OutfitSuggestion's pager and
+// thumbnails — so the cost of a scroll-threshold crossing scaled with however
+// much content the outfit card happened to be showing.
+//
+// Every prop below is referentially stable between fetches (`settings` is a
+// useState value from SettingsContext; `coords` is WeatherHUD's `place` state),
+// so the default shallow compare is enough.
+export default memo(WeatherDetails);

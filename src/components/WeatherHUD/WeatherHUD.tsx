@@ -19,6 +19,7 @@ import Animated, {
     FadeIn,
     withTiming,
     Easing as REasing,
+    type SharedValue,
 } from 'react-native-reanimated';
 import { useSpinAnimation } from '../../hooks/useSpinAnimation';
 import { useReduceMotion } from '../../hooks/useReduceMotion';
@@ -62,10 +63,12 @@ import { flattenHsl, hslToHex, lerpHslFlat } from './colorMath';
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 import { gradientFor, footerBgFor } from './weatherPalette';
 import { accentFromGradient } from '../../lib/weather/accentColor';
-import { isClearNight, isThunderstorm } from '../../lib/weather/conditions';
+import { isClearNight, isDrizzle, isRain, isThunderstorm } from '../../lib/weather/conditions';
 import { solarPosition, type SolarPosition } from '../../lib/solarPosition';
 import { rainAngleFor } from '../../lib/weather/windSlant';
-import BackdropLayer from './BackdropLayer';
+import BackdropLayer, { SCROLL_RANGE } from './BackdropLayer';
+import PerfPanel from '../debug/PerfPanel';
+import { usePerfFlags } from '../../lib/debug/perfFlags';
 import LastUpdated from './LastUpdated';
 import { fToC } from '../../lib/units';
 import { humanizeCondition } from '../../lib/weather/humanizeCondition';
@@ -122,6 +125,54 @@ const HOUR_MS = 3_600_000;
 const hourBucketOf = (t: string | number): number =>
     Math.floor(new Date(t).getTime() / HOUR_MS);
 
+/** How often the solar position is resampled. See the note at its useEffect. */
+const SUN_TICK_MS = 300_000;
+
+// ─── Animated gradient colours ────────────────────────────────────────────────
+// Interpolates a flattened HSL gradient on the UI thread and returns it as the
+// `colors` prop for a LinearGradient. Hex parsing happens on the JS thread when
+// from/to change; the worklet only does numeric HSL interpolation plus one
+// hslToHex per stop per frame.
+const useInterpolatedGradient = (
+    fromHsl: SharedValue<number[]>,
+    toHsl: SharedValue<number[]>,
+    progress: SharedValue<number>,
+) =>
+    useAnimatedProps(() => {
+        'worklet';
+        const from = fromHsl.value;
+        const to = toHsl.value;
+        const t = progress.value;
+        const stagger = 0.15;
+        const stops = to.length / 3;
+        const result: string[] = new Array(stops);
+        for (let i = 0; i < stops; i++) {
+            const offset = (i / Math.max(1, stops - 1)) * stagger;
+            let stopT = (t - offset) / (1 - stagger);
+            if (stopT < 0) stopT = 0;
+            else if (stopT > 1) stopT = 1;
+            const e =
+                stopT < 0.5
+                    ? 2 * stopT * stopT
+                    : 1 - Math.pow(-2 * stopT + 2, 2) / 2;
+            const b = i * 3;
+            const h1 = from[b],
+                s1 = from[b + 1],
+                l1 = from[b + 2];
+            const h2 = to[b],
+                s2 = to[b + 1],
+                l2 = to[b + 2];
+            let dh = h2 - h1;
+            if (dh > 180) dh -= 360;
+            else if (dh < -180) dh += 360;
+            const h = s1 < 0.05 ? h2 : h1 + dh * e;
+            const s = s1 + (s2 - s1) * e;
+            const l = l1 + (l2 - l1) * e;
+            result[i] = hslToHex(h, s, l);
+        }
+        return { colors: result as unknown as [string, string, ...string[]] };
+    });
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 interface Props {
@@ -165,6 +216,9 @@ const WeatherHUD = ({
     const { colors } = useTheme();
     const st = useMemo(() => makeStyles(colors), [colors]);
     const reduceMotion = useReduceMotion();
+    // Dev-only bisection switches; every flag is `true` in a release build, so
+    // this reads as the current behaviour everywhere but the perf panel.
+    const perf = usePerfFlags();
     const { setFooterBg, setAccent } = useWeatherTheme();
     const { top: topInset } = useSafeAreaInsets();
     const tabPad = useTabBarPadding();
@@ -409,19 +463,34 @@ const WeatherHUD = ({
     const loadingOpacity = useRef(new RNAnimated.Value(1)).current;
 
     // ── Solar elevation (drives the time-of-day sky) ──────────────────────────
-    // Recomputed on a 60s timer rather than continuously: the sun moves ~0.25°
-    // per minute, so this is finer than the gradient can express, and it keeps
-    // the animation event-driven. Feeding it from a per-frame shared value would
-    // keep the gradient worklet alive forever instead of only during the ~2s
-    // transitions — turning a free change into a permanent per-frame cost.
+    // Recomputed on a timer rather than continuously: feeding it from a
+    // per-frame shared value would keep the gradient worklet alive forever
+    // instead of only during the ~2s transitions — turning a free change into a
+    // permanent per-frame cost.
+    //
+    // The interval was 60s, which was finer than the gradient could express
+    // anyway (the sun moves ~0.25°/min) and cost a full WeatherHUD re-render
+    // every minute, since solarPosition returns a fresh object each call. At
+    // 300s the sun moves ~1.25° between samples — still well inside the width
+    // of a single gradient band — for a fifth of the re-renders.
     const [sun, setSun] = useState<SolarPosition | undefined>(undefined);
 
     useEffect(() => {
         if (!place) return;
         const update = () => setSun(solarPosition(place.lat, place.lon));
         update();
-        const timer = setInterval(update, 60_000);
-        return () => clearInterval(timer);
+        const timer = setInterval(update, SUN_TICK_MS);
+
+        // Timers are suspended while backgrounded, so at a 300s tick a resume
+        // could otherwise land on a sky up to five minutes stale — most visible
+        // around sunrise/sunset, where the gradient moves fastest.
+        const sub = AppState.addEventListener('change', (next) => {
+            if (next === 'active') update();
+        });
+        return () => {
+            clearInterval(timer);
+            sub.remove();
+        };
     }, [place?.lat, place?.lon]);
 
     // Compute target gradient from weather data. Memoised so the dependency
@@ -461,40 +530,12 @@ const WeatherHUD = ({
 
     const prevTargetRef = useRef<readonly string[]>(DEFAULT_GRADIENT);
 
-    const animatedGradientProps = useAnimatedProps(() => {
-        'worklet';
-        const from = fromHsl.value;
-        const to = toHsl.value;
-        const t = progress.value;
-        const stagger = 0.15;
-        const stops = to.length / 3;
-        const result: string[] = new Array(stops);
-        for (let i = 0; i < stops; i++) {
-            const offset = (i / Math.max(1, stops - 1)) * stagger;
-            let stopT = (t - offset) / (1 - stagger);
-            if (stopT < 0) stopT = 0;
-            else if (stopT > 1) stopT = 1;
-            const e =
-                stopT < 0.5
-                    ? 2 * stopT * stopT
-                    : 1 - Math.pow(-2 * stopT + 2, 2) / 2;
-            const b = i * 3;
-            const h1 = from[b],
-                s1 = from[b + 1],
-                l1 = from[b + 2];
-            const h2 = to[b],
-                s2 = to[b + 1],
-                l2 = to[b + 2];
-            let dh = h2 - h1;
-            if (dh > 180) dh -= 360;
-            else if (dh < -180) dh += 360;
-            const h = s1 < 0.05 ? h2 : h1 + dh * e;
-            const s = s1 + (s2 - s1) * e;
-            const l = l1 + (l2 - l1) * e;
-            result[i] = hslToHex(h, s, l);
-        }
-        return { colors: result as unknown as [string, string, ...string[]] };
-    });
+    const animatedGradientProps = useInterpolatedGradient(
+        fromHsl,
+        toHsl,
+        progress,
+    );
+
 
     useEffect(() => {
         if (targetGradient === prevTargetRef.current) return;
@@ -528,6 +569,13 @@ const WeatherHUD = ({
     // Spinner fades out once weather data arrives; the content layer renders at
     // full opacity from the start so GlassView can sample the background
     // immediately — mounting inside opacity:0 prevents native blur initialisation.
+    // Kept mounted for the length of the fade, then unmounted — the same
+    // mount-through-the-fade pattern BackdropLayer uses, and for the same
+    // reason its comment gives: a full-screen layer parked at opacity 0 still
+    // costs fill rate on every frame. This one is worse than most, since it
+    // sits at zIndex 10 above the entire screen.
+    const [loaderMounted, setLoaderMounted] = useState(true);
+
     useEffect(() => {
         if (!loading && weather) {
             RNAnimated.timing(loadingOpacity, {
@@ -535,9 +583,14 @@ const WeatherHUD = ({
                 duration: 400,
                 easing: RNEasing.out(RNEasing.cubic),
                 useNativeDriver: true,
-            }).start();
+            }).start(({ finished }) => {
+                // Only unmount on a fade that ran to completion; an interrupted
+                // one means loading restarted behind it.
+                if (finished) setLoaderMounted(false);
+            });
         } else if (loading) {
             loadingOpacity.setValue(1);
+            setLoaderMounted(true);
         }
     }, [loading, weather]);
 
@@ -551,8 +604,14 @@ const WeatherHUD = ({
         }
     }, [loading, onReady]);
 
-    // Spinner rotation for the inline loading indicator
-    const spinRotate = useSpinAnimation(2_000);
+    // Spinner rotation for the inline loading indicator.
+    //
+    // Gated on `loading`, which it previously wasn't: the hook's effect keys on
+    // [reduceMotion, durationMs], so a constant duration meant the Animated.loop
+    // started at mount and ran for the life of the screen — an invisible icon
+    // rotating at display rate long after the overlay had faded out. Passing 0
+    // takes the hook's stop-and-reset path.
+    const spinRotate = useSpinAnimation(loading ? 2_000 : 0);
 
     // ── Sticky mini header (drives the fade/slide as the hero scrolls away) ───
     // scrollY is updated on the UI thread by useAnimatedScrollHandler. The mini
@@ -566,6 +625,7 @@ const WeatherHUD = ({
             scrollY.value = e.contentOffset.y;
         },
     });
+
 
     const scrollRef = useAnimatedRef<Animated.ScrollView>();
 
@@ -600,6 +660,25 @@ const WeatherHUD = ({
             if (current !== previous) runOnJS(setMiniVisible)(current);
         },
         [heroBottomY],
+    );
+
+    // Freeze point for the clear-night twinkle. Deliberately deeper than
+    // `miniVisible`: stopping the animation snaps every star to full opacity
+    // (progress 0 is the bright end of TWINKLE_RANGE), so a star caught mid-dim
+    // jumps from 0.15 to 1.0. Firing that at the hero boundary put the pop where
+    // the field was still near full brightness and plainly visible.
+    //
+    // SCROLL_RANGE is where BackdropLayer's dim bottoms out at MIN_DIM, so by
+    // here the field is at its faintest and well behind the content — the same
+    // snap lands at roughly half the amplitude, against a sky the eye has
+    // already left.
+    const [twinkleFrozen, setTwinkleFrozen] = useState(false);
+
+    useAnimatedReaction(
+        () => scrollY.value >= SCROLL_RANGE,
+        (current, previous) => {
+            if (current !== previous) runOnJS(setTwinkleFrozen)(current);
+        },
     );
 
     const isMetric = settings.temperatureScale === 'Metric';
@@ -660,10 +739,13 @@ const WeatherHUD = ({
         );
     }, [forecasts, sunEvents, isMetric]);
 
-    // Full-screen star backdrop for clear nights; storm backdrop for thunder.
-    // Both derive from the shared classifier so they track the icon/gradient.
+    // Full-screen star backdrop for clear nights; storm backdrop for thunder;
+    // light-rain backdrop for plain rain; drizzle backdrop for drizzle. All
+    // derive from the shared classifier so they track the icon/gradient.
     const isClearNightBg = !!weather && isClearNight(weather.WeatherText, weather.IsDayTime);
     const isStormBg = !!weather && isThunderstorm(weather.WeatherText);
+    const isRainBg = !!weather && isRain(weather.WeatherText);
+    const isDrizzleBg = !!weather && isDrizzle(weather.WeatherText);
 
     // Precipitation slant from the reported wind. Gust is preferred when present
     // — it's what makes a squall look like a squall rather than steady drizzle.
@@ -682,6 +764,18 @@ const WeatherHUD = ({
             weather?.Wind.Direction,
         ],
     );
+
+    // Opaque weather-matched fill for the details card (dev flag only, for now).
+    // The palette's footer colours stop at 0.97 alpha — visually solid, but the
+    // compositor still treats them as translucent and so still draws the
+    // animating sky underneath. Forcing alpha to 1 is what lets that region be
+    // skipped entirely.
+    const opaqueCardBg = useMemo(() => {
+        if (!weather) return undefined;
+        const c = footerBgFor(weather.WeatherText, weather.IsDayTime);
+        const m = /^rgba\(([^,]+),([^,]+),([^,]+),[^)]+\)$/.exec(c.trim());
+        return m ? `rgb(${m[1].trim()},${m[2].trim()},${m[3].trim()})` : c;
+    }, [weather?.WeatherText, weather?.IsDayTime]);
 
     // ── Error state (#9: retry + check settings) ──────────────────────────────
     if (error && !weather)
@@ -719,18 +813,43 @@ const WeatherHUD = ({
                 so they barely drift; storm rain is right in front of you and
                 tracks the scroll hard. Moving both at one rate is what makes
                 cheap parallax read as a flat sticker sliding around. */}
-            <BackdropLayer visible={isClearNightBg} scrollY={scrollY} depth={0.3}>
+            <BackdropLayer
+                visible={isClearNightBg && perf.backdrop}
+                scrollY={scrollY}
+                depth={0.3}
+                parallax={perf.parallax}
+            >
+                {/* Option H — the twinkle stops once scrolled past
+                    SCROLL_RANGE. Six looping opacity drivers on near-coprime
+                    durations mean this sky never settles, so anything blurring
+                    it re-samples forever; by that offset it's dimmed to MIN_DIM
+                    and nobody is looking at the stars. See `twinkleFrozen` above
+                    for why the threshold is that deep rather than the hero
+                    boundary.
+
+                    Clear night ONLY. The rain, drizzle and storm backdrops
+                    below keep animating unconditionally — they aren't what
+                    stutters, and their motion is the entire point of them. */}
                 <ClearNightIconMoon
                     fullWidth
                     fullHeight
                     showMoon={false}
+                    animate={
+                        perf.twinkle &&
+                        !(perf.freezeTwinkleOnScroll && twinkleFrozen)
+                    }
                 />
             </BackdropLayer>
 
             {/* Full-screen storm backdrop — falling rain + occasional sheet flash.
                 rainAngle now tracks the reported wind, so the slant matches the
                 conditions instead of being a fixed 0.12 everywhere. */}
-            <BackdropLayer visible={isStormBg} scrollY={scrollY} depth={1}>
+            <BackdropLayer
+                visible={isStormBg && perf.backdrop}
+                scrollY={scrollY}
+                depth={1}
+                parallax={perf.parallax}
+            >
                 <StormIconLightning
                     fullWidth
                     fullHeight
@@ -739,12 +858,58 @@ const WeatherHUD = ({
                     showRain
                     showFlash
                     rainAngle={rainAngle}
+                    animate={perf.twinkle}
+                />
+            </BackdropLayer>
+
+            {/* Full-screen plain-rain backdrop — gentler, much slower falling
+                rain, no bolts or sheet flash. Mutually exclusive with the storm
+                backdrop above and the drizzle one below: isThunderstorm, isRain
+                and isDrizzle come from disjoint classifier kinds. */}
+            <BackdropLayer
+                visible={isRainBg && perf.backdrop}
+                scrollY={scrollY}
+                depth={1}
+                parallax={perf.parallax}
+            >
+                <StormIconLightning
+                    fullWidth
+                    fullHeight
+                    showCloud={false}
+                    showBolts={false}
+                    showRain
+                    showFlash={false}
+                    rainAngle={rainAngle}
+                    rainVariant="light"
+                    animate={perf.twinkle}
+                />
+            </BackdropLayer>
+
+            {/* Full-screen drizzle backdrop — same falling-rain mechanism, but
+                short, faint, quick-falling droplets instead of the long slow
+                streaks used for plain rain. */}
+            <BackdropLayer
+                visible={isDrizzleBg && perf.backdrop}
+                scrollY={scrollY}
+                depth={1}
+                parallax={perf.parallax}
+            >
+                <StormIconLightning
+                    fullWidth
+                    fullHeight
+                    showCloud={false}
+                    showBolts={false}
+                    showRain
+                    showFlash={false}
+                    rainAngle={rainAngle}
+                    rainVariant="drizzle"
+                    animate={perf.twinkle}
                 />
             </BackdropLayer>
 
             {/* Transparent loading spinner — sits over the animating gradient.
                 Suppressed when a parent owns the loading gate (showInlineLoader). */}
-            {showInlineLoader && (
+            {showInlineLoader && loaderMounted && (
                 <RNAnimated.View
                     style={[st.loadingOverlay, { opacity: loadingOpacity }]}
                     pointerEvents={loading ? 'auto' : 'none'}
@@ -840,7 +1005,15 @@ const WeatherHUD = ({
                             colorScheme="dark" from ForceDarkPalette on MainPage,
                             keeping tiles consistent between light and dark mode.
                             (GlassGroup/GlassContainer has no colorScheme prop and
-                            always follows UIWindow, which breaks consistency.) */}
+                            always follows UIWindow, which breaks consistency.)
+
+                            These were briefly consolidated into one card spanning
+                            the strip, on the theory that surface COUNT was the
+                            cost. Measured worse on an iPhone 16: the ScrollView
+                            clips offscreen tiles so only ~5 ever blur anything,
+                            and the gaps between them aren't blurred either, so
+                            one contiguous full-width surface covers more animated
+                            sky than the tiles it replaced. */}
                         {stripItems.length > 0 && (
                             <View>
                                 <ScrollView
@@ -881,6 +1054,7 @@ const WeatherHUD = ({
                                                         item.data.DateTime,
                                                     ) === hourBucket
                                                 }
+                                                disableGlass={!perf.glass}
                                             />
                                         ) : (
                                             <SunEventTile
@@ -888,6 +1062,7 @@ const WeatherHUD = ({
                                                 time={item.time}
                                                 temperature={item.temp}
                                                 tempUnit={isMetric ? 'C' : 'F'}
+                                                disableGlass={!perf.glass}
                                             />
                                         ),
                                     )}
@@ -895,8 +1070,42 @@ const WeatherHUD = ({
                             </View>
                         )}
 
-                        {/* Details + outfit */}
-                        <GlassCard style={st.details}>
+                        {/* Details + outfit.
+                            NOT a glass surface, deliberately. This is the
+                            tallest element on the screen, so as glass it blurred
+                            more animated sky than everything else combined — and
+                            its children (the Stat cards, the outfit's article
+                            and layer cards, the GlassGroups) are themselves
+                            glass, so each one was re-blurring a surface that had
+                            already blurred the sky. Dropping the outer material
+                            removes the largest blur region AND collapses that
+                            stacking; the children still read as glass because
+                            they now sample the sky directly.
+
+                            The style already carries the translucent bg + border
+                            that `disableGlass` renders, so the container looks
+                            the same — at this size the material was almost
+                            entirely hidden behind its own children anyway. */}
+                        <GlassCard
+                            style={[
+                                st.details,
+                                // Last in the array on purpose: GlassCard's
+                                // fallback applies `style` after its own
+                                // background, so overriding here (rather than
+                                // via tintColor) is what actually wins.
+                                //
+                                // Only reaches the screen on the FALLBACK path.
+                                // With outfitCardGlass on, GlassCard strips
+                                // backgroundColor before handing the style to
+                                // GlassView, so on iOS 26 this is inert and the
+                                // material shows through as normal; on Android
+                                // and pre-26 it paints the card solid.
+                                perf.opaqueOutfitCard && opaqueCardBg
+                                    ? { backgroundColor: opaqueCardBg }
+                                    : null,
+                            ]}
+                            disableGlass={!perf.outfitCardGlass}
+                        >
                             <WeatherDetails
                                 weather={weather}
                                 settings={settings}
@@ -955,6 +1164,7 @@ const WeatherHUD = ({
                             <GlassCard
                                 glassStyle='clear'
                                 style={st.locationsBtn}
+                                disableGlass={!perf.glass}
                             >
                                 <Pressable
                                     onPress={onOpenLocations}
@@ -985,6 +1195,7 @@ const WeatherHUD = ({
                                     <GlassCard
                                         glassStyle='regular'
                                         style={st.miniPill}
+                                        disableGlass={!perf.glass}
                                     >
                                         <WeatherIconDisplay
                                             condition={weather.WeatherText}
@@ -1004,7 +1215,11 @@ const WeatherHUD = ({
                                 </Pressable>
                             </Animated.View>
                         )}
-                        <GlassCard glassStyle='clear' style={st.gearBtn}>
+                        <GlassCard
+                            glassStyle='clear'
+                            style={st.gearBtn}
+                            disableGlass={!perf.glass}
+                        >
                             <Pressable
                                 onPress={() => nav.push('/account')}
                                 accessibilityLabel='Account settings'
@@ -1017,6 +1232,11 @@ const WeatherHUD = ({
                             </Pressable>
                         </GlassCard>
                     </View>
+
+                    {/* Dev-only bisection switches. Inside the content layer so
+                        it sits above the backdrops and the glass surfaces it
+                        toggles; renders null in a release build. */}
+                    <PerfPanel />
 
                     <ShareToInstagramSheet
                         visible={showShareSheet}

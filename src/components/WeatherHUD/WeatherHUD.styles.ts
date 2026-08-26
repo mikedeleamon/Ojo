@@ -59,19 +59,21 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         paddingVertical: 6,
         overflow: 'hidden',
     },
+    // Sticky mini header mirrors the hero (see WeatherIconDisplay's `animate`
+    // comment), so it stays on `fonts.hero` too.
     miniCity: {
-        fontFamily: fonts.display,
+        fontFamily: fonts.hero,
         fontSize: 16,
         color: colors.textPrimary,
         flexShrink: 1,
     },
     miniTemp: {
-        fontFamily: fonts.display,
+        fontFamily: fonts.hero,
         fontSize: 16,
         color: colors.textPrimary,
     },
     city: {
-        fontFamily: fonts.display,
+        fontFamily: fonts.hero,
         fontSize: 36,
         color: colors.textPrimary,
     },
@@ -135,6 +137,10 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         marginTop: 4,
         letterSpacing: 0.5,
     },
+    // `gap` is load-bearing beyond spacing: the tiles are individual glass
+    // surfaces and the space between them is NOT blurred, so widening the gap
+    // trades layout density against blurred area — which is what this screen
+    // turns out to be sensitive to. See the note in MinimizedWeatherDisplay.
     forecastStrip: {
         flexDirection: 'row',
         gap: 8,

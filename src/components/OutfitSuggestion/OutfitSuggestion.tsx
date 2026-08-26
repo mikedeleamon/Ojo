@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
+import { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback, memo } from 'react';
 import { useFocusEffect } from 'expo-router';
 import {
     ScrollView,
@@ -19,6 +19,7 @@ import Animated, {
     Easing,
 } from 'react-native-reanimated';
 import { View, Text, GlassCard, GlassGroup } from '../primitives';
+import { usePerfFlags } from '../../lib/debug/perfFlags';
 import { EmptyState } from '../shared';
 import OccasionChips from '../OccasionChips';
 import { useClosets } from '../../hooks/useClosets';
@@ -98,9 +99,17 @@ const ArticleThumb = ({
     onRemove?: () => void;
 }) => {
     const { colors } = useTheme();
+    const perf = usePerfFlags();
     const styles = useMemo(() => makeStyles(colors), [colors]);
     return (
-        <GlassCard style={styles.articleCard}>
+        // Not glass by default — it sits inside the outfit card, which is no
+        // longer glass either, so this would blur the animated sky directly.
+        // `articleCard` already sets the translucent bg the fallback draws, so
+        // it looks the same. See lib/debug/perfFlags.
+        <GlassCard
+            style={styles.articleCard}
+            disableGlass={!perf.outfitInnerGlass}
+        >
             <View style={styles.articleImg}>
                 {article.imageUrl ? (
                     <Image
@@ -247,6 +256,7 @@ interface Props {
 
 const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }: Props) => {
     const { colors } = useTheme();
+    const perf = usePerfFlags();
     const styles = useMemo(() => makeStyles(colors), [colors]);
     const { closets, loading, error: closetsError, preferred, setPreferred, refresh } =
         useClosets();
@@ -767,6 +777,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
 
     // #5 — Fire a subtle swipe-hint bounce once after outfits appear
     useEffect(() => {
+        if (!perf.outfitSwipeHint) return;
         if (reduceMotion || hintFired.current || outfits.length <= 1) return;
         hintFired.current = true;
         const timer = setTimeout(() => {
@@ -786,7 +797,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
             ]).start();
         }, 800);
         return () => clearTimeout(timer);
-    }, [outfits.length, reduceMotion]);
+    }, [outfits.length, reduceMotion, perf.outfitSwipeHint]);
 
     if (loading) return null;
 
@@ -980,8 +991,25 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
                 one is absolutely positioned so it never affects layout. ── */}
             <View>
                 {/* ── Interactive panel: trip banner + generated suggestion ── */}
+                {/* The animated style is attached only once a crossfade can
+                    actually occur. Binding it from first render makes this
+                    entire subtree — pager, cards, thumbnails, layering — a
+                    standing animated layer that can't be flattened into its
+                    parent, so it gets composited separately on every scrolled
+                    frame, for a transition that hasn't happened yet.
+
+                    `confirmEverNeeded` is the same condition already used to
+                    gate the confirmation panel's children: false until the
+                    first "Wore this today", true forever after. While it's
+                    false, `wornLogged` is false too, so the style this replaces
+                    resolves to plain opacity 1 — dropping it changes nothing
+                    visually. */}
                 <Animated.View
-                    style={[carouselAnimStyle, wornLogged && styles.crossfadeInactive]}
+                    style={
+                        perf.outfitCrossfade || confirmEverNeeded
+                            ? [carouselAnimStyle, wornLogged && styles.crossfadeInactive]
+                            : undefined
+                    }
                     pointerEvents={wornLogged ? 'none' : 'auto'}
                 >
                     {/* Trip banner and the generated suggestion are mutually
@@ -1029,11 +1057,19 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
                         )}
                     </View>
 
-                    {/* ── Outfit pager with #5 swipe hint bounce ── */}
+                    {/* ── Outfit pager with #5 swipe hint bounce ──
+                        With the hint off this deliberately passes no style at
+                        all rather than an identity transform: binding an
+                        interpolated value here makes the whole pager subtree a
+                        permanently attached animated layer, which is the part
+                        worth being able to switch off, not just the 800ms of
+                        motion. */}
                     <RNAnimated.View
-                        style={{
-                            transform: [{ translateX: hintTranslateX }],
-                        }}
+                        style={
+                            perf.outfitSwipeHint
+                                ? { transform: [{ translateX: hintTranslateX }] }
+                                : undefined
+                        }
                     >
                         <ScrollView
                             ref={pagerRef}
@@ -1339,4 +1375,7 @@ const PreferredBadge = ({
     );
 };
 
-export default OutfitSuggestion;
+// Memoised for the same reason as its parent — this is the largest subtree on
+// the screen, and it was being reconciled on every WeatherHUD state change.
+// See the note above WeatherDetails' export.
+export default memo(OutfitSuggestion);

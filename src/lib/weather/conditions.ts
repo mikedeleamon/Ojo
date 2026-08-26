@@ -197,3 +197,11 @@ export const isClearNight = (condition: string, isDay: boolean): boolean =>
 /** True for thunderstorm conditions — drives the storm backdrop. */
 export const isThunderstorm = (condition: string): boolean =>
     classifyCondition(condition) === 'thunderstorm';
+
+/** True for plain rain (not drizzle, not thunderstorms) — drives the light-rain backdrop. */
+export const isRain = (condition: string): boolean =>
+    classifyCondition(condition) === 'rain';
+
+/** True for drizzle — drives the drizzle backdrop (short, quick droplets). */
+export const isDrizzle = (condition: string): boolean =>
+    classifyCondition(condition) === 'drizzle';

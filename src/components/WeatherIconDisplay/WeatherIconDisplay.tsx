@@ -58,11 +58,15 @@ const makeStyles = (colors: ColorTokens) =>
         iconLarge: { width: 180, height: 180 },
         iconSmall: { width: 36, height: 36 },
         temps: { alignItems: 'center', gap: 2 },
+        // RN clips glyphs to the line box, so lineHeight must clear the font's
+        // declared ascent+descent. Fraunces' (~123% of em) is comfortably
+        // smaller than DM Serif's (~137%), so this has more headroom than the
+        // original serif did, not less.
         temp: {
-            fontFamily: fonts.display,
+            fontFamily: fonts.hero,
             fontSize: 64,
             color: colors.textPrimary,
-            lineHeight: 68,
+            lineHeight: 70,
         },
         feelsLike: {
             fontFamily: fonts.body,

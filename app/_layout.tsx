@@ -213,6 +213,7 @@ export default Sentry.wrap(function RootLayout() {
       try {
         await Font.loadAsync({
           DMSerifDisplay: require('../assets/fonts/DMSerifDisplay-Regular.ttf'),
+          'Fraunces-SemiBold': require('../assets/fonts/Fraunces-SemiBold.ttf'),
           Outfit:          require('../assets/fonts/Outfit_400Regular.ttf'),
           'Outfit-Light':    require('../assets/fonts/Outfit_300Light.ttf'),
           'Outfit-Regular':  require('../assets/fonts/Outfit_400Regular.ttf'),

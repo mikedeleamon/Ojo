@@ -25,6 +25,15 @@ import { useReduceMotion } from '../../hooks/useReduceMotion';
 // UI thread with no JS-thread work per frame. (This component previously used
 // RN Animated; the two systems can't be composed on a single view, and scrollY
 // is already a Reanimated shared value driving the sticky header.)
+//
+// The scroll dim was once moved out of here — onto a full-screen gradient scrim
+// in WeatherHUD — on the theory that group opacity over the 32-view star field
+// was forcing a per-frame offscreen composite. Measured on an iPhone 16, that
+// made scrolling *worse*, not better: the scrim added a full-screen alpha-
+// blended layer beneath the glass, and its cost outweighed whatever the
+// offscreen pass had been costing. The dim lives here again. If this is
+// revisited, the lesson is that full-screen fill under a glass surface is the
+// expensive thing on this screen — adding any layer there has to pay for itself.
 
 const FADE_MS = 900;
 
@@ -38,8 +47,12 @@ const FADE_MS = 900;
  */
 const MAX_PARALLAX = 48;
 
-/** Scroll offset at which parallax and dimming reach their limit. */
-const SCROLL_RANGE = 420;
+/**
+ * Scroll offset at which parallax and dimming reach their limit.
+ * Exported because WeatherHUD freezes the clear-night twinkle at exactly this
+ * point — past here the backdrop is at MIN_DIM and holds still.
+ */
+export const SCROLL_RANGE = 420;
 /** Rubber-band range above the top (pull-to-refresh) that drifts the sky down. */
 const OVERSCROLL_RANGE = 160;
 
@@ -57,10 +70,22 @@ interface Props {
      * you, so they should not move together.
      */
     depth: number;
+    /**
+     * Apply the scroll-driven parallax and dim. Only the dev perf panel passes
+     * false — it's one of the levers for isolating what actually costs frames
+     * on this screen (see lib/debug/perfFlags).
+     */
+    parallax?: boolean;
     children: React.ReactNode;
 }
 
-export default function BackdropLayer({ visible, scrollY, depth, children }: Props) {
+export default function BackdropLayer({
+    visible,
+    scrollY,
+    depth,
+    parallax = true,
+    children,
+}: Props) {
     const reduceMotion = useReduceMotion();
     // Rendered while visible, and kept alive through the fade-out afterwards.
     const [mounted, setMounted] = useState(visible);
@@ -88,7 +113,7 @@ export default function BackdropLayer({ visible, scrollY, depth, children }: Pro
         // Parallax is motion tied to the finger and is a known vestibular
         // trigger, so it goes away under reduce-motion. The dim is not motion
         // and stays — it's there for text legibility.
-        const translateY = reduceMotion
+        const translateY = reduceMotion || !parallax
             ? 0
             : interpolate(
                   scrollY.value,
@@ -100,15 +125,17 @@ export default function BackdropLayer({ visible, scrollY, depth, children }: Pro
         // Thin the backdrop as content slides over it: keeps the glass cards and
         // body copy legible against a busy sky, and reads as depth rather than
         // as a compromise.
-        const dim = interpolate(
-            scrollY.value,
-            [0, SCROLL_RANGE],
-            [1, MIN_DIM],
-            Extrapolation.CLAMP,
-        );
+        const dim = parallax
+            ? interpolate(
+                  scrollY.value,
+                  [0, SCROLL_RANGE],
+                  [1, MIN_DIM],
+                  Extrapolation.CLAMP,
+              )
+            : 1;
 
         return { opacity: fade.value * dim, transform: [{ translateY }] };
-    }, [depth, reduceMotion]);
+    }, [depth, reduceMotion, parallax]);
 
     if (!mounted) return null;
 

@@ -84,6 +84,28 @@ const RAIN_GROUPS = [
     { id: 'C', xOffsets: [0.04, 0.19, 0.34, 0.50, 0.66, 0.83], duration: 1100, startDelay: 420 },
 ] as const;
 
+// Plain-rain variant: fewer columns and a slower fall than the storm rain
+// above, so ordinary rain/drizzle reads as gentler without touching the
+// thunderstorm backdrop's look. No sheet flash or bolts accompany this one —
+// callers pass showFlash={false} showBolts={false}.
+const RAIN_GROUPS_LIGHT = [
+    { id: 'A', xOffsets: [0.10, 0.35, 0.60, 0.85], duration: 1300, startDelay: 0   },
+    { id: 'B', xOffsets: [0.22, 0.48, 0.73],       duration: 1550, startDelay: 260 },
+] as const;
+
+// Drizzle variant: NOT the slow fall above — fine droplets fall quickly, just
+// short and faint. Denser columns than the light-rain variant (closer to the
+// storm count) since drizzle reads as a mist of many tiny drops rather than a
+// few long streaks.
+const RAIN_GROUPS_DRIZZLE = [
+    { id: 'A', xOffsets: [0.08, 0.24, 0.40, 0.56, 0.72, 0.88], duration: 620, startDelay: 0   },
+    { id: 'B', xOffsets: [0.16, 0.32, 0.48, 0.64, 0.80, 0.96], duration: 700, startDelay: 140 },
+] as const;
+
+const STREAK_OPACITY_STORM = 0.55;
+const STREAK_OPACITY_LIGHT = 0.32;
+const STREAK_OPACITY_DRIZZLE = 0.30;
+
 const DROPS_PER_GROUP = 6;
 
 // Streak dimensions in POINTS. The rain SVG is given a viewBox in points (see
@@ -92,7 +114,8 @@ const DROPS_PER_GROUP = 6;
 // across — a sub-pixel hairline that aliases and shimmers as it translates,
 // which is its own source of visible chop independent of frame rate.
 const STREAK_WIDTH = 1.5;
-const STREAK_HEIGHT = 14;
+const STREAK_HEIGHT_STORM = 14;
+const STREAK_HEIGHT_DRIZZLE = 6;
 
 // ─── Bolt component ──────────────────────────────────────────────────────────
 // A single bolt polygon wrapped in an Animated.View whose opacity is driven by
@@ -158,6 +181,8 @@ interface RainLayerProps {
     duration: number;
     startDelay: number;
     fill: string;
+    opacity: number;
+    streakHeight: number;
     width: number;
     height: number;
     rainAngle: number;
@@ -165,7 +190,7 @@ interface RainLayerProps {
 }
 
 function RainLayer({
-    xOffsets, duration, startDelay, fill, width, height, rainAngle, animate,
+    xOffsets, duration, startDelay, fill, opacity, streakHeight, width, height, rainAngle, animate,
 }: RainLayerProps) {
     const progress = useRef(new Animated.Value(0)).current;
     // The rain SVG's viewBox is the layer in points, so STREAK_WIDTH/HEIGHT and
@@ -238,10 +263,10 @@ function RainLayer({
                         x={s.x}
                         y={s.y}
                         width={STREAK_WIDTH}
-                        height={STREAK_HEIGHT}
+                        height={streakHeight}
                         rx={STREAK_WIDTH / 2}
                         fill={fill}
-                        opacity={0.55}
+                        opacity={opacity}
                     />
                 ))}
             </Svg>
@@ -341,6 +366,13 @@ interface StormIconLightningProps {
     showFlash?: boolean;
     /** 0–0.3 wind-drift fraction (translateX / translateY per rain segment). */
     rainAngle?: number;
+    /**
+     * 'storm' is the dense, fast rain used behind thunderstorms. 'light' is
+     * fewer streaks falling much slower and fainter, for plain rain. 'drizzle'
+     * is dense but short, faint, quick-falling droplets. Pair 'light'/'drizzle'
+     * with showBolts={false} showFlash={false}. Default 'storm'.
+     */
+    rainVariant?: 'storm' | 'light' | 'drizzle';
 }
 
 export default function StormIconLightning({
@@ -354,6 +386,7 @@ export default function StormIconLightning({
     showRain = false,
     showFlash = false,
     rainAngle = 0.12,
+    rainVariant = 'storm',
 }: StormIconLightningProps) {
     const reduceMotion = useReduceMotion();
     const animateOn = animate && !reduceMotion;
@@ -397,14 +430,27 @@ export default function StormIconLightning({
                 />
             ))}
 
-            {/* Rain — 3 parallax groups, each native-driver translateY+translateX */}
-            {showRain && RAIN_GROUPS.map((g) => (
+            {/* Rain — parallax groups, each native-driver translateY+translateX.
+                'light' swaps in fewer, much slower, fainter columns for plain
+                rain. 'drizzle' keeps storm-like density and speed but with
+                short, faint droplets instead of long streaks. */}
+            {showRain && (
+                rainVariant === 'light' ? RAIN_GROUPS_LIGHT
+                : rainVariant === 'drizzle' ? RAIN_GROUPS_DRIZZLE
+                : RAIN_GROUPS
+            ).map((g) => (
                 <RainLayer
                     key={g.id}
                     xOffsets={g.xOffsets}
                     duration={g.duration}
                     startDelay={g.startDelay}
                     fill={color}
+                    opacity={
+                        rainVariant === 'light' ? STREAK_OPACITY_LIGHT
+                        : rainVariant === 'drizzle' ? STREAK_OPACITY_DRIZZLE
+                        : STREAK_OPACITY_STORM
+                    }
+                    streakHeight={rainVariant === 'drizzle' ? STREAK_HEIGHT_DRIZZLE : STREAK_HEIGHT_STORM}
                     width={width}
                     height={height}
                     rainAngle={rainAngle}

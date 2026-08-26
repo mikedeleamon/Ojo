@@ -126,6 +126,41 @@ const STAR_SEEDS: { xf: number; yf: number; d: number }[] = [
     { xf: 0.93, yf: 0.813, d: 5.5 },
 ];
 
+/**
+ * Fixed stars — rendered as plain Views, never animated.
+ *
+ * These carry no opacity driver and no Animated.View wrapper, so they add
+ * geometry without adding anything the compositor has to revisit: the field
+ * gets denser at no per-frame cost, and they keep the sky populated after the
+ * twinkling set freezes on scroll (see WeatherHUD's `twinkleFrozen`).
+ *
+ * Placed in the gaps the twinkling seeds leave, and kept to the small end of
+ * the size range — baseAlpha() maps diameter to brightness, so these land
+ * dimmer and read as more distant, which is also why they aren't missed when
+ * they don't twinkle.
+ */
+const STATIC_STAR_SEEDS: { xf: number; yf: number; d: number }[] = [
+    // ── Upper centre — the band the twinkling seeds skip ───────────────────
+    { xf: 0.42, yf: 0.098, d: 3 },
+    { xf: 0.58, yf: 0.135, d: 3.5 },
+    { xf: 0.68, yf: 0.055, d: 3 },
+    // ── Upper-to-middle transition ─────────────────────────────────────────
+    { xf: 0.09, yf: 0.242, d: 3.5 },
+    { xf: 0.33, yf: 0.203, d: 3 },
+    { xf: 0.62, yf: 0.227, d: 4 },
+    { xf: 0.91, yf: 0.258, d: 3 },
+    // ── Middle centre ──────────────────────────────────────────────────────
+    { xf: 0.38, yf: 0.328, d: 3.5 },
+    { xf: 0.68, yf: 0.313, d: 3.5 },
+    { xf: 0.55, yf: 0.445, d: 3 },
+    { xf: 0.35, yf: 0.523, d: 4 },
+    // ── Lower centre ───────────────────────────────────────────────────────
+    { xf: 0.62, yf: 0.594, d: 3 },
+    { xf: 0.45, yf: 0.633, d: 3.5 },
+    { xf: 0.88, yf: 0.648, d: 3 },
+    { xf: 0.17, yf: 0.945, d: 4 },
+];
+
 const STAR_MIN_D = 3;
 const STAR_MAX_D = 6;
 
@@ -228,12 +263,34 @@ function StarField({ width, height, color, animate }: StarFieldProps) {
         [width, height, color],
     );
 
+    // Plain Views: no animated node, no opacity binding, nothing per-frame.
+    const staticBoxes = useMemo<ViewStyle[]>(
+        () =>
+            STATIC_STAR_SEEDS.map((s) => ({
+                position: 'absolute',
+                left: s.xf * width - s.d / 2,
+                top: s.yf * height - s.d / 2,
+                width: s.d,
+                height: s.d,
+                borderRadius: s.d / 2,
+                backgroundColor: withAlpha(color, baseAlpha(s.d)),
+            })),
+        [width, height, color],
+    );
+
     return (
         <>
             {boxes.map((box, i) => (
                 <Animated.View
                     key={i}
                     style={[box, { opacity: opacities[i % opacities.length] }]}
+                    pointerEvents='none'
+                />
+            ))}
+            {staticBoxes.map((box, i) => (
+                <View
+                    key={i}
+                    style={box}
                     pointerEvents='none'
                 />
             ))}

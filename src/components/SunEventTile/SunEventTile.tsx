@@ -15,6 +15,9 @@ interface Props {
     time: string; // ISO timestamp of the sunrise / sunset moment
     temperature: number; // already converted to the user's preferred unit
     tempUnit: string; // 'F' | 'C'
+    /** Forwarded from the dev perf panel so the strip participates in the
+     *  glass on/off bisection along with the rest of the HUD. */
+    disableGlass?: boolean;
 }
 
 const formatExactTime = (iso: string) =>
@@ -50,16 +53,16 @@ const makeStyles = (colors: ColorTokens) =>
         },
     });
 
-const SunEventTile = ({ time, temperature, tempUnit }: Props) => {
+const SunEventTile = ({ time, temperature, tempUnit, disableGlass }: Props) => {
     const { colors } = useTheme();
     const styles = useMemo(() => makeStyles(colors), [colors]);
     return (
-        // disableGlass can be used as for the same reason as the forecast tiles it sits
-        // between: see MinimizedWeatherDisplay. see commented example below. The native glass effect is disabled because the backdrop is moving (the sky) and the native glass effect re-blurred its backdrop on every frame the sky moved. The card style already carries the translucent bg + border the fallback path uses, so the tiles look the same either way — at 64 pt wide the material was barely legible regardless. To avoid the performance hit, we disable the native glass effect and just use the fallback style by uncommenting the following line:
-        // <GlassCard disableGlass style={styles.card}>
+        // Its own glass surface, for the same reason as the forecast tiles it
+        // sits between — see MinimizedWeatherDisplay.
         <GlassCard
             glassStyle='clear'
             style={styles.card}
+            disableGlass={disableGlass}
         >
             <Text style={styles.time}>{formatExactTime(time)}</Text>
             <SunriseSunsetIcon size={36} />
