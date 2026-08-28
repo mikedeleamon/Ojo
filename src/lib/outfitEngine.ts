@@ -91,7 +91,9 @@ const FABRIC_WEATHER: Record<string, Record<WeatherBucket, number>> = {
 // hoodie — the fabric modifier captures this.
 // 0 = no insulation (tank), 1 = maximum insulation (heavy coat).
 
-const GARMENT_WARMTH_BASE: Record<string, number> = {
+// Exported (read-only) so the archetype catalog test can validate against the
+// real table rather than a hand-copied duplicate of its keys.
+export const GARMENT_WARMTH_BASE: Record<string, number> = {
   Tank:       0.00,
   'T-Shirt':  0.05,
   Blouse:     0.05,
@@ -115,7 +117,7 @@ const GARMENT_WARMTH_BASE: Record<string, number> = {
 
 // Fabric contribution to garment warmth — added to base.
 // Positive = insulates more; negative = breathes more / less warm.
-const FABRIC_WARMTH_MOD: Record<string, number> = {
+export const FABRIC_WARMTH_MOD: Record<string, number> = {
   Fleece:     0.15,
   Wool:       0.12,
   Leather:    0.08,

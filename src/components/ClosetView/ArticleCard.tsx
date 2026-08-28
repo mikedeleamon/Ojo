@@ -4,6 +4,7 @@ import { Swipeable } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
 import { View, Text, GlassCard } from '../primitives';
 import { HangerIcon } from '../shared/HangerIcon';
+import GarmentSilhouette, { hasSilhouette } from '../GarmentSilhouette';
 import { useConfirm } from '../ConfirmDialog';
 import { useTheme } from '../../theme/ThemeContext';
 import { fonts, fontSizes, fontWeights, radius } from '../../theme/tokens';
@@ -70,6 +71,14 @@ export const ArticleCard = memo(({
                             onError={() =>
                                 setErroredUrl(article.imageUrl ?? null)
                             }
+                        />
+                    ) : hasSilhouette(article.clothingType) ? (
+                        // Drawn rather than hangered: an item added by hand
+                        // simply has no photo, which is not the same thing as a
+                        // photo that failed to load.
+                        <GarmentSilhouette
+                            clothingType={article.clothingType}
+                            size={20}
                         />
                     ) : (
                         <HangerIcon
@@ -163,6 +172,14 @@ export const TileArticleCard = memo(({
                             onError={() =>
                                 setErroredUrl(article.imageUrl ?? null)
                             }
+                        />
+                    ) : hasSilhouette(article.clothingType) ? (
+                        // Drawn rather than hangered: an item added by hand
+                        // simply has no photo, which is not the same thing as a
+                        // photo that failed to load.
+                        <GarmentSilhouette
+                            clothingType={article.clothingType}
+                            size={26}
                         />
                     ) : (
                         <HangerIcon

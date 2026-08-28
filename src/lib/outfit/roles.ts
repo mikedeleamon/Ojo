@@ -1,7 +1,12 @@
 import type { ClothingArticle, BodyZone } from '../../types';
 import type { OutfitRole } from './types';
 
-const ROLE_MAP: Record<string, OutfitRole> = {
+/**
+ * Exported (read-only) so the archetype catalog test can assert every archetype's
+ * `clothingType` is a real key here. A type missing from this map falls through
+ * to 'top' silently — see docs/zero-catalog-first-value.md §2.2.
+ */
+export const ROLE_MAP: Record<string, OutfitRole> = {
   Shirt: 'top', 'T-Shirt': 'top', Blouse: 'top',
   Hoodie: 'midLayer', Sweater: 'midLayer',
   Jacket: 'outerwear', Coat: 'outerwear',

@@ -10,6 +10,9 @@ import OjoLogoIcon from '../../components/icons/OjoLogoIcon';
 import { useSettings } from '../../hooks/useSettings';
 import { useReduceMotion } from '../../hooks/useReduceMotion';
 import { markOnboardingComplete } from '../../lib/onboarding';
+import CityAutocomplete from '../../features/settings/components/CityAutocomplete';
+import { getCurrentLocation } from '../../lib/location';
+import { reverseGeocode } from '../../lib/geocoding';
 import { requestPermission, registerPushToken, NOTIF_DEFAULTS } from '../../lib/notifications';
 import { hapticSuccess } from '../../lib/haptics';
 import { auth } from '../../lib/auth';
@@ -23,7 +26,21 @@ import { GENDERS } from '../../lib/colors/palettes';
 
 const STYLES_LIST = ['Casual', 'Business Casual', 'Formal', 'Athletic', 'Streetwear', 'Minimalist'];
 const TEMP_UNITS  = ['Imperial', 'Metric'] as const;
-const TOTAL_STEPS = 5;
+/**
+ * Six steps: Welcome → Location → Closet → Preferences → Notifications → Done.
+ *
+ * Location is step 2 because it is the app's most fundamental input — no
+ * coordinates, no weather, no recommendation — and because Welcome has just
+ * told the user Ojo dresses them for their weather, so the ask is motivated at
+ * the moment it lands. It used to happen implicitly on the first Home render,
+ * where the OS prompt appeared with no explanation while the weather HUD was
+ * already trying to load, and a denial left a screen that silently fell back to
+ * whatever city was in settings.
+ *
+ * Manual city search sits alongside the permission button rather than behind a
+ * "denied" branch: someone who declines the OS prompt must not hit a dead end.
+ */
+const TOTAL_STEPS = 6;
 
 // Notification types surfaced on the enable step, so users see the value
 // before the OS permission prompt appears.
@@ -118,6 +135,11 @@ export default function OnboardingPage({ onComplete }: Props) {
 
   const [step, setStep] = useState(1);
 
+  const [cityLabel,  setCityLabel]  = useState<string | null>(settings.location || null);
+  const [hasCoords,  setHasCoords]  = useState<boolean>(settings.lat != null && settings.lon != null);
+  const [locLoading, setLocLoading] = useState(false);
+  const [locErr,     setLocErr]     = useState<string | null>(null);
+
   const [closetName,    setClosetName]    = useState('My Wardrobe');
   const [closetDone,    setClosetDone]    = useState(false);
   const [closetErr,     setClosetErr]     = useState<string | null>(null);
@@ -168,6 +190,34 @@ export default function OnboardingPage({ onComplete }: Props) {
   const advance = (toStep: number) => transition(toStep, 'forward');
   const goBack  = (toStep: number) => transition(toStep, 'back');
 
+  /** Persist whatever coordinates we ended up with, however they were obtained. */
+  const persistLocation = async (lat: number, lon: number, label: string) => {
+    setHasCoords(true);
+    setCityLabel(label);
+    try {
+      await saveSettings({ ...settings, location: label, lat, lon });
+    } catch { /* non-fatal — the value still stands for this session */ }
+  };
+
+  const handleUseMyLocation = async () => {
+    setLocLoading(true);
+    setLocErr(null);
+    try {
+      const pos = await getCurrentLocation();
+      if (!pos) {
+        setLocErr('Location unavailable. Search for your city instead.');
+        return;
+      }
+      const label = (await reverseGeocode(pos.lat, pos.lng)) ?? 'Current location';
+      await persistLocation(pos.lat, pos.lng, label);
+      hapticSuccess();
+    } catch {
+      setLocErr('Location unavailable. Search for your city instead.');
+    } finally {
+      setLocLoading(false);
+    }
+  };
+
   const handleCreateCloset = async () => {
     if (!closetName.trim()) return;
     setClosetLoading(true);
@@ -183,7 +233,7 @@ export default function OnboardingPage({ onComplete }: Props) {
     }
   };
 
-  // Step 3 → 4: persist preferences, then move on to the notifications step.
+  // Step 4 → 5: persist preferences, then move on to the notifications step.
   // Completion is marked later (when leaving the notifications step) so a user
   // can still back out to tweak preferences.
   const handleFinish = async () => {
@@ -200,13 +250,13 @@ export default function OnboardingPage({ onComplete }: Props) {
         humidityPreference: humidity,
       });
     } catch { /* non-fatal */ }
-    advance(4);
+    advance(5);
   };
 
-  // Step 4 → 5: mark onboarding done and slide to the "all set" screen.
+  // Step 5 → 6: mark onboarding done and slide to the "all set" screen.
   const finishOnboarding = async () => {
     await markOnboardingComplete();
-    advance(5);
+    advance(6);
   };
 
   const handleEnableNotifications = async () => {
@@ -243,7 +293,7 @@ export default function OnboardingPage({ onComplete }: Props) {
   };
 
   useEffect(() => {
-    if (step === 5) {
+    if (step === 6) {
       const t = setTimeout(() => onComplete?.(), 1800);
       return () => clearTimeout(t);
     }
@@ -319,10 +369,90 @@ export default function OnboardingPage({ onComplete }: Props) {
                 </View>
               )}
 
-              {/* ── Step 2: Create Closet ────────────────────────────────────── */}
+              {/* ── Step 2: Location ─────────────────────────────────────────── */}
               {step === 2 && (
                 <View style={st.stepShell}>
                   <Dots step={2} colors={colors} />
+                  <StepIcon colors={colors}>
+                    <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
+                      <Path
+                        d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11Z"
+                        stroke={colors.textSecondary} strokeWidth={1.5}
+                        strokeLinecap="round" strokeLinejoin="round"
+                      />
+                      <Circle cx={12} cy={10} r={2.6} stroke={colors.textSecondary} strokeWidth={1.5} />
+                    </Svg>
+                  </StepIcon>
+                  <Text style={st.stepHeading}>Where are you?</Text>
+                  <Text style={st.stepDesc}>
+                    Ojo dresses you for your weather, so it needs to know where that is.
+                  </Text>
+
+                  {cityLabel && hasCoords ? (
+                    <View style={st.successBadge}>
+                      <Svg width={18} height={18} viewBox="0 0 18 18" fill="none">
+                        <Circle cx={9} cy={9} r={8} stroke="rgba(52,211,153,0.8)" strokeWidth={1.5} />
+                        <Path d="M5.5 9l2.5 2.5 4.5-4.5" stroke="rgba(52,211,153,0.9)"
+                          strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+                      </Svg>
+                      <Text style={st.successText}>{cityLabel}</Text>
+                    </View>
+                  ) : null}
+
+                  {locErr ? <Text style={st.errText}>{locErr}</Text> : null}
+
+                  <Pressable
+                    style={[st.primaryBtn, locLoading && st.primaryBtnDisabled]}
+                    onPress={handleUseMyLocation}
+                    disabled={locLoading}
+                    accessibilityRole="button"
+                    accessibilityLabel={locLoading ? 'Getting your location' : 'Use my location'}
+                    accessibilityState={{ busy: locLoading, disabled: locLoading }}
+                  >
+                    <Text style={st.primaryBtnText}>
+                      {locLoading ? 'Locating…' : cityLabel ? 'Use my location again' : 'Use my location'}
+                    </Text>
+                  </Pressable>
+
+                  <View style={{ width: '100%' }}>
+                    <Text style={st.prefLabel}>Or search for your city</Text>
+                    <CityAutocomplete
+                      onSelect={(city) => {
+                        if (city) void persistLocation(city.lat, city.lon, city.name);
+                      }}
+                      initialQuery={settings.location || ''}
+                      accessibilityLabel="Search for your city"
+                    />
+                  </View>
+
+                  <View style={st.navRow}>
+                    <Pressable
+                      style={st.ghostBtn}
+                      onPress={() => goBack(1)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Back"
+                    >
+                      <Text style={st.ghostBtnText}>Back</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[st.primaryBtn, !hasCoords && st.primaryBtnDisabled]}
+                      onPress={() => advance(3)}
+                      disabled={!hasCoords}
+                      accessibilityRole="button"
+                      accessibilityLabel="Next"
+                      accessibilityState={{ disabled: !hasCoords }}
+                    >
+                      <Text style={st.primaryBtnText}>Next</Text>
+                      <ArrowRight color={colors.saveBtnText} />
+                    </Pressable>
+                  </View>
+                </View>
+              )}
+
+              {/* ── Step 3: Create Closet ────────────────────────────────────── */}
+              {step === 3 && (
+                <View style={st.stepShell}>
+                  <Dots step={3} colors={colors} />
                   <StepIcon colors={colors}>
                     <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
                       <Path
@@ -376,7 +506,7 @@ export default function OnboardingPage({ onComplete }: Props) {
                   <View style={st.navRow}>
                     <Pressable
                       style={st.ghostBtn}
-                      onPress={() => goBack(1)}
+                      onPress={() => goBack(2)}
                       accessibilityRole="button"
                       accessibilityLabel="Back"
                     >
@@ -384,7 +514,7 @@ export default function OnboardingPage({ onComplete }: Props) {
                     </Pressable>
                     <Pressable
                       style={[st.primaryBtn, (!closetDone && !closetErr) && st.primaryBtnDisabled]}
-                      onPress={() => advance(3)}
+                      onPress={() => advance(4)}
                       disabled={!closetDone && !closetErr}
                       accessibilityRole="button"
                       accessibilityLabel={closetErr ? 'Skip this step' : 'Next'}
@@ -397,10 +527,10 @@ export default function OnboardingPage({ onComplete }: Props) {
                 </View>
               )}
 
-              {/* ── Step 3: Preferences ──────────────────────────────────────── */}
-              {step === 3 && (
+              {/* ── Step 4: Preferences ──────────────────────────────────────── */}
+              {step === 4 && (
                 <View style={st.stepShell}>
-                  <Dots step={3} colors={colors} />
+                  <Dots step={4} colors={colors} />
                   <StepIcon colors={colors}>
                     <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
                       <Path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"
@@ -549,7 +679,7 @@ export default function OnboardingPage({ onComplete }: Props) {
                   <View style={st.navRow}>
                     <Pressable
                       style={st.ghostBtn}
-                      onPress={() => goBack(2)}
+                      onPress={() => goBack(3)}
                       accessibilityRole="button"
                       accessibilityLabel="Back"
                     >
@@ -568,10 +698,10 @@ export default function OnboardingPage({ onComplete }: Props) {
                 </View>
               )}
 
-              {/* ── Step 4: Notifications ────────────────────────────────────── */}
-              {step === 4 && (
+              {/* ── Step 5: Notifications ────────────────────────────────────── */}
+              {step === 5 && (
                 <View style={st.stepShell}>
-                  <Dots step={4} colors={colors} />
+                  <Dots step={5} colors={colors} />
                   <StepIcon colors={colors}>
                     <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
                       <Path
@@ -607,7 +737,7 @@ export default function OnboardingPage({ onComplete }: Props) {
                   <View style={st.navRow}>
                     <Pressable
                       style={st.ghostBtn}
-                      onPress={() => goBack(3)}
+                      onPress={() => goBack(4)}
                       disabled={notifLoading}
                       accessibilityRole="button"
                       accessibilityLabel="Back"
@@ -639,10 +769,10 @@ export default function OnboardingPage({ onComplete }: Props) {
                 </View>
               )}
 
-              {/* ── Step 5: Done ─────────────────────────────────────────────── */}
-              {step === 5 && (
+              {/* ── Step 6: Done ─────────────────────────────────────────────── */}
+              {step === 6 && (
                 <View style={st.stepShell}>
-                  <Dots step={5} colors={colors} />
+                  <Dots step={6} colors={colors} />
                   <Svg width={56} height={56} viewBox="0 0 24 24" fill="none">
                     <Circle cx={12} cy={12} r={10} stroke="rgba(52,211,153,0.8)" strokeWidth={1.5} />
                     <Path

@@ -329,6 +329,71 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         color: colors.textSecondary,
         textDecorationLine: 'underline' as const,
     },
+    // ── Generic suggestion (empty/sparse closet) ─────────────────────────────
+    // Visually quieter than the real outfit card on purpose: this is advice,
+    // not the user's wardrobe, and it should read as a placeholder that wants
+    // replacing rather than as the finished product.
+    genericCard: {
+        gap: spacing.xs,
+        padding: spacing.md,
+        borderRadius: radius.md,
+        borderWidth: 1,
+        borderColor: colors.glassBorder,
+        backgroundColor: colors.glassBg,
+    },
+    genericLabel: {
+        fontFamily: fonts.body,
+        fontSize: 10,
+        letterSpacing: 0.09 * 10,
+        textTransform: 'uppercase' as const,
+        color: colors.textMuted,
+    },
+    genericTitle: {
+        fontFamily: fonts.display,
+        fontSize: fontSizes.lg,
+        color: colors.textPrimary,
+    },
+    genericHeadline: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.base,
+        fontWeight: fontWeights.semibold,
+        color: colors.textPrimary,
+        marginTop: spacing.xs,
+    },
+    genericBody: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.sm,
+        color: colors.textSecondary,
+        lineHeight: fontSizes.sm * 1.6,
+    },
+    genericTimeline: {
+        gap: 6,
+        marginTop: spacing.xs,
+        paddingLeft: spacing.xs,
+        borderLeftWidth: 1,
+        borderLeftColor: colors.glassBorder,
+    },
+    genericTimelineRow: { gap: 1 },
+    genericTimelineTime: {
+        fontFamily: fonts.body,
+        fontSize: 10,
+        letterSpacing: 0.06 * 10,
+        textTransform: 'uppercase' as const,
+        color: colors.textMuted,
+    },
+    genericTimelineAction: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs,
+        color: colors.textSecondary,
+        lineHeight: fontSizes.xs * 1.5,
+    },
+    genericNote: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs,
+        color: colors.textMuted,
+        lineHeight: fontSizes.xs * 1.5,
+        marginTop: spacing.xs,
+    },
     ctaBtn: {
         // No marginTop — EmptyState's own container already gaps (spacing.sm)
         // before the action slot; an added margin here just double-counted it.

@@ -5,6 +5,7 @@ import WeatherHUD from '../../components/WeatherHUD/WeatherHUD';
 import { useSettings } from '../../hooks/useSettings';
 import { useActiveLocation } from '../../context/ActiveLocationContext';
 import { getCurrentLocation, formatCoords } from '../../lib/location';
+import { getToken } from '../../lib/auth';
 import { CURRENT_LOCATION_ID } from '../../lib/savedLocations';
 import { getAllSnapshots, setSnapshot } from '../../lib/weatherCache';
 import { refreshClosets } from '../../hooks/useClosets';
@@ -54,6 +55,14 @@ export default function MainPage() {
   // INTO My Location, or the settings fallback changing.
   useEffect(() => {
     if (!settingsReady || activeId !== CURRENT_LOCATION_ID) return;
+    // Signed-out users never resolve GPS. AuthGate redirects them to the login
+    // screen, but this screen still mounts for a beat behind that redirect —
+    // long enough to fire the OS location prompt on top of the sign-in form.
+    // iOS grants exactly one such prompt per install, and onboarding now spends
+    // it deliberately, with an explanation and a manual city fallback (see
+    // OnboardingPage step 2). Spending it here first, on a stranger looking at
+    // a password field, is the worst possible moment and cannot be retried.
+    if (!getToken()) return;
     getCurrentLocation(8000).then(coords => {
       setGpsLocation(coords ? formatCoords(coords.lat, coords.lng) : settings.location);
     });

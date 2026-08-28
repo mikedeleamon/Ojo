@@ -84,8 +84,36 @@ import {
     weatherAwareInsufficientBody,
 } from './copy';
 import { HangerIcon } from '../shared/HangerIcon';
+import GarmentSilhouette, { hasSilhouette } from '../GarmentSilhouette';
+import GenericSuggestion from './GenericSuggestion';
+import {
+    buildGenericOutfit,
+    type GenericOutfit,
+} from '../../lib/archetypes/genericOutfit';
 import { LayeringSection } from './LayeringSection';
 import { makeStyles } from './OutfitSuggestion.styles';
+
+/** Value equality for generic advice — see the guard in the effect below. */
+const sameGenericOutfit = (
+    a: GenericOutfit | null,
+    b: GenericOutfit | null,
+): boolean => {
+    if (a === b) return true;
+    if (!a || !b) return false;
+    return (
+        a.band === b.band &&
+        a.headline === b.headline &&
+        a.recommendation === b.recommendation &&
+        a.notes.length === b.notes.length &&
+        a.notes.every((n, i) => n === b.notes[i]) &&
+        (a.timeline?.length ?? 0) === (b.timeline?.length ?? 0) &&
+        (a.timeline ?? []).every(
+            (s, i) =>
+                s.time === b.timeline?.[i]?.time &&
+                s.action === b.timeline?.[i]?.action,
+        )
+    );
+};
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -116,6 +144,14 @@ const ArticleThumb = ({
                         source={{ uri: article.imageUrl }}
                         style={styles.articleImgFill}
                         resizeMode='cover'
+                    />
+                ) : hasSilhouette(article.clothingType) ? (
+                    // A hanger reads as a *failed* image load. This garment
+                    // simply was never photographed, which is a different (and
+                    // fine) thing — so draw the garment.
+                    <GarmentSilhouette
+                        clothingType={article.clothingType}
+                        size={22}
                     />
                 ) : (
                     <HangerIcon
@@ -485,6 +521,49 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
             .catch(() => {});
     }, [status, outfits.length]);
 
+    // ── Generic advice ────────────────────────────────────────────────────────
+    // A signed-in user whose closet can't produce an outfit still gets a real,
+    // weather-specific answer — built from what a typical wardrobe in their
+    // climate holds. It is strictly a fallback: the moment the real closet can
+    // dress them, this is never consulted, so an assumed garment can never turn
+    // up mixed into suggestions from clothes they own.
+    const needsGeneric =
+        !loading &&
+        (closets.length === 0 || status === 'empty_closet' || status === 'insufficient');
+
+    const [generic, setGeneric] = useState<GenericOutfit | null>(null);
+    // Primitives, not the LocationCoords object, so a caller that rebuilds it
+    // inline can't re-trigger the work on every render.
+    const genericLat = coords?.lat;
+    const genericLon = coords?.lon;
+    useEffect(() => {
+        if (!needsGeneric) {
+            // Drop it as soon as it stops being needed, so a closet that just
+            // became wearable can't briefly render both answers. Guarded so an
+            // already-null value doesn't publish a no-op update.
+            setGeneric((prev) => (prev === null ? prev : null));
+            return;
+        }
+        // Same treatment as real generation: off the render path, so an empty
+        // closet's advice never blocks a tap or a tab switch.
+        const task = InteractionManager.runAfterInteractions(() => {
+            const next = buildGenericOutfit({
+                weather,
+                settings: effectiveSettings,
+                forecasts,
+                coords:
+                    typeof genericLat === 'number' && typeof genericLon === 'number'
+                        ? { lat: genericLat, lon: genericLon }
+                        : null,
+            });
+            // Keep the previous object when the advice is unchanged. The result
+            // is a fresh object every run, so without this a churning dependency
+            // would turn one recompute into an unbounded render loop.
+            setGeneric((prev) => (sameGenericOutfit(prev, next) ? prev : next));
+        });
+        return () => task.cancel();
+    }, [needsGeneric, weather, effectiveSettings, forecasts, genericLat, genericLon]);
+
     const safeIdx = Math.min(activeIdx, Math.max(0, outfits.length - 1));
     const activeOutfit: OutfitResult | null = outfits[safeIdx] ?? null;
 
@@ -822,19 +901,28 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
     if (closets.length === 0)
         return (
             <View style={styles.root}>
-                <EmptyState
-                    icon={<HangerIcon size={32} />}
-                    title='No closet yet'
-                    body="Create a closet, photograph your clothes with the camera, and Ojo will suggest the best outfits for today's weather."
-                    action={
-                        <Pressable
-                            style={styles.ctaBtn}
-                            onPress={() => nav.push('/(tabs)/closet')}
-                        >
-                            <Text style={styles.ctaBtnText}>Set up closet</Text>
-                        </Pressable>
-                    }
-                />
+                {generic ? (
+                    <GenericSuggestion
+                        outfit={generic}
+                        title="Here's what to wear today"
+                        ctaLabel='Set up your closet'
+                        onCta={() => nav.push('/(tabs)/closet')}
+                    />
+                ) : (
+                    <EmptyState
+                        icon={<HangerIcon size={32} />}
+                        title='No closet yet'
+                        body="Create a closet, photograph your clothes with the camera, and Ojo will suggest the best outfits for today's weather."
+                        action={
+                            <Pressable
+                                style={styles.ctaBtn}
+                                onPress={() => nav.push('/(tabs)/closet')}
+                            >
+                                <Text style={styles.ctaBtnText}>Set up closet</Text>
+                            </Pressable>
+                        }
+                    />
+                )}
             </View>
         );
 
@@ -892,27 +980,36 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
                     name={preferred.name}
                     onPress={() => nav.push('/(tabs)/closet')}
                 />
-                <EmptyState
-                    icon={<HangerIcon size={32} />}
-                    title={
-                        status === 'empty_closet'
-                            ? 'This closet is empty'
-                            : 'Not enough to build an outfit'
-                    }
-                    body={
-                        status === 'empty_closet'
-                            ? weatherAwareAddClothesBody(weather)
-                            : weatherAwareInsufficientBody(weather)
-                    }
-                    action={
-                        <Pressable
-                            style={styles.ctaBtn}
-                            onPress={() => nav.push('/(tabs)/closet')}
-                        >
-                            <Text style={styles.ctaBtnText}>Add clothes</Text>
-                        </Pressable>
-                    }
-                />
+                {generic ? (
+                    <GenericSuggestion
+                        outfit={generic}
+                        title="Here's what to wear today"
+                        ctaLabel='Add clothes'
+                        onCta={() => nav.push('/(tabs)/closet')}
+                    />
+                ) : (
+                    <EmptyState
+                        icon={<HangerIcon size={32} />}
+                        title={
+                            status === 'empty_closet'
+                                ? 'This closet is empty'
+                                : 'Not enough to build an outfit'
+                        }
+                        body={
+                            status === 'empty_closet'
+                                ? weatherAwareAddClothesBody(weather)
+                                : weatherAwareInsufficientBody(weather)
+                        }
+                        action={
+                            <Pressable
+                                style={styles.ctaBtn}
+                                onPress={() => nav.push('/(tabs)/closet')}
+                            >
+                                <Text style={styles.ctaBtnText}>Add clothes</Text>
+                            </Pressable>
+                        }
+                    />
+                )}
             </View>
         );
 

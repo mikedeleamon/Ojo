@@ -234,15 +234,32 @@ router.post('/apple', async (req: Request, res: Response): Promise<void> => {
     // 1) Look up by Apple sub
     let user = await User.findOne({ appleSub: claims.sub });
 
-    // 2) Fallback: link to existing email/password account by email.
-    // Use findOneAndUpdate to avoid running full validators on the existing doc.
-    if (!user && claims.email) {
+    // 2) Fallback: link to existing email/password account by email — but only
+    // when Apple has itself confirmed the address. An unverified email claim
+    // must never be trusted to take over an existing account; Apple encodes
+    // this as the string "true"/"false" rather than a boolean.
+    const appleEmailVerified = claims.email_verified === true || claims.email_verified === 'true';
+    if (!user && claims.email && appleEmailVerified) {
       const byEmail = await User.findOneAndUpdate(
         { email: claims.email.toLowerCase() },
         { $set: { appleSub: claims.sub } },
         { new: true },
       );
       if (byEmail) user = byEmail;
+    }
+
+    // An account already holds this address but the token didn't prove
+    // ownership of it, so linking above was (correctly) skipped. Creating a
+    // second account would violate the unique email index and surface as an
+    // opaque 500, so answer with something the user can act on instead.
+    if (!user && claims.email && !appleEmailVerified) {
+      if (await User.exists({ email: claims.email.toLowerCase() })) {
+        res.status(409).json({
+          error: 'An account already uses this email. Sign in with your password instead.',
+          code:  'EMAIL_NOT_VERIFIED',
+        });
+        return;
+      }
     }
 
     // Whether this request created a brand-new account — the client uses this
@@ -332,16 +349,28 @@ router.post('/google', async (req: Request, res: Response): Promise<void> => {
     // 1) Look up by Google sub
     let user = await User.findOne({ googleSub: claims.sub });
 
-    // 2) Fallback: link to existing email/password account by email.
-    // Use findByIdAndUpdate rather than save() to avoid running full document
-    // validators — the only thing changing is the googleSub field.
-    if (!user && claims.email) {
+    // 2) Fallback: link to existing email/password account by email — but only
+    // when Google has itself confirmed the address. An unverified email claim
+    // must never be trusted to take over an existing account.
+    if (!user && claims.email && claims.email_verified) {
       const byEmail = await User.findOneAndUpdate(
         { email: claims.email.toLowerCase() },
         { $set: { googleSub: claims.sub } },
         { new: true },
       );
       if (byEmail) user = byEmail;
+    }
+
+    // See the Apple route: an unverified claim must not link, and must not fall
+    // through into a create that trips the unique email index and 500s.
+    if (!user && claims.email && !claims.email_verified) {
+      if (await User.exists({ email: claims.email.toLowerCase() })) {
+        res.status(409).json({
+          error: 'An account already uses this email. Sign in with your password instead.',
+          code:  'EMAIL_NOT_VERIFIED',
+        });
+        return;
+      }
     }
 
     // Whether this request created a brand-new account — the client uses this

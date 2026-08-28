@@ -76,7 +76,10 @@ export default function ClosetPage() {
             <Text style={{ color: colors.textPrimary }}>+</Text>
             {' '}button below to create your first closet, then use the camera to photograph your clothes.
           </Text>
-          <Text style={st.emptyHint}>Outfit suggestions unlock once you add a top and a bottom.</Text>
+          <Text style={st.emptyHint}>
+            Until then, Home shows general advice for today's weather — adding your
+            clothes turns it into suggestions from your own wardrobe.
+          </Text>
         </View>
       ) : null}
 
