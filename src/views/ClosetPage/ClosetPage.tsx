@@ -93,7 +93,7 @@ export default function ClosetPage() {
         onEditArticle={editArticle}
         onRemoveArticle={removeArticle}
         onSetPreferred={setPreferred}
-        onTripFit={() => push('/account/tripfit')}
+        onTripFit={() => push('/(tabs)/tripfit')}
         onRefresh={hardRefresh}
         tabClearance={tabPad}
       />

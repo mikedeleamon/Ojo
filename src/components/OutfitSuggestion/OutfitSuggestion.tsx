@@ -383,7 +383,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
                 driftNote={tripMode.driftNote}
                 onWoreThis={() => handleWoreTrip()}
                 onOpenTrip={() =>
-                    nav.push('/account/tripfit', { planId: tripMode.trip!.id })
+                    nav.push('/(tabs)/tripfit', { planId: tripMode.trip!.id })
                 }
                 onDismiss={() => setTripDismissed(true)}
             />

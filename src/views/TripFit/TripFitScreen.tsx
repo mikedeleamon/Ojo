@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useClosets } from '../../hooks/useClosets';
 import { useSettings } from '../../context/SettingsContext';
 import { useTripPlans } from '../../hooks/useTripPlans';
@@ -12,12 +12,14 @@ type Mode =
     | { kind: 'planner'; existing?: SavedTripFitPlan; prefill?: PlannerPrefill };
 
 /**
- * TripFit entry point. Owns the saved-trip library and swaps in the planner
- * for creating a new trip, planning from an imported flight, or opening a
- * saved one. All persistence flows through `useTripPlans`.
+ * TripFit entry point — the `tripfit` tab. Owns the saved-trip library and
+ * swaps in the planner for creating a new trip, planning from an imported
+ * flight, or opening a saved one. All persistence flows through `useTripPlans`.
+ *
+ * As a root tab this screen has nothing to go "back" to, so the library
+ * renders without a back chevron (see TripLibrary's optional `onBack`).
  */
 export default function TripFitScreen() {
-    const router = useRouter();
     const { closets } = useClosets();
     const { settings } = useSettings();
     const { plans, loading, upsert, remove } = useTripPlans();
@@ -77,7 +79,6 @@ export default function TripFitScreen() {
             onOpen={(plan) => setMode({ kind: 'planner', existing: plan })}
             onDelete={remove}
             onPlanFromAirline={(prefill) => setMode({ kind: 'planner', prefill })}
-            onBackToCloset={() => router.replace('/(tabs)/closet')}
         />
     );
 }

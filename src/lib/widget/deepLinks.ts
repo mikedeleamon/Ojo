@@ -7,8 +7,8 @@
  * app/+native-intent.tsx — keep the two in sync:
  *
  *   ojo://outfit     → "/"                              (home tab · today's outfit)
- *   ojo://trip/<id>  → "/account/tripfit?planId=<id>"   (opens the saved trip)
- *   ojo://trips      → "/account/tripfit"               (opens the trip library)
+ *   ojo://trip/<id>  → "/tripfit?planId=<id>"           (tripfit tab · saved trip)
+ *   ojo://trips      → "/tripfit"                       (tripfit tab · trip library)
  *   ojo://closet/new → "/closet?new=1"                  (closet tab, create form open)
  */
 

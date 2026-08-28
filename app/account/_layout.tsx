@@ -32,7 +32,6 @@ export default function AccountLayout() {
       <Stack.Screen name="permissions" options={{ ...subScreen, title: 'Permissions' }} />
       <Stack.Screen name="data-usage" options={{ ...subScreen, title: 'Data Usage' }} />
       <Stack.Screen name="legal" options={{ ...subScreen, title: 'Legal' }} />
-      <Stack.Screen name="tripfit" options={{ headerShown: false }} />
     </Stack>
   );
 }

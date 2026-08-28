@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { View, Text, GlassCard } from '../../components/primitives';
 import SuitcaseIcon from '../../components/icons/SuitcaseIcon';
 import { useTheme, ForceDarkPalette } from '../../theme/ThemeContext';
+import { useTabBarPadding } from '../../hooks/useTabBarPadding';
 import { fonts, fontSizes, radius, spacing, darkColors } from '../../theme/tokens';
 import { gradientFor } from '../../components/WeatherHUD/weatherPalette';
 import api from '../../api/client';
@@ -61,7 +62,8 @@ interface TripLibraryProps {
     onOpen: (plan: SavedTripFitPlan) => void;
     onDelete: (id: string) => void;
     onPlanFromAirline: (prefill: PlannerPrefill) => void;
-    onBackToCloset: () => void;
+    /** Omitted when the library is a root tab — there is nothing to go back to. */
+    onBack?: () => void;
 }
 
 // ─── TripCard ────────────────────────────────────────────────────────────────────
@@ -210,10 +212,11 @@ export default function TripLibrary({
     onOpen,
     onDelete,
     onPlanFromAirline,
-    onBackToCloset,
+    onBack,
 }: TripLibraryProps) {
     const { colors } = useTheme();
     const st = useMemo(() => makeStyles(colors), [colors]);
+    const tabPad = useTabBarPadding();
 
     const [airlineTrips, setAirlineTrips] = useState<AirlineTrip[]>([]);
 
@@ -275,23 +278,26 @@ export default function TripLibrary({
         [airlineTrips, plans],
     );
 
+    // Bottom edge is owned by the tab bar — cleared via `tabPad` on the scroll.
     return (
-        <SafeAreaView style={st.root} edges={['top', 'bottom']}>
+        <SafeAreaView style={st.root} edges={['top']}>
             <View style={st.header}>
-                <Pressable
-                    onPress={onBackToCloset}
-                    style={st.backBtn}
-                    accessibilityLabel='Go back to closet'
-                    accessibilityRole='button'
-                >
-                    <Text style={[st.backArrow, { color: colors.textPrimary }]}>‹</Text>
-                </Pressable>
+                {onBack && (
+                    <Pressable
+                        onPress={onBack}
+                        style={st.backBtn}
+                        accessibilityLabel='Go back'
+                        accessibilityRole='button'
+                    >
+                        <Text style={[st.backArrow, { color: colors.textPrimary }]}>‹</Text>
+                    </Pressable>
+                )}
                 <Text style={st.title}>TripFit</Text>
             </View>
 
             <ScrollView
                 style={{ flex: 1 }}
-                contentContainerStyle={st.scroll}
+                contentContainerStyle={[st.scroll, { paddingBottom: tabPad }]}
                 showsVerticalScrollIndicator={false}
             >
                 {/* Plan new trip CTA */}

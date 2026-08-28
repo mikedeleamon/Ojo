@@ -11,6 +11,14 @@ import { useWeatherTheme } from '../../src/context/WeatherContext';
 // `tintColor` replaces iOS's default system blue with an accent derived from the
 // live weather gradient, so the active tab tracks the sky behind it. The value
 // changes only when the gradient does (see WeatherHUD → WeatherContext.accent).
+//
+// Home and TripFit use brand marks instead of SF Symbols. Both are pure-white
+// PNG template sets (40/80/120px) whose shape lives in the alpha channel — iOS
+// tints them with `tintColor` when active and system gray when not, so they
+// track the sky exactly like the SF Symbol tabs do. The TripFit mark is a raster
+// of TripFitIcon (src/components/icons/ClosetIcons.tsx); the gradient fill is
+// deliberately dropped, since a template image discards color anyway. Regenerate
+// with scripts/render-tripfit-tab-icon.py if the logo's geometry changes.
 
 export default function TabLayout() {
   const { accent } = useWeatherTheme();
@@ -33,9 +41,9 @@ export default function TabLayout() {
           <Icon sf="camera" />
         </NativeTabs.Trigger>
 
-        <NativeTabs.Trigger name="style">
-          <Label>Style</Label>
-          <Icon sf="sparkles" />
+        <NativeTabs.Trigger name="tripfit">
+          <Label>TripFit</Label>
+          <Icon src={require('../../assets/images/ojo_tripfit_tab_icon.png')} />
         </NativeTabs.Trigger>
 
         <NativeTabs.Trigger name="insights">

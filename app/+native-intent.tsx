@@ -4,8 +4,8 @@
  *
  * Widget contract (see src/lib/widget/deepLinks.ts):
  *   ojo://outfit     → "/"                              (home tab · today's outfit)
- *   ojo://trip/<id>  → "/account/tripfit?planId=<id>"   (opens the saved trip)
- *   ojo://trips      → "/account/tripfit"               (opens the trip library)
+ *   ojo://trip/<id>  → "/tripfit?planId=<id>"           (tripfit tab · saved trip)
+ *   ojo://trips      → "/tripfit"                       (tripfit tab · trip library)
  *   ojo://closet/new → "/closet?new=1"                  (closet tab, create form open)
  *   ojo://closet     → "/closet"                        (closet tab · closet gap nudge)
  *   ojo://recap      → "/account/recap"                 (weekly wardrobe recap)
@@ -49,14 +49,14 @@ export function redirectSystemPath({
     // Weekly wardrobe recap (notification tap / share landing page)
     if (normalized === '/recap') return '/account/recap';
 
-    // Trip library (no id) → TripFit's saved-trip list
-    if (normalized === '/trips') return '/account/tripfit';
+    // Trip library (no id) → TripFit tab's saved-trip list
+    if (normalized === '/trips') return '/tripfit';
 
-    // Trip → open the saved plan in TripFit
+    // Trip → open the saved plan in the TripFit tab
     const trip = normalized.match(/^\/trip\/([^/]+)$/);
     if (trip) {
       const planId = decodeURIComponent(trip[1]);
-      return `/account/tripfit?planId=${encodeURIComponent(planId)}`;
+      return `/tripfit?planId=${encodeURIComponent(planId)}`;
     }
 
     return path;

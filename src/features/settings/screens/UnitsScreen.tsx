@@ -34,8 +34,8 @@ export default function UnitsScreen() {
     if (savedTimer.current) clearTimeout(savedTimer.current);
   }, []);
 
-  // Auto-save on tap — mirrors the Style tab so changing a unit feels the same
-  // everywhere (no explicit Save button to hunt for).
+  // Auto-save on tap — mirrors Style Preferences so changing a unit feels the
+  // same everywhere (no explicit Save button to hunt for).
   const select = (next: 'Imperial' | 'Metric') => {
     if (next === scale) return;
     setScale(next);

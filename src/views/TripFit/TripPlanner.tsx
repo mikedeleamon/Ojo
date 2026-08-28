@@ -20,6 +20,7 @@ import CameraIcon from '../../components/icons/CameraIcon';
 import SuitcaseIcon from '../../components/icons/SuitcaseIcon';
 import { PackingCategoryIcon } from '../../components/icons/PackingCategoryIcon';
 import { useTheme, ForceDarkPalette } from '../../theme/ThemeContext';
+import { useTabBarPadding } from '../../hooks/useTabBarPadding';
 import {
     fonts,
     fontSizes,
@@ -926,11 +927,14 @@ export default function TripPlanner({
             : undefined;
 
     const st = useMemo(() => makeStyles(colors), [colors]);
+    const tabPad = useTabBarPadding();
     const calContainerWidth = windowWidth - spacing.md * 2;
     const showForm = !isSaved;
 
     return (
-        <SafeAreaView style={st.root} edges={['top', 'bottom']}>
+        // The planner is a mode of the TripFit tab, not a pushed screen, so the
+        // tab bar stays visible — clear it with `tabPad` instead of a bottom edge.
+        <SafeAreaView style={st.root} edges={['top']}>
             {/* Header */}
             <View style={st.header}>
                 <Pressable
@@ -946,7 +950,7 @@ export default function TripPlanner({
 
             <ScrollView
                 style={{ flex: 1 }}
-                contentContainerStyle={st.scroll}
+                contentContainerStyle={[st.scroll, { paddingBottom: tabPad }]}
                 keyboardShouldPersistTaps='handled'
             >
                 {/* Name (always available) */}
