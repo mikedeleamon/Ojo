@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { Animated, useWindowDimensions, View, type ViewStyle } from 'react-native';
+import {
+    Animated,
+    useWindowDimensions,
+    View,
+    type ViewStyle,
+} from 'react-native';
 import Svg, { Path, G } from 'react-native-svg';
 import { useReduceMotion } from '../../hooks/useReduceMotion';
 import { nativeLoop, pingPong } from '../../lib/animation/nativeLoop';
@@ -13,7 +18,7 @@ const MOON_D_FULL =
 /** Center and radius of the moon disc in the 1280×1280 viewBox. */
 const MOON_CX = 644;
 const MOON_CY = 593;
-const MOON_R  = 240;
+const MOON_R = 240;
 
 /**
  * Geometric SVG path for the illuminated portion of the moon.
@@ -25,7 +30,12 @@ const MOON_R  = 240;
  * (a half-ellipse whose x-radius is r·|cos(2π·phase)|). The sweep
  * direction flips between crescent and gibbous at the quarter boundary.
  */
-function moonPhasePath(cx: number, cy: number, r: number, phase: number): string {
+function moonPhasePath(
+    cx: number,
+    cy: number,
+    r: number,
+    phase: number,
+): string {
     const p = ((phase % 1) + 1) % 1; // normalise to [0, 1)
     if (p < 0.02 || p > 0.98) return ''; // new moon — nothing visible
 
@@ -34,9 +44,9 @@ function moonPhasePath(cx: number, cy: number, r: number, phase: number): string
         return `M ${cx - r},${cy} A ${r},${r} 0 1,1 ${cx + r},${cy} A ${r},${r} 0 1,1 ${cx - r},${cy} Z`;
     }
 
-    const top    = `${cx},${cy - r}`;
+    const top = `${cx},${cy - r}`;
     const bottom = `${cx},${cy + r}`;
-    const rx     = r * Math.abs(Math.cos(2 * Math.PI * p));
+    const rx = r * Math.abs(Math.cos(2 * Math.PI * p));
 
     if (p < 0.5) {
         // Waxing: right side lit.
@@ -81,15 +91,14 @@ function moonPhasePath(cx: number, cy: number, r: number, phase: number): string
 
 /**
  * Star seeds. `xf`/`yf` are 0–1 fractions of the canvas; `d` is the star's
- * weight in **points** — it sets both the brightness and the sparkle's span
- * (see SPAN_RATIO), so the tuning below still reads as a size ordering.
+ * tip-to-tip span in **points**, and also drives its brightness.
  *
- * These used to be radii in viewBox units, which the full-screen canvas scaled
- * by ~0.14 (the viewBox was sized `screenWidth / size * 1280` ≈ 2860 units wide
- * but rendered at ~400 pt). An eight-segment sparkle path authored at r=14 came
- * out under 4 pt across — all of that geometry rasterized into something the
- * size of a full stop. Sizing in points instead means what is written here is
- * what lands on screen.
+ * These were radii in viewBox units (r=12–22), which the full-screen canvas
+ * scaled by `size / 1280` = 0.1406 pt per unit — so they rendered at 3.4–6.2 pt
+ * across, and were rewritten into this table at exactly that size. That is the
+ * intended scale of the field, not an accident of the viewBox: stars this small
+ * are what makes the sky read as depth rather than as decoration. Sizing in
+ * points means what is written here is what lands on screen.
  *
  * Middle-band seeds (yf 0.35–0.66) stay outside xf 0.38–0.62 to clear the moon.
  */
@@ -165,10 +174,34 @@ const STATIC_STAR_SEEDS: { xf: number; yf: number; d: number }[] = [
     { xf: 0.45, yf: 0.633, d: 3.5 },
     { xf: 0.88, yf: 0.648, d: 3 },
     { xf: 0.17, yf: 0.945, d: 4 },
+    // ── Fill pass — the field thinned out once stars shrank to their
+    //    original span; these sit in the gaps the seeds above leave, still
+    //    clear of the moon zone and still free (no animation driver). ──────
+    { xf: 0.13, yf: 0.056, d: 3 },
+    { xf: 0.52, yf: 0.073, d: 3.5 },
+    { xf: 0.89, yf: 0.085, d: 3 },
+    { xf: 0.25, yf: 0.127, d: 3.5 },
+    { xf: 0.73, yf: 0.169, d: 3 },
+    { xf: 0.04, yf: 0.196, d: 3.5 },
+    { xf: 0.54, yf: 0.274, d: 3 },
+    { xf: 0.06, yf: 0.302, d: 3.5 },
+    { xf: 0.8, yf: 0.325, d: 3 },
+    { xf: 0.14, yf: 0.384, d: 3.5 },
+    { xf: 0.97, yf: 0.401, d: 3 },
+    { xf: 0.03, yf: 0.418, d: 3 },
+    { xf: 0.24, yf: 0.462, d: 4 },
+    { xf: 0.82, yf: 0.485, d: 3.5 },
+    { xf: 0.22, yf: 0.538, d: 3 },
+    { xf: 0.69, yf: 0.547, d: 3 },
+    { xf: 0.04, yf: 0.591, d: 3.5 },
+    { xf: 0.8, yf: 0.612, d: 3 },
+    { xf: 0.15, yf: 0.667, d: 3.5 },
+    { xf: 0.96, yf: 0.74, d: 3.5 },
+    { xf: 0.38, yf: 0.77, d: 3.5 },
+    { xf: 0.18, yf: 0.825, d: 3.5 },
+    { xf: 0.88, yf: 0.892, d: 3.5 },
+    { xf: 0.53, yf: 0.985, d: 3 },
 ];
-
-const STAR_MIN_D = 3;
-const STAR_MAX_D = 6;
 
 /**
  * Twinkle phases. Stars share an opacity value with every Nth star, so the
@@ -188,6 +221,9 @@ const PHASE_CONFIGS = [
 /** Opacity floor of the twinkle. */
 const TWINKLE_MIN = 0.15;
 const TWINKLE_RANGE = pingPong(1, TWINKLE_MIN);
+
+const STAR_MIN_D = 3;
+const STAR_MAX_D = 6;
 
 /**
  * Per-star baseline brightness, folded into the fill colour rather than the
@@ -212,32 +248,31 @@ function withAlpha(color: string, alpha: number): string {
 // ─── Sparkle geometry ───────────────────────────────────────────────────────
 
 /**
- * A 4-point sparkle on a 0–100 box, centred at (50, 50).
+ * A 4-point sparkle on a 0–100 box, centred at (50, 50), tips on the edges.
  *
- * Each arm is one cubic whose control points sit close to the centre, which is
- * what pulls the edges concave and tapers the tips to needles. Straight-line
- * arms of constant width read as a plus sign at these sizes; the concavity is
- * what makes it read as a star.
+ * This is `generateSparkle()` from before the field became dots, transcribed:
+ * eight straight segments, tip → waist → tip, with the waist at 12% of the
+ * radius (50 ± 6). The needle-thin waist is the shape — curving the edges or
+ * fattening the waist turns it into a plus sign or a diamond at these sizes.
  */
-const SPARKLE_D =
-    'M50,0 C54.5,33 67,45.5 100,50 C67,54.5 54.5,67 50,100 C45.5,67 33,54.5 0,50 C33,45.5 45.5,33 50,0 Z';
+const SPARKLE_D = 'M50,0 L56,44 L100,50 L56,56 L50,100 L44,56 L0,50 L44,44 Z';
 
-/** Tip-to-tip span of the sparkle, as a multiple of the seed's weight. */
-const SPAN_RATIO = 2;
-/** Seeds at or above this weight get a second sparkle at 45°, for 8 points. */
-const CROSS_MIN_D = 4;
-/** Size of that second sparkle, relative to the first. */
-const CROSS_SCALE = 0.62;
-/** Rotates the cross sparkle about the centre of the 0–100 box. */
-const CROSS_TRANSFORM = `translate(50, 50) rotate(45) scale(${CROSS_SCALE}) translate(-50, -50)`;
+/**
+ * Tip-to-tip span, as a multiple of the seed's `d`.
+ *
+ * 1, because `d` already *is* the original span in points. The old field lived
+ * in a viewBox scaled by `size / 1280` = 0.1406 pt per unit, so its r=12–22
+ * seeds landed at 3.4–6.2 pt across — and the seed table those were rewritten
+ * into (d=3–6) preserved that mapping exactly. Anything above 1 here is bigger
+ * than the sky has ever been.
+ */
+const SPAN_RATIO = 1;
 
 interface Star {
     /** Absolute box for the star's own Svg, in canvas points. */
     box: ViewStyle;
     span: number;
     fill: string;
-    /** Whether to add the 45° pair. */
-    cross: boolean;
 }
 
 function makeStar(
@@ -259,20 +294,21 @@ function makeStar(
         },
         span,
         fill: withAlpha(color, baseAlpha(d)),
-        cross: d >= CROSS_MIN_D,
     };
 }
 
 /** The star's geometry. Static once mounted — only the wrapper's opacity moves. */
-function Sparkle({ span, fill, cross }: Omit<Star, 'box'>) {
+function Sparkle({ span, fill }: Omit<Star, 'box'>) {
     return (
-        <Svg viewBox='0 0 100 100' width={span} height={span}>
-            <Path fill={fill} d={SPARKLE_D} />
-            {cross && (
-                <G transform={CROSS_TRANSFORM}>
-                    <Path fill={fill} d={SPARKLE_D} />
-                </G>
-            )}
+        <Svg
+            viewBox='0 0 100 100'
+            width={span}
+            height={span}
+        >
+            <Path
+                fill={fill}
+                d={SPARKLE_D}
+            />
         </Svg>
     );
 }
@@ -354,7 +390,6 @@ function StarField({ width, height, color, animate }: StarFieldProps) {
                     <Sparkle
                         span={star.span}
                         fill={star.fill}
-                        cross={star.cross}
                     />
                 </Animated.View>
             ))}
@@ -367,7 +402,6 @@ function StarField({ width, height, color, animate }: StarFieldProps) {
                     <Sparkle
                         span={star.span}
                         fill={star.fill}
-                        cross={star.cross}
                     />
                 </View>
             ))}
@@ -430,7 +464,10 @@ export default function ClearNightIcon({
     const height = fullHeight ? screenHeight : size;
 
     const moonD = useMemo(
-        () => moonPhase !== undefined ? moonPhasePath(MOON_CX, MOON_CY, MOON_R, moonPhase) : MOON_D_FULL,
+        () =>
+            moonPhase !== undefined
+                ? moonPhasePath(MOON_CX, MOON_CY, MOON_R, moonPhase)
+                : MOON_D_FULL,
         [moonPhase],
     );
 
