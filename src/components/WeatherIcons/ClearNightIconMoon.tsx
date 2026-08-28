@@ -54,29 +54,35 @@ function moonPhasePath(cx: number, cy: number, r: number, phase: number): string
 
 // ─── Star field ─────────────────────────────────────────────────────────────
 //
-// Stars are plain leaf Views — a background colour and a corner radius — not
-// SVG. The SVG version cost five full-screen RNSVGSvgView layers to draw six
-// dots apiece, and each one was expensive twice over:
+// Each star is a 4-point sparkle: a concave-tapered path, drawn by its own
+// star-sized <Svg>. Crossed rounded-rect Views were tried first and read as
+// plus signs — the taper is the whole difference between a star and a dot with
+// arms — and no combination of borderRadius makes a View concave.
+//
+// What must never come back is the *full-screen* SVG layer this file used to
+// have: five of them, cross-fading, six shapes apiece.
 //
 //   • RNSVGSvgView renders through `drawRect:` (see its `contentMode =
 //     UIViewContentModeRedraw`), so every layer carried a full-screen
 //     CPU-rasterized backing store — roughly 12 MB each at @3x, ~60 MB for the
-//     field, to paint 31 dots.
+//     field, to paint 31 sparkles.
 //   • Each layer animated its own opacity while holding sublayers, so
 //     CoreAnimation had to render the subtree into an offscreen buffer and
 //     composite it every frame (`allowsGroupOpacity`) — five full-screen
 //     offscreen passes per frame, on top of whatever the glass surfaces above
 //     were already costing.
 //
-// A leaf view with a solid background and a corner radius has no sublayers and
-// no backing store: CoreAnimation fills a rounded rect directly, and animating
-// its opacity is pure compositing. Thirty-one of them cost less than one of the
-// layers they replace, and each star can now carry its own brightness and
-// phase instead of six of them blinking in unison.
+// Both costs scale with the *layer's* area, not the field's shape count, so a
+// per-star Svg sized to its own star inverts them: a 12 pt box is a ~5 KB
+// backing store rasterized once (the geometry never changes), and its group
+// opacity is a 12 pt offscreen pass. Forty-six of those together are smaller
+// than one of the full-screen layers they replace, and each star can carry its
+// own brightness and phase instead of six of them blinking in unison.
 
 /**
- * Star seeds. `xf`/`yf` are 0–1 fractions of the canvas; `d` is the diameter in
- * **points**.
+ * Star seeds. `xf`/`yf` are 0–1 fractions of the canvas; `d` is the star's
+ * weight in **points** — it sets both the brightness and the sparkle's span
+ * (see SPAN_RATIO), so the tuning below still reads as a size ordering.
  *
  * These used to be radii in viewBox units, which the full-screen canvas scaled
  * by ~0.14 (the viewBox was sized `screenWidth / size * 1280` ≈ 2860 units wide
@@ -203,6 +209,74 @@ function withAlpha(color: string, alpha: number): string {
     );
 }
 
+// ─── Sparkle geometry ───────────────────────────────────────────────────────
+
+/**
+ * A 4-point sparkle on a 0–100 box, centred at (50, 50).
+ *
+ * Each arm is one cubic whose control points sit close to the centre, which is
+ * what pulls the edges concave and tapers the tips to needles. Straight-line
+ * arms of constant width read as a plus sign at these sizes; the concavity is
+ * what makes it read as a star.
+ */
+const SPARKLE_D =
+    'M50,0 C54.5,33 67,45.5 100,50 C67,54.5 54.5,67 50,100 C45.5,67 33,54.5 0,50 C33,45.5 45.5,33 50,0 Z';
+
+/** Tip-to-tip span of the sparkle, as a multiple of the seed's weight. */
+const SPAN_RATIO = 2;
+/** Seeds at or above this weight get a second sparkle at 45°, for 8 points. */
+const CROSS_MIN_D = 4;
+/** Size of that second sparkle, relative to the first. */
+const CROSS_SCALE = 0.62;
+/** Rotates the cross sparkle about the centre of the 0–100 box. */
+const CROSS_TRANSFORM = `translate(50, 50) rotate(45) scale(${CROSS_SCALE}) translate(-50, -50)`;
+
+interface Star {
+    /** Absolute box for the star's own Svg, in canvas points. */
+    box: ViewStyle;
+    span: number;
+    fill: string;
+    /** Whether to add the 45° pair. */
+    cross: boolean;
+}
+
+function makeStar(
+    xf: number,
+    yf: number,
+    d: number,
+    width: number,
+    height: number,
+    color: string,
+): Star {
+    const span = d * SPAN_RATIO;
+    return {
+        box: {
+            position: 'absolute',
+            left: xf * width - span / 2,
+            top: yf * height - span / 2,
+            width: span,
+            height: span,
+        },
+        span,
+        fill: withAlpha(color, baseAlpha(d)),
+        cross: d >= CROSS_MIN_D,
+    };
+}
+
+/** The star's geometry. Static once mounted — only the wrapper's opacity moves. */
+function Sparkle({ span, fill, cross }: Omit<Star, 'box'>) {
+    return (
+        <Svg viewBox='0 0 100 100' width={span} height={span}>
+            <Path fill={fill} d={SPARKLE_D} />
+            {cross && (
+                <G transform={CROSS_TRANSFORM}>
+                    <Path fill={fill} d={SPARKLE_D} />
+                </G>
+            )}
+        </Svg>
+    );
+}
+
 /** One natively-looped 0→1 progress value per phase, mapped to a twinkle. */
 function useTwinklePhases(animate: boolean) {
     const ref = useRef<Animated.Value[] | null>(null);
@@ -249,50 +323,53 @@ interface StarFieldProps {
 function StarField({ width, height, color, animate }: StarFieldProps) {
     const opacities = useTwinklePhases(animate);
 
-    const boxes = useMemo<ViewStyle[]>(
+    const twinkling = useMemo(
         () =>
-            STAR_SEEDS.map((s) => ({
-                position: 'absolute',
-                left: s.xf * width - s.d / 2,
-                top: s.yf * height - s.d / 2,
-                width: s.d,
-                height: s.d,
-                borderRadius: s.d / 2,
-                backgroundColor: withAlpha(color, baseAlpha(s.d)),
-            })),
+            STAR_SEEDS.map((seed) =>
+                makeStar(seed.xf, seed.yf, seed.d, width, height, color),
+            ),
         [width, height, color],
     );
 
     // Plain Views: no animated node, no opacity binding, nothing per-frame.
-    const staticBoxes = useMemo<ViewStyle[]>(
+    const fixed = useMemo(
         () =>
-            STATIC_STAR_SEEDS.map((s) => ({
-                position: 'absolute',
-                left: s.xf * width - s.d / 2,
-                top: s.yf * height - s.d / 2,
-                width: s.d,
-                height: s.d,
-                borderRadius: s.d / 2,
-                backgroundColor: withAlpha(color, baseAlpha(s.d)),
-            })),
+            STATIC_STAR_SEEDS.map((seed) =>
+                makeStar(seed.xf, seed.yf, seed.d, width, height, color),
+            ),
         [width, height, color],
     );
 
     return (
         <>
-            {boxes.map((box, i) => (
+            {twinkling.map((star, i) => (
                 <Animated.View
                     key={i}
-                    style={[box, { opacity: opacities[i % opacities.length] }]}
+                    style={[
+                        star.box,
+                        { opacity: opacities[i % opacities.length] },
+                    ]}
                     pointerEvents='none'
-                />
+                >
+                    <Sparkle
+                        span={star.span}
+                        fill={star.fill}
+                        cross={star.cross}
+                    />
+                </Animated.View>
             ))}
-            {staticBoxes.map((box, i) => (
+            {fixed.map((star, i) => (
                 <View
                     key={i}
-                    style={box}
+                    style={star.box}
                     pointerEvents='none'
-                />
+                >
+                    <Sparkle
+                        span={star.span}
+                        fill={star.fill}
+                        cross={star.cross}
+                    />
+                </View>
             ))}
         </>
     );
