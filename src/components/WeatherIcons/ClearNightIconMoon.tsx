@@ -88,16 +88,26 @@ function moonPhasePath(
 // opacity is a 12 pt offscreen pass. Forty-six of those together are smaller
 // than one of the full-screen layers they replace, and each star can carry its
 // own brightness and phase instead of six of them blinking in unison.
+//
+// The `starLayer` prop (see seedsForLayer / NEAR_MIN_D below) splits the same
+// seed tables by size instead of adding stars, so a caller — currently
+// WeatherHUD's full-screen backdrop — can mount two of these at different
+// BackdropLayer scroll-parallax depths and get real near/far separation for
+// the price of one extra wrapper view, not a bigger field.
 
 /**
  * Star seeds. `xf`/`yf` are 0–1 fractions of the canvas; `d` is the star's
  * tip-to-tip span in **points**, and also drives its brightness.
  *
- * These were radii in viewBox units (r=12–22), which the full-screen canvas
- * scaled by `size / 1280` = 0.1406 pt per unit — so they rendered at 3.4–6.2 pt
- * across, and were rewritten into this table at exactly that size. That is the
- * intended scale of the field, not an accident of the viewBox: stars this small
- * are what makes the sky read as depth rather than as decoration. Sizing in
+ * These were originally radii in viewBox units (r=12–22), which the
+ * full-screen canvas scaled by `size / 1280` = 0.1406 pt per unit — so they
+ * rendered at 3.4–6.2 pt across, and were rewritten into this table at
+ * exactly that size. Small is still the baseline: it's what makes the sky
+ * read as depth rather than as decoration, and the far band (d < NEAR_MIN_D)
+ * stays there. The near band (d ≥ NEAR_MIN_D) has since been bumped past
+ * that original ceiling on purpose — a visible size jump between the two
+ * bands, not just a brightness and speed one, sharpens the near/far split
+ * from `starLayer` instead of leaving it as a continuous gradient. Sizing in
  * points means what is written here is what lands on screen.
  *
  * Middle-band seeds (yf 0.35–0.66) stay outside xf 0.38–0.62 to clear the moon.
@@ -106,39 +116,39 @@ const STAR_SEEDS: { xf: number; yf: number; d: number }[] = [
     // ── Top strip ──────────────────────────────────────────────────────────
     { xf: 0.02, yf: 0.02, d: 3.5 },
     { xf: 0.18, yf: 0.012, d: 3 },
-    { xf: 0.35, yf: 0.027, d: 4.5 },
+    { xf: 0.35, yf: 0.027, d: 5.5 },
     { xf: 0.5, yf: 0.014, d: 3.5 },
-    { xf: 0.65, yf: 0.023, d: 5 },
+    { xf: 0.65, yf: 0.023, d: 6 },
     { xf: 0.82, yf: 0.016, d: 3 },
-    { xf: 0.98, yf: 0.022, d: 4.5 },
+    { xf: 0.98, yf: 0.022, d: 5.5 },
     // ── Upper ──────────────────────────────────────────────────────────────
-    { xf: 0.02, yf: 0.125, d: 4 },
+    { xf: 0.02, yf: 0.125, d: 5 },
     { xf: 0.12, yf: 0.156, d: 3 },
-    { xf: 0.25, yf: 0.07, d: 4.5 },
+    { xf: 0.25, yf: 0.07, d: 5.5 },
     { xf: 0.75, yf: 0.078, d: 3.5 },
-    { xf: 0.88, yf: 0.172, d: 5 },
+    { xf: 0.88, yf: 0.172, d: 6 },
     { xf: 0.97, yf: 0.133, d: 3.5 },
     // ── Middle sides ───────────────────────────────────────────────────────
-    { xf: 0.02, yf: 0.352, d: 4.5 },
+    { xf: 0.02, yf: 0.352, d: 5.5 },
     { xf: 0.08, yf: 0.5, d: 3.5 },
     { xf: 0.15, yf: 0.609, d: 3 },
-    { xf: 0.25, yf: 0.406, d: 4 },
-    { xf: 0.75, yf: 0.391, d: 4 },
+    { xf: 0.25, yf: 0.406, d: 5 },
+    { xf: 0.75, yf: 0.391, d: 5 },
     { xf: 0.85, yf: 0.563, d: 3.5 },
-    { xf: 0.92, yf: 0.352, d: 4.5 },
-    { xf: 0.98, yf: 0.5, d: 5 },
+    { xf: 0.92, yf: 0.352, d: 5.5 },
+    { xf: 0.98, yf: 0.5, d: 6 },
     // ── Lower ──────────────────────────────────────────────────────────────
-    { xf: 0.03, yf: 0.684, d: 4.5 },
+    { xf: 0.03, yf: 0.684, d: 5.5 },
     { xf: 0.2, yf: 0.719, d: 3.5 },
-    { xf: 0.5, yf: 0.703, d: 5.5 },
-    { xf: 0.8, yf: 0.734, d: 4.5 },
-    { xf: 0.97, yf: 0.684, d: 5 },
+    { xf: 0.5, yf: 0.703, d: 6.5 },
+    { xf: 0.8, yf: 0.734, d: 5.5 },
+    { xf: 0.97, yf: 0.684, d: 6 },
     // ── Bottom strip ───────────────────────────────────────────────────────
-    { xf: 0.07, yf: 0.813, d: 5 },
+    { xf: 0.07, yf: 0.813, d: 6 },
     { xf: 0.3, yf: 0.875, d: 3.5 },
-    { xf: 0.5, yf: 0.836, d: 6 },
-    { xf: 0.72, yf: 0.875, d: 4.5 },
-    { xf: 0.93, yf: 0.813, d: 5.5 },
+    { xf: 0.5, yf: 0.836, d: 7 },
+    { xf: 0.72, yf: 0.875, d: 5.5 },
+    { xf: 0.93, yf: 0.813, d: 6.5 },
 ];
 
 /**
@@ -162,18 +172,18 @@ const STATIC_STAR_SEEDS: { xf: number; yf: number; d: number }[] = [
     // ── Upper-to-middle transition ─────────────────────────────────────────
     { xf: 0.09, yf: 0.242, d: 3.5 },
     { xf: 0.33, yf: 0.203, d: 3 },
-    { xf: 0.62, yf: 0.227, d: 4 },
+    { xf: 0.62, yf: 0.227, d: 5 },
     { xf: 0.91, yf: 0.258, d: 3 },
     // ── Middle centre ──────────────────────────────────────────────────────
     { xf: 0.38, yf: 0.328, d: 3.5 },
     { xf: 0.68, yf: 0.313, d: 3.5 },
     { xf: 0.55, yf: 0.445, d: 3 },
-    { xf: 0.35, yf: 0.523, d: 4 },
+    { xf: 0.35, yf: 0.523, d: 5 },
     // ── Lower centre ───────────────────────────────────────────────────────
     { xf: 0.62, yf: 0.594, d: 3 },
     { xf: 0.45, yf: 0.633, d: 3.5 },
     { xf: 0.88, yf: 0.648, d: 3 },
-    { xf: 0.17, yf: 0.945, d: 4 },
+    { xf: 0.17, yf: 0.945, d: 5 },
     // ── Fill pass — the field thinned out once stars shrank to their
     //    original span; these sit in the gaps the seeds above leave, still
     //    clear of the moon zone and still free (no animation driver). ──────
@@ -189,7 +199,7 @@ const STATIC_STAR_SEEDS: { xf: number; yf: number; d: number }[] = [
     { xf: 0.14, yf: 0.384, d: 3.5 },
     { xf: 0.97, yf: 0.401, d: 3 },
     { xf: 0.03, yf: 0.418, d: 3 },
-    { xf: 0.24, yf: 0.462, d: 4 },
+    { xf: 0.24, yf: 0.462, d: 5 },
     { xf: 0.82, yf: 0.485, d: 3.5 },
     { xf: 0.22, yf: 0.538, d: 3 },
     { xf: 0.69, yf: 0.547, d: 3 },
@@ -202,6 +212,33 @@ const STATIC_STAR_SEEDS: { xf: number; yf: number; d: number }[] = [
     { xf: 0.88, yf: 0.892, d: 3.5 },
     { xf: 0.53, yf: 0.985, d: 3 },
 ];
+
+/**
+ * Depth band a caller can restrict the field to. Splits the same seed tables
+ * by size rather than drawing extra stars, so a caller can mount two
+ * instances — 'far' at a shallow scroll-parallax depth, 'near' at a deeper
+ * one — and get real motion-parallax separation for the price of one extra
+ * BackdropLayer, not a bigger field. Omit to render every seed (unchanged
+ * behaviour for any caller that doesn't care about the split).
+ */
+type StarLayer = 'near' | 'far';
+
+/**
+ * Size cutoff between the two bands. 4 splits the current field roughly
+ * 1:2 (23 near, 47 far) — a small, bright foreground scattered over a denser,
+ * dimmer background, which is the near/far ratio a real sky reads as.
+ */
+const NEAR_MIN_D = 4;
+
+function seedsForLayer<T extends { d: number }>(
+    seeds: readonly T[],
+    layer: StarLayer | undefined,
+): readonly T[] {
+    if (!layer) return seeds;
+    return seeds.filter((s) =>
+        layer === 'near' ? s.d >= NEAR_MIN_D : s.d < NEAR_MIN_D,
+    );
+}
 
 /**
  * Twinkle phases. Stars share an opacity value with every Nth star, so the
@@ -218,12 +255,27 @@ const PHASE_CONFIGS = [
     { delay: 2810, duration: 4700 },
 ] as const;
 
-/** Opacity floor of the twinkle. */
-const TWINKLE_MIN = 0.15;
-const TWINKLE_RANGE = pingPong(1, TWINKLE_MIN);
+/**
+ * PHASE_CONFIGS split by duration, short first — the near/bigger stars
+ * round-robin FAST, the far/smaller ones round-robin SLOW, so "closer" stars
+ * visibly swing quicker without adding any native loops beyond the six above.
+ */
+const FAST_PHASE_INDICES = [0, 2, 4] as const; // 3100, 2900, 3300 ms
+const SLOW_PHASE_INDICES = [1, 3, 5] as const; // 3700, 4300, 4700 ms
+
+/**
+ * Twinkle amplitude floor, one per depth band. Near stars swing all the way
+ * down to near-invisible; far stars barely dim, which reads as a shimmer
+ * rather than a blink at that size — pairing depth with contrast the same
+ * way duration pairs it with speed above.
+ */
+const TWINKLE_MIN_NEAR = 0.15;
+const TWINKLE_MIN_FAR = 0.55;
+const TWINKLE_RANGE_NEAR = pingPong(1, TWINKLE_MIN_NEAR);
+const TWINKLE_RANGE_FAR = pingPong(1, TWINKLE_MIN_FAR);
 
 const STAR_MIN_D = 3;
-const STAR_MAX_D = 6;
+const STAR_MAX_D = 7;
 
 /**
  * Per-star baseline brightness, folded into the fill colour rather than the
@@ -260,11 +312,9 @@ const SPARKLE_D = 'M50,0 L56,44 L100,50 L56,56 L50,100 L44,56 L0,50 L44,44 Z';
 /**
  * Tip-to-tip span, as a multiple of the seed's `d`.
  *
- * 1, because `d` already *is* the original span in points. The old field lived
- * in a viewBox scaled by `size / 1280` = 0.1406 pt per unit, so its r=12–22
- * seeds landed at 3.4–6.2 pt across — and the seed table those were rewritten
- * into (d=3–6) preserved that mapping exactly. Anything above 1 here is bigger
- * than the sky has ever been.
+ * 1, because `d` already *is* the span in points — no extra scaling on top of
+ * whatever's written in the seed tables (originally 3–6, now 3–7 since the
+ * near band's seeds were bumped up; see STAR_SEEDS above).
  */
 const SPAN_RATIO = 1;
 
@@ -313,8 +363,13 @@ function Sparkle({ span, fill }: Omit<Star, 'box'>) {
     );
 }
 
-/** One natively-looped 0→1 progress value per phase, mapped to a twinkle. */
-function useTwinklePhases(animate: boolean) {
+/**
+ * One natively-looped 0→1 progress value per phase. Raw — not mapped to an
+ * opacity curve here, because near and far stars apply different amplitudes
+ * (TWINKLE_RANGE_NEAR / _FAR) to the same six drivers rather than each
+ * getting their own loop.
+ */
+function useTwinkleProgress(animate: boolean): Animated.Value[] {
     const ref = useRef<Animated.Value[] | null>(null);
     if (ref.current === null) {
         ref.current = PHASE_CONFIGS.map(() => new Animated.Value(0));
@@ -341,12 +396,7 @@ function useTwinklePhases(animate: boolean) {
         };
     }, [animate, values]);
 
-    // progress 0 (the resting value) maps to full opacity, so a non-animating
-    // field renders as a still sky rather than a dimmed one.
-    return useMemo(
-        () => values.map((v) => v.interpolate(TWINKLE_RANGE)),
-        [values],
-    );
+    return values;
 }
 
 interface StarFieldProps {
@@ -354,42 +404,49 @@ interface StarFieldProps {
     height: number;
     color: string;
     animate: boolean;
+    /** Restrict the field to one depth band. Omit to render every seed. */
+    layer?: StarLayer;
 }
 
-function StarField({ width, height, color, animate }: StarFieldProps) {
-    const opacities = useTwinklePhases(animate);
+function StarField({ width, height, color, animate, layer }: StarFieldProps) {
+    // progress[i] resting at 0 maps to full opacity below, so a non-animating
+    // field renders as a still sky rather than a dimmed one.
+    const progress = useTwinkleProgress(animate);
 
-    const twinkling = useMemo(
-        () =>
-            STAR_SEEDS.map((seed) =>
-                makeStar(seed.xf, seed.yf, seed.d, width, height, color),
-            ),
-        [width, height, color],
-    );
+    const twinkling = useMemo(() => {
+        const seeds = seedsForLayer(STAR_SEEDS, layer);
+        let fast = 0;
+        let slow = 0;
+        return seeds.map((seed) => {
+            const star = makeStar(seed.xf, seed.yf, seed.d, width, height, color);
+            const near = seed.d >= NEAR_MIN_D;
+            const pool = near ? FAST_PHASE_INDICES : SLOW_PHASE_INDICES;
+            const phaseIndex = pool[(near ? fast++ : slow++) % pool.length];
+            const range = near ? TWINKLE_RANGE_NEAR : TWINKLE_RANGE_FAR;
+            return { star, opacity: progress[phaseIndex].interpolate(range) };
+        });
+    }, [width, height, color, layer, progress]);
 
     // Plain Views: no animated node, no opacity binding, nothing per-frame.
     const fixed = useMemo(
         () =>
-            STATIC_STAR_SEEDS.map((seed) =>
+            seedsForLayer(STATIC_STAR_SEEDS, layer).map((seed) =>
                 makeStar(seed.xf, seed.yf, seed.d, width, height, color),
             ),
-        [width, height, color],
+        [width, height, color, layer],
     );
 
     return (
         <>
-            {twinkling.map((star, i) => (
+            {twinkling.map((t, i) => (
                 <Animated.View
                     key={i}
-                    style={[
-                        star.box,
-                        { opacity: opacities[i % opacities.length] },
-                    ]}
+                    style={[t.star.box, { opacity: t.opacity }]}
                     pointerEvents='none'
                 >
                     <Sparkle
-                        span={star.span}
-                        fill={star.fill}
+                        span={t.star.span}
+                        fill={t.star.fill}
                     />
                 </Animated.View>
             ))}
@@ -438,6 +495,14 @@ interface ClearNightIconProps {
      * Does not affect stars. Default false.
      */
     mirrorDisc?: boolean;
+    /**
+     * Restrict the star field to one depth band — 'near' (bigger, brighter,
+     * faster/deeper twinkle) or 'far' (the bulk of the field, dimmer and
+     * slower). Lets a caller mount two instances at different scroll-parallax
+     * depths for real motion-parallax separation. Omit to render every star,
+     * which is what every non-full-screen caller wants.
+     */
+    starLayer?: StarLayer;
 }
 
 export default function ClearNightIcon({
@@ -450,6 +515,7 @@ export default function ClearNightIcon({
     showMoon = true,
     moonPhase,
     mirrorDisc = false,
+    starLayer,
 }: ClearNightIconProps) {
     const reduceMotion = useReduceMotion();
     const animateStars = animate && showStars && !reduceMotion;
@@ -505,6 +571,7 @@ export default function ClearNightIcon({
                     height={height}
                     color={color}
                     animate={animateStars}
+                    layer={starLayer}
                 />
             )}
         </View>

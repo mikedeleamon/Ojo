@@ -747,6 +747,11 @@ const WeatherHUD = ({
     const isRainBg = !!weather && isRain(weather.WeatherText);
     const isDrizzleBg = !!weather && isDrizzle(weather.WeatherText);
 
+    // Shared by both star-field parallax layers below, so the near and far
+    // bands freeze on scroll together rather than drifting out of sync.
+    const starsAnimate =
+        perf.twinkle && !(perf.freezeTwinkleOnScroll && twinkleFrozen);
+
     // Precipitation slant from the reported wind. Gust is preferred when present
     // — it's what makes a squall look like a squall rather than steady drizzle.
     // Both fields are optional (older cached snapshots predate them), and
@@ -804,19 +809,23 @@ const WeatherHUD = ({
             animatedProps={animatedGradientProps}
             style={st.root}
         >
-            {/* Full-screen star field — absolute layer behind all content.
-                BackdropLayer cross-fades instead of mounting/unmounting, so a
-                condition change no longer costs a commit + re-rasterization on
-                the frame the weather updates.
+            {/* Full-screen star field — two absolute layers behind all content,
+                split by depth rather than doubled in star count (see
+                `starLayer` on ClearNightIconMoon). BackdropLayer cross-fades
+                instead of mounting/unmounting, so a condition change no
+                longer costs a commit + re-rasterization on the frame the
+                weather updates.
 
-                `depth` sets the parallax rate. Stars are effectively at infinity
-                so they barely drift; storm rain is right in front of you and
-                tracks the scroll hard. Moving both at one rate is what makes
-                cheap parallax read as a flat sticker sliding around. */}
+                `depth` sets the parallax rate. The far layer (most of the
+                field, small and dim) sits close to infinity and barely
+                drifts; the near layer (fewer, bigger, brighter stars) tracks
+                the scroll more — that gap in travel is what reads as the sky
+                having depth instead of being one flat sheet. Storm rain is
+                right in front of you and tracks harder still. */}
             <BackdropLayer
                 visible={isClearNightBg && perf.backdrop}
                 scrollY={scrollY}
-                depth={0.3}
+                depth={0.15}
                 parallax={perf.parallax}
             >
                 {/* Option H — the twinkle stops once scrolled past
@@ -834,10 +843,22 @@ const WeatherHUD = ({
                     fullWidth
                     fullHeight
                     showMoon={false}
-                    animate={
-                        perf.twinkle &&
-                        !(perf.freezeTwinkleOnScroll && twinkleFrozen)
-                    }
+                    starLayer='far'
+                    animate={starsAnimate}
+                />
+            </BackdropLayer>
+            <BackdropLayer
+                visible={isClearNightBg && perf.backdrop}
+                scrollY={scrollY}
+                depth={0.45}
+                parallax={perf.parallax}
+            >
+                <ClearNightIconMoon
+                    fullWidth
+                    fullHeight
+                    showMoon={false}
+                    starLayer='near'
+                    animate={starsAnimate}
                 />
             </BackdropLayer>
 
