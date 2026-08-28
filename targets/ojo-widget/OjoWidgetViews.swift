@@ -54,6 +54,27 @@ extension View {
   }
 }
 
+/// The small family's content inset.
+///
+/// Since iOS 17 the system already insets widget content by its own default
+/// content margin; the views' `.padding(10)` sat INSIDE that, making the real
+/// inset roughly 26pt and leaving the small tile about 96pt of content on a
+/// 148pt device. Adding nothing on 17+ leaves the system margin as the whole
+/// inset (~16pt) and hands ~20pt back in each direction. iOS 16 applies no
+/// system margin, so there the view supplies the same inset itself.
+///
+/// Deliberately not `contentMarginsDisabled()`: that modifier is iOS 17-only
+/// and can't be applied conditionally to a WidgetConfiguration on a 16.0
+/// deployment target, and a full bleed puts type closer to the corner radius
+/// than the layout wants. Medium and large keep their own padding for now —
+/// they were never the squeezed ones.
+extension View {
+  @ViewBuilder
+  func ojoSmallPadding(_ legacyInset: CGFloat = 16) -> some View {
+    if #available(iOS 17.0, *) { self } else { padding(legacyInset) }
+  }
+}
+
 // MARK: - Root
 
 struct OjoWidgetView: View {
@@ -178,6 +199,12 @@ struct TempHeroView: View {
       Text("\(w.temp)°")
         .font(.system(size: size, weight: .semibold, design: .rounded))
         .monospacedDigit()
+        // Three digits are a full monospaced advance wider than two. Without
+        // these the hero is truncated instead of scaled — the one Text in this
+        // file that lacked the limit every other one has.
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
+        .allowsTightening(true)
         .foregroundStyle(.white)
     } else if let t = snap.tempLine, !t.isEmpty {
       Text(t)
@@ -193,7 +220,7 @@ struct TempHeroView: View {
 /// and the small family omits it entirely (one glance, tightest space).
 struct CityLabel: View {
   let snap: WidgetSnapshot
-  var size: CGFloat = 11
+  var size: CGFloat = 14
   var weight: Font.Weight = .semibold
 
   var body: some View {
@@ -220,6 +247,17 @@ func weatherMetaLine(
   if includeFeelsLike, let f = w.feelsLike { parts.append("Feels \(f)°") }
   if let c = w.condition, !c.isEmpty { parts.append(c) }
   if includeHighLow, let h = w.high, let l = w.low { parts.append("H:\(h)° L:\(l)°") }
+  return parts.isEmpty ? snap.tempLine : parts.joined(separator: " · ")
+}
+
+/// The small family's meta line — "Feels 99° · 103°/78°". `weatherMetaLine`
+/// adds the condition and spells out H:/L:, which runs wider than the small
+/// tile can hold at 8pt; the condition is already carried by the gradient.
+func compactMetaLine(_ snap: WidgetSnapshot) -> String? {
+  guard let w = snap.weather else { return snap.tempLine }
+  var parts: [String] = []
+  if let f = w.feelsLike { parts.append("Feels \(f)°") }
+  if let h = w.high, let l = w.low { parts.append("\(h)°/\(l)°") }
   return parts.isEmpty ? snap.tempLine : parts.joined(separator: " · ")
 }
 
@@ -252,6 +290,9 @@ private struct ChipSpec: Identifiable {
   let id: String
   let symbol: String
   let text: String
+  /// Shorter label for the small family, where this row shares its width with
+  /// the layer pill. The glyph already says which signal it is.
+  let compactText: String
 }
 
 /// Merges the ambient weather signals (rain %, high UV) with the outfit-gap
@@ -265,21 +306,21 @@ private func signalChips(_ snap: WidgetSnapshot, maxCount: Int) -> [ChipSpec] {
   // Rain: the daily chance when known (ambient signal, per the spec), else
   // only when the outfit-gap alert fired.
   if let rc = snap.weather?.rainChance, rc >= 20 {
-    chips.append(ChipSpec(id: "rain", symbol: "umbrella.fill", text: "RAIN \(rc)%"))
+    chips.append(ChipSpec(id: "rain", symbol: "umbrella.fill", text: "RAIN \(rc)%", compactText: "\(rc)%"))
   } else if alerts.contains("rain") {
-    chips.append(ChipSpec(id: "rain", symbol: "umbrella.fill", text: "RAIN"))
+    chips.append(ChipSpec(id: "rain", symbol: "umbrella.fill", text: "RAIN", compactText: "RAIN"))
   }
   if alerts.contains("layer") {
-    chips.append(ChipSpec(id: "layer", symbol: "tshirt.fill", text: "LAYER UP"))
+    chips.append(ChipSpec(id: "layer", symbol: "tshirt.fill", text: "LAYER UP", compactText: "LAYER"))
   }
   if alerts.contains("snow") {
-    chips.append(ChipSpec(id: "snow", symbol: "snowflake", text: "BOOTS"))
+    chips.append(ChipSpec(id: "snow", symbol: "snowflake", text: "BOOTS", compactText: "BOOTS"))
   }
   // UV: category text ("UV VERY HIGH"), same wording as the app's "UV Index"
   // stat — shown whenever the day is High+, not just when a hat is missing.
   if let uv = snap.uvIndexText ?? snap.weather?.uvText,
      ["High", "Very High", "Extreme"].contains(uv) {
-    chips.append(ChipSpec(id: "uv", symbol: "sun.max.fill", text: "UV \(uv.uppercased())"))
+    chips.append(ChipSpec(id: "uv", symbol: "sun.max.fill", text: "UV \(uv.uppercased())", compactText: "UV"))
   }
   return Array(chips.prefix(maxCount))
 }
@@ -287,12 +328,14 @@ private func signalChips(_ snap: WidgetSnapshot, maxCount: Int) -> [ChipSpec] {
 struct SignalChipsView: View {
   let snap: WidgetSnapshot
   var maxCount: Int = 3
+  /// Small family: use each chip's short label — see ChipSpec.compactText.
+  var compact: Bool = false
 
   var body: some View {
     let chips = signalChips(snap, maxCount: maxCount)
     if !chips.isEmpty {
       HStack(spacing: 5) {
-        ForEach(chips) { SignalChip(symbol: $0.symbol, text: $0.text) }
+        ForEach(chips) { SignalChip(symbol: $0.symbol, text: compact ? $0.compactText : $0.text) }
       }
     }
   }
@@ -411,23 +454,105 @@ struct OutfitThumbRow: View {
   }
 }
 
-/// The compact single hint line for the small widget — shows the weather cues
-/// (timeline strip or signal chips) when there's something to flag, otherwise
-/// the outfit description. One line only, so the layout stays glanceable.
-struct CompactHintView: View {
-  let snap: WidgetSnapshot
-  var maxAlerts: Int = 3
+// MARK: - Layer pills
 
-  private var hasCues: Bool {
-    (snap.timeline?.isEmpty == false) || !signalChips(snap, maxCount: 1).isEmpty
+/// Which of the three layers a glyph draws.
+enum LayerKind { case base, mid, outer }
+
+/// The layer glyphs, drawn on a 24×24 grid and scaled to the frame. Stroked
+/// rather than filled so they inherit the pill's foreground colour, and drawn
+/// here rather than pulled from SF Symbols because the set has no long-sleeve
+/// counterpart to `tshirt` — without one, base and mid would be the same shape.
+struct LayerGlyph: Shape {
+  let kind: LayerKind
+
+  func path(in rect: CGRect) -> Path {
+    let unit = min(rect.width, rect.height) / 24
+    func pt(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+      CGPoint(x: rect.minX + x * unit, y: rect.minY + y * unit)
+    }
+
+    var path = Path()
+    switch kind {
+    case .base:
+      // Short sleeves: the cuff turns back up into the body.
+      path.move(to: pt(9, 3.5))
+      path.addLine(to: pt(4.5, 6))
+      path.addLine(to: pt(6.3, 9.2))
+      path.addLine(to: pt(8, 8.3))
+      path.addLine(to: pt(8, 20))
+      path.addLine(to: pt(16, 20))
+      path.addLine(to: pt(16, 8.3))
+      path.addLine(to: pt(17.7, 9.2))
+      path.addLine(to: pt(19.5, 6))
+      path.addLine(to: pt(15, 3.5))
+      path.addQuadCurve(to: pt(9, 3.5), control: pt(12, 6.6))
+    case .mid, .outer:
+      // Long sleeves reach the same silhouette; the detail below separates them.
+      path.move(to: pt(9, 3.5))
+      path.addLine(to: pt(4.5, 6))
+      path.addLine(to: pt(3, 14))
+      path.addLine(to: pt(6, 14.8))
+      path.addLine(to: pt(6, 20))
+      path.addLine(to: pt(18, 20))
+      path.addLine(to: pt(18, 14.8))
+      path.addLine(to: pt(21, 14))
+      path.addLine(to: pt(19.5, 6))
+      path.addLine(to: pt(15, 3.5))
+      if kind == .mid {
+        path.addQuadCurve(to: pt(9, 3.5), control: pt(12, 6.6))
+        // Ribbed hem — the one mark that tells a sweater from a tee at 11pt.
+        path.move(to: pt(6, 17.2))
+        path.addLine(to: pt(18, 17.2))
+      } else {
+        // Open front: collar V, then the zip line down the middle.
+        path.addLine(to: pt(12, 6.2))
+        path.addLine(to: pt(9, 3.5))
+        path.move(to: pt(12, 6.2))
+        path.addLine(to: pt(12, 20))
+      }
+    }
+    return path
   }
+}
+
+/// The layer stack as ONE frosted pill rather than three — at the small
+/// family's width, grouping them is the ~24pt that lets the weather chip sit
+/// beside it. A layer the weather doesn't call for is dimmed rather than
+/// hidden, so the stack always reads in the same order and "no extra layers
+/// needed" is visible at a glance instead of spelled out in a sentence.
+struct LayerStackPill: View {
+  let stack: WidgetSnapshot.LayerStack
+  var glyphSize: CGFloat = 11
 
   var body: some View {
-    if hasCues {
-      WeatherCuesView(snap: snap, maxAlerts: maxAlerts)
-    } else {
-      OutfitDescriptionView(snap: snap, lineLimit: 1)
+    HStack(spacing: 4) {
+      glyph(.base, stack.base)
+      glyph(.mid, stack.mid)
+      glyph(.outer, stack.outer)
     }
+    .padding(.horizontal, 6)
+    .padding(.vertical, 4)
+    .background(Capsule().fill(Color.white.opacity(0.22)))
+    .foregroundStyle(.white)
+  }
+
+  /// "on" reads at full strength, "spare" (worn but not needed today) sits
+  /// between, and anything else — including a state a newer JS build might
+  /// send — falls back to the dimmest step.
+  private func opacity(_ state: String) -> Double {
+    switch state {
+    case "on":    return 1
+    case "spare": return 0.55
+    default:      return 0.3
+    }
+  }
+
+  private func glyph(_ kind: LayerKind, _ state: String) -> some View {
+    LayerGlyph(kind: kind)
+      .stroke(style: StrokeStyle(lineWidth: 1, lineCap: .round, lineJoin: .round))
+      .frame(width: glyphSize, height: glyphSize)
+      .opacity(opacity(state))
   }
 }
 
@@ -495,41 +620,61 @@ struct MediumOutfitView: View {
           .frame(maxHeight: .infinity)
       }
     }
-    .padding(12)
+    .padding(8)
   }
 }
 
 // MARK: - Small
 
-/// One idea per glance: weather glyph + hero temperature up top, the outfit
-/// strip in the middle, and a single line — description, else headline — at
-/// the bottom. No chips or meta line; the small family cuts detail, not type.
+/// City and glyph on top, the hero temperature, a compact meta line, the
+/// outfit thumbnails, and a bottom row pairing the layer stack with the day's
+/// strongest weather signal.
+///
+/// The layer pills replace the old headline line: at this size the headline
+/// mostly repeated what the thumbnails already showed, while the layer state is
+/// the thing the app exists to answer. The city arrives with them — it was
+/// dropped from this family for want of room, and the reduced inset (see
+/// `ojoSmallPadding`) is what pays for it.
 struct SmallOutfitView: View {
   let snap: WidgetSnapshot
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
+    VStack(alignment: .leading, spacing: 2) {
       if snap.mode == .trip, let trip = snap.trip {
         TripBadge(trip: trip)
       }
-      HStack(alignment: .center) {
-        WeatherIconView(kind: snap.weatherKind, isDay: snap.isDay, size: 24)
+
+      HStack(alignment: .center, spacing: 4) {
+        CityLabel(snap: snap, size: 14)
         Spacer(minLength: 4)
-        TempHeroView(snap: snap, size: 26)
+        WeatherIconView(kind: snap.weatherKind, isDay: snap.isDay, size: 20)
       }
 
-      OutfitThumbRow(items: snap.items, maxCount: 3, ratio: 0.7, spacing: 4, minHeight: 44)
+      TempHeroView(snap: snap, size: 38)
 
+      // if let meta = compactMetaLine(snap), !meta.isEmpty {
+      //   Text(meta)
+      //     .font(.system(size: 8, weight: .medium))
+      //     .foregroundStyle(.white.opacity(0.75))
+      //     .lineLimit(1)
+      //     .minimumScaleFactor(0.8)
+      // }
+
+      //Spacer(minLength: 0)
+
+      OutfitThumbRow(items: snap.items, maxCount: 3, ratio: 1, spacing: 4, maxHeight: 28, minHeight: 22)
       Spacer(minLength: 0)
-
-      CompactHintView(snap: snap, maxAlerts: 1)
-
-      Text(headlineText(snap))
-        .font(.system(size: 12, weight: .semibold))
-        .foregroundStyle(.white)
-        .lineLimit(1)
+      HStack(spacing: 4) {
+        if let stack = snap.layerStack {
+          LayerStackPill(stack: stack)
+        }
+        Spacer(minLength: 4)
+        // One signal only, with its short label — the layer pill takes the
+        // left half of this row.
+        SignalChipsView(snap: snap, maxCount: 1, compact: true)
+      }
     }
-    .padding(10)
+    .ojoSmallPadding()
   }
 }
 
@@ -550,7 +695,7 @@ struct LargeOutfitView: View {
 
       HStack(alignment: .top) {
         VStack(alignment: .leading, spacing: 2) {
-          CityLabel(snap: snap, size: 12, weight: .bold)
+          CityLabel(snap: snap, weight: .bold)
           HStack(alignment: .center, spacing: 8) {
             TempHeroView(snap: snap, size: 44)
             WeatherIconView(kind: snap.weatherKind, isDay: snap.isDay, size: 40)
@@ -613,7 +758,8 @@ struct LargeOutfitView: View {
 
       ChangeFitFooter(snap: snap)
     }
-    .padding(16)
+    .padding(12)
+
   }
 }
 

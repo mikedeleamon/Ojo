@@ -117,6 +117,10 @@ struct TomorrowBadge: View {
 /// Tomorrow's hero is the H/L pair — there is no "current" temperature for a
 /// day that hasn't started. High leads at hero size, low trails smaller and
 /// dimmer, both in the rounded monospaced style of TempHeroView.
+///
+/// Both Texts scale rather than truncate: two numbers and two degree signs run
+/// roughly 40pt wider than the main widget's single temperature, so this pair
+/// is the first thing to outgrow its row at three digits.
 struct TomorrowHiLoView: View {
   let t: WidgetSnapshot.TomorrowBlock
   var size: CGFloat = 34
@@ -126,10 +130,16 @@ struct TomorrowHiLoView: View {
       Text("\(t.high)°")
         .font(.system(size: size, weight: .semibold, design: .rounded))
         .monospacedDigit()
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
+        .allowsTightening(true)
         .foregroundStyle(.white)
       Text("\(t.low)°")
         .font(.system(size: size * 0.55, weight: .semibold, design: .rounded))
         .monospacedDigit()
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
+        .allowsTightening(true)
         .foregroundStyle(.white.opacity(0.55))
     }
   }
@@ -201,7 +211,7 @@ struct TomorrowSmallView: View {
         Spacer(minLength: 0)
       }
     }
-    .padding(10)
+    .ojoSmallPadding()
   }
 }
 

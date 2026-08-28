@@ -595,5 +595,7 @@ export const generateLayeringRecommendation = ({
     confidence:     Math.max(0, computeConfidence(currentTemp, tempDelta, windSpeed, !!activeMid, !!activeOuter) - removabilityPenalty),
     missingMid,
     missingOuter,
+    needsMid,
+    needsOuter,
   };
 };

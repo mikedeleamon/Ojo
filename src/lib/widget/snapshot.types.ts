@@ -30,6 +30,23 @@ export type WidgetEmptyReason = 'no_closet' | 'empty_closet' | 'insufficient';
  * layer is next most common; boots/UV are more situational). The widget
  * renders these as a small glyph row — see native.ts / OjoWidgetViews.swift.
  */
+/**
+ * Per-layer state for the widget's layer pills:
+ *  - 'on'    — in the outfit and called for by today's weather
+ *  - 'spare' — in the outfit, but the weather doesn't ask for it
+ *  - 'off'   — not in the outfit
+ * A needed-but-absent layer reads as 'off': the 'layer' alert already calls
+ * that gap out, and the pills describe what you are actually wearing.
+ */
+export type WidgetLayerState = 'on' | 'spare' | 'off';
+
+/** Base/mid/outer state for one outfit — see WidgetLayerState. */
+export interface WidgetLayerStack {
+  base: WidgetLayerState;
+  mid: WidgetLayerState;
+  outer: WidgetLayerState;
+}
+
 export type WidgetAlertKind = 'rain' | 'layer' | 'snow' | 'uv';
 
 /**
@@ -168,6 +185,8 @@ export interface WidgetOutfitVariant {
   headline: string;
   items: OjoWidgetSnapshotItem[];
   layerNote?: string;
+  /** Base/mid/outer state for this outfit's layer pills. Omitted when the outfit had no layering result. */
+  layerStack?: WidgetLayerStack;
   alerts: WidgetAlertKind[];
   uvIndexText?: string;
   timeline?: WidgetTimelineStep[];
@@ -178,6 +197,7 @@ export interface WidgetOutfitVariantInput {
   headline: string;
   items: { id: string; role: string; imageUrl: string }[];
   layerNote?: string;
+  layerStack?: WidgetLayerStack;
   alerts: WidgetAlertKind[];
   uvIndexText?: string;
   timeline?: WidgetTimelineStep[];
@@ -216,6 +236,8 @@ export interface OjoWidgetSnapshot {
   variants?: WidgetOutfitVariant[];
   /** Short layering call-to-action from layeringEngine's recommendation, e.g. "Bring a jacket — windy after 4pm." Omitted in 'empty' mode. */
   layerNote?: string;
+  /** Base/mid/outer state for the small family's layer pills. Omitted in 'empty' mode and on pre-pills snapshots. */
+  layerStack?: WidgetLayerStack;
   /** Accessory gaps the outfit thumbnails don't already cover, priority order. Empty when nothing's missing. */
   alerts: WidgetAlertKind[];
   /** UV category text ("High"/"Very High"/"Extreme") for the 'uv' alert's label — same value the app's WeatherDetails "UV Index" stat shows. Present only when the UV alert is active. */
@@ -258,6 +280,7 @@ export interface WidgetSnapshotInput {
   /** All renderable outfits for today, primary first. Index 0 mirrors the top-level fields. */
   variants?: WidgetOutfitVariantInput[];
   layerNote?: string;
+  layerStack?: WidgetLayerStack;
   alerts: WidgetAlertKind[];
   uvIndexText?: string;
   timeline?: WidgetTimelineStep[];

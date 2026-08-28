@@ -13,6 +13,14 @@ export interface LayeringResult {
   /** Weather calls for a mid/outer layer but the chosen outfit doesn't have one — a wardrobe gap, not just "extra layer optional." */
   missingMid: boolean;
   missingOuter: boolean;
+  /**
+   * Whether the weather actually calls for each layer, independent of whether
+   * the outfit has one. `missing*` above only fires when needed AND absent, so
+   * it can't tell a needed-and-worn layer from an optional one — that split is
+   * what the widget's layer pills render.
+   */
+  needsMid: boolean;
+  needsOuter: boolean;
 }
 
 /**

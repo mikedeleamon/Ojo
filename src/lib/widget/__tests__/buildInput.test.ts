@@ -169,6 +169,64 @@ describe('buildWidgetInput variants', () => {
   });
 });
 
+describe('buildWidgetInput layer stack', () => {
+  /** An outfit carrying a layering result with the given layers/necessity. */
+  const layered = (
+    layers: { mid: boolean; outer: boolean },
+    needs: { needsMid: boolean; needsOuter: boolean },
+  ): OutfitResult => {
+    const slot = (role: string) => ({ role, article: { _id: role, imageUrl: `https://img/${role}.jpg` } });
+    return {
+      ...outfit('Layered'),
+      layering: {
+        layers: {
+          base: slot('top'),
+          mid: layers.mid ? slot('midLayer') : null,
+          outer: layers.outer ? slot('outerwear') : null,
+        },
+        recommendation: 'Layer up.',
+        confidence: 0.8,
+        missingMid: needs.needsMid && !layers.mid,
+        missingOuter: needs.needsOuter && !layers.outer,
+        ...needs,
+      },
+    } as unknown as OutfitResult;
+  };
+
+  const stackFor = (outfitResult: OutfitResult) =>
+    buildWidgetInput(baseData({ todayOutfits: [outfitResult] })).layerStack;
+
+  it('marks a layer the weather calls for as worn', () => {
+    expect(stackFor(layered({ mid: true, outer: true }, { needsMid: true, needsOuter: true }))).toEqual({
+      base: 'on',
+      mid: 'on',
+      outer: 'on',
+    });
+  });
+
+  it('marks a layer that is in the outfit but not needed as spare', () => {
+    // The distinction the pills exist for — missingMid/missingOuter cannot
+    // express it, because both are false whenever the layer is present.
+    expect(stackFor(layered({ mid: true, outer: true }, { needsMid: false, needsOuter: false }))).toEqual({
+      base: 'on',
+      mid: 'spare',
+      outer: 'spare',
+    });
+  });
+
+  it('marks absent layers off, including one the weather wanted', () => {
+    expect(stackFor(layered({ mid: false, outer: false }, { needsMid: true, needsOuter: false }))).toEqual({
+      base: 'on',
+      mid: 'off',
+      outer: 'off',
+    });
+  });
+
+  it('omits the stack entirely when the outfit has no layering result', () => {
+    expect(buildWidgetInput(baseData()).layerStack).toBeUndefined();
+  });
+});
+
 describe('buildWidgetInput upcoming trip', () => {
   const upcomingPlan = {
     id: 'trip-1',

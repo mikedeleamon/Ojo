@@ -15,6 +15,8 @@ import type {
   OjoWidgetUpcomingTrip,
   OjoWidgetWeather,
   WidgetAlertKind,
+  WidgetLayerStack,
+  WidgetLayerState,
   WidgetEmptyReason,
   WidgetOutfitVariantInput,
   WidgetSnapshotInput,
@@ -38,6 +40,25 @@ const itemsFromOutfit = (outfit: OutfitResult): WidgetSnapshotInput['items'] =>
   }));
 
 /**
+ * base/mid/outer state for the widget's layer pills. A layer the outfit has but
+ * the weather doesn't call for is 'spare' rather than 'on' — that split is the
+ * whole point of the pills, and `missingMid`/`missingOuter` can't express it
+ * (they only fire when a layer is needed AND absent). The base layer is always
+ * 'on' when present: you are wearing it regardless of what the weather asks.
+ */
+const layerStackFor = (outfit: OutfitResult): WidgetLayerStack | undefined => {
+  const layering = outfit.layering;
+  if (!layering) return undefined;
+  const state = (present: unknown, needed: boolean): WidgetLayerState =>
+    !present ? 'off' : needed ? 'on' : 'spare';
+  return {
+    base: layering.layers.base ? 'on' : 'off',
+    mid: state(layering.layers.mid, layering.needsMid),
+    outer: state(layering.layers.outer, layering.needsOuter),
+  };
+};
+
+/**
  * Maps an outfit's layering/accessory computation onto the widget's glyph row
  * and timeline strip. Alerts only flag gaps the outfit's own item thumbnails
  * don't already show — a selected outerwear item is visible as a thumbnail,
@@ -47,7 +68,13 @@ const itemsFromOutfit = (outfit: OutfitResult): WidgetSnapshotInput['items'] =>
  */
 const widgetAlertsFor = (
   outfit: OutfitResult,
-): { layerNote?: string; alerts: WidgetAlertKind[]; uvIndexText?: string; timeline?: WidgetTimelineStep[] } => {
+): {
+  layerNote?: string;
+  layerStack?: WidgetLayerStack;
+  alerts: WidgetAlertKind[];
+  uvIndexText?: string;
+  timeline?: WidgetTimelineStep[];
+} => {
   const alerts: WidgetAlertKind[] = [];
   if ((outfit.accessoryAlerts?.rain ?? 'none') !== 'none') alerts.push('rain');
   if (outfit.layering?.missingMid || outfit.layering?.missingOuter) alerts.push('layer');
@@ -55,6 +82,7 @@ const widgetAlertsFor = (
   if (outfit.accessoryAlerts?.missingHat) alerts.push('uv');
   return {
     layerNote: outfit.layering?.recommendation,
+    layerStack: layerStackFor(outfit),
     alerts,
     // Only meaningful alongside the 'uv' alert; the widget reads it as "UV High" — same category text WeatherDetails shows.
     uvIndexText: outfit.accessoryAlerts?.missingHat ? outfit.accessoryAlerts?.uvIndexText : undefined,

@@ -26,6 +26,10 @@ struct WidgetSnapshot: Codable {
   /// Short layering call-to-action from the JS layering engine, e.g. "Bring a
   /// jacket — windy after 4pm." Optional so older snapshots still decode.
   let layerNote: String?
+  /// Base/mid/outer state for the small family's layer pills. Optional so
+  /// snapshots written before the pills existed still decode — SmallOutfitView
+  /// falls back to the thumbnail row alone when nil.
+  let layerStack: LayerStack?
   /// Accessory gaps not already visible from `items`' thumbnails, priority
   /// order: "rain" | "layer" | "snow" | "uv". Optional (not just empty) so a
   /// snapshot written before this field existed still decodes.
@@ -56,6 +60,17 @@ struct WidgetSnapshot: Codable {
   let tomorrow: TomorrowBlock?
   let deepLink: String
 
+  /// Mirrors snapshot.types.ts `WidgetLayerStack`. Each value is a
+  /// `WidgetLayerState` raw string: "on" (worn and called for), "spare" (worn
+  /// but not needed today), "off" (not in the outfit). Kept as String rather
+  /// than an enum so an unrecognised state from a newer JS build still decodes
+  /// — LayerStackPill treats anything it doesn't know as "off".
+  struct LayerStack: Codable {
+    let base: String
+    let mid: String
+    let outer: String
+  }
+
   struct Item: Codable, Identifiable {
     let id: String
     let role: String
@@ -85,6 +100,7 @@ struct WidgetSnapshot: Codable {
     let headline: String
     let items: [Item]
     let layerNote: String?
+    let layerStack: LayerStack?
     let alerts: [String]?
     let uvIndexText: String?
     let timeline: [TimelineStep]?
@@ -156,7 +172,7 @@ extension WidgetSnapshot {
   var variantCount: Int { max(variants?.count ?? 1, 1) }
 
   /// Returns a copy whose top-level outfit fields (headline/items/layerNote/
-  /// alerts/uvIndexText/timeline) are replaced by `variants[index mod count]`,
+  /// layerStack/alerts/uvIndexText/timeline) are replaced by `variants[index mod count]`,
   /// so every view keeps reading the same top-level fields regardless of which
   /// fit the user has cycled to. Index 0 / missing variants → self unchanged.
   func applyingVariant(_ index: Int) -> WidgetSnapshot {
@@ -173,6 +189,7 @@ extension WidgetSnapshot {
       items: v.items,
       variants: variants,
       layerNote: v.layerNote,
+      layerStack: v.layerStack,
       alerts: v.alerts,
       uvIndexText: v.uvIndexText,
       timeline: v.timeline,
@@ -214,6 +231,7 @@ extension WidgetSnapshot {
     ],
     variants: nil,
     layerNote: "Layer up — cooler after sunset.",
+    layerStack: WidgetSnapshot.LayerStack(base: "on", mid: "on", outer: "spare"),
     alerts: ["layer"],
     uvIndexText: "High",
     timeline: [
@@ -260,6 +278,7 @@ extension WidgetSnapshot {
     items: [],
     variants: nil,
     layerNote: nil,
+    layerStack: nil,
     alerts: [],
     uvIndexText: nil,
     timeline: nil,
