@@ -116,13 +116,28 @@ export const weatherGradients = {
   // violet (residual warmth over the ozone Chappuis band) while morning blue
   // hour stays a purer, cooler blue.
   //
+  // The first band of each table is a *low sun* stop, not a twilight one. Going
+  // straight from clearDay to goldenHour meant one blend spanning ~180 degrees
+  // of hue, which is both a long way to travel and where the old green-routing
+  // bug was most visible. Splitting it in two keeps each arc short, and it is
+  // what the sky does anyway: it pales and warms at the horizon well before it
+  // turns gold.
+  //
   // Evening (sun descending):
+  lowSun:       ['#0B5FA8', '#8FC4DE', '#DFE8EC'],   // deep blue, hazy blue, pale washed horizon
   goldenHour:   ['#0C4A8A', '#E8834A', '#FCD34D'],   // low sun, warm gold horizon
   sunset:       ['#1E1B4B', '#C2410C', '#F59E0B'],   // civil twilight, burnt orange
+  // Same reasoning as lowSun above, at the other end of twilight. sunset →
+  // blueHour is a ~130 degree arc between two vivid palettes, so the crossing
+  // held full saturation and the whole screen went hot magenta around −6.
+  // Afterglow is the muted plum the sky actually shows once the sun is down.
+  afterglow:    ['#141538', '#5B2F52', '#A85A63'],   // dark indigo, muted plum, dusty rose
   blueHour:     ['#0B1026', '#1E3A8A', '#7C3AED'],   // nautical twilight, violet
   // Morning (sun ascending) — paler, cooler, rosier counterparts:
+  dawnPale:     ['#0E5FA8', '#93C6E4', '#E4ECF2'],   // clean blue, hazy blue, cool washed horizon
   dawnGold:     ['#0E5BA8', '#EFA184', '#F9E29A'],   // clean blue, peach, pale lemon
   dawn:         ['#1B2C63', '#C85A7C', '#F5A98D'],   // civil twilight, rose + coral
+  dawnAfterglow:['#101B40', '#4A3A6B', '#9A7391'],   // dark indigo, muted violet, dusty mauve
   dawnBlue:     ['#070C1F', '#153A82', '#3B7DD8'],   // nautical twilight, cool blue
 
   // ── Clouds ────────────────────────────────────────────────────────────────

@@ -1,3 +1,4 @@
+import CoreImage
 import ExpoModulesCore
 import UIKit
 import WidgetKit
@@ -12,7 +13,9 @@ import WidgetKit
  * JS API (see src/lib/widget/native.ts):
  *   - writeSnapshot(json)        → writes snapshot.json, reloads all timelines
  *   - cacheThumb(remoteUrl)      → downloads + downscales one thumbnail, returns
- *                                  its container-relative path ("thumbs/<hash>.jpg")
+ *                                  its container-relative path ("thumbs/<hash>.jpg").
+ *                                  Also writes a companion "<hash>.vibrant.png"
+ *                                  alongside it — see writeVibrantCompanion below.
  *   - pruneThumbs(keepPaths)     → deletes cached thumbnails not in keepPaths
  *
  * The App Group id MUST match plugins/withOjoAppGroup.js and the widget target.
@@ -64,8 +67,13 @@ public class OjoWidgetBridgeModule: Module {
       let relPath = "\(THUMBS_DIR)/\(name)"
       let destURL = thumbsDir.appendingPathComponent(name)
 
-      // Already cached → return immediately, no network.
+      // Already cached → return immediately, no network. Still backfill the
+      // vibrant companion if this thumb was cached before that feature existed.
       if FileManager.default.fileExists(atPath: destURL.path) {
+        if !FileManager.default.fileExists(atPath: vibrantURL(for: destURL).path),
+           let data = try? Data(contentsOf: destURL), let image = UIImage(data: data) {
+          try? writeVibrantCompanion(image, next: destURL)
+        }
         promise.resolve(relPath)
         return
       }
@@ -90,7 +98,8 @@ public class OjoWidgetBridgeModule: Module {
           promise.reject("DecodeFailed", "Could not decode image at \(remoteUrl)")
           return
         }
-        guard let jpeg = downscaledJPEG(image, maxDim: THUMB_MAX_DIM) else {
+        guard let scaled = downscaled(image, maxDim: THUMB_MAX_DIM),
+              let jpeg = scaled.jpegData(compressionQuality: 0.85) else {
           promise.reject("EncodeFailed", "Could not encode thumbnail.")
           return
         }
@@ -98,6 +107,7 @@ public class OjoWidgetBridgeModule: Module {
           try FileManager.default.createDirectory(
             at: thumbsDir, withIntermediateDirectories: true)
           try jpeg.write(to: destURL, options: .atomic)
+          try? writeVibrantCompanion(scaled, next: destURL)
           promise.resolve(relPath)
         } catch {
           promise.reject("WriteFailed", error.localizedDescription)
@@ -115,7 +125,10 @@ public class OjoWidgetBridgeModule: Module {
     AsyncFunction("pruneThumbs") { (keepPaths: [String]) -> Void in
       guard let container = try? appGroupContainer() else { return }
       let thumbsDir = container.appendingPathComponent(THUMBS_DIR, isDirectory: true)
-      let keep = Set(keepPaths.map { ($0 as NSString).lastPathComponent })
+      // Each kept "<hash>.jpg" has a "<hash>.vibrant.png" companion (see
+      // writeVibrantCompanion) that must survive the same prune.
+      let jpgNames = keepPaths.map { ($0 as NSString).lastPathComponent }
+      let keep = Set(jpgNames + jpgNames.map(vibrantFileName))
       let fm = FileManager.default
       guard let files = try? fm.contentsOfDirectory(atPath: thumbsDir.path) else { return }
       for file in files where !keep.contains(file) {
@@ -152,16 +165,45 @@ private func stableHash(_ s: String) -> String {
   return String(hash, radix: 16)
 }
 
-/// Redraw `image` so its longest edge is at most `maxDim` px, then JPEG-encode.
-/// Never upscales.
-private func downscaledJPEG(_ image: UIImage, maxDim: CGFloat) -> Data? {
+/// Redraw `image` so its longest edge is at most `maxDim` px. Never upscales.
+private func downscaled(_ image: UIImage, maxDim: CGFloat) -> UIImage? {
   let w = image.size.width, h = image.size.height
   guard w > 0, h > 0 else { return nil }
   let scale = min(1, maxDim / max(w, h))
   let target = CGSize(width: w * scale, height: h * scale)
   let renderer = UIGraphicsImageRenderer(size: target)
-  let scaled = renderer.image { _ in
+  return renderer.image { _ in
     image.draw(in: CGRect(origin: .zero, size: target))
   }
-  return scaled.jpegData(compressionQuality: 0.85)
+}
+
+/// "<hash>.jpg" → "<hash>.vibrant.png"
+private func vibrantFileName(_ jpgName: String) -> String {
+  ((jpgName as NSString).deletingPathExtension) + ".vibrant.png"
+}
+
+private func vibrantURL(for jpgURL: URL) -> URL {
+  jpgURL.deletingLastPathComponent()
+    .appendingPathComponent(vibrantFileName(jpgURL.lastPathComponent))
+}
+
+/// WidgetKit's Clear/Tinted (accented) rendering mode derives visibility from
+/// an image's *alpha channel* only — color and luminance are discarded. Our
+/// thumbnails are opaque JPEGs (uniform alpha=1), so rendered directly they
+/// collapse into one flat, undifferentiated tile in that mode.
+///
+/// `CIMaskToAlpha` turns luminance into alpha (bright → opaque, dark →
+/// transparent), which is the standard trick for prepping bitmap content for
+/// vibrant rendering: WidgetKit's own alpha-based masking then reproduces the
+/// photo's tonal shape instead of one flat block. Written as its own PNG
+/// (JPEG can't hold alpha) alongside the full-color thumb; ThumbView picks
+/// whichever file matches the current rendering mode.
+private func writeVibrantCompanion(_ image: UIImage, next jpgURL: URL) throws {
+  guard let ciImage = CIImage(image: image) else { return }
+  let mono = ciImage.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 0])
+  let masked = mono.applyingFilter("CIMaskToAlpha")
+  let context = CIContext()
+  guard let cgImage = context.createCGImage(masked, from: masked.extent),
+        let pngData = UIImage(cgImage: cgImage).pngData() else { return }
+  try pngData.write(to: vibrantURL(for: jpgURL), options: .atomic)
 }

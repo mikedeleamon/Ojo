@@ -122,21 +122,20 @@ struct OjoWidgetView: View {
 /// Loads a cached garment thumbnail from the App Group; shows a translucent
 /// glass-style tile (matching the app's GlassCard look) when uncached.
 ///
-/// In the Home Screen's "Clear"/tinted appearance, WidgetKit renders
-/// non-accentable content as a vibrancy mask instead of full color. Our
-/// garment photos are mostly white-background product shots, so that mask
-/// crushes them to a near-blank tile — swap to a tintable glyph instead of
-/// showing an unreadable photo.
+/// In the Home Screen's "Clear"/tinted appearance, WidgetKit derives what's
+/// visible from an image's *alpha channel* only, ignoring color. Our
+/// full-color thumb is an opaque JPEG (alpha=1 everywhere), so rendered
+/// as-is there it collapses into one flat tile. The bridge module writes a
+/// companion "<hash>.vibrant.png" with alpha derived from luminance
+/// (CIMaskToAlpha) specifically for this — load that one instead so
+/// WidgetKit's own vibrancy reproduces the photo's actual shape/tone.
 struct ThumbView: View {
   let item: WidgetSnapshot.Item
   @Environment(\.widgetRenderingMode) private var renderingMode
 
   var body: some View {
     ZStack {
-      if renderingMode == .fullColor,
-         let url = SnapshotStore.thumbURL(item.thumb),
-         let data = try? Data(contentsOf: url),
-         let ui = UIImage(data: data) {
+      if let ui = loadedImage {
         Image(uiImage: ui)
           .resizable()
           .aspectRatio(contentMode: .fill)
@@ -152,6 +151,14 @@ struct ThumbView: View {
       }
     }
     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+  }
+
+  private var loadedImage: UIImage? {
+    let url = renderingMode == .fullColor
+      ? SnapshotStore.thumbURL(item.thumb)
+      : SnapshotStore.vibrantThumbURL(item.thumb)
+    guard let url, let data = try? Data(contentsOf: url) else { return nil }
+    return UIImage(data: data)
   }
 }
 

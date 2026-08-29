@@ -17,21 +17,31 @@ type Stops = readonly { elevation: number; colors: readonly string[] }[];
  * Two tables, because a given elevation is reached twice a day and the sky does
  * not look the same both times — see the aerosol note in theme/tokens. The
  * daylight and deep-night endpoints are shared: high noon is high noon, and
- * below −16° there is no sunlight left to be asymmetric about. Only the three
- * twilight bands differ.
+ * below −16° there is no sunlight left to be asymmetric about. Only the five
+ * intermediate bands differ.
+ *
+ * Bands are kept narrow in hue as well as elevation: any single blend spanning
+ * a large hue arc has to pass through colours the sky never actually shows,
+ * and holds full saturation while it does. The low-sun stop at +6° halves the
+ * long blue → gold journey; the afterglow stop at −7° does the same for
+ * gold → violet, which was crossing magenta at full strength.
  */
 const DUSK_STOPS: Stops = [
     { elevation:  10, colors: weatherGradients.clearDay },
+    { elevation:   6, colors: weatherGradients.lowSun },
     { elevation:   2, colors: weatherGradients.goldenHour },
     { elevation:  -4, colors: weatherGradients.sunset },
+    { elevation:  -7, colors: weatherGradients.afterglow },
     { elevation: -10, colors: weatherGradients.blueHour },
     { elevation: -16, colors: weatherGradients.clearNight },
 ] as const;
 
 const DAWN_STOPS: Stops = [
     { elevation:  10, colors: weatherGradients.clearDay },
+    { elevation:   6, colors: weatherGradients.dawnPale },
     { elevation:   2, colors: weatherGradients.dawnGold },
     { elevation:  -4, colors: weatherGradients.dawn },
+    { elevation:  -7, colors: weatherGradients.dawnAfterglow },
     { elevation: -10, colors: weatherGradients.dawnBlue },
     { elevation: -16, colors: weatherGradients.clearNight },
 ] as const;

@@ -86,6 +86,64 @@ export const hslToRgb = (
     ];
 };
 
+// ── Hue routing ──────────────────────────────────────────────────────────────
+// Shortest-arc hue interpolation is wrong for skies. Sky blue sits at hue ~199
+// and golden hour at ~46, so the short way round is −153° — straight through
+// 120°, pure green. That turned the last ~40 minutes before sunset into a lime
+// horizon under a blue zenith. The long way (via violet → magenta → orange) is
+// both green-free and what the sky actually does.
+//
+// Worse than wrong, it was unstable: `clearDay` mid → `dawnGold` mid is a 182°
+// gap, which lands on the other side of the 180° tiebreak and routes the
+// opposite way from the horizon stop beside it — a magenta band over a green
+// one. A 2° palette tweak could flip a stop's whole route.
+
+/** The hue we route around. Nothing in the sky is this colour. */
+const GREEN_HUE = 120;
+
+/**
+ * Signed hue arc h1 → h2 taking whichever direction does NOT sweep through
+ * green. Green lies on exactly one of the two arcs, so this always resolves;
+ * when the endpoints are close together the avoided arc is the long one and
+ * this returns the short move unchanged.
+ */
+export const skyHueDelta = (h1: number, h2: number): number => {
+    'worklet';
+    const up = (((h2 - h1) % 360) + 360) % 360; // arc travelling upwards
+    const toGreen = (((GREEN_HUE - h1) % 360) + 360) % 360;
+    // `toGreen < up` ⇒ green is on the upward arc, so travel down instead.
+    return toGreen < up ? up - 360 : up;
+};
+
+/**
+ * Blend two HSL triples along a green-free hue arc, dipping saturation in
+ * proportion to how far the hue has to travel.
+ *
+ * The dip is the other half of the fix. Routing around green stopped the sky
+ * turning lime, but a long arc held at full saturation just swaps one
+ * implausible colour for another — the mid-arc went vivid magenta instead.
+ * Real skies whiten at the horizon before they warm, so the further the hue
+ * has to move, the paler it goes on the way. `sin(pi*t)` is zero at both ends,
+ * so the endpoint palettes stay exact.
+ *
+ * Shared by lerpColor, lerpHslFlat and the per-frame gradient worklet: all
+ * three must agree, or the animated sweep takes a different route through
+ * colour space than the endpoints it is sweeping between.
+ */
+export const blendHsl = (
+    h1: number, s1: number, l1: number,
+    h2: number, s2: number, l2: number,
+    t: number,
+): [number, number, number] => {
+    'worklet';
+    const dh = skyHueDelta(h1, h2);
+    // A near-grey source has no meaningful hue to travel from; adopt the target's.
+    const h = s1 < 0.05 ? h2 : h1 + dh * t;
+    const travel = Math.abs(dh) / 180;
+    const dip = 1 - 0.55 * (travel < 1 ? travel : 1) * Math.sin(Math.PI * t);
+    return [h, (s1 + (s2 - s1) * t) * dip, l1 + (l2 - l1) * t];
+};
+
 /**
  * Interpolate two hex colors via HSL space.
  * Stays in vibrant hue space rather than passing through muddy grey midpoints,
@@ -98,17 +156,9 @@ export const lerpColor = (from: string, to: string, t: number): string => {
     const [h1, s1, l1] = rgbToHsl(r1, g1, b1);
     const [h2, s2, l2] = rgbToHsl(r2, g2, b2);
 
-    let dh = h2 - h1;
-    if (dh > 180) dh -= 360;
-    else if (dh < -180) dh += 360;
-    const h = h1 + dh * t;
+    const [h, s, l] = blendHsl(h1, s1, l1, h2, s2, l2, t);
 
-    const effectiveH = s1 < 0.05 ? h2 : h;
-
-    const s = s1 + (s2 - s1) * t;
-    const l = l1 + (l2 - l1) * t;
-
-    const [r, g, b] = hslToRgb(effectiveH, s, l);
+    const [r, g, b] = hslToRgb(h, s, l);
     return rgbToHex(r, g, b);
 };
 
@@ -159,8 +209,9 @@ export const hslToHex = (h: number, s: number, l: number): string => {
 };
 
 /**
- * Interpolate a packed HSL gradient with per-stop staggering and shortest-path
- * hue blending. JS-side helper for snapshotting an in-flight transition.
+ * Interpolate a packed HSL gradient with per-stop staggering and green-avoiding
+ * hue blending (see skyHueDelta). JS-side helper for snapshotting an in-flight
+ * transition.
  */
 export const lerpHslFlat = (
     from: readonly number[],
@@ -179,13 +230,10 @@ export const lerpHslFlat = (
         const b = i * 3;
         const h1 = from[b],     s1 = from[b + 1], l1 = from[b + 2];
         const h2 = to[b],       s2 = to[b + 1],   l2 = to[b + 2];
-        let dh = h2 - h1;
-        if (dh > 180) dh -= 360;
-        else if (dh < -180) dh += 360;
-        const h = s1 < 0.05 ? h2 : h1 + dh * e;
+        const [h, s, l] = blendHsl(h1, s1, l1, h2, s2, l2, e);
         out[b]     = h;
-        out[b + 1] = s1 + (s2 - s1) * e;
-        out[b + 2] = l1 + (l2 - l1) * e;
+        out[b + 1] = s;
+        out[b + 2] = l;
     }
     return out;
 };

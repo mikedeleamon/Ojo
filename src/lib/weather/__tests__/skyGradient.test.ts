@@ -1,6 +1,7 @@
 import { skyGradientFor } from '../skyGradient';
 import { gradientFor } from '../conditions';
 import { weatherGradients } from '../../../theme/tokens';
+import { hexToRgb, rgbToHsl } from '../../../components/WeatherHUD/colorMath';
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
@@ -19,8 +20,10 @@ describe('skyGradientFor', () => {
 
     it('lands exactly on the intermediate palettes at their stops', () => {
         // By reference, like the endpoints — a stop shouldn't allocate either.
+        expect(skyGradientFor(6)).toBe(weatherGradients.lowSun);
         expect(skyGradientFor(2)).toBe(weatherGradients.goldenHour);
         expect(skyGradientFor(-4)).toBe(weatherGradients.sunset);
+        expect(skyGradientFor(-7)).toBe(weatherGradients.afterglow);
         expect(skyGradientFor(-10)).toBe(weatherGradients.blueHour);
     });
 
@@ -61,8 +64,10 @@ describe('skyGradientFor — dawn vs dusk', () => {
     });
 
     it('lands on the dawn palettes when the sun is rising', () => {
+        expect(skyGradientFor(6, true)).toBe(weatherGradients.dawnPale);
         expect(skyGradientFor(2, true)).toBe(weatherGradients.dawnGold);
         expect(skyGradientFor(-4, true)).toBe(weatherGradients.dawn);
+        expect(skyGradientFor(-7, true)).toBe(weatherGradients.dawnAfterglow);
         expect(skyGradientFor(-10, true)).toBe(weatherGradients.dawnBlue);
     });
 
@@ -152,5 +157,96 @@ describe('gradientFor with solar elevation', () => {
         expect(gradientFor('Thunderstorms', true, -4)).toBe(weatherGradients.stormy);
         expect(gradientFor('Snow', false, 20)).toBe(weatherGradients.snow);
         expect(gradientFor('Cloudy', true, -8)).toBe(weatherGradients.cloudy);
+    });
+});
+
+describe('skyGradientFor — hue path', () => {
+    // The continuity tests above measure r+g+b, and lime green has much the
+    // same luminance sum as the blue and gold it used to sit between, so it
+    // sailed through them. Blending clearDay (hue ~199) toward goldenHour
+    // (~46) by the shortest arc ran straight through 120°, painting the whole
+    // pre-sunset sky green. Assert on hue, not brightness.
+    const GREEN_LO = 75;
+    const GREEN_HI = 165;
+
+    const hsl = (hex: string) => {
+        const [r, g, b] = hexToRgb(hex);
+        return rgbToHsl(r, g, b);
+    };
+
+    it.each([
+        ['dusk', false],
+        ['dawn', true],
+    ])('never passes through green on the %s side', (_label, isRising) => {
+        for (let e = 20; e >= -25; e -= 0.25) {
+            skyGradientFor(e, isRising as boolean).forEach((c, i) => {
+                const [h, s] = hsl(c);
+                // Near-grey stops have no meaningful hue to constrain.
+                if (s <= 0.2) return;
+                const inWedge = h > GREEN_LO && h < GREEN_HI;
+                expect({ elevation: e, stop: i, hex: c, hue: Math.round(h), inWedge })
+                    .toMatchObject({ inWedge: false });
+            });
+        }
+    });
+
+    it('keeps saturation and lightness in range across the sweep', () => {
+        for (let e = 20; e >= -25; e -= 0.25) {
+            for (const isRising of [false, true]) {
+                for (const c of skyGradientFor(e, isRising)) {
+                    const [, s, l] = hsl(c);
+                    expect(s).toBeGreaterThanOrEqual(0);
+                    expect(s).toBeLessThanOrEqual(1);
+                    expect(l).toBeGreaterThanOrEqual(0);
+                    expect(l).toBeLessThanOrEqual(1);
+                }
+            }
+        }
+    });
+});
+
+describe('skyGradientFor — twilight is not lurid', () => {
+    // sunset -> blueHour used to hold ~0.8 saturation across a ~130 degree arc,
+    // so civil twilight went hot magenta. The afterglow stop at -7 mutes that
+    // crossing.
+    //
+    // Note this caps saturation only in the MAGENTA band. A blanket cap would
+    // also flag the vivid orange just after sunset, which is exactly right and
+    // must stay: the complaint was never "too saturated", it was "too
+    // saturated while passing through magenta".
+    const MAGENTA_LO = 280;
+    const MAGENTA_HI = 345;
+    // The cap cannot go much below this while blueHour's horizon is #7C3AED
+    // (saturation 0.83): approaching that stop necessarily climbs, and the hue
+    // passes through 285 on the way, peaking at 0.56 around -9.25. The old
+    // routing hit ~0.68 there. Lowering this further means restyling blueHour,
+    // not tuning the blend.
+    const CAP = 0.6;
+
+    const hsl = (hex: string) => {
+        const [r, g, b] = hexToRgb(hex);
+        return rgbToHsl(r, g, b);
+    };
+
+    it.each([
+        ['dusk', false],
+        ['dawn', true],
+    ])('keeps %s magenta muted across the whole sweep', (_l, rising) => {
+        for (let e = 20; e >= -25; e -= 0.25) {
+            skyGradientFor(e, rising as boolean).forEach((c, i) => {
+                const [h, sat] = hsl(c);
+                if (h <= MAGENTA_LO || h >= MAGENTA_HI) return;
+                expect({ elevation: e, stop: i, hex: c, hue: Math.round(h), sat })
+                    .toMatchObject({ sat: expect.any(Number) });
+                expect(sat).toBeLessThan(CAP);
+            });
+        }
+    });
+
+    it('still allows a saturated orange right after sunset', () => {
+        // Guards the cap above from being tightened into something that flattens
+        // the sunset itself.
+        const [, sat] = hsl(skyGradientFor(-5)[2]);
+        expect(sat).toBeGreaterThan(CAP);
     });
 });

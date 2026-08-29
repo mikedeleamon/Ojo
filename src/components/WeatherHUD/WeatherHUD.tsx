@@ -55,7 +55,7 @@ import {
 import { geocodeCity } from '../../lib/geocoding';
 import { spacing } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
-import { flattenHsl, hslToHex, lerpHslFlat } from './colorMath';
+import { blendHsl, flattenHsl, hslToHex, lerpHslFlat } from './colorMath';
 
 // LinearGradient driven by a UI-thread worklet via useAnimatedProps. The
 // gradient's colors prop is updated directly on the native view each frame,
@@ -162,12 +162,7 @@ const useInterpolatedGradient = (
             const h2 = to[b],
                 s2 = to[b + 1],
                 l2 = to[b + 2];
-            let dh = h2 - h1;
-            if (dh > 180) dh -= 360;
-            else if (dh < -180) dh += 360;
-            const h = s1 < 0.05 ? h2 : h1 + dh * e;
-            const s = s1 + (s2 - s1) * e;
-            const l = l1 + (l2 - l1) * e;
+            const [h, s, l] = blendHsl(h1, s1, l1, h2, s2, l2, e);
             result[i] = hslToHex(h, s, l);
         }
         return { colors: result as unknown as [string, string, ...string[]] };
@@ -1256,8 +1251,10 @@ const WeatherHUD = ({
 
                     {/* Dev-only bisection switches. Inside the content layer so
                         it sits above the backdrops and the glass surfaces it
-                        toggles; renders null in a release build. */}
-                    <PerfPanel />
+                        toggles; renders null in a release build. Disabled for
+                        App Store screenshot capture — re-enable by restoring
+                        this render call. */}
+                    {/* <PerfPanel /> */}
 
                     <ShareToInstagramSheet
                         visible={showShareSheet}

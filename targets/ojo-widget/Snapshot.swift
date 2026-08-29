@@ -314,4 +314,16 @@ enum SnapshotStore {
     guard let rel = rel, !rel.isEmpty, let dir = containerURL() else { return nil }
     return dir.appendingPathComponent(rel)
   }
+
+  /// Companion "<hash>.vibrant.png" written next to "<hash>.jpg" by
+  /// OjoWidgetBridgeModule — an alpha-from-luminance version of the same
+  /// thumbnail for Clear/Tinted (accented) rendering. See ThumbView.
+  static func vibrantThumbURL(_ rel: String?) -> URL? {
+    guard let rel = rel, !rel.isEmpty, let dir = containerURL() else { return nil }
+    let name = (rel as NSString).lastPathComponent
+    let vibrantName = ((name as NSString).deletingPathExtension) + ".vibrant.png"
+    return dir.appendingPathComponent(rel)
+      .deletingLastPathComponent()
+      .appendingPathComponent(vibrantName)
+  }
 }
