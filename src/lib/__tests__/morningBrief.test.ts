@@ -173,6 +173,23 @@ describe('buildBriefBody — swing suffix', () => {
     expect(body).not.toContain('swing');
   });
 
+  it('stays quiet when the whole day is hot, even with a wide raw spread', () => {
+    // 83°-106° is a 23°F swing (clears the 15°F threshold) but never dips
+    // below the user's own hiTempThreshold (75°) — there's no layer to shed.
+    const body = buildBriefBody({
+      day: day({ minTempF: 83, maxTempF: 106 }), outfit: outfit(), settings: settings(), swing: swingOn,
+    });
+    expect(body).not.toContain('swing');
+  });
+
+  it('stays quiet when the whole day stays cold', () => {
+    // Never climbs into "warm" or "hot", so there's nothing to shed later.
+    const body = buildBriefBody({
+      day: day({ minTempF: 10, maxTempF: 40 }), outfit: outfit(), settings: settings(), swing: swingOn,
+    });
+    expect(body).not.toContain('swing');
+  });
+
   it('converts the spread as a delta, not as a temperature', () => {
     // 30°F of spread is 17°C of spread. Running it through the °F→°C formula
     // would give -1, which is the bug this asserts against.

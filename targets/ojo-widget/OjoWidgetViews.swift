@@ -54,24 +54,27 @@ extension View {
   }
 }
 
-/// The small family's content inset.
+/// The small family's content inset — 16pt, always, on every OS version.
 ///
-/// Since iOS 17 the system already insets widget content by its own default
-/// content margin; the views' `.padding(10)` sat INSIDE that, making the real
-/// inset roughly 26pt and leaving the small tile about 96pt of content on a
-/// 148pt device. Adding nothing on 17+ leaves the system margin as the whole
-/// inset (~16pt) and hands ~20pt back in each direction. iOS 16 applies no
-/// system margin, so there the view supplies the same inset itself.
+/// Two false starts before this, both confirmed wrong on a real device:
+///  1. Skip `.padding` entirely on iOS 17+ and trust the system's automatic
+///     default content margin to supply ~16pt on its own — measured as too
+///     little; content sat close enough to the edge to read as missing an
+///     inset.
+///  2. Apply this explicit 16pt unconditionally, same as now, but WITHOUT
+///     disabling the system's own margin — measured as too much, because the
+///     system margin was real and was stacking on top of this one.
 ///
-/// Deliberately not `contentMarginsDisabled()`: that modifier is iOS 17-only
-/// and can't be applied conditionally to a WidgetConfiguration on a 16.0
-/// deployment target, and a full bleed puts type closer to the corner radius
-/// than the layout wants. Medium and large keep their own padding for now —
-/// they were never the squeezed ones.
+/// `OjoWidget.body` and `OjoTomorrowWidget.body` now call
+/// `contentMarginsDisabled()` unconditionally (it is available from iOS 15.0
+/// and is a documented no-op pre-17, so it needs no `#available` guard of its
+/// own), so the system contributes nothing and this 16pt is the WHOLE inset
+/// on every OS version, not an addition to an unmeasured one. Medium and
+/// large keep their own `.padding(...)` and are affected by the same
+/// `contentMarginsDisabled()` call — see those widgets' `body` comments.
 extension View {
-  @ViewBuilder
-  func ojoSmallPadding(_ legacyInset: CGFloat = 16) -> some View {
-    if #available(iOS 17.0, *) { self } else { padding(legacyInset) }
+  func ojoSmallPadding(_ inset: CGFloat = 16) -> some View {
+    padding(inset)
   }
 }
 
@@ -118,12 +121,20 @@ struct OjoWidgetView: View {
 
 /// Loads a cached garment thumbnail from the App Group; shows a translucent
 /// glass-style tile (matching the app's GlassCard look) when uncached.
+///
+/// In the Home Screen's "Clear"/tinted appearance, WidgetKit renders
+/// non-accentable content as a vibrancy mask instead of full color. Our
+/// garment photos are mostly white-background product shots, so that mask
+/// crushes them to a near-blank tile — swap to a tintable glyph instead of
+/// showing an unreadable photo.
 struct ThumbView: View {
   let item: WidgetSnapshot.Item
+  @Environment(\.widgetRenderingMode) private var renderingMode
 
   var body: some View {
     ZStack {
-      if let url = SnapshotStore.thumbURL(item.thumb),
+      if renderingMode == .fullColor,
+         let url = SnapshotStore.thumbURL(item.thumb),
          let data = try? Data(contentsOf: url),
          let ui = UIImage(data: data) {
         Image(uiImage: ui)
@@ -133,9 +144,10 @@ struct ThumbView: View {
         Rectangle()
           .fill(Color.white.opacity(0.16))
           .overlay(
-            Image(systemName: "photo")
+            Image(systemName: "tshirt.fill")
               .font(.system(size: 15))
               .foregroundStyle(.white.opacity(0.7))
+              .widgetAccentable()
           )
       }
     }

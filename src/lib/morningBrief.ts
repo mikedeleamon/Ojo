@@ -36,6 +36,7 @@
 import type { DailyForecast, Settings } from '../types';
 import { articleDisplayName } from '../types';
 import type { OutfitResult, OutfitRole } from './outfit/types';
+import { getWeatherBucket } from './outfit/weatherBuckets';
 import { humanizeConditionShort } from './weather/humanizeCondition';
 
 /** Appending past roughly this much reads as a wall of text on a lock screen. */
@@ -152,6 +153,14 @@ function weatherOnlyBody(day: DailyForecast, settings: Settings): string {
  * Skipped when the engine produced a timeline, because a timeline means
  * `layering.recommendation` already said this in better words ("you can drop the
  * jacket as the day warms up") and repeating it in degrees reads like a bug.
+ *
+ * A wide raw-degree spread isn't enough on its own: an 83°-106° day swings 23°F
+ * but never leaves the user's "hot" bucket, so there's no layer to shed in the
+ * first place. This only fires when the morning low actually sits in a bucket
+ * that wants a layer (cool/cold/freezing, per the user's own hi/lo thresholds)
+ * and the afternoon high climbs into a bucket where that layer comes off
+ * (warm/hot) — i.e. the day crosses the user's own comfort line, not just any
+ * numeric gap.
  */
 function swingSuffix({ day, outfit, settings, swing }: BriefInput): string {
   if (!swing.enabled) return '';
@@ -159,6 +168,13 @@ function swingSuffix({ day, outfit, settings, swing }: BriefInput): string {
 
   const swingF = day.maxTempF - day.minTempF;
   if (swingF < swing.thresholdF) return '';
+
+  const { hiTempThreshold, lowTempThreshold } = settings;
+  const loBucket = getWeatherBucket(day.minTempF, hiTempThreshold, lowTempThreshold);
+  const hiBucket = getWeatherBucket(day.maxTempF, hiTempThreshold, lowTempThreshold);
+  const morningNeedsLayer = loBucket === 'cool' || loBucket === 'cold' || loBucket === 'freezing';
+  const afternoonShedsLayer = hiBucket === 'warm' || hiBucket === 'hot';
+  if (!morningNeedsLayer || !afternoonShedsLayer) return '';
 
   const unit = isMetric(settings) ? 'C' : 'F';
   return ` ${tempDelta(swingF, settings)}°${unit} swing — wear layers you can shed.`;
