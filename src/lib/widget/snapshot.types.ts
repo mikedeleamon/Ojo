@@ -32,13 +32,18 @@ export type WidgetEmptyReason = 'no_closet' | 'empty_closet' | 'insufficient';
  */
 /**
  * Per-layer state for the widget's layer pills:
- *  - 'on'    — in the outfit and called for by today's weather
- *  - 'spare' — in the outfit, but the weather doesn't ask for it
- *  - 'off'   — not in the outfit
- * A needed-but-absent layer reads as 'off': the 'layer' alert already calls
- * that gap out, and the pills describe what you are actually wearing.
+ *  - 'on'      — in the outfit and called for by today's weather
+ *  - 'spare'   — in the outfit, but the weather doesn't ask for it
+ *  - 'off'     — not in the outfit, and not needed
+ *  - 'missing' — the weather calls for it and the outfit does NOT have one
+ *
+ * 'off' and 'missing' are deliberately distinct even though neither is being
+ * worn: one is reassurance ("you don't need a jacket"), the other is a task
+ * ("you need one and don't have it"). Collapsing them, as an earlier version
+ * did, makes the pills say the opposite of what they mean on exactly the days
+ * the advice matters most. Mirrors layeringEngine's missingMid/missingOuter.
  */
-export type WidgetLayerState = 'on' | 'spare' | 'off';
+export type WidgetLayerState = 'on' | 'spare' | 'off' | 'missing';
 
 /** Base/mid/outer state for one outfit — see WidgetLayerState. */
 export interface WidgetLayerStack {
@@ -167,6 +172,8 @@ export interface OjoWidgetTomorrow {
   items?: OjoWidgetSnapshotItem[];
   /** Layering recommendation for tomorrow's conditions. */
   layerNote?: string;
+  /** Base/mid/outer state for tomorrow's layer pills — see WidgetLayerStack. Absent alongside `headline`. */
+  layerStack?: WidgetLayerStack;
 }
 
 /** Input-side tomorrow block — thumbnails are still remote URLs. */

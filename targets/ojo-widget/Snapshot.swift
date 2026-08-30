@@ -62,9 +62,10 @@ struct WidgetSnapshot: Codable {
 
   /// Mirrors snapshot.types.ts `WidgetLayerStack`. Each value is a
   /// `WidgetLayerState` raw string: "on" (worn and called for), "spare" (worn
-  /// but not needed today), "off" (not in the outfit). Kept as String rather
-  /// than an enum so an unrecognised state from a newer JS build still decodes
-  /// — LayerStackPill treats anything it doesn't know as "off".
+  /// but not needed today), "off" (not in the outfit and not needed), or
+  /// "missing" (the weather calls for it and the outfit has none). Kept as
+  /// String rather than an enum so an unrecognised state from a newer JS build
+  /// still decodes — LayerStackPill treats anything it doesn't know as "off".
   struct LayerStack: Codable {
     let base: String
     let mid: String
@@ -154,6 +155,9 @@ struct WidgetSnapshot: Codable {
     let headline: String?
     let items: [Item]?
     let layerNote: String?
+    /// Base/mid/outer state for tomorrow's layer pills. Optional so snapshots
+    /// written before this field existed still decode.
+    let layerStack: LayerStack?
   }
 
   /// `time` is one of layeringEngine's 7 buckets (Early morning/Morning/Late
@@ -261,7 +265,8 @@ extension WidgetSnapshot {
         Item(id: "2", role: "bottom", thumb: nil),
         Item(id: "3", role: "footwear", thumb: nil),
       ],
-      layerNote: "Cooler start — bring a light jacket."
+      layerNote: "Cooler start — bring a light jacket.",
+      layerStack: WidgetSnapshot.LayerStack(base: "on", mid: "on", outer: "missing")
     ),
     deepLink: "ojo://outfit"
   )

@@ -4,6 +4,10 @@ import WidgetKit
 // Ojo brand green (#87DE5A), used as the accent for the trip badge.
 extension Color {
   static let ojoAccent = Color(red: 0x87 / 255, green: 0xDE / 255, blue: 0x5A / 255)
+  /// Amber for "the weather wants this and you don't have it" — already in the
+  /// palette as the mid stop of WeatherGradient's `sunny` ramp (#FBBF24), so
+  /// it reads as brand rather than as a system alert colour.
+  static let ojoWarning = Color(red: 0xFB / 255, green: 0xBF / 255, blue: 0x24 / 255)
 }
 
 /// The Home Screen widget's background is the local-weather gradient (see
@@ -54,26 +58,33 @@ extension View {
   }
 }
 
-/// The small family's content inset — 16pt, always, on every OS version.
+/// The content inset for EVERY Home Screen family of the two widgets that call
+/// `contentMarginsDisabled()` — OjoWidget and OjoTomorrowWidget.
 ///
-/// Two false starts before this, both confirmed wrong on a real device:
-///  1. Skip `.padding` entirely on iOS 17+ and trust the system's automatic
-///     default content margin to supply ~16pt on its own — measured as too
-///     little; content sat close enough to the edge to read as missing an
-///     inset.
-///  2. Apply this explicit 16pt unconditionally, same as now, but WITHOUT
-///     disabling the system's own margin — measured as too much, because the
-///     system margin was real and was stacking on top of this one.
+/// Those widgets opt out of the system's automatic content margin, so this is
+/// the WHOLE inset rather than an addition to it. Every family routes through
+/// here so small / medium / large are inset identically and read consistently
+/// side by side on the Home Screen; before this, the families each carried a
+/// different hand-tuned number (8 / 12 / 16) chosen back when an unmeasured
+/// system margin was silently stacking on top of them.
 ///
-/// `OjoWidget.body` and `OjoTomorrowWidget.body` now call
-/// `contentMarginsDisabled()` unconditionally (it is available from iOS 15.0
-/// and is a documented no-op pre-17, so it needs no `#available` guard of its
-/// own), so the system contributes nothing and this 16pt is the WHOLE inset
-/// on every OS version, not an addition to an unmeasured one. Medium and
-/// large keep their own `.padding(...)` and are affected by the same
-/// `contentMarginsDisabled()` call — see those widgets' `body` comments.
+/// Two false starts, both confirmed wrong on a real device:
+///  1. Skip `.padding` on iOS 17+ and trust the system's default margin to
+///     supply ~16pt alone — too little; content sat almost on the edge.
+///  2. Apply an explicit 16pt but WITHOUT disabling the system margin — too
+///     much, because that margin was real and stacked on top.
+///
+/// `contentMarginsDisabled()` needs no `#available` guard: it is available
+/// from iOS 15.0 and no-ops pre-17, where there is no system margin to
+/// disable. See those widgets' `body` comments.
+///
+/// Trip Countdown and Layer Timeline do NOT disable content margins and keep
+/// their own padding — routing them through here would double-inset them.
 extension View {
-  func ojoSmallPadding(_ inset: CGFloat = 16) -> some View {
+  func ojoWidgetPadding(_ inset: CGFloat = 16) -> some View {
+    padding(inset)
+  }
+  func ojoLargeWidgetPadding(_ inset: CGFloat = 24) -> some View {
     padding(inset)
   }
 }
@@ -558,7 +569,8 @@ struct LayerStackPill: View {
 
   /// "on" reads at full strength, "spare" (worn but not needed today) sits
   /// between, and anything else — including a state a newer JS build might
-  /// send — falls back to the dimmest step.
+  /// send — falls back to the dimmest step. "missing" is handled separately in
+  /// `glyph`, since dimming is exactly the wrong signal for it.
   private func opacity(_ state: String) -> Double {
     switch state {
     case "on":    return 1
@@ -567,11 +579,31 @@ struct LayerStackPill: View {
     }
   }
 
+  /// A "missing" layer is the one state that must not read as absence: the
+  /// weather is asking for it and the outfit has none, which is a task, not
+  /// reassurance. It gets full-strength amber inside a dashed outline — the
+  /// dashes say "not on you", the colour says "still your problem" — while
+  /// "off" stays quietly dimmed.
+  @ViewBuilder
   private func glyph(_ kind: LayerKind, _ state: String) -> some View {
-    LayerGlyph(kind: kind)
+    let shape = LayerGlyph(kind: kind)
       .stroke(style: StrokeStyle(lineWidth: 1, lineCap: .round, lineJoin: .round))
       .frame(width: glyphSize, height: glyphSize)
-      .opacity(opacity(state))
+
+    if state == "missing" {
+      shape
+        .foregroundStyle(Color.ojoWarning)
+        .padding(1)
+        .overlay(
+          RoundedRectangle(cornerRadius: 4, style: .continuous)
+            .strokeBorder(
+              Color.ojoWarning.opacity(0.85),
+              style: StrokeStyle(lineWidth: 1, dash: [2, 2])
+            )
+        )
+    } else {
+      shape.opacity(opacity(state))
+    }
   }
 }
 
@@ -639,7 +671,7 @@ struct MediumOutfitView: View {
           .frame(maxHeight: .infinity)
       }
     }
-    .padding(8)
+    .ojoWidgetPadding()
   }
 }
 
@@ -693,7 +725,7 @@ struct SmallOutfitView: View {
         SignalChipsView(snap: snap, maxCount: 1, compact: true)
       }
     }
-    .ojoSmallPadding()
+    .ojoWidgetPadding()
   }
 }
 
@@ -777,7 +809,7 @@ struct LargeOutfitView: View {
 
       ChangeFitFooter(snap: snap)
     }
-    .padding(12)
+    .ojoLargeWidgetPadding()
 
   }
 }
@@ -877,6 +909,6 @@ struct EmptyStateView: View {
       Spacer(minLength: 0)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(12)
+    .ojoWidgetPadding()
   }
 }

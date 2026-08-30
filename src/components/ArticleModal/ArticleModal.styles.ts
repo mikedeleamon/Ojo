@@ -26,7 +26,7 @@ export const makeSt = (colors: ColorTokens) => StyleSheet.create({
   imagePlaceholder:     { width: 100, height: 100, borderRadius: radius.sm, backgroundColor: colors.glassBg, borderWidth: 1, borderColor: colors.glassBorder, alignItems: 'center', justifyContent: 'center' },
   imagePlaceholderText: { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textMuted },
   imageButtons:         { flexDirection: 'row', gap: spacing.sm },
-  imageBtn:             { flex: 1, paddingVertical: 7, paddingHorizontal: spacing.md, backgroundColor: colors.glassBg, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.glassBorder, alignItems: 'center' },
+  imageBtn:             { flex: 1, paddingVertical: 12, paddingHorizontal: spacing.md, backgroundColor: colors.glassBg, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.glassBorder, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 },
   imageBtnText:         { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.textSecondary },
 
   detectionCard:        { width: '100%', backgroundColor: colors.glassBg, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: radius.sm, padding: spacing.sm, gap: 6 },

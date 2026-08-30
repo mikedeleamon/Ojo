@@ -21,8 +21,9 @@ import api from '../../api/client';
 import { authHeaders } from '../../lib/auth';
 import type { SavedTripFitPlan } from '../../types';
 import type { PlannerPrefill } from './TripPlanner';
+import PhraseWeatherIcon from '../../components/WeatherIcons/PhraseWeatherIcon';
+import { PlaneIcon, GlobeIcon } from '../../components/icons/GlyphIcons';
 import {
-    phraseEmoji,
     fmtShortISO,
     daysUntil,
     tripFitStatus,
@@ -162,7 +163,7 @@ const TripCard = ({
                         />
                         <GlassCard glassStyle='regular' style={st.card}>
                             <RNView style={st.cardTopRow}>
-                                <Text style={st.cardEmoji}>{phraseEmoji(dominantPhrase)}</Text>
+                                <PhraseWeatherIcon phrase={dominantPhrase} size={30} />
                                 <GlassCard glassStyle='clear' style={st.badge}>
                                     <Text style={[st.badgeText, { color: darkColors.textSecondary }]}>
                                         {badgeLabel}
@@ -315,7 +316,10 @@ export default function TripLibrary({
                 {/* Airline suggestions */}
                 {suggestions.length > 0 && (
                     <RNView style={{ gap: spacing.xs }}>
-                        <Text style={st.sectionHeader}>From your flights ✈️</Text>
+                        <RNView style={st.sectionHeaderRow}>
+                            <Text style={st.sectionHeader}>From your flights</Text>
+                            <PlaneIcon size={15} color={colors.textPrimary} />
+                        </RNView>
                         {suggestions.map((t) => (
                             <Pressable
                                 key={t._id}
@@ -332,9 +336,12 @@ export default function TripLibrary({
                                 accessibilityRole='button'
                             >
                                 <GlassCard glassStyle='clear' style={st.suggestionCard}>
-                                    <Text style={[st.suggestionText, { color: colors.textPrimary }]}>
-                                        ✈️ {t.destinationCity} · {fmtShortISO(isoDay(t.departureDate))}
-                                    </Text>
+                                    <RNView style={st.suggestionTextRow}>
+                                        <PlaneIcon size={14} color={colors.textPrimary} />
+                                        <Text style={[st.suggestionText, { color: colors.textPrimary }]}>
+                                            {t.destinationCity} · {fmtShortISO(isoDay(t.departureDate))}
+                                        </Text>
+                                    </RNView>
                                     <Text style={[st.suggestionCta, { color: colors.textSecondary }]}>
                                         Plan outfits →
                                     </Text>
@@ -371,7 +378,7 @@ export default function TripLibrary({
                 {/* Empty state */}
                 {!loading && plans.length === 0 && (
                     <GlassCard glassStyle='regular' style={st.emptyCard}>
-                        <Text style={st.emptyEmoji}>🌍</Text>
+                        <GlobeIcon size={44} color={colors.textMuted} strokeWidth={1.2} />
                         <Text style={[st.emptyTitle, { color: colors.textPrimary }]}>
                             No trips yet
                         </Text>
@@ -509,7 +516,17 @@ function makeStyles(colors: ReturnType<typeof useTheme>['colors']) {
         },
         centerBox: { paddingVertical: spacing.xl, alignItems: 'center' },
         emptyCard: { padding: spacing.lg, borderRadius: radius.md, alignItems: 'center', gap: 6 },
-        emptyEmoji: { fontSize: 44, lineHeight: 50 },
+        sectionHeaderRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+        },
+        suggestionTextRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            flex: 1,
+        },
         emptyTitle: { fontFamily: fonts.display, fontSize: fontSizes.lg },
         emptySub: { fontFamily: fonts.body, fontSize: fontSizes.sm, textAlign: 'center' },
     });

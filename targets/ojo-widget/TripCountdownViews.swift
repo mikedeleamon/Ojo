@@ -109,7 +109,6 @@ private struct TripCountdownContent: View {
           packingBar.frame(width: 120)
         }
       }
-      .padding(12)
     } else {
       // systemSmall: keep the weather peek visible, and let the actionable
       // drift note take the bottom slot when present (else packing progress).

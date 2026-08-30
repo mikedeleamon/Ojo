@@ -56,7 +56,6 @@ import {
     buildTripWeather,
     fmtDate,
     fmtShortDate,
-    phraseEmoji,
     categoryKey,
     daysUntil,
     isInForecastWindow,
@@ -65,6 +64,8 @@ import {
     rehydratePlans,
     snapshotFromPlans,
 } from './shared';
+import PhraseWeatherIcon from '../../components/WeatherIcons/PhraseWeatherIcon';
+import { PlaneIcon, PinIcon, RefreshIcon } from '../../components/icons/GlyphIcons';
 import ShareToInstagramSheet from '../../components/ShareCard/ShareToInstagramSheet';
 import TripFitShareCard from '../../components/ShareCard/TripFitShareCard';
 import PackingListShareCard from '../../components/ShareCard/PackingListShareCard';
@@ -162,9 +163,16 @@ const DayCard = ({
             }}
         >
             <GlassCard style={dayCardSt.card} glassStyle='regular'>
-                <Text style={[dayCardSt.dateLabel, { color: colors.textSecondary }]}>
-                    {phraseEmoji(plan.day.dayPhrase)} {fmtDate(plan.day.date)}
-                </Text>
+                <RNView style={dayCardSt.dateRow}>
+                    <PhraseWeatherIcon
+                        phrase={plan.day.dayPhrase}
+                        size={16}
+                        color={colors.textSecondary}
+                    />
+                    <Text style={[dayCardSt.dateLabel, { color: colors.textSecondary }]}>
+                        {fmtDate(plan.day.date)}
+                    </Text>
+                </RNView>
                 <Text style={[dayCardSt.tempRow, { color: colors.textMuted }]}>
                     {Math.round(plan.day.minTempF)}° – {Math.round(plan.day.maxTempF)}°F ·{' '}
                     {humanizeCondition(plan.day.dayPhrase)}
@@ -229,6 +237,7 @@ const DayCard = ({
 
 const dayCardSt = StyleSheet.create({
     card: { padding: spacing.md, gap: 8, minHeight: 200, borderRadius: radius.lg },
+    dateRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     dateLabel: { fontFamily: fonts.bodySemiBold, fontSize: fontSizes.sm },
     tempRow: { fontFamily: fonts.body, fontSize: fontSizes.xs },
     thumbGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
@@ -336,7 +345,7 @@ const HeroBanner = ({
                     end={{ x: 1, y: 1 }}
                 />
                 <GlassCard glassStyle='regular' style={heroBannerSt.card}>
-                    <Text style={heroBannerSt.emoji}>{phraseEmoji(dominantPhrase)}</Text>
+                    <PhraseWeatherIcon phrase={dominantPhrase} size={36} />
                     <Text style={[heroBannerSt.destination, { color: darkColors.textPrimary }]}>
                         {destination}
                     </Text>
@@ -1036,10 +1045,13 @@ export default function TripPlanner({
                             <>
                                 <RNView style={st.infoNote}>
                                     <GlassCard glassStyle='clear' style={st.infoInner}>
-                                        <Text style={[st.infoText, { color: colors.textSecondary }]}>
-                                            ✈️ This trip is beyond the 10-day forecast. Save it now and
-                                            we'll generate outfits once it's within range.
-                                        </Text>
+                                        <RNView style={st.infoRow}>
+                                            <PlaneIcon size={14} color={colors.textSecondary} />
+                                            <Text style={[st.infoText, { color: colors.textSecondary }]}>
+                                                This trip is beyond the 10-day forecast. Save it now and
+                                                we'll generate outfits once it's within range.
+                                            </Text>
+                                        </RNView>
                                     </GlassCard>
                                 </RNView>
                                 <Pressable
@@ -1077,9 +1089,12 @@ export default function TripPlanner({
                                 {loading ? (
                                     <ActivityIndicator color={colors.saveBtnText} />
                                 ) : (
-                                    <Text style={[st.planBtnText, { color: colors.saveBtnText }]}>
-                                        Plan my trip ✈️
-                                    </Text>
+                                    <RNView style={st.planBtnRow}>
+                                        <Text style={[st.planBtnText, { color: colors.saveBtnText }]}>
+                                            Plan my trip
+                                        </Text>
+                                        <PlaneIcon size={16} color={colors.saveBtnText} />
+                                    </RNView>
                                 )}
                             </Pressable>
                         )}
@@ -1087,12 +1102,15 @@ export default function TripPlanner({
                 ) : (
                     /* Saved summary */
                     <RNView style={st.summaryRow}>
-                        <Text style={[st.summaryText, { color: colors.textSecondary }]}>
-                            📍 {destination} · {selectedOccasion}
-                            {tripStart && tripEnd
-                                ? ` · ${fmtShortDate(tripStart)}–${fmtShortDate(tripEnd)}`
-                                : ''}
-                        </Text>
+                        <RNView style={st.summaryTextRow}>
+                            <PinIcon size={14} color={colors.textSecondary} />
+                            <Text style={[st.summaryText, { color: colors.textSecondary }]}>
+                                {destination} · {selectedOccasion}
+                                {tripStart && tripEnd
+                                    ? ` · ${fmtShortDate(tripStart)}–${fmtShortDate(tripEnd)}`
+                                    : ''}
+                            </Text>
+                        </RNView>
                         <StatusBadge status={status} startDate={startISO} colors={colors} st={st} />
                     </RNView>
                 )}
@@ -1101,9 +1119,12 @@ export default function TripPlanner({
                 {refreshAvailable && !loading && (
                     <Pressable onPress={onPlan} accessibilityRole='button'>
                         <GlassCard glassStyle='clear' style={st.refreshCard}>
-                            <Text style={[st.refreshText, { color: colors.textPrimary }]}>
-                                🔄 The forecast may have changed — tap to regenerate outfits.
-                            </Text>
+                            <RNView style={st.refreshRow}>
+                                <RefreshIcon size={14} color={colors.textPrimary} />
+                                <Text style={[st.refreshText, { color: colors.textPrimary }]}>
+                                    The forecast may have changed — tap to regenerate outfits.
+                                </Text>
+                            </RNView>
                         </GlassCard>
                     </Pressable>
                 )}
@@ -1397,7 +1418,18 @@ function makeStyles(colors: ReturnType<typeof useTheme>['colors']) {
         planBtnText: { fontFamily: fonts.bodySemiBold, fontSize: fontSizes.base },
         infoNote: { borderRadius: radius.sm, overflow: 'hidden' },
         infoInner: { padding: spacing.sm },
-        infoText: { fontFamily: fonts.body, fontSize: fontSizes.sm },
+        infoText: { fontFamily: fonts.body, fontSize: fontSizes.sm, flex: 1 },
+        // Icon + copy rows. `alignItems: flex-start` keeps the glyph on the
+        // first line when the text wraps, rather than centring against the block.
+        infoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
+        refreshRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
+        summaryTextRow: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            flex: 1,
+        },
+        planBtnRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
         summaryRow: {
             flexDirection: 'row',
             alignItems: 'center',
@@ -1413,7 +1445,7 @@ function makeStyles(colors: ReturnType<typeof useTheme>['colors']) {
             letterSpacing: 0.5,
         },
         refreshCard: { padding: spacing.sm, borderRadius: radius.sm },
-        refreshText: { fontFamily: fonts.bodyMedium, fontSize: fontSizes.sm },
+        refreshText: { fontFamily: fonts.bodyMedium, fontSize: fontSizes.sm, flex: 1 },
         pendingCard: {
             padding: spacing.lg,
             borderRadius: radius.md,

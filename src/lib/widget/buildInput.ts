@@ -40,17 +40,20 @@ const itemsFromOutfit = (outfit: OutfitResult): WidgetSnapshotInput['items'] =>
   }));
 
 /**
- * base/mid/outer state for the widget's layer pills. A layer the outfit has but
- * the weather doesn't call for is 'spare' rather than 'on' — that split is the
- * whole point of the pills, and `missingMid`/`missingOuter` can't express it
- * (they only fire when a layer is needed AND absent). The base layer is always
- * 'on' when present: you are wearing it regardless of what the weather asks.
+ * base/mid/outer state for the widget's layer pills. Two splits matter here and
+ * neither is expressible with `missingMid`/`missingOuter` alone:
+ *  - worn-and-needed ('on') vs worn-but-optional ('spare') — missing* is false
+ *    for both, since the layer is present either way;
+ *  - not-needed ('off') vs needed-but-absent ('missing') — the pills must not
+ *    show reassurance where the answer is actually a task.
+ * The base layer is always 'on' when present: you are wearing it regardless of
+ * what the weather asks.
  */
-const layerStackFor = (outfit: OutfitResult): WidgetLayerStack | undefined => {
-  const layering = outfit.layering;
+const layerStackFor = (outfit: OutfitResult | null | undefined): WidgetLayerStack | undefined => {
+  const layering = outfit?.layering;
   if (!layering) return undefined;
   const state = (present: unknown, needed: boolean): WidgetLayerState =>
-    !present ? 'off' : needed ? 'on' : 'spare';
+    present ? (needed ? 'on' : 'spare') : needed ? 'missing' : 'off';
   return {
     base: layering.layers.base ? 'on' : 'off',
     mid: state(layering.layers.mid, layering.needsMid),
@@ -214,6 +217,7 @@ const tomorrowFor = (
     headline: hasOutfit ? outfit.headline || "Tomorrow's outfit" : undefined,
     items: hasOutfit ? itemsFromOutfit(outfit) : undefined,
     layerNote: hasOutfit ? outfit.layering?.recommendation : undefined,
+    layerStack: hasOutfit ? layerStackFor(outfit) : undefined,
   };
 };
 

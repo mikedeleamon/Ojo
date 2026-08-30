@@ -149,13 +149,17 @@ struct TomorrowHiLoView: View {
 /// Only rendered at >= 20% — mirrors signalChips' ambient-rain threshold.
 struct TomorrowRainChip: View {
   let t: WidgetSnapshot.TomorrowBlock
+  /// Small family: drop the leading word — the umbrella already says what this
+  /// is, and the full label pushes the row past the tile's content width when
+  /// it shares that row with the layer pill.
+  var compact: Bool = false
 
   var body: some View {
     if let rc = t.rainChance, rc >= 20 {
       HStack(spacing: 3) {
         Image(systemName: "umbrella.fill")
           .font(.system(size: 8, weight: .semibold))
-        Text("RAIN \(rc)%")
+        Text(compact ? "\(rc)%" : "RAIN \(rc)%")
           .font(.system(size: 9, weight: .semibold))
           .tracking(0.4)
       }
@@ -185,33 +189,44 @@ private func tomorrowHeadline(_ t: WidgetSnapshot.TomorrowBlock) -> String {
 
 // MARK: - Small
 
-/// One glance: TOMORROW badge, icon + H/L, the outfit strip, headline.
+/// One glance: TOMORROW badge, icon + H/L, the outfit strip, and the layer
+/// stack paired with tomorrow's rain chance.
+///
+/// The layer pills take the slot the headline used to hold. On the one screen
+/// read specifically to decide what to put out tonight, "which layers" is the
+/// question, and the thumbnails above already carry what the headline was
+/// saying. It also gives the "missing" state somewhere to land while there is
+/// still an evening to do something about it — see LayerStackPill.
 struct TomorrowSmallView: View {
   let t: WidgetSnapshot.TomorrowBlock
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
+    VStack(alignment: .leading, spacing: 4) {
       TomorrowBadge(dayName: t.dayName, compact: true)
       HStack(alignment: .center) {
-        WeatherIconView(kind: t.weatherKind, isDay: true, size: 24)
+        WeatherIconView(kind: t.weatherKind, isDay: true, size: 22)
         Spacer(minLength: 4)
-        TomorrowHiLoView(t: t, size: 24)
+        TomorrowHiLoView(t: t, size: 26)
       }
 
       if let items = t.items, !items.isEmpty {
-        OutfitThumbRow(items: items, maxCount: 3, ratio: 0.7, spacing: 4, minHeight: 44)
         Spacer(minLength: 0)
-        Text(tomorrowHeadline(t))
-          .font(.system(size: 12, weight: .semibold))
-          .foregroundStyle(.white)
-          .lineLimit(1)
+        OutfitThumbRow(items: items, maxCount: 3, ratio: 0.7, spacing: 4, maxHeight: 30, minHeight: 24)
+
+        HStack(spacing: 4) {
+          if let stack = t.layerStack {
+            LayerStackPill(stack: stack)
+          }
+          Spacer(minLength: 4)
+          TomorrowRainChip(t: t, compact: true)
+        }
       } else {
         Spacer(minLength: 0)
         TomorrowNudgeView()
         Spacer(minLength: 0)
       }
     }
-    .ojoSmallPadding()
+    .ojoWidgetPadding()
   }
 }
 
@@ -268,7 +283,7 @@ struct TomorrowMediumView: View {
           .frame(maxHeight: .infinity)
       }
     }
-    .padding(12)
+    .ojoWidgetPadding()
   }
 }
 
@@ -324,6 +339,6 @@ struct TomorrowLargeView: View {
 
       Spacer(minLength: 0)
     }
-    .padding(16)
+    .ojoWidgetPadding()
   }
 }

@@ -214,10 +214,13 @@ describe('buildWidgetInput layer stack', () => {
     });
   });
 
-  it('marks absent layers off, including one the weather wanted', () => {
+  it('distinguishes a layer the weather wants but the outfit lacks from one it simply does not need', () => {
+    // The whole reason 'missing' exists: both are unworn, but only one is a
+    // task. Collapsing them makes the pills show reassurance on exactly the
+    // days the user needs to go find a jacket.
     expect(stackFor(layered({ mid: false, outer: false }, { needsMid: true, needsOuter: false }))).toEqual({
       base: 'on',
-      mid: 'off',
+      mid: 'missing',
       outer: 'off',
     });
   });
@@ -345,6 +348,40 @@ describe('buildWidgetInput tomorrow block', () => {
     );
     expect(input.mode).toBe('empty');
     expect(input.tomorrow?.date).toBe(tomorrowDay.date);
+  });
+});
+
+describe('buildWidgetInput tomorrow layer stack', () => {
+  const tomorrowOutfit = (): OutfitResult =>
+    ({
+      ...outfit('Tomorrow fit'),
+      layering: {
+        layers: {
+          base: { role: 'top', article: { _id: 'top', imageUrl: 'https://img/top.jpg' } },
+          mid: null,
+          outer: { role: 'outerwear', article: { _id: 'outer', imageUrl: 'https://img/outer.jpg' } },
+        },
+        recommendation: 'Bring a jacket.',
+        confidence: 0.8,
+        missingMid: true,
+        missingOuter: false,
+        needsMid: true,
+        needsOuter: true,
+      },
+    }) as unknown as OutfitResult;
+
+  it('carries the layer stack on the tomorrow block, not just the top level', () => {
+    const input = buildWidgetInput(
+      baseData({ tomorrow: { day: tomorrowDaily(), outfit: tomorrowOutfit() } } as Partial<WidgetSyncData>),
+    );
+    expect(input.tomorrow?.layerStack).toEqual({ base: 'on', mid: 'missing', outer: 'on' });
+  });
+
+  it('omits it when tomorrow produced no wearable outfit', () => {
+    const input = buildWidgetInput(
+      baseData({ tomorrow: { day: tomorrowDaily(), outfit: null } } as Partial<WidgetSyncData>),
+    );
+    expect(input.tomorrow?.layerStack).toBeUndefined();
   });
 });
 
