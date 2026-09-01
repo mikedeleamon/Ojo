@@ -352,6 +352,23 @@ describe('buildWidgetInput tomorrow block', () => {
 });
 
 describe('buildWidgetInput tomorrow layer stack', () => {
+  // Same shape as the `tomorrowDay` fixture in the block above, as a factory so
+  // each case gets its own object. Only the layer stack is asserted here, but
+  // `dayName` is derived from `date`, so it still needs a real local date.
+  const tomorrowDaily = (): DailyForecast => {
+    const now = new Date();
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return {
+      date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+      minTempF: 58.3,
+      maxTempF: 74.2,
+      dayPhrase: 'Rain',
+      hasPrecipitation: true,
+      precipProbability: 70,
+    };
+  };
+
   const tomorrowOutfit = (): OutfitResult =>
     ({
       ...outfit('Tomorrow fit'),

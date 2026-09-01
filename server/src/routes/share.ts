@@ -67,4 +67,8 @@ router.get('/recap', (_req: Request, res: Response) => {
   res.type('html').send(landingHtml({ title: 'My Week in Outfits', deepLink: 'ojo://recap' }));
 });
 
+router.get('/donation', (_req: Request, res: Response) => {
+  res.type('html').send(landingHtml({ title: 'My Donation List', deepLink: 'ojo://donation' }));
+});
+
 export default router;

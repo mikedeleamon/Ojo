@@ -9,6 +9,7 @@
  *   ojo://closet/new → "/closet?new=1"                  (closet tab, create form open)
  *   ojo://closet     → "/closet"                        (closet tab · closet gap nudge)
  *   ojo://recap      → "/account/recap"                 (weekly wardrobe recap)
+ *   ojo://donation   → "/insights"                      (insights tab · donation queue)
  *
  * expo-router hands us the FULL incoming URL as `path` (which may be null).
  * Anything we don't recognize is returned unchanged so normal routing/linking
@@ -48,6 +49,9 @@ export function redirectSystemPath({
 
     // Weekly wardrobe recap (notification tap / share landing page)
     if (normalized === '/recap') return '/account/recap';
+
+    // Donation list (share landing page) — the queue lives on the Insights tab.
+    if (normalized === '/donation') return '/insights';
 
     // Trip library (no id) → TripFit tab's saved-trip list
     if (normalized === '/trips') return '/tripfit';

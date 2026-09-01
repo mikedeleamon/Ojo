@@ -1,6 +1,20 @@
 {
+  // ts-jest compiles each test file against this config, so it must add "jest"
+  // to `types`. It also re-states `exclude` without the base config's test
+  // filters: tsconfig.json deliberately hides __tests__ from `npm run typecheck`
+  // (RN app code and test code want different `types`), which means a type error
+  // inside a test is invisible to that command and only surfaces as a
+  // "Test suite failed to run" once jest reaches the file. `npm run
+  // typecheck:test` uses this project to catch those directly.
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "types": ["node", "jest"]
-  }
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build",
+    "web-server",
+    "server"
+  ]
 }

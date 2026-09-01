@@ -9,10 +9,15 @@
  * `ojo://` deep link — see src/lib/widget/deepLinks.ts + app/+native-intent.tsx
  * for the in-app routing those `ojo://` links resolve to.
  *
- * EXPO_PUBLIC_SHARE_BASE_URL is unset until the landing page is actually
- * hosted at a real domain; until then these helpers return `null` and callers
- * omit attributionURL entirely, so sharing still works — just without the
- * tappable link sticker.
+ * EXPO_PUBLIC_SHARE_BASE_URL must point at the API host — the /s/* pages are
+ * Express routes, not part of the marketing site (www.ojoapp.io 404s on them).
+ * It is set for the preview and production build profiles in eas.json; when it
+ * is unset these helpers return `null` and callers omit attributionURL
+ * entirely, so sharing still works — just without the tappable link sticker.
+ *
+ * Every path below needs a matching route in server/src/routes/share.ts AND a
+ * matching `ojo://` branch in app/+native-intent.tsx, or the sticker lands on a
+ * 404 / dead-ends after the handoff.
  */
 
 const SHARE_BASE_URL = process.env.EXPO_PUBLIC_SHARE_BASE_URL;
