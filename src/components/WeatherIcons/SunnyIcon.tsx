@@ -38,11 +38,19 @@ const RAY_TOP_RIGHT_D =
 interface SunnyIconProps {
     size?: number;
     color?: string;
+    decorative?: boolean;
 }
 
-export default function SunnyIcon({ size = 180, color = '#fefefe' }: SunnyIconProps) {
+export default function SunnyIcon({ size = 180, color = '#fefefe', decorative = false }: SunnyIconProps) {
     return (
-        <Svg viewBox="0 0 1280 1280" width={size} height={size} accessibilityLabel="Sunny">
+        <Svg
+            viewBox="0 0 1280 1280"
+            width={size}
+            height={size}
+            accessibilityLabel="Sunny"
+            accessibilityElementsHidden={decorative}
+            importantForAccessibility={decorative ? 'no' : 'auto'}
+        >
             <Path id="disc"            fill={color} fillRule="evenodd" d={DISC_D} />
             <Path id="ray-bottom-left" fill={color} fillRule="evenodd" d={RAY_BOTTOM_LEFT_D} />
             <Path id="ray-left"        fill={color} fillRule="evenodd" d={RAY_LEFT_D} />

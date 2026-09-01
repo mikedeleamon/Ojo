@@ -40,6 +40,7 @@ const Thumb = ({
                     style={{ width: 56, height: 56 }}
                     resizeMode="cover"
                     onError={() => setErr(true)}
+                    accessibilityLabel={article.name ?? article.clothingType}
                 />
             ) : (
                 <HangerIcon size={22} color={muted} decorative />
@@ -137,6 +138,7 @@ export default function TripModeCard({
                         disabled={articles.length === 0}
                         accessibilityRole="button"
                         accessibilityLabel="Log this outfit as worn"
+                        accessibilityState={{ disabled: articles.length === 0 }}
                     >
                         <Text style={st.primaryBtnText}>Wore this</Text>
                     </Pressable>

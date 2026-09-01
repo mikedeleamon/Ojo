@@ -166,6 +166,11 @@ struct WidgetSnapshot: Codable {
   struct TimelineStep: Codable, Identifiable {
     let time: String
     let action: String
+    /// 0–23 wall-clock hour the `time` bucket was derived from. Optional so a
+    /// snapshot written before this field existed still decodes — nothing
+    /// reads it yet, so a nil here just means "positioning by hour isn't
+    /// available for this cached snapshot."
+    let hour: Int?
     var id: String { "\(time)|\(action)" }
   }
 }
@@ -239,13 +244,13 @@ extension WidgetSnapshot {
     alerts: ["layer"],
     uvIndexText: "High",
     timeline: [
-      TimelineStep(time: "Afternoon", action: "Remove your jacket — warming up"),
-      TimelineStep(time: "Evening", action: "Add it back — sun is setting, cooling down"),
+      TimelineStep(time: "Afternoon", action: "Remove your jacket — warming up", hour: 15),
+      TimelineStep(time: "Evening", action: "Add it back — sun is setting, cooling down", hour: 18),
     ],
     fullTimeline: [
-      TimelineStep(time: "Morning", action: "Keep your jacket on — crisp start"),
-      TimelineStep(time: "Afternoon", action: "Remove your jacket — warming up"),
-      TimelineStep(time: "Evening", action: "Add it back — sun is setting, cooling down"),
+      TimelineStep(time: "Morning", action: "Keep your jacket on — crisp start", hour: 8),
+      TimelineStep(time: "Afternoon", action: "Remove your jacket — warming up", hour: 15),
+      TimelineStep(time: "Evening", action: "Add it back — sun is setting, cooling down", hour: 18),
     ],
     emptyReason: nil,
     trip: nil,

@@ -69,7 +69,7 @@ export default function ClosetPage() {
 
       {closets.length === 0 ? (
         <View style={st.emptyState}>
-          <HangerIcon size={36} color={colors.textMuted} />
+          <HangerIcon size={36} color={colors.textMuted} decorative />
           <Text style={st.emptyTitle}>Your wardrobe is empty</Text>
           <Text style={st.emptyDesc}>
             Tap the{' '}

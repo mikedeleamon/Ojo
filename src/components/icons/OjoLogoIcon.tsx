@@ -12,9 +12,10 @@ import { useTheme } from '../../theme/ThemeContext';
 interface Props {
     width?: number;
     height?: number;
+    decorative?: boolean;
 }
 
-export default function OjoLogoIcon({ width = 120, height = 48 }: Props) {
+export default function OjoLogoIcon({ width = 120, height = 48, decorative = false }: Props) {
     const { isDark } = useTheme();
     // The two O's track the device theme: white in dark mode, black in light.
     const oFill = isDark ? '#fff' : '#000';
@@ -24,6 +25,8 @@ export default function OjoLogoIcon({ width = 120, height = 48 }: Props) {
             width={width}
             height={height}
             accessibilityLabel="Ojo"
+            accessibilityElementsHidden={decorative}
+            importantForAccessibility={decorative ? 'no' : 'auto'}
         >
             <Defs>
                 <LinearGradient

@@ -251,7 +251,13 @@ export function ColorPalette({ articles, colors, reduceMotion }: Props) {
           const isSel = selected === b.name;
           const dimmed = selected !== null && !isSel;
           return (
-            <G key={b.name} onPress={() => toggle(b.name)} opacity={dimmed ? 0.28 : 1}>
+            <G
+              key={b.name}
+              onPress={() => toggle(b.name)}
+              opacity={dimmed ? 0.28 : 1}
+              accessible
+              accessibilityLabel={`${b.name}, ${b.count} ${b.count === 1 ? 'item' : 'items'}, ${b.pct}%${isSel ? ', selected' : ''}`}
+            >
               {/* Orb body */}
               <Circle cx={b.cx} cy={b.cy} r={b.rr} fill={fill} fillOpacity={0.9} />
               {/* Glass rim — brighter when selected */}

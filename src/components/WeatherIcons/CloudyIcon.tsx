@@ -8,11 +8,19 @@ const CLOUD_D =
 interface CloudyIconProps {
     size?: number;
     color?: string;
+    decorative?: boolean;
 }
 
-export default function CloudyIcon({ size = 180, color = '#fefefe' }: CloudyIconProps) {
+export default function CloudyIcon({ size = 180, color = '#fefefe', decorative = false }: CloudyIconProps) {
     return (
-        <Svg viewBox="0 0 1280 1280" width={size} height={size} accessibilityLabel="Cloudy">
+        <Svg
+            viewBox="0 0 1280 1280"
+            width={size}
+            height={size}
+            accessibilityLabel="Cloudy"
+            accessibilityElementsHidden={decorative}
+            importantForAccessibility={decorative ? 'no' : 'auto'}
+        >
             <Path id="cloud" fill={color} d={CLOUD_D} />
         </Svg>
     );

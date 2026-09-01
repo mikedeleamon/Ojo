@@ -112,14 +112,20 @@ interface PartlyCloudyIconProps {
     size?: number;
     color?: string;
     animate?: boolean;
+    decorative?: boolean;
 }
 
-export default function PartlyCloudyIcon({ size = 180, color = '#fefefe', animate = false }: PartlyCloudyIconProps) {
+export default function PartlyCloudyIcon({ size = 180, color = '#fefefe', animate = false, decorative = false }: PartlyCloudyIconProps) {
     const reduceMotion = useReduceMotion();
     const shouldAnimate = animate && !reduceMotion;
 
     return (
-        <View style={{ width: size, height: size }} accessibilityLabel='Partly cloudy'>
+        <View
+            style={{ width: size, height: size }}
+            accessibilityLabel='Partly cloudy'
+            accessibilityElementsHidden={decorative}
+            importantForAccessibility={decorative ? 'no' : 'auto'}
+        >
             {/* Cloud + sun silhouette — static base layer */}
             <Svg
                 viewBox='0 0 1280 1280'

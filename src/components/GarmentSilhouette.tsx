@@ -67,14 +67,18 @@ interface Props {
   clothingType?: string | null;
   size?: number;
   color?: string;
+  /** Already decorative by default — this illustration has no label of its
+   *  own and is meant to sit inside an already-labeled photo frame/row. Pass
+   *  false to expose it to the accessibility tree. */
+  decorative?: boolean;
 }
 
-export default function GarmentSilhouette({ clothingType, size = 22, color }: Props) {
+export default function GarmentSilhouette({ clothingType, size = 22, color, decorative = true }: Props) {
   const { colors } = useTheme();
   const Glyph = useMemo(() => silhouetteFor(clothingType), [clothingType]);
   if (!Glyph) return null;
   // Slightly lighter stroke than the app-chrome icons: this sits inside a photo
   // frame, so it should read as an illustration of a garment rather than as
   // another piece of UI furniture.
-  return <Glyph size={size} color={color ?? colors.textMuted} strokeWidth={1.4} />;
+  return <Glyph size={size} color={color ?? colors.textMuted} strokeWidth={1.4} decorative={decorative} />;
 }

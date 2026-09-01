@@ -101,9 +101,10 @@ interface RainyIconProps {
     /** Run the drop animation. Pass false for small/list instances to avoid
      *  per-frame cost across many rendered cells. Defaults to true. */
     animate?: boolean;
+    decorative?: boolean;
 }
 
-export default function RainyIcon({ size = 180, color = '#fefefe', animate = true }: RainyIconProps) {
+export default function RainyIcon({ size = 180, color = '#fefefe', animate = true, decorative = false }: RainyIconProps) {
     const reduceMotion = useReduceMotion();
     const shouldAnimate = animate && !reduceMotion;
 
@@ -111,6 +112,8 @@ export default function RainyIcon({ size = 180, color = '#fefefe', animate = tru
         <View
             style={{ width: size, height: size }}
             accessibilityLabel='Rainy'
+            accessibilityElementsHidden={decorative}
+            importantForAccessibility={decorative ? 'no' : 'auto'}
         >
             {/* Cloud — static base layer */}
             <Svg

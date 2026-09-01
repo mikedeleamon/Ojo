@@ -47,6 +47,7 @@ export default function AuthField({
                         onPress={() => setReveal((r) => !r)}
                         accessibilityRole="button"
                         accessibilityLabel={reveal ? `Hide ${label}` : `Show ${label}`}
+                        accessibilityState={{ checked: reveal }}
                     >
                         <Text style={styles.inputSuffixText}>
                             {reveal ? 'Hide' : 'Show'}

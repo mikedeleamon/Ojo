@@ -8,7 +8,7 @@ export interface LayeringResult {
     outer: OutfitSlot | null;
   };
   recommendation: string;
-  timeline?: { time: string; action: string }[];
+  timeline?: { time: string; action: string; hour: number }[];
   confidence: number;
   /** Weather calls for a mid/outer layer but the chosen outfit doesn't have one — a wardrobe gap, not just "extra layer optional." */
   missingMid: boolean;

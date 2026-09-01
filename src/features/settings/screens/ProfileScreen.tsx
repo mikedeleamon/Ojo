@@ -181,7 +181,8 @@ export default function ProfileScreen({ onLogout }: Props) {
             <Text style={s.dangerBody}>
               Permanently removes your account, closets, clothing articles, and outfit history. Cannot be undone.
             </Text>
-            <Pressable style={s.dangerBtn} onPress={() => { hapticWarning(); setDeleteStep(true); }}>
+            <Pressable style={s.dangerBtn} onPress={() => { hapticWarning(); setDeleteStep(true); }}
+              accessibilityRole="button">
               <Text style={s.dangerBtnText}>Delete my account</Text>
             </Pressable>
           </View>
@@ -190,7 +191,10 @@ export default function ProfileScreen({ onLogout }: Props) {
 
       <Modal visible={deleteStep} transparent animationType="fade">
         <Pressable style={styles.backdrop}
-          onPress={() => { if (!deleteLoading) { setDeleteStep(false); setDeleteError(null); } }} />
+          onPress={() => { if (!deleteLoading) { setDeleteStep(false); setDeleteError(null); } }}
+          accessibilityLabel="Dismiss"
+          accessibilityRole="button"
+          accessibilityState={{ disabled: deleteLoading }} />
         <GlassCard style={styles.modalCard}>
           <View style={styles.modalIcon}>
             <Text style={{ fontSize: 20 }}>⚠️</Text>

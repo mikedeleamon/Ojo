@@ -503,6 +503,7 @@ interface ClearNightIconProps {
      * which is what every non-full-screen caller wants.
      */
     starLayer?: StarLayer;
+    decorative?: boolean;
 }
 
 export default function ClearNightIcon({
@@ -516,6 +517,7 @@ export default function ClearNightIcon({
     moonPhase,
     mirrorDisc = false,
     starLayer,
+    decorative = false,
 }: ClearNightIconProps) {
     const reduceMotion = useReduceMotion();
     const animateStars = animate && showStars && !reduceMotion;
@@ -541,6 +543,8 @@ export default function ClearNightIcon({
         <View
             style={{ width, height }}
             accessibilityLabel='Clear night'
+            accessibilityElementsHidden={decorative}
+            importantForAccessibility={decorative ? 'no' : 'auto'}
         >
             {showMoon && moonD.length > 0 && (
                 // mirrorDisc flips the disc for Southern Hemisphere observers.

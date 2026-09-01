@@ -2,16 +2,20 @@ import { Svg, Path } from 'react-native-svg';
 
 interface GoogleGlyphProps {
   size?: number;
+  /** Already decorative by default — no label of its own, meant to sit
+   *  inside an already-labeled control (e.g. "Sign in with Google"). Pass
+   *  false to expose it. */
+  decorative?: boolean;
 }
 
 // The four-colour Google "G" mark, used on the Sign in with Google button.
-const GoogleGlyph = ({ size = 18 }: GoogleGlyphProps) => (
+const GoogleGlyph = ({ size = 18, decorative = true }: GoogleGlyphProps) => (
   <Svg
     width={size}
     height={size}
     viewBox='0 0 48 48'
-    accessibilityElementsHidden={true}
-    importantForAccessibility='no'
+    accessibilityElementsHidden={decorative}
+    importantForAccessibility={decorative ? 'no' : 'auto'}
   >
     <Path
       fill='#EA4335'

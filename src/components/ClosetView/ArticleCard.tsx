@@ -266,6 +266,8 @@ export const SwipeableArticleCard = memo((props: ArticleCardProps) => {
                         swipeable.close();
                         props.onRemove(props.article);
                     }}
+                    accessibilityRole='button'
+                    accessibilityLabel={`Delete ${articleDisplayName(props.article)}`}
                 >
                     <Text style={swipeStyles.deleteText}>Delete</Text>
                 </Pressable>

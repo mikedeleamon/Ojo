@@ -209,7 +209,7 @@ describe('buildBriefBody — swing suffix', () => {
         layering: {
           layers: { base: null, mid: null, outer: null },
           recommendation: 'Wear the fleece — you can drop it as the day warms up.',
-          timeline: [{ time: 'Late morning', action: 'Remove Grey Fleece — warming up' }],
+          timeline: [{ time: 'Late morning', action: 'Remove Grey Fleece — warming up', hour: 11 }],
           confidence: 0.8,
           missingMid: false,
           missingOuter: false,

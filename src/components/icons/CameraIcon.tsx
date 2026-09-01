@@ -10,12 +10,17 @@ interface CameraIconProps {
     size?: number;
     color?: string;
     strokeWidth?: number;
+    /** Already decorative by default — this icon has no label of its own and
+     *  is meant to sit inside an already-labeled control. Pass false only if
+     *  this ever becomes the sole accessible content of its container. */
+    decorative?: boolean;
 }
 
 const CameraIcon = ({
     size = 16,
     color = 'rgba(255,255,255,0.85)',
     strokeWidth = 1.6,
+    decorative = true,
 }: CameraIconProps) => (
     <Svg
         width={size}
@@ -26,8 +31,8 @@ const CameraIcon = ({
         strokeWidth={strokeWidth}
         strokeLinecap='round'
         strokeLinejoin='round'
-        accessibilityElementsHidden={true}
-        importantForAccessibility='no'
+        accessibilityElementsHidden={decorative}
+        importantForAccessibility={decorative ? 'no' : 'auto'}
     >
         <Path d='M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z' />
         <Circle cx={12} cy={13} r={4} />

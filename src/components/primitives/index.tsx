@@ -2,4 +2,5 @@ export { View, Text, TextInput, ScrollView, Image, Pressable } from 'react-nativ
 export { AppSlider } from './AppSlider';
 export { GlassCard } from './GlassCard';
 export { GlassGroup } from './GlassGroup';
+export { IconButton } from './IconButton';
 export { isGlassEffectAPIAvailable, isLiquidGlassAvailable } from 'expo-glass-effect';

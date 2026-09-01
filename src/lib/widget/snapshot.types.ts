@@ -56,16 +56,21 @@ export type WidgetAlertKind = 'rain' | 'layer' | 'snow' | 'uv';
 
 /**
  * One step of layeringEngine's same-day timeline, e.g. { time: "Afternoon",
- * action: "Remove your denim jacket — warming up" }. `time` is always one of
- * layeringEngine's 7 buckets (Early morning/Morning/Late morning/Early
- * afternoon/Afternoon/Evening/Night); `action` is free text from a small,
- * fixed set of templates (see buildTimeline in layeringEngine.ts) — the widget
- * keyword-matches its known prefixes ("Remove"/"Add"/"Rain starts"/"Rain
- * clears"/"Keep your") to pick an icon, with a generic fallback for others.
+ * action: "Remove your denim jacket — warming up", hour: 15 }. `time` is
+ * always one of layeringEngine's 7 buckets (Early morning/Morning/Late
+ * morning/Early afternoon/Afternoon/Evening/Night); `action` is free text
+ * from a small, fixed set of templates (see buildTimeline in
+ * layeringEngine.ts) — the widget keyword-matches its known prefixes
+ * ("Remove"/"Add"/"Rain starts"/"Rain clears"/"Keep your") to pick an icon,
+ * with a generic fallback for others. `hour` is the 0–23 wall-clock hour the
+ * bucket label was derived from — kept alongside it (not instead of it) so
+ * anything positioning a step on an hourly axis doesn't have to reverse
+ * hourLabel()'s bucketing to guess one back.
  */
 export interface WidgetTimelineStep {
   time: string;
   action: string;
+  hour: number;
 }
 
 export interface OjoWidgetUpcomingTrip {

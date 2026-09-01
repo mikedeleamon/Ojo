@@ -27,13 +27,17 @@ export interface GarmentGlyphProps {
   size?: number;
   color?: string;
   strokeWidth?: number;
+  /** Already decorative by default — these glyphs have no label of their
+   *  own and are meant to sit inside an already-labeled photo frame/row.
+   *  Pass false to expose one to the accessibility tree. */
+  decorative?: boolean;
 }
 
 export type GarmentGlyph = (props: GarmentGlyphProps) => React.ReactElement;
 
 const DEFAULT_COLOR = 'rgba(255,255,255,0.85)';
 
-const base = (size: number, color: string, strokeWidth: number) => ({
+const base = (size: number, color: string, strokeWidth: number, decorative: boolean = true) => ({
   width: size,
   height: size,
   viewBox: '0 0 24 24',
@@ -42,15 +46,15 @@ const base = (size: number, color: string, strokeWidth: number) => ({
   strokeWidth,
   strokeLinecap: 'round' as const,
   strokeLinejoin: 'round' as const,
-  accessibilityElementsHidden: true,
-  importantForAccessibility: 'no' as const,
+  accessibilityElementsHidden: decorative,
+  importantForAccessibility: (decorative ? 'no' : 'auto') as 'no' | 'auto',
 });
 
 /** Builds a glyph from one or more path strings — the common case. */
 const glyph = (...d: string[]): GarmentGlyph =>
-  function Glyph({ size = 24, color = DEFAULT_COLOR, strokeWidth = 1.5 }: GarmentGlyphProps) {
+  function Glyph({ size = 24, color = DEFAULT_COLOR, strokeWidth = 1.5, decorative = true }: GarmentGlyphProps) {
     return (
-      <Svg {...base(size, color, strokeWidth)}>
+      <Svg {...base(size, color, strokeWidth, decorative)}>
         {d.map((p, i) => <Path key={i} d={p} />)}
       </Svg>
     );
@@ -192,8 +196,8 @@ const Beanie = glyph(
   'M12 6.5 V4.5',
 );
 
-const SunHat: GarmentGlyph = ({ size = 24, color = DEFAULT_COLOR, strokeWidth = 1.5 }) => (
-  <Svg {...base(size, color, strokeWidth)}>
+const SunHat: GarmentGlyph = ({ size = 24, color = DEFAULT_COLOR, strokeWidth = 1.5, decorative = true }) => (
+  <Svg {...base(size, color, strokeWidth, decorative)}>
     <Path d="M8 13 C8 9 9.6 6.5 12 6.5 C14.4 6.5 16 9 16 13" />
     <Ellipse cx={12} cy={13.6} rx={9} ry={3} />
   </Svg>
@@ -211,8 +215,8 @@ const Gloves = glyph(
   'M10.2 8.6 V5.6 M12 7.8 V4.6 M13.8 8.6 V5.6',
 );
 
-const Belt: GarmentGlyph = ({ size = 24, color = DEFAULT_COLOR, strokeWidth = 1.5 }) => (
-  <Svg {...base(size, color, strokeWidth)}>
+const Belt: GarmentGlyph = ({ size = 24, color = DEFAULT_COLOR, strokeWidth = 1.5, decorative = true }) => (
+  <Svg {...base(size, color, strokeWidth, decorative)}>
     <Rect x={2} y={10} width={20} height={4} rx={1.2} />
     <Rect x={8.8} y={8.4} width={6.4} height={7.2} rx={1.2} />
     <Path d="M12 8.4 V15.6" />
@@ -229,8 +233,8 @@ const Socks = glyph(
   'M9 7 H14',
 );
 
-const Watch: GarmentGlyph = ({ size = 24, color = DEFAULT_COLOR, strokeWidth = 1.5 }) => (
-  <Svg {...base(size, color, strokeWidth)}>
+const Watch: GarmentGlyph = ({ size = 24, color = DEFAULT_COLOR, strokeWidth = 1.5, decorative = true }) => (
+  <Svg {...base(size, color, strokeWidth, decorative)}>
     <Rect x={7.8} y={7.8} width={8.4} height={8.4} rx={2.4} />
     <Path d="M10 7.8 V4 H14 V7.8 M10 16.2 V20 H14 V16.2" />
     <Path d="M12 10.4 V12 L13.4 13" />

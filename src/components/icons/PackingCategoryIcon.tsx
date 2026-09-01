@@ -13,9 +13,10 @@ interface ShapeProps {
     size: number;
     color: string;
     strokeWidth: number;
+    decorative: boolean;
 }
 
-const base = (size: number, color: string, strokeWidth: number) => ({
+const base = (size: number, color: string, strokeWidth: number, decorative: boolean = true) => ({
     width: size,
     height: size,
     viewBox: '0 0 24 24',
@@ -24,24 +25,24 @@ const base = (size: number, color: string, strokeWidth: number) => ({
     strokeWidth,
     strokeLinecap: 'round' as const,
     strokeLinejoin: 'round' as const,
-    accessibilityElementsHidden: true,
-    importantForAccessibility: 'no' as const,
+    accessibilityElementsHidden: decorative,
+    importantForAccessibility: (decorative ? 'no' : 'auto') as 'no' | 'auto',
 });
 
-const TopShape = ({ size, color, strokeWidth }: ShapeProps) => (
-    <Svg {...base(size, color, strokeWidth)}>
+const TopShape = ({ size, color, strokeWidth, decorative }: ShapeProps) => (
+    <Svg {...base(size, color, strokeWidth, decorative)}>
         <Path d='M9 3L4 6l2 4 2-1.5V20h8V8.5L18 10l2-4-5-3v.5c0 1.5-1.3 2.5-3 2.5s-3-1-3-2.5V3z' />
     </Svg>
 );
 
-const BottomShape = ({ size, color, strokeWidth }: ShapeProps) => (
-    <Svg {...base(size, color, strokeWidth)}>
+const BottomShape = ({ size, color, strokeWidth, decorative }: ShapeProps) => (
+    <Svg {...base(size, color, strokeWidth, decorative)}>
         <Path d='M7 3h10v9l-1.5 8h-3L12 12.5 11.5 20h-3L7 12V3z' />
     </Svg>
 );
 
-const OuterwearShape = ({ size, color, strokeWidth }: ShapeProps) => (
-    <Svg {...base(size, color, strokeWidth)}>
+const OuterwearShape = ({ size, color, strokeWidth, decorative }: ShapeProps) => (
+    <Svg {...base(size, color, strokeWidth, decorative)}>
         <Path d='M9 3L4 6l2 4 2-1.5V20h3.3V6.5' />
         <Path d='M15 3l5 3-2 4-2-1.5V20h-3.3V6.5' />
         <Path d='M9 3l2 2.5' />
@@ -49,14 +50,14 @@ const OuterwearShape = ({ size, color, strokeWidth }: ShapeProps) => (
     </Svg>
 );
 
-const FootwearShape = ({ size, color, strokeWidth }: ShapeProps) => (
-    <Svg {...base(size, color, strokeWidth)}>
+const FootwearShape = ({ size, color, strokeWidth, decorative }: ShapeProps) => (
+    <Svg {...base(size, color, strokeWidth, decorative)}>
         <Path d='M3 18v-3c0-2 1.5-3 3-3h5l2-3h3v3h3c1.5 0 2.5 1 2.5 2.5V18H3z' />
     </Svg>
 );
 
-const AccessoryShape = ({ size, color, strokeWidth }: ShapeProps) => (
-    <Svg {...base(size, color, strokeWidth)}>
+const AccessoryShape = ({ size, color, strokeWidth, decorative }: ShapeProps) => (
+    <Svg {...base(size, color, strokeWidth, decorative)}>
         <Path d='M7 8c0-3 1.5-5 3-5h4c1.5 0 3 2 3 5' />
         <Path d='M5 8h14l-1 12H6L5 8z' />
     </Svg>
@@ -68,6 +69,10 @@ interface PackingCategoryIconProps {
     size?: number;
     color?: string;
     strokeWidth?: number;
+    /** Already decorative by default — these icons have no label of their
+     *  own and are meant to sit inside an already-labeled row. Pass false
+     *  to expose one to the accessibility tree. */
+    decorative?: boolean;
 }
 
 export const PackingCategoryIcon = ({
@@ -75,8 +80,9 @@ export const PackingCategoryIcon = ({
     size = 14,
     color = 'rgba(255,255,255,0.85)',
     strokeWidth = 1.6,
+    decorative = true,
 }: PackingCategoryIconProps) => {
-    const shapeProps = { size, color, strokeWidth };
+    const shapeProps = { size, color, strokeWidth, decorative };
     switch (category) {
         case 'bottom':
             return <BottomShape {...shapeProps} />;

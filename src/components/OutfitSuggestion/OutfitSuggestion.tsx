@@ -18,7 +18,7 @@ import Animated, {
     interpolate,
     Easing,
 } from 'react-native-reanimated';
-import { View, Text, GlassCard, GlassGroup } from '../primitives';
+import { View, Text, GlassCard, GlassGroup, IconButton } from '../primitives';
 import { usePerfFlags } from '../../lib/debug/perfFlags';
 import { EmptyState } from '../shared';
 import OccasionChips from '../OccasionChips';
@@ -26,6 +26,7 @@ import { useClosets } from '../../hooks/useClosets';
 import { useReduceMotion } from '../../hooks/useReduceMotion';
 import { useTripMode } from '../../hooks/useTripMode';
 import { useMorningBriefScheduler } from '../../hooks/useMorningBriefScheduler';
+import { useSameDayNudgeScheduler } from '../../hooks/useSameDayNudgeScheduler';
 import { hapticSuccess } from '../../lib/haptics';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { buildWidgetInput, tomorrowDailyFor } from '../../lib/widget/buildInput';
@@ -190,6 +191,7 @@ const ArticleThumb = ({
                     onPress={onRemove}
                     hitSlop={8}
                     accessibilityLabel='Remove from outfit'
+                    accessibilityRole='button'
                 >
                     <Text style={styles.articleRemoveText}>✕</Text>
                 </Pressable>
@@ -253,13 +255,13 @@ const GapCard = ({
     const searchTerm = GAP_SEARCH_TERMS[suggestion.type] ?? 'clothing';
     return (
         <View style={styles.gapCard}>
-            <Pressable
+            <IconButton
                 style={styles.gapDismiss}
                 onPress={onDismiss}
                 hitSlop={8}
-            >
-                <Text style={styles.gapDismissText}>✕</Text>
-            </Pressable>
+                accessibilityLabel='Dismiss suggestion'
+                icon={<Text style={styles.gapDismissText}>✕</Text>}
+            />
             <Text style={styles.gapMessage}>{suggestion.message}</Text>
             <Pressable
                 style={styles.gapCTA}
@@ -268,6 +270,8 @@ const GapCard = ({
                         `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(searchTerm)}`,
                     )
                 }
+                accessibilityRole='button'
+                accessibilityLabel={`Browse ${searchTerm}`}
             >
                 <Text style={styles.gapCTAText}>Browse {searchTerm} →</Text>
             </Pressable>
@@ -724,6 +728,15 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
         ready: !loading,
     });
 
+    // ─── Same-Day Weather Nudge ─────────────────────────────────────────────────
+    // Reuses outfits[0] — already generated above from live weather + real hourly
+    // forecasts — rather than regenerating anything, unlike the Brief.
+    useSameDayNudgeScheduler({
+        outfit: outfits[0] ?? null,
+        city,
+        ready: !loading,
+    });
+
     useEffect(() => {
         if (!activeOutfit || activeOutfit.notes.length === 0) return;
         recordGapsFromNotes(activeOutfit.notes)
@@ -890,7 +903,12 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
                     title="Couldn't load your closet"
                     body={closetsError}
                     action={
-                        <Pressable style={styles.ctaBtn} onPress={refresh}>
+                        <Pressable
+                            style={styles.ctaBtn}
+                            onPress={refresh}
+                            accessibilityRole='button'
+                            accessibilityLabel='Retry'
+                        >
                             <Text style={styles.ctaBtnText}>Retry</Text>
                         </Pressable>
                     }
@@ -917,6 +935,8 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
                             <Pressable
                                 style={styles.ctaBtn}
                                 onPress={() => nav.push('/(tabs)/closet')}
+                                accessibilityRole='button'
+                                accessibilityLabel='Set up closet'
                             >
                                 <Text style={styles.ctaBtnText}>Set up closet</Text>
                             </Pressable>
@@ -942,10 +962,13 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
                             style={styles.closetPickBtn}
                             onPress={() => setPreferredCloset(c._id)}
                             disabled={settingPref}
+                            accessibilityRole='button'
+                            accessibilityLabel={`${c.name}, ${c.articles.length} items`}
                         >
                             <HangerIcon
                                 size={14}
                                 color={colors.textSecondary}
+                                decorative
                             />
                             <Text style={styles.closetPickName}>{c.name}</Text>
                             <Text style={styles.closetPickCount}>
@@ -1004,6 +1027,8 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
                             <Pressable
                                 style={styles.ctaBtn}
                                 onPress={() => nav.push('/(tabs)/closet')}
+                                accessibilityRole='button'
+                                accessibilityLabel='Add clothes'
                             >
                                 <Text style={styles.ctaBtnText}>Add clothes</Text>
                             </Pressable>
@@ -1120,6 +1145,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
                             style={styles.breakdownToggle}
                             onPress={() => setShowOtherIdeas((v) => !v)}
                             accessibilityRole='button'
+                            accessibilityLabel={showOtherIdeas ? 'Hide other ideas' : 'See other ideas for today'}
                             hitSlop={8}
                         >
                             <Text style={styles.breakdownToggleText}>
@@ -1274,6 +1300,9 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
                                             setActiveIdx(i);
                                             setShowBreakdown(false);
                                         }}
+                                        accessibilityLabel={`Outfit ${i + 1} of ${outfits.length}`}
+                                        accessibilityRole='button'
+                                        accessibilityState={{ selected: i === safeIdx }}
                                     />
                                 ))}
                             </View>
@@ -1283,6 +1312,8 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
                                 onPress={handleResetOutfit}
                                 style={styles.resetLink}
                                 hitSlop={8}
+                                accessibilityRole='button'
+                                accessibilityLabel='Reset outfit'
                             >
                                 <Text style={styles.resetLinkText}>
                                     Reset outfit
@@ -1304,6 +1335,8 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
                         style={styles.breakdownToggle}
                         onPress={() => setShowBreakdown((v) => !v)}
                         hitSlop={8}
+                        accessibilityRole='button'
+                        accessibilityLabel={showBreakdown ? 'Hide breakdown' : 'Score breakdown'}
                     >
                         <Text style={styles.breakdownToggleText}>
                             {showBreakdown ? 'Hide breakdown' : 'Score breakdown'}
@@ -1355,6 +1388,8 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
                     <Pressable
                         style={styles.woreThisBtn}
                         onPress={handleWoreThis}
+                        accessibilityRole='button'
+                        accessibilityLabel='Wore this today'
                     >
                         <Text style={styles.woreThisText}>
                             Wore this today
@@ -1421,7 +1456,13 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
                                 </View>
                             </View>
 
-                            <Pressable onPress={handleUndoLog} style={styles.confirmUndo} hitSlop={8}>
+                            <Pressable
+                                onPress={handleUndoLog}
+                                style={styles.confirmUndo}
+                                hitSlop={8}
+                                accessibilityRole='button'
+                                accessibilityLabel='Wore something else?'
+                            >
                                 <Text style={styles.confirmUndoText}>
                                     Wore something else?
                                 </Text>
@@ -1462,10 +1503,13 @@ const PreferredBadge = ({
         <Pressable
             style={styles.preferredBadge}
             onPress={onPress}
+            accessibilityRole='button'
+            accessibilityLabel={`Preferred closet: ${name}`}
         >
             <HangerIcon
                 size={11}
                 color={colors.textSecondary}
+                decorative
             />
             <Text style={styles.preferredBadgeText}>{name}</Text>
         </Pressable>

@@ -798,6 +798,7 @@ const ArticleModal = ({
                                     style={st.preview}
                                     resizeMode='cover'
                                     onError={() => setPreviewError(true)}
+                                    accessibilityLabel='Selected photo preview'
                                 />
                                 <Pressable
                                     style={st.clearImg}

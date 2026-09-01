@@ -1,601 +1,835 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  StyleSheet,
-  ScrollView,
-  Switch,
-  Animated,
-  Alert,
-  Linking,
+    StyleSheet,
+    ScrollView,
+    Switch,
+    Animated,
+    Alert,
+    Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Slider from '@react-native-community/slider';
-import { View, Text, Pressable, GlassCard } from '../../../components/primitives';
+import {
+    View,
+    Text,
+    Pressable,
+    GlassCard,
+} from '../../../components/primitives';
 import Loading from '../../../components/Loading/Loading';
 import SunnyIcon from '../../../components/WeatherIcons/SunnyIcon';
 import { useSpinAnimation } from '../../../hooks/useSpinAnimation';
 import { NotificationSettings } from '../../../types';
 import {
-  NOTIF_DEFAULTS,
-  getPermissionStatus,
-  requestPermission,
-  registerPushToken,
-  scheduleWeeklyRecap,
-  cancelWeeklyRecap,
-  cancelTripPackingReminder,
-  cancelAllTripMorningNotifications,
-  cancelMorningBriefs,
-  getBriefPreview,
-  TRIP_PACKING_PREF_KEY,
-  TRIP_MODE_MORNING_PREF_KEY,
-  localHourToUTC,
-  utcHourToLocal,
-  PermissionStatus,
-  type BriefDay,
+    NOTIF_DEFAULTS,
+    getPermissionStatus,
+    requestPermission,
+    registerPushToken,
+    scheduleWeeklyRecap,
+    cancelWeeklyRecap,
+    cancelTripPackingReminder,
+    cancelAllTripMorningNotifications,
+    cancelMorningBriefs,
+    cancelSameDayNudges,
+    getBriefPreview,
+    TRIP_PACKING_PREF_KEY,
+    TRIP_MODE_MORNING_PREF_KEY,
+    localHourToUTC,
+    utcHourToLocal,
+    PermissionStatus,
+    type BriefDay,
 } from '../../../lib/notifications';
 import { storage } from '../../../lib/storage';
 import { hapticSuccess } from '../../../lib/haptics';
 import axios from '../../../api/client';
 import { authHeaders, getErrorMessage } from '../../../lib/auth';
-import { spacing, radius, fonts, fontSizes, fontWeights } from '../../../theme/tokens';
+import {
+    spacing,
+    radius,
+    fonts,
+    fontSizes,
+    fontWeights,
+} from '../../../theme/tokens';
 import { makeStyles } from './screens.styles';
 import { useTheme } from '../../../theme/ThemeContext';
 import { ColorTokens } from '../../../theme/tokens';
 
 const HOUR_OPTIONS = [6, 7, 8, 9, 10];
 const HOUR_LABEL = (h: number) => {
-  const period = h < 12 ? 'am' : 'pm';
-  const display = h <= 12 ? h : h - 12;
-  return `${display}${period}`;
+    const period = h < 12 ? 'am' : 'pm';
+    const display = h <= 12 ? h : h - 12;
+    return `${display}${period}`;
 };
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-const makeLocalStyles = (colors: ColorTokens, isDark: boolean) => StyleSheet.create({
-  root:    { flex: 1, backgroundColor: colors.bgDefault },
-  content: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xl },
-  section: { gap: spacing.sm },
-  card: {
-    backgroundColor: colors.glassBg,
-    borderWidth:     1,
-    borderColor:     colors.glassBorder,
-    borderRadius:    radius.md,
-    paddingVertical:   14,
-    paddingHorizontal: spacing.md,
-    gap:             12,
-  },
-  row: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    justifyContent: 'space-between',
-    gap:             spacing.sm,
-  },
-  rowLabel: { flex: 1, gap: 3 },
-  rowTitle: {
-    fontFamily: fonts.body,
-    fontSize:   fontSizes.base,
-    fontWeight: fontWeights.medium,
-    color:      colors.textPrimary,
-  },
-  rowSubtitle: {
-    fontFamily: fonts.body,
-    fontSize:   fontSizes.sm - 1,
-    color:      colors.textMuted,
-    lineHeight: (fontSizes.sm - 1) * 1.55,
-  },
-  subConfig: { gap: 8, paddingTop: 4 },
-  subLabel: {
-    fontFamily:    fonts.body,
-    fontSize:      fontSizes.xs,
-    fontWeight:    fontWeights.medium,
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-    color:         colors.textMuted,
-  },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap:      'wrap',
-    gap:           6,
-  },
-  // Extra breathing room above so the preview reads as a separate beat from the
-  // hour picker rather than a caption on it.
-  previewLabel: { paddingTop: 4 },
-  preview: {
-    backgroundColor: colors.glassBg,
-    borderWidth:     1,
-    borderColor:     colors.glassBorder,
-    borderRadius:    radius.md,
-    padding:         spacing.sm,
-    gap:             3,
-  },
-  previewTitle: {
-    fontFamily: fonts.body,
-    fontSize:   fontSizes.sm,
-    fontWeight: fontWeights.medium,
-    color:      colors.textPrimary,
-  },
-  previewBody: {
-    fontFamily: fonts.body,
-    fontSize:   fontSizes.sm - 1,
-    color:      colors.textSecondary,
-    lineHeight: (fontSizes.sm - 1) * 1.55,
-  },
-  permBanner: {
-    backgroundColor: isDark ? 'rgba(250, 204, 21, 0.08)' : 'rgba(250, 204, 21, 0.18)',
-    borderWidth:     1,
-    borderColor:     isDark ? 'rgba(250, 204, 21, 0.25)' : 'rgba(180, 130, 0, 0.45)',
-    borderRadius:    radius.md,
-    padding:         spacing.md,
-    gap:             10,
-  },
-  permText: {
-    fontFamily: fonts.body,
-    fontSize:   fontSizes.sm,
-    color:      isDark ? 'rgba(253, 224, 71, 0.9)' : '#78350f',
-    lineHeight: fontSizes.sm * 1.5,
-  },
-  permBtn: {
-    alignSelf:         'flex-start',
-    paddingVertical:   7,
-    paddingHorizontal: 14,
-    backgroundColor:   isDark ? 'rgba(250, 204, 21, 0.12)' : 'rgba(250, 204, 21, 0.30)',
-    borderWidth:       1,
-    borderColor:       isDark ? 'rgba(250, 204, 21, 0.30)' : 'rgba(180, 130, 0, 0.55)',
-    borderRadius:      radius.pill,
-  },
-  permBtnText: {
-    fontFamily: fonts.body,
-    fontSize:   fontSizes.sm,
-    fontWeight: fontWeights.medium,
-    color:      isDark ? 'rgba(253, 224, 71, 1)' : '#78350f',
-  },
-});
+const makeLocalStyles = (colors: ColorTokens, isDark: boolean) =>
+    StyleSheet.create({
+        root: { flex: 1, backgroundColor: colors.bgDefault },
+        content: {
+            padding: spacing.md,
+            gap: spacing.md,
+            paddingBottom: spacing.xl,
+        },
+        section: { gap: spacing.sm },
+        card: {
+            backgroundColor: colors.glassBg,
+            borderWidth: 1,
+            borderColor: colors.glassBorder,
+            borderRadius: radius.md,
+            paddingVertical: 14,
+            paddingHorizontal: spacing.md,
+            gap: 12,
+        },
+        row: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: spacing.sm,
+        },
+        rowLabel: { flex: 1, gap: 3 },
+        rowTitle: {
+            fontFamily: fonts.body,
+            fontSize: fontSizes.base,
+            fontWeight: fontWeights.medium,
+            color: colors.textPrimary,
+        },
+        rowSubtitle: {
+            fontFamily: fonts.body,
+            fontSize: fontSizes.sm - 1,
+            color: colors.textMuted,
+            lineHeight: (fontSizes.sm - 1) * 1.55,
+        },
+        subConfig: { gap: 8, paddingTop: 4 },
+        subLabel: {
+            fontFamily: fonts.body,
+            fontSize: fontSizes.xs,
+            fontWeight: fontWeights.medium,
+            letterSpacing: 0.5,
+            textTransform: 'uppercase',
+            color: colors.textMuted,
+        },
+        chipRow: {
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            gap: 6,
+        },
+        // Extra breathing room above so the preview reads as a separate beat from the
+        // hour picker rather than a caption on it.
+        previewLabel: { paddingTop: 4 },
+        preview: {
+            backgroundColor: colors.glassBg,
+            borderWidth: 1,
+            borderColor: colors.glassBorder,
+            borderRadius: radius.md,
+            padding: spacing.sm,
+            gap: 3,
+        },
+        previewTitle: {
+            fontFamily: fonts.body,
+            fontSize: fontSizes.sm,
+            fontWeight: fontWeights.medium,
+            color: colors.textPrimary,
+        },
+        previewBody: {
+            fontFamily: fonts.body,
+            fontSize: fontSizes.sm - 1,
+            color: colors.textSecondary,
+            lineHeight: (fontSizes.sm - 1) * 1.55,
+        },
+        permBanner: {
+            backgroundColor: isDark
+                ? 'rgba(250, 204, 21, 0.08)'
+                : 'rgba(250, 204, 21, 0.18)',
+            borderWidth: 1,
+            borderColor: isDark
+                ? 'rgba(250, 204, 21, 0.25)'
+                : 'rgba(180, 130, 0, 0.45)',
+            borderRadius: radius.md,
+            padding: spacing.md,
+            gap: 10,
+        },
+        permText: {
+            fontFamily: fonts.body,
+            fontSize: fontSizes.sm,
+            color: isDark ? 'rgba(253, 224, 71, 0.9)' : '#78350f',
+            lineHeight: fontSizes.sm * 1.5,
+        },
+        permBtn: {
+            alignSelf: 'flex-start',
+            paddingVertical: 7,
+            paddingHorizontal: 14,
+            backgroundColor: isDark
+                ? 'rgba(250, 204, 21, 0.12)'
+                : 'rgba(250, 204, 21, 0.30)',
+            borderWidth: 1,
+            borderColor: isDark
+                ? 'rgba(250, 204, 21, 0.30)'
+                : 'rgba(180, 130, 0, 0.55)',
+            borderRadius: radius.pill,
+        },
+        permBtnText: {
+            fontFamily: fonts.body,
+            fontSize: fontSizes.sm,
+            fontWeight: fontWeights.medium,
+            color: isDark ? 'rgba(253, 224, 71, 1)' : '#78350f',
+        },
+    });
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-const Row = ({ children, st }: { children: React.ReactNode; st: ReturnType<typeof makeLocalStyles> }) => (
-  <View style={st.row}>{children}</View>
-);
+const Row = ({
+    children,
+    st,
+}: {
+    children: React.ReactNode;
+    st: ReturnType<typeof makeLocalStyles>;
+}) => <View style={st.row}>{children}</View>;
 
-const RowLabel = ({ title, subtitle, st }: { title: string; subtitle: string; st: ReturnType<typeof makeLocalStyles> }) => (
-  <View style={st.rowLabel}>
-    <Text style={st.rowTitle}>{title}</Text>
-    <Text style={st.rowSubtitle}>{subtitle}</Text>
-  </View>
+const RowLabel = ({
+    title,
+    subtitle,
+    st,
+}: {
+    title: string;
+    subtitle: string;
+    st: ReturnType<typeof makeLocalStyles>;
+}) => (
+    <View style={st.rowLabel}>
+        <Text style={st.rowTitle}>{title}</Text>
+        <Text style={st.rowSubtitle}>{subtitle}</Text>
+    </View>
 );
 
 const ChipRow = ({
-  options,
-  selected,
-  onSelect,
-  labelFn,
-  s,
+    options,
+    selected,
+    onSelect,
+    labelFn,
+    s,
 }: {
-  options: number[];
-  selected: number;
-  onSelect: (v: number) => void;
-  labelFn: (v: number) => string;
-  s: ReturnType<typeof makeStyles>;
+    options: number[];
+    selected: number;
+    onSelect: (v: number) => void;
+    labelFn: (v: number) => string;
+    s: ReturnType<typeof makeStyles>;
 }) => (
-  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-    {options.map(v => (
-      <Pressable
-        key={v}
-        style={[s.chip, v === selected && s.chipActive]}
-        onPress={() => onSelect(v)}
-      >
-        <Text style={[s.chipText, v === selected && s.chipTextActive]}>
-          {labelFn(v)}
-        </Text>
-      </Pressable>
-    ))}
-  </View>
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+        {options.map((v) => (
+            <Pressable
+                key={v}
+                style={[s.chip, v === selected && s.chipActive]}
+                onPress={() => onSelect(v)}
+                accessibilityRole='button'
+                accessibilityLabel={labelFn(v)}
+                accessibilityState={{ selected: v === selected }}
+            >
+                <Text style={[s.chipText, v === selected && s.chipTextActive]}>
+                    {labelFn(v)}
+                </Text>
+            </Pressable>
+        ))}
+    </View>
 );
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function NotificationsScreen() {
-  const { colors, isDark } = useTheme();
-  const s  = useMemo(() => makeStyles(colors), [colors]);
-  const st = useMemo(() => makeLocalStyles(colors, isDark), [colors, isDark]);
+    const { colors, isDark } = useTheme();
+    const s = useMemo(() => makeStyles(colors), [colors]);
+    const st = useMemo(() => makeLocalStyles(colors, isDark), [colors, isDark]);
 
-  const [loading,     setLoading]     = useState(true);
-  const [saving,      setSaving]      = useState(false);
-  const [permission,  setPermission]  = useState<PermissionStatus>('undetermined');
-  const [saved,       setSaved]       = useState(false);
-  const [error,       setError]       = useState('');
-  const [localHour,   setLocalHour]   = useState(7);
-  const [ns,          setNs]          = useState<NotificationSettings>(NOTIF_DEFAULTS);
-  // Copy for the next scheduled brief, written by the scheduler on the home
-  // screen. Read rather than recomputed: this screen has no weather or closet
-  // context, and wiring it up just to render a preview would be the wrong trade.
-  const [preview,     setPreview]     = useState<BriefDay | null>(null);
-  const savingRotate = useSpinAnimation(1_500);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [permission, setPermission] =
+        useState<PermissionStatus>('undetermined');
+    const [saved, setSaved] = useState(false);
+    const [error, setError] = useState('');
+    const [localHour, setLocalHour] = useState(7);
+    const [ns, setNs] = useState<NotificationSettings>(NOTIF_DEFAULTS);
+    // Copy for the next scheduled brief, written by the scheduler on the home
+    // screen. Read rather than recomputed: this screen has no weather or closet
+    // context, and wiring it up just to render a preview would be the wrong trade.
+    const [preview, setPreview] = useState<BriefDay | null>(null);
+    const savingRotate = useSpinAnimation(1_500);
 
-  const set = useCallback(
-    <K extends keyof NotificationSettings>(key: K, val: NotificationSettings[K]) =>
-      setNs(prev => ({ ...prev, [key]: val })),
-    [],
-  );
+    const set = useCallback(
+        <K extends keyof NotificationSettings>(
+            key: K,
+            val: NotificationSettings[K],
+        ) => setNs((prev) => ({ ...prev, [key]: val })),
+        [],
+    );
 
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      const perm = await getPermissionStatus();
-      if (!cancelled) setPermission(perm);
-      try {
-        const [{ data }, localTripPacking, localTripMorning, briefPreview] = await Promise.all([
-          axios.get('/api/notifications/settings', authHeaders()),
-          storage.getItem(TRIP_PACKING_PREF_KEY),
-          storage.getItem(TRIP_MODE_MORNING_PREF_KEY),
-          getBriefPreview(),
-        ]);
-        if (!cancelled) {
-          setPreview(briefPreview);
-          const merged = { ...NOTIF_DEFAULTS, ...data };
-          // tripPackingEnabled + tripModeMorningEnabled are stored locally — the
-          // local value wins if present.
-          if (localTripPacking !== null) {
-            merged.tripPackingEnabled = localTripPacking === 'true';
-          }
-          if (localTripMorning !== null) {
-            merged.tripModeMorningEnabled = localTripMorning === 'true';
-          }
-          setNs(merged);
-          setLocalHour(utcHourToLocal(merged.morningBriefHourUTC));
+    useEffect(() => {
+        let cancelled = false;
+        const load = async () => {
+            const perm = await getPermissionStatus();
+            if (!cancelled) setPermission(perm);
+            try {
+                const [
+                    { data },
+                    localTripPacking,
+                    localTripMorning,
+                    briefPreview,
+                ] = await Promise.all([
+                    axios.get('/api/notifications/settings', authHeaders()),
+                    storage.getItem(TRIP_PACKING_PREF_KEY),
+                    storage.getItem(TRIP_MODE_MORNING_PREF_KEY),
+                    getBriefPreview(),
+                ]);
+                if (!cancelled) {
+                    setPreview(briefPreview);
+                    const merged = { ...NOTIF_DEFAULTS, ...data };
+                    // tripPackingEnabled + tripModeMorningEnabled are stored locally — the
+                    // local value wins if present.
+                    if (localTripPacking !== null) {
+                        merged.tripPackingEnabled = localTripPacking === 'true';
+                    }
+                    if (localTripMorning !== null) {
+                        merged.tripModeMorningEnabled =
+                            localTripMorning === 'true';
+                    }
+                    setNs(merged);
+                    setLocalHour(utcHourToLocal(merged.morningBriefHourUTC));
+                }
+            } catch {
+                // Fall back to defaults; still try to read local trip-packing pref
+                try {
+                    const localTripPacking = await storage.getItem(
+                        TRIP_PACKING_PREF_KEY,
+                    );
+                    if (!cancelled && localTripPacking !== null) {
+                        setNs((prev) => ({
+                            ...prev,
+                            tripPackingEnabled: localTripPacking === 'true',
+                        }));
+                    }
+                } catch {
+                    /* ignore */
+                }
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        };
+        load();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    const handleRequestPermission = async () => {
+        // Once the OS has recorded a denial it won't re-prompt — requestPermission
+        // would just return 'denied' again. Send the user straight to system
+        // settings instead, which is what the "Open Settings" label promises.
+        if (permission === 'denied') {
+            Linking.openSettings();
+            return;
         }
-      } catch {
-        // Fall back to defaults; still try to read local trip-packing pref
-        try {
-          const localTripPacking = await storage.getItem(TRIP_PACKING_PREF_KEY);
-          if (!cancelled && localTripPacking !== null) {
-            setNs(prev => ({ ...prev, tripPackingEnabled: localTripPacking === 'true' }));
-          }
-        } catch { /* ignore */ }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    load();
-    return () => { cancelled = true; };
-  }, []);
-
-  const handleRequestPermission = async () => {
-    // Once the OS has recorded a denial it won't re-prompt — requestPermission
-    // would just return 'denied' again. Send the user straight to system
-    // settings instead, which is what the "Open Settings" label promises.
-    if (permission === 'denied') {
-      Linking.openSettings();
-      return;
-    }
-    const status = await requestPermission();
-    setPermission(status);
-    if (status === 'granted') {
-      await registerPushToken();
-    } else if (status === 'denied') {
-      Alert.alert(
-        'Notifications Blocked',
-        'Enable notifications for Ojo in Settings to receive alerts.',
-        [
-          { text: 'Not now', style: 'cancel' },
-          { text: 'Open Settings', onPress: () => Linking.openSettings() },
-        ],
-      );
-    }
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    setError('');
-    setSaved(false);
-    try {
-      // The Morning Brief is scheduled on-device now, so it needs notification
-      // permission but not a push token — only the server-sent alerts do.
-      const needsToken =
-        ns.weatherChangeEnabled ||
-        ns.closetGapEnabled;
-
-      const needsPermission = needsToken || ns.morningBriefEnabled;
-
-      if (needsPermission && permission !== 'granted') {
         const status = await requestPermission();
         setPermission(status);
-        if (status !== 'granted') {
-          setError('Notification permission is required to enable these alerts.');
-          return;
+        if (status === 'granted') {
+            await registerPushToken();
+        } else if (status === 'denied') {
+            Alert.alert(
+                'Notifications Blocked',
+                'Enable notifications for Ojo in Settings to receive alerts.',
+                [
+                    { text: 'Not now', style: 'cancel' },
+                    {
+                        text: 'Open Settings',
+                        onPress: () => Linking.openSettings(),
+                    },
+                ],
+            );
         }
-      }
-      if (needsToken) await registerPushToken();
+    };
 
-      const toSave: NotificationSettings = {
-        ...ns,
-        morningBriefHourUTC: localHourToUTC(localHour),
-      };
+    const handleSave = async () => {
+        setSaving(true);
+        setError('');
+        setSaved(false);
+        try {
+            // The Morning Brief is scheduled on-device now, so it needs notification
+            // permission but not a push token — only the server-sent alerts do.
+            const needsToken = ns.weatherChangeEnabled || ns.closetGapEnabled;
 
-      await axios.put('/api/notifications/settings', toSave, authHeaders());
+            const needsPermission =
+                needsToken || ns.morningBriefEnabled || ns.sameDayNudgeEnabled;
 
-      if (ns.weeklyRecapEnabled) {
-        await scheduleWeeklyRecap(ns.weeklyRecapDay);
-      } else {
-        await cancelWeeklyRecap();
-      }
+            if (needsPermission && permission !== 'granted') {
+                const status = await requestPermission();
+                setPermission(status);
+                if (status !== 'granted') {
+                    setError(
+                        'Notification permission is required to enable these alerts.',
+                    );
+                    return;
+                }
+            }
+            if (needsToken) await registerPushToken();
 
-      // Turning the brief off must take effect now — the scheduled window would
-      // otherwise keep firing for up to a week. Turning it on can't be honoured
-      // here: the copy needs weather and closet data this screen doesn't have,
-      // so useMorningBriefScheduler fills the window on the next home-screen
-      // visit. That's also why the preview clears rather than repopulating.
-      if (!ns.morningBriefEnabled) {
-        await cancelMorningBriefs();
-        setPreview(null);
-      }
+            const toSave: NotificationSettings = {
+                ...ns,
+                morningBriefHourUTC: localHourToUTC(localHour),
+            };
 
-      await storage.setItem(TRIP_PACKING_PREF_KEY, ns.tripPackingEnabled ? 'true' : 'false');
-      if (!ns.tripPackingEnabled) {
-        await cancelTripPackingReminder();
-      }
+            await axios.put(
+                '/api/notifications/settings',
+                toSave,
+                authHeaders(),
+            );
 
-      await storage.setItem(TRIP_MODE_MORNING_PREF_KEY, ns.tripModeMorningEnabled ? 'true' : 'false');
-      if (!ns.tripModeMorningEnabled) {
-        await cancelAllTripMorningNotifications();
-      }
-      // When enabled, per-trip nudges are (re)scheduled by useTripPlans on next
-      // load — its reconcile pass self-gates on this pref + notification permission.
+            if (ns.weeklyRecapEnabled) {
+                await scheduleWeeklyRecap(ns.weeklyRecapDay);
+            } else {
+                await cancelWeeklyRecap();
+            }
 
-      setSaved(true);
-      hapticSuccess();
-      setTimeout(() => setSaved(false), 3000);
-    } catch (err) {
-      setError(getErrorMessage(err, 'Failed to save notification settings.'));
-    } finally {
-      setSaving(false);
-    }
-  };
+            // Turning the brief off must take effect now — the scheduled window would
+            // otherwise keep firing for up to a week. Turning it on can't be honoured
+            // here: the copy needs weather and closet data this screen doesn't have,
+            // so useMorningBriefScheduler fills the window on the next home-screen
+            // visit. That's also why the preview clears rather than repopulating.
+            if (!ns.morningBriefEnabled) {
+                await cancelMorningBriefs();
+                setPreview(null);
+            }
 
-  if (loading) return <Loading />;
+            // Same treatment: off takes effect now; on is deferred to the next
+            // home-screen sync, since the content needs today's live outfit
+            // generation, which this screen doesn't have.
+            if (!ns.sameDayNudgeEnabled) {
+                await cancelSameDayNudges();
+            }
 
-  const anyEnabled =
-    ns.morningBriefEnabled ||
-    ns.weatherChangeEnabled ||
-    ns.tempSwingEnabled ||
-    ns.closetGapEnabled ||
-    ns.weeklyRecapEnabled ||
-    ns.tripPackingEnabled ||
-    ns.tripModeMorningEnabled;
+            await storage.setItem(
+                TRIP_PACKING_PREF_KEY,
+                ns.tripPackingEnabled ? 'true' : 'false',
+            );
+            if (!ns.tripPackingEnabled) {
+                await cancelTripPackingReminder();
+            }
 
-  return (
-    <SafeAreaView style={st.root} edges={['bottom']}>
-      <ScrollView contentContainerStyle={st.content}>
+            await storage.setItem(
+                TRIP_MODE_MORNING_PREF_KEY,
+                ns.tripModeMorningEnabled ? 'true' : 'false',
+            );
+            if (!ns.tripModeMorningEnabled) {
+                await cancelAllTripMorningNotifications();
+            }
+            // When enabled, per-trip nudges are (re)scheduled by useTripPlans on next
+            // load — its reconcile pass self-gates on this pref + notification permission.
 
-        {permission !== 'granted' && (
-          <View style={st.permBanner}>
-            <Text style={st.permText}>
-              Push notifications are{' '}
-              {permission === 'denied' ? 'blocked' : 'not yet enabled'} for Ojo.
-            </Text>
-            <Pressable style={st.permBtn} onPress={handleRequestPermission}>
-              <Text style={st.permBtnText}>
-                {permission === 'denied' ? 'Open Settings' : 'Enable Notifications'}
-              </Text>
-            </Pressable>
-          </View>
-        )}
+            setSaved(true);
+            hapticSuccess();
+            setTimeout(() => setSaved(false), 3000);
+        } catch (err) {
+            setError(
+                getErrorMessage(err, 'Failed to save notification settings.'),
+            );
+        } finally {
+            setSaving(false);
+        }
+    };
 
-        <View style={st.section}>
-          <Text style={s.sectionLabel}>Daily</Text>
+    if (loading) return <Loading />;
 
-          <GlassCard style={st.card}>
-            <Row st={st}>
-              <RowLabel st={st}
-                title="Morning Outfit Brief"
-                subtitle="What to wear, and the weather that decided it. Built from your closet each morning."
-              />
-              <Switch
-                value={ns.morningBriefEnabled}
-                onValueChange={v => set('morningBriefEnabled', v)}
-                trackColor={{ false: colors.glassBorder, true: colors.toggleTrackActive }}
-                thumbColor={ns.morningBriefEnabled ? colors.toggleThumbActive : colors.textMuted}
-              />
-            </Row>
+    const anyEnabled =
+        ns.morningBriefEnabled ||
+        ns.weatherChangeEnabled ||
+        ns.tempSwingEnabled ||
+        ns.closetGapEnabled ||
+        ns.weeklyRecapEnabled ||
+        ns.tripPackingEnabled ||
+        ns.tripModeMorningEnabled ||
+        ns.sameDayNudgeEnabled;
 
-            {ns.morningBriefEnabled && (
-              <View style={st.subConfig}>
-                <Text style={st.subLabel}>Send at</Text>
-                <ChipRow s={s}
-                  options={HOUR_OPTIONS}
-                  selected={localHour}
-                  onSelect={setLocalHour}
-                  labelFn={HOUR_LABEL}
-                />
-
-                {/* Shows the copy actually queued for the next brief, so the
-                    promise in the subtitle is verifiable before committing to a
-                    week of them. Quoted rather than dressed up as a fake lock
-                    screen — the fidelity is in the words, not the chrome. */}
-                <Text style={[st.subLabel, st.previewLabel]}>Next brief</Text>
-                {preview ? (
-                  <View style={st.preview}>
-                    <Text style={st.previewTitle}>{preview.title}</Text>
-                    <Text style={st.previewBody}>{preview.body}</Text>
-                  </View>
-                ) : (
-                  <Text style={s.hint}>
-                    Your first brief is ready once Ojo next loads your weather.
-                  </Text>
-                )}
-              </View>
-            )}
-          </GlassCard>
-
-          <GlassCard style={st.card}>
-            <Row st={st}>
-              <RowLabel st={st}
-                title="Temperature Swing Warning"
-                subtitle="Alerts you to dress in layers when the daily swing is large."
-              />
-              <Switch
-                value={ns.tempSwingEnabled}
-                onValueChange={v => set('tempSwingEnabled', v)}
-                trackColor={{ false: colors.glassBorder, true: colors.toggleTrackActive }}
-                thumbColor={ns.tempSwingEnabled ? colors.toggleThumbActive : colors.textMuted}
-              />
-            </Row>
-
-            {ns.tempSwingEnabled && (
-              <View style={st.subConfig}>
-                <View style={s.sliderMeta}>
-                  <Text style={st.subLabel}>Alert when swing exceeds</Text>
-                  <Text style={s.sliderValue}>{ns.tempSwingThresholdF}°F</Text>
-                </View>
-                <Slider
-                  style={{ width: '100%', height: 36 }}
-                  minimumValue={10}
-                  maximumValue={40}
-                  step={5}
-                  value={ns.tempSwingThresholdF}
-                  onValueChange={v => set('tempSwingThresholdF', v)}
-                  minimumTrackTintColor={colors.toggleThumbActive}
-                  maximumTrackTintColor={colors.glassBorder}
-                  thumbTintColor={colors.toggleThumbActive}
-                />
-              </View>
-            )}
-          </GlassCard>
-        </View>
-
-        <View style={st.section}>
-          <Text style={s.sectionLabel}>Alerts</Text>
-
-          <GlassCard style={st.card}>
-            <Row st={st}>
-              <RowLabel st={st}
-                title="Weather Change Alert"
-                subtitle="Notifies you in the afternoon if rain or a cold front moves in unexpectedly."
-              />
-              <Switch
-                value={ns.weatherChangeEnabled}
-                onValueChange={v => set('weatherChangeEnabled', v)}
-                trackColor={{ false: colors.glassBorder, true: colors.toggleTrackActive }}
-                thumbColor={ns.weatherChangeEnabled ? colors.toggleThumbActive : colors.textMuted}
-              />
-            </Row>
-          </GlassCard>
-
-          <GlassCard style={st.card}>
-            <Row st={st}>
-              <RowLabel st={st}
-                title="Closet Gap Nudge"
-                subtitle="Suggests adding missing items when your closet lacks gear for the forecast."
-              />
-              <Switch
-                value={ns.closetGapEnabled}
-                onValueChange={v => set('closetGapEnabled', v)}
-                trackColor={{ false: colors.glassBorder, true: colors.toggleTrackActive }}
-                thumbColor={ns.closetGapEnabled ? colors.toggleThumbActive : colors.textMuted}
-              />
-            </Row>
-          </GlassCard>
-        </View>
-
-        <View style={st.section}>
-          <Text style={s.sectionLabel}>Trips</Text>
-
-          <GlassCard style={st.card}>
-            <Row st={st}>
-              <RowLabel st={st}
-                title="Trip Packing Reminder"
-                subtitle="Reminds you to check your TripFit packing list a week out and again 2 days before each trip."
-              />
-              <Switch
-                value={ns.tripPackingEnabled}
-                onValueChange={v => set('tripPackingEnabled', v)}
-                trackColor={{ false: colors.glassBorder, true: colors.toggleTrackActive }}
-                thumbColor={ns.tripPackingEnabled ? colors.toggleThumbActive : colors.textMuted}
-              />
-            </Row>
-          </GlassCard>
-
-          <GlassCard style={st.card}>
-            <Row st={st}>
-              <RowLabel st={st}
-                title="Trip Mode Morning Outfit"
-                subtitle="While you're on a trip, a morning nudge points you to the outfit you planned for that day."
-              />
-              <Switch
-                value={ns.tripModeMorningEnabled}
-                onValueChange={v => set('tripModeMorningEnabled', v)}
-                trackColor={{ false: colors.glassBorder, true: colors.toggleTrackActive }}
-                thumbColor={ns.tripModeMorningEnabled ? colors.toggleThumbActive : colors.textMuted}
-              />
-            </Row>
-          </GlassCard>
-        </View>
-
-        <View style={st.section}>
-          <Text style={s.sectionLabel}>Weekly</Text>
-
-          <GlassCard style={st.card}>
-            <Row st={st}>
-              <RowLabel st={st}
-                title="Weekly Wardrobe Recap"
-                subtitle="A weekly prompt to review your outfit history and discover new combinations."
-              />
-              <Switch
-                value={ns.weeklyRecapEnabled}
-                onValueChange={v => set('weeklyRecapEnabled', v)}
-                trackColor={{ false: colors.glassBorder, true: colors.toggleTrackActive }}
-                thumbColor={ns.weeklyRecapEnabled ? colors.toggleThumbActive : colors.textMuted}
-              />
-            </Row>
-
-            {ns.weeklyRecapEnabled && (
-              <View style={st.subConfig}>
-                <Text style={st.subLabel}>Send on</Text>
-                <ChipRow s={s}
-                  options={[0, 1, 2, 3, 4, 5, 6]}
-                  selected={ns.weeklyRecapDay}
-                  onSelect={v => set('weeklyRecapDay', v)}
-                  labelFn={v => DAY_LABELS[v]}
-                />
-              </View>
-            )}
-          </GlassCard>
-        </View>
-
-        {error !== '' && (
-          <View style={[s.statusMsg, s.error]}>
-            <Text style={{ color: colors.errorText, fontFamily: fonts.body, fontSize: 13 }}>
-              {error}
-            </Text>
-          </View>
-        )}
-        {saved && (
-          <View style={[s.statusMsg, s.success]}>
-            <Text style={{ color: colors.successText, fontFamily: fonts.body, fontSize: 13 }}>
-              Notification settings saved.
-            </Text>
-          </View>
-        )}
-
-        <Pressable
-          style={[s.saveBtn, (saving || !anyEnabled) && s.saveBtnDisabled]}
-          onPress={handleSave}
-          disabled={saving}
+    return (
+        <SafeAreaView
+            style={st.root}
+            edges={['bottom']}
         >
-          {saving
-            ? <Animated.View style={{ width: 20, height: 20, transform: [{ rotate: savingRotate }] }}>
-                <SunnyIcon size={20} />
-              </Animated.View>
-            : <Text style={s.saveBtnText}>Save Changes</Text>
-          }
-        </Pressable>
+            <ScrollView contentContainerStyle={st.content}>
+                {permission !== 'granted' && (
+                    <View style={st.permBanner}>
+                        <Text style={st.permText}>
+                            Push notifications are{' '}
+                            {permission === 'denied'
+                                ? 'blocked'
+                                : 'not yet enabled'}{' '}
+                            for Ojo.
+                        </Text>
+                        <Pressable
+                            style={st.permBtn}
+                            onPress={handleRequestPermission}
+                            accessibilityRole='button'
+                            accessibilityLabel={
+                                permission === 'denied'
+                                    ? 'Open Settings'
+                                    : 'Enable Notifications'
+                            }
+                        >
+                            <Text style={st.permBtnText}>
+                                {permission === 'denied'
+                                    ? 'Open Settings'
+                                    : 'Enable Notifications'}
+                            </Text>
+                        </Pressable>
+                    </View>
+                )}
 
-        <Text style={[s.hint, { textAlign: 'center' }]}>
-          All notifications need permission to reach you.{'\n'}
-          Morning Brief and Weekly Recap are prepared on your device — open Ojo
-          now and then to keep them current.
-        </Text>
+                <View style={st.section}>
+                    <Text style={s.sectionLabel}>Daily</Text>
 
-      </ScrollView>
-    </SafeAreaView>
-  );
+                    <GlassCard style={st.card}>
+                        <Row st={st}>
+                            <RowLabel
+                                st={st}
+                                title='Morning Outfit Brief'
+                                subtitle='What to wear, and the weather that decided it. Built from your closet each morning.'
+                            />
+                            <Switch
+                                value={ns.morningBriefEnabled}
+                                onValueChange={(v) =>
+                                    set('morningBriefEnabled', v)
+                                }
+                                trackColor={{
+                                    false: colors.glassBorder,
+                                    true: colors.toggleTrackActive,
+                                }}
+                                thumbColor={
+                                    ns.morningBriefEnabled
+                                        ? colors.toggleThumbActive
+                                        : colors.textMuted
+                                }
+                                accessibilityLabel='Morning Outfit Brief'
+                            />
+                        </Row>
+
+                        {ns.morningBriefEnabled && (
+                            <View style={st.subConfig}>
+                                <Text style={st.subLabel}>Send at</Text>
+                                <ChipRow
+                                    s={s}
+                                    options={HOUR_OPTIONS}
+                                    selected={localHour}
+                                    onSelect={setLocalHour}
+                                    labelFn={HOUR_LABEL}
+                                />
+                            </View>
+                        )}
+                    </GlassCard>
+
+                    <GlassCard style={st.card}>
+                        <Row st={st}>
+                            <RowLabel
+                                st={st}
+                                title='Temperature Swing Warning'
+                                subtitle='Alerts you to dress in layers when the daily swing is large.'
+                            />
+                            <Switch
+                                value={ns.tempSwingEnabled}
+                                onValueChange={(v) =>
+                                    set('tempSwingEnabled', v)
+                                }
+                                trackColor={{
+                                    false: colors.glassBorder,
+                                    true: colors.toggleTrackActive,
+                                }}
+                                thumbColor={
+                                    ns.tempSwingEnabled
+                                        ? colors.toggleThumbActive
+                                        : colors.textMuted
+                                }
+                                accessibilityLabel='Temperature Swing Warning'
+                            />
+                        </Row>
+
+                        {ns.tempSwingEnabled && (
+                            <View style={st.subConfig}>
+                                <View style={s.sliderMeta}>
+                                    <Text style={st.subLabel}>
+                                        Alert when swing exceeds
+                                    </Text>
+                                    <Text style={s.sliderValue}>
+                                        {ns.tempSwingThresholdF}°F
+                                    </Text>
+                                </View>
+                                <Slider
+                                    style={{ width: '100%', height: 36 }}
+                                    minimumValue={10}
+                                    maximumValue={40}
+                                    step={5}
+                                    value={ns.tempSwingThresholdF}
+                                    onValueChange={(v) =>
+                                        set('tempSwingThresholdF', v)
+                                    }
+                                    minimumTrackTintColor={
+                                        colors.toggleThumbActive
+                                    }
+                                    maximumTrackTintColor={colors.glassBorder}
+                                    thumbTintColor={colors.toggleThumbActive}
+                                />
+                            </View>
+                        )}
+                    </GlassCard>
+                </View>
+
+                <View style={st.section}>
+                    <Text style={s.sectionLabel}>Alerts</Text>
+
+                    <GlassCard style={st.card}>
+                        <Row st={st}>
+                            <RowLabel
+                                st={st}
+                                title='Weather Change Alert'
+                                subtitle='Notifies you in the afternoon if rain or a cold front moves in unexpectedly.'
+                            />
+                            <Switch
+                                value={ns.weatherChangeEnabled}
+                                onValueChange={(v) =>
+                                    set('weatherChangeEnabled', v)
+                                }
+                                trackColor={{
+                                    false: colors.glassBorder,
+                                    true: colors.toggleTrackActive,
+                                }}
+                                thumbColor={
+                                    ns.weatherChangeEnabled
+                                        ? colors.toggleThumbActive
+                                        : colors.textMuted
+                                }
+                                accessibilityLabel='Weather Change Alert'
+                            />
+                        </Row>
+                    </GlassCard>
+
+                    <GlassCard style={st.card}>
+                        <Row st={st}>
+                            <RowLabel
+                                st={st}
+                                title='Same-Day Weather Nudge'
+                                subtitle="A precise heads-up — with the exact layer to change — the moment today's forecast actually shifts."
+                            />
+                            <Switch
+                                value={ns.sameDayNudgeEnabled}
+                                onValueChange={(v) =>
+                                    set('sameDayNudgeEnabled', v)
+                                }
+                                trackColor={{
+                                    false: colors.glassBorder,
+                                    true: colors.toggleTrackActive,
+                                }}
+                                thumbColor={
+                                    ns.sameDayNudgeEnabled
+                                        ? colors.toggleThumbActive
+                                        : colors.textMuted
+                                }
+                                accessibilityLabel='Same-Day Weather Nudge'
+                            />
+                        </Row>
+
+                        {ns.sameDayNudgeEnabled && ns.weatherChangeEnabled && (
+                            <Text style={[s.hint, st.subConfig]}>
+                                Weather Change Alert is also on — you may get
+                                two alerts about the same shift. That one fires
+                                at a fixed afternoon time; this one fires at the
+                                actual hour.
+                            </Text>
+                        )}
+                    </GlassCard>
+
+                    <GlassCard style={st.card}>
+                        <Row st={st}>
+                            <RowLabel
+                                st={st}
+                                title='Closet Gap Nudge'
+                                subtitle='Suggests adding missing items when your closet lacks gear for the forecast.'
+                            />
+                            <Switch
+                                value={ns.closetGapEnabled}
+                                onValueChange={(v) =>
+                                    set('closetGapEnabled', v)
+                                }
+                                trackColor={{
+                                    false: colors.glassBorder,
+                                    true: colors.toggleTrackActive,
+                                }}
+                                thumbColor={
+                                    ns.closetGapEnabled
+                                        ? colors.toggleThumbActive
+                                        : colors.textMuted
+                                }
+                                accessibilityLabel='Closet Gap Nudge'
+                            />
+                        </Row>
+                    </GlassCard>
+                </View>
+
+                <View style={st.section}>
+                    <Text style={s.sectionLabel}>Trips</Text>
+
+                    <GlassCard style={st.card}>
+                        <Row st={st}>
+                            <RowLabel
+                                st={st}
+                                title='Trip Packing Reminder'
+                                subtitle='Reminds you to check your TripFit packing list a week out and again 2 days before each trip.'
+                            />
+                            <Switch
+                                value={ns.tripPackingEnabled}
+                                onValueChange={(v) =>
+                                    set('tripPackingEnabled', v)
+                                }
+                                trackColor={{
+                                    false: colors.glassBorder,
+                                    true: colors.toggleTrackActive,
+                                }}
+                                thumbColor={
+                                    ns.tripPackingEnabled
+                                        ? colors.toggleThumbActive
+                                        : colors.textMuted
+                                }
+                                accessibilityLabel='Trip Packing Reminder'
+                            />
+                        </Row>
+                    </GlassCard>
+
+                    <GlassCard style={st.card}>
+                        <Row st={st}>
+                            <RowLabel
+                                st={st}
+                                title='Trip Mode Morning Outfit'
+                                subtitle="While you're on a trip, a morning nudge points you to the outfit you planned for that day."
+                            />
+                            <Switch
+                                value={ns.tripModeMorningEnabled}
+                                onValueChange={(v) =>
+                                    set('tripModeMorningEnabled', v)
+                                }
+                                trackColor={{
+                                    false: colors.glassBorder,
+                                    true: colors.toggleTrackActive,
+                                }}
+                                thumbColor={
+                                    ns.tripModeMorningEnabled
+                                        ? colors.toggleThumbActive
+                                        : colors.textMuted
+                                }
+                                accessibilityLabel='Trip Mode Morning Outfit'
+                            />
+                        </Row>
+                    </GlassCard>
+                </View>
+
+                <View style={st.section}>
+                    <Text style={s.sectionLabel}>Weekly</Text>
+
+                    <GlassCard style={st.card}>
+                        <Row st={st}>
+                            <RowLabel
+                                st={st}
+                                title='Weekly Wardrobe Recap'
+                                subtitle='A weekly prompt to review your outfit history and discover new combinations.'
+                            />
+                            <Switch
+                                value={ns.weeklyRecapEnabled}
+                                onValueChange={(v) =>
+                                    set('weeklyRecapEnabled', v)
+                                }
+                                trackColor={{
+                                    false: colors.glassBorder,
+                                    true: colors.toggleTrackActive,
+                                }}
+                                thumbColor={
+                                    ns.weeklyRecapEnabled
+                                        ? colors.toggleThumbActive
+                                        : colors.textMuted
+                                }
+                                accessibilityLabel='Weekly Wardrobe Recap'
+                            />
+                        </Row>
+
+                        {ns.weeklyRecapEnabled && (
+                            <View style={st.subConfig}>
+                                <Text style={st.subLabel}>Send on</Text>
+                                <ChipRow
+                                    s={s}
+                                    options={[0, 1, 2, 3, 4, 5, 6]}
+                                    selected={ns.weeklyRecapDay}
+                                    onSelect={(v) => set('weeklyRecapDay', v)}
+                                    labelFn={(v) => DAY_LABELS[v]}
+                                />
+                            </View>
+                        )}
+                    </GlassCard>
+                </View>
+
+                {error !== '' && (
+                    <View style={[s.statusMsg, s.error]}>
+                        <Text
+                            style={{
+                                color: colors.errorText,
+                                fontFamily: fonts.body,
+                                fontSize: 13,
+                            }}
+                        >
+                            {error}
+                        </Text>
+                    </View>
+                )}
+                {saved && (
+                    <View style={[s.statusMsg, s.success]}>
+                        <Text
+                            style={{
+                                color: colors.successText,
+                                fontFamily: fonts.body,
+                                fontSize: 13,
+                            }}
+                        >
+                            Notification settings saved.
+                        </Text>
+                    </View>
+                )}
+
+                <Pressable
+                    style={[
+                        s.saveBtn,
+                        (saving || !anyEnabled) && s.saveBtnDisabled,
+                    ]}
+                    onPress={handleSave}
+                    disabled={saving}
+                    accessibilityRole='button'
+                    accessibilityLabel={saving ? 'Saving' : 'Save Changes'}
+                    accessibilityState={{
+                        busy: saving,
+                        disabled: saving || !anyEnabled,
+                    }}
+                >
+                    {saving ? (
+                        <Animated.View
+                            style={{
+                                width: 20,
+                                height: 20,
+                                transform: [{ rotate: savingRotate }],
+                            }}
+                        >
+                            <SunnyIcon
+                                size={20}
+                                decorative
+                            />
+                        </Animated.View>
+                    ) : (
+                        <Text style={s.saveBtnText}>Save Changes</Text>
+                    )}
+                </Pressable>
+
+                <Text style={[s.hint, { textAlign: 'center' }]}>
+                    All notifications need permission to reach you.{'\n'}
+                    Morning Brief and Weekly Recap are prepared on your device —
+                    open Ojo now and then to keep them current.
+                </Text>
+            </ScrollView>
+        </SafeAreaView>
+    );
 }

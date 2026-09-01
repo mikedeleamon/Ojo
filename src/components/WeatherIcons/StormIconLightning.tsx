@@ -373,6 +373,7 @@ interface StormIconLightningProps {
      * with showBolts={false} showFlash={false}. Default 'storm'.
      */
     rainVariant?: 'storm' | 'light' | 'drizzle';
+    decorative?: boolean;
 }
 
 export default function StormIconLightning({
@@ -387,6 +388,7 @@ export default function StormIconLightning({
     showFlash = false,
     rainAngle = 0.12,
     rainVariant = 'storm',
+    decorative = false,
 }: StormIconLightningProps) {
     const reduceMotion = useReduceMotion();
     const animateOn = animate && !reduceMotion;
@@ -401,7 +403,12 @@ export default function StormIconLightning({
     const height = fullHeight ? screenHeight : size;
 
     return (
-        <View style={{ width, height }} accessibilityLabel="Storm">
+        <View
+            style={{ width, height }}
+            accessibilityLabel="Storm"
+            accessibilityElementsHidden={decorative}
+            importantForAccessibility={decorative ? 'no' : 'auto'}
+        >
             {/* Cloud — static, sits at the bottom of the stack */}
             {showCloud && (
                 <Svg viewBox={`0 0 ${vbW} ${vbH}`} width={width} height={height}>

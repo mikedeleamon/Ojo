@@ -30,6 +30,7 @@ export const NOTIF_DEFAULTS: NotificationSettings = {
   weeklyRecapDay:       0,    // Sunday
   tripPackingEnabled:   false,
   tripModeMorningEnabled: false,
+  sameDayNudgeEnabled:  false,
 };
 
 // ─── Permissions ──────────────────────────────────────────────────────────────
@@ -379,7 +380,7 @@ export const scheduleTripMorningNotifications = async (
 // normal use the near days are always freshly generated.
 //
 // iOS caps pending local notifications at 64. Budget: 7 here + up to 14 Trip Mode
-// + 2 per trip plan + 1 recap.
+// + 2 per trip plan + 1 recap + up to 2 same-day nudges.
 
 export const BRIEF_WINDOW_DAYS = 7;
 
@@ -504,5 +505,95 @@ export const reconcileMorningBriefs = async (): Promise<void> => {
   } catch {
     // Best-effort — leave the existing window alone rather than cancelling on a
     // transient network failure.
+  }
+};
+
+// ─── Same-Day Weather Nudge ────────────────────────────────────────────────────
+// A same-day DATE trigger fired at the actual clock hour buildTimeline flags a
+// real change (a temp swing crossing, rain starting or clearing) — not the
+// Morning Brief's once-a-day, fixed-hour check-in. Scheduled off the live outfit
+// generation that already runs in OutfitSuggestion (see
+// useSameDayNudgeScheduler), so there's no separate fetch here — filtering and
+// content live in lib/sameDayNudge.ts, this file only knows how to schedule/
+// cancel what it's handed, same division as the Brief.
+//
+// Distinct from weatherChangeEnabled: that's an existing server-side cron fixed
+// to 2pm UTC with no per-user hour precision. A user with both toggles on can get
+// two pushes about the same event — flagged in NotificationsScreen, not resolved
+// here.
+
+const SAME_DAY_NUDGE_PREFIX = 'ojo_samedaynudge_';
+
+// idx guards two candidates sharing an hour (e.g. rain starts and a temp
+// threshold cross in the same clock hour) from colliding on one identifier.
+const sameDayNudgeId = (dateISO: string, hour: number, idx: number) =>
+  `${SAME_DAY_NUDGE_PREFIX}${dateISO}_${hour}_${idx}`;
+
+export interface SameDayNudgeItem {
+  /** Local calendar date, yyyy-mm-dd — always "today" in practice. */
+  dateISO: string;
+  /** 0–23 local wall-clock hour to fire at. */
+  hour:  number;
+  title: string;
+  body:  string;
+}
+
+/** Cancel every scheduled Same-Day Weather Nudge. */
+export const cancelSameDayNudges = async (): Promise<void> =>
+  cancelByPrefix(SAME_DAY_NUDGE_PREFIX);
+
+/**
+ * (Re)schedule today's nudges.
+ *
+ * Always cancels first, so calling this on every sync replaces the set rather
+ * than stacking duplicates on top of it — same pattern as scheduleMorningBriefs.
+ *
+ * Returns the number scheduled.
+ */
+export const scheduleSameDayNudges = async (items: SameDayNudgeItem[]): Promise<number> => {
+  await cancelByPrefix(SAME_DAY_NUDGE_PREFIX);
+
+  if (items.length === 0) return 0;
+
+  const { status } = await Notifications.getPermissionsAsync();
+  if (status !== 'granted') return 0;
+
+  const now = new Date();
+  let scheduled = 0;
+
+  for (const [idx, item] of items.entries()) {
+    const fireAt = new Date(item.dateISO + 'T00:00:00');
+    if (isNaN(fireAt.getTime())) continue;
+    fireAt.setHours(item.hour, 0, 0, 0);
+    if (fireAt <= now) continue; // the step's hour already passed
+
+    await Notifications.scheduleNotificationAsync({
+      identifier: sameDayNudgeId(item.dateISO, item.hour, idx),
+      content: {
+        title: item.title,
+        body: item.body,
+        data: { url: 'ojo://outfit' },
+      },
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: fireAt },
+    }).catch(() => {});
+
+    scheduled++;
+  }
+
+  return scheduled;
+};
+
+/**
+ * Drop today's nudges if the feature was turned off on another device — same
+ * cross-device-off reasoning as reconcileMorningBriefs. Only ever cancels;
+ * re-scheduling needs the live outfit generation only the home screen has.
+ */
+export const reconcileSameDayNudges = async (): Promise<void> => {
+  if (!getToken()) return;
+  try {
+    const { data } = await axios.get('/api/notifications/settings', authHeaders());
+    if (!data?.sameDayNudgeEnabled) await cancelSameDayNudges();
+  } catch {
+    // Best-effort — leave the existing schedule alone on a transient failure.
   }
 };

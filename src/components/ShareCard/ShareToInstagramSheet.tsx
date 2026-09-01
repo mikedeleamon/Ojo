@@ -84,7 +84,12 @@ const ShareToInstagramSheet = ({
 
   return (
     <Modal visible={visible} transparent animationType='slide' onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel='Dismiss' />
+      <Pressable
+        style={styles.backdrop}
+        onPress={onClose}
+        accessibilityRole='button'
+        accessibilityLabel='Dismiss'
+      />
       <View style={styles.sheet}>
         {/* Grabber + scaled preview of the story card */}
         <View style={styles.grabber} />
@@ -100,7 +105,8 @@ const ShareToInstagramSheet = ({
             onPress={handleShare}
             disabled={capturing}
             accessibilityRole='button'
-            accessibilityLabel={igAvailable ? 'Share to Instagram Stories' : 'Share'}
+            accessibilityLabel={capturing ? 'Preparing' : (igAvailable ? 'Share to Instagram Stories' : 'Share')}
+            accessibilityState={{ busy: capturing, disabled: capturing }}
           >
             <Text style={styles.primaryBtnText}>
               {capturing
@@ -117,6 +123,7 @@ const ShareToInstagramSheet = ({
             disabled={capturing}
             accessibilityRole='button'
             accessibilityLabel='Save or share elsewhere'
+            accessibilityState={{ disabled: capturing }}
           >
             <Text style={styles.secondaryBtnText}>Save or share elsewhere…</Text>
           </Pressable>

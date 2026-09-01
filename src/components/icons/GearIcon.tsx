@@ -5,6 +5,9 @@ interface GearIconProps {
     height?: number;
     stroke?: string;
     strokeWidth?: number;
+    /** Already decorative by default — no label of its own, meant to sit
+     *  inside an already-labeled control. Pass false to expose it. */
+    decorative?: boolean;
 }
 
 const GearIcon = ({
@@ -12,6 +15,7 @@ const GearIcon = ({
     height = 22,
     stroke = 'rgba(255,255,255,0.85)',
     strokeWidth = 1.5,
+    decorative = true,
 }: GearIconProps) => (
     <Svg
         width={width}
@@ -22,8 +26,8 @@ const GearIcon = ({
         strokeWidth={strokeWidth}
         strokeLinecap='round'
         strokeLinejoin='round'
-        accessibilityElementsHidden={true}
-        importantForAccessibility="no"
+        accessibilityElementsHidden={decorative}
+        importantForAccessibility={decorative ? 'no' : 'auto'}
     >
         <Circle
             cx={12}

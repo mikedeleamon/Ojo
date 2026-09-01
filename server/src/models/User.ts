@@ -40,6 +40,7 @@ export interface INotificationSettings {
   closetGapEnabled:       boolean;
   weeklyRecapEnabled:     boolean;
   weeklyRecapDay:         number;
+  sameDayNudgeEnabled:    boolean;
 }
 
 export interface IMorningSnapshot {
@@ -118,6 +119,7 @@ const notificationSettingsSchema = new Schema<INotificationSettings>({
   closetGapEnabled:     { type: Boolean, default: false },
   weeklyRecapEnabled:   { type: Boolean, default: false },
   weeklyRecapDay:       { type: Number,  default: 0 },
+  sameDayNudgeEnabled:  { type: Boolean, default: false },
 }, { _id: false });
 
 const morningSnapshotSchema = new Schema<IMorningSnapshot>({

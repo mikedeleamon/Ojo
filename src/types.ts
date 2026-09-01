@@ -219,6 +219,11 @@ export interface NotificationSettings {
   tripPackingEnabled:     boolean;
   /** Morning "here's today's trip outfit" nudge during a trip. Stored locally. */
   tripModeMorningEnabled: boolean;
+  /** Clock-hour-precise push for a same-day temp swing or rain start/stop from
+   *  today's layering timeline. Separate from tempSwingEnabled (Morning Brief
+   *  copy only) and weatherChangeEnabled (server cron, fixed 2pm UTC) — see
+   *  lib/sameDayNudge.ts. */
+  sameDayNudgeEnabled:    boolean;
 }
 
 /** Weather + settings snapshot captured when an outfit is logged as worn.

@@ -9,11 +9,19 @@ const CLOUD_D =
 interface PartlyCloudyNightIconProps {
     size?: number;
     color?: string;
+    decorative?: boolean;
 }
 
-export default function PartlyCloudyNightIcon({ size = 180, color = '#fefefe' }: PartlyCloudyNightIconProps) {
+export default function PartlyCloudyNightIcon({ size = 180, color = '#fefefe', decorative = false }: PartlyCloudyNightIconProps) {
     return (
-        <Svg viewBox="0 0 1280 1280" width={size} height={size} accessibilityLabel="Partly cloudy night">
+        <Svg
+            viewBox="0 0 1280 1280"
+            width={size}
+            height={size}
+            accessibilityLabel="Partly cloudy night"
+            accessibilityElementsHidden={decorative}
+            importantForAccessibility={decorative ? 'no' : 'auto'}
+        >
             <Path id="cloud" fill={color} d={CLOUD_D} />
         </Svg>
     );

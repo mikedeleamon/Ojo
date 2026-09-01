@@ -110,6 +110,7 @@ const ThumbImage = ({
                     style={{ width: size, height: size }}
                     resizeMode='cover'
                     onError={() => setErr(true)}
+                    accessibilityLabel={articleDisplayName(article)}
                 />
             ) : (
                 <HangerIcon size={size * 0.4} color={colors.textMuted} decorative />
@@ -168,6 +169,7 @@ const DayCard = ({
                         phrase={plan.day.dayPhrase}
                         size={16}
                         color={colors.textSecondary}
+                        decorative
                     />
                     <Text style={[dayCardSt.dateLabel, { color: colors.textSecondary }]}>
                         {fmtDate(plan.day.date)}
@@ -204,7 +206,8 @@ const DayCard = ({
                         disabled={isReplanning}
                         style={dayCardSt.replanInner}
                         accessibilityRole='button'
-                        accessibilityLabel='Replan this day'
+                        accessibilityLabel={isReplanning ? 'Replanning this day' : 'Replan this day'}
+                        accessibilityState={{ busy: isReplanning }}
                         hitSlop={8}
                     >
                         {isReplanning ? (
@@ -227,7 +230,7 @@ const DayCard = ({
                         accessibilityLabel='Share this day to Instagram'
                         hitSlop={8}
                     >
-                        <CameraIcon size={16} color={colors.textSecondary} />
+                        <CameraIcon size={16} color={colors.textSecondary} decorative />
                     </Pressable>
                 </GlassCard>
             </GlassCard>
@@ -982,6 +985,7 @@ export default function TripPlanner({
                         onBlur={onRenameSubmit}
                         returnKeyType='done'
                         autoCapitalize='words'
+                        accessibilityLabel='Trip name'
                     />
                 </View>
 
@@ -1063,7 +1067,8 @@ export default function TripPlanner({
                                     onPress={onSaveForLater}
                                     disabled={savingPending || days === 0}
                                     accessibilityRole='button'
-                                    accessibilityLabel='Save trip for later'
+                                    accessibilityLabel={savingPending ? 'Saving trip for later' : 'Save trip for later'}
+                                    accessibilityState={{ busy: savingPending, disabled: savingPending || days === 0 }}
                                 >
                                     {savingPending ? (
                                         <ActivityIndicator color={colors.saveBtnText} />
@@ -1084,7 +1089,8 @@ export default function TripPlanner({
                                 onPress={onPlan}
                                 disabled={loading || days === 0}
                                 accessibilityRole='button'
-                                accessibilityLabel='Plan trip'
+                                accessibilityLabel={loading ? 'Planning trip' : 'Plan trip'}
+                                accessibilityState={{ busy: loading, disabled: loading || days === 0 }}
                             >
                                 {loading ? (
                                     <ActivityIndicator color={colors.saveBtnText} />
@@ -1093,7 +1099,7 @@ export default function TripPlanner({
                                         <Text style={[st.planBtnText, { color: colors.saveBtnText }]}>
                                             Plan my trip
                                         </Text>
-                                        <PlaneIcon size={16} color={colors.saveBtnText} />
+                                        <PlaneIcon size={16} color={colors.saveBtnText} decorative />
                                     </RNView>
                                 )}
                             </Pressable>
@@ -1260,6 +1266,7 @@ export default function TripPlanner({
                                             ]}
                                             accessibilityRole='button'
                                             accessibilityLabel={`Day ${i + 1}`}
+                                            accessibilityState={{ selected: i === activeIdx }}
                                         />
                                     ))}
                                 </GlassCard>

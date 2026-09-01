@@ -44,6 +44,7 @@ interface Props {
      * invisible on the light day-cards, so those call sites must pass a token.
      */
     color?: string;
+    decorative?: boolean;
 }
 
 const PhraseWeatherIcon = ({
@@ -51,22 +52,23 @@ const PhraseWeatherIcon = ({
     size = 20,
     isDay = true,
     color = '#fefefe',
+    decorative = false,
 }: Props) => {
     switch (iconTypeFor(phrase ?? '', isDay)) {
         case 'storm':
-            return <StormIcon size={size} color={color} />;
+            return <StormIcon size={size} color={color} decorative={decorative} />;
         case 'snow':
-            return <SnowIcon size={size} color={color} />;
+            return <SnowIcon size={size} color={color} decorative={decorative} />;
         case 'rainy':
-            return <RainyIcon size={size} color={color} animate={false} />;
+            return <RainyIcon size={size} color={color} animate={false} decorative={decorative} />;
         case 'cloudy':
-            return <CloudyIcon size={size} color={color} />;
+            return <CloudyIcon size={size} color={color} decorative={decorative} />;
         case 'partly-cloudy':
             return (
-                <PartlyCloudyIcon size={size} color={color} animate={false} />
+                <PartlyCloudyIcon size={size} color={color} animate={false} decorative={decorative} />
             );
         case 'partly-cloudy-night':
-            return <PartlyCloudyNightIcon size={size} color={color} />;
+            return <PartlyCloudyNightIcon size={size} color={color} decorative={decorative} />;
         case 'clear-night':
             return (
                 <ClearNightIcon
@@ -74,11 +76,12 @@ const PhraseWeatherIcon = ({
                     color={color}
                     starCount={6}
                     animate={false}
+                    decorative={decorative}
                 />
             );
         case 'sunny':
         default:
-            return <SunnyIcon size={size} color={color} />;
+            return <SunnyIcon size={size} color={color} decorative={decorative} />;
     }
 };
 

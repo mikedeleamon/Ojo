@@ -433,13 +433,43 @@ func timelineActionIcon(_ action: String) -> String {
 struct TimelineStripView: View {
   let steps: [WidgetSnapshot.TimelineStep]
 
+  /// Chronological by actual hour when every step carries one — true for any
+  /// snapshot written since buildTimeline() started attaching `hour`. A step
+  /// from a snapshot cached before that (hour == nil) falls back to the order
+  /// the JS side already sent — buildTimeline already sorts before capping,
+  /// so this is a safety net, not the primary ordering path.
+  private var ordered: [WidgetSnapshot.TimelineStep] {
+    steps.allSatisfy { $0.hour != nil } ? steps.sorted { $0.hour! < $1.hour! } : steps
+  }
+
+  /// Gap before a step, tiered by how many hours separate it from the
+  /// previous one — two steps an hour apart read as adjacent, a morning step
+  /// and an evening step read as far apart. The same relationship the
+  /// draggable full-day scrubber (LayeringTimelineScrubber.example.tsx) shows
+  /// continuously; this is the same idea rationed to WidgetKit's static,
+  /// space-constrained row. Falls back to the original fixed 4pt gap when
+  /// either side is missing an hour (older cached snapshot) — same reasoning
+  /// as `ordered` above.
+  private func gapBefore(_ index: Int, in steps: [WidgetSnapshot.TimelineStep]) -> CGFloat {
+    guard index > 0, let h = steps[index].hour, let prev = steps[index - 1].hour else { return 4 }
+    switch h - prev {
+    case ..<2:  return 4
+    case 2..<5: return 9
+    case 5..<9: return 15
+    default:    return 20
+    }
+  }
+
   var body: some View {
-    HStack(spacing: 4) {
+    let steps = ordered
+    HStack(spacing: 0) {
       ForEach(Array(steps.enumerated()), id: \.element.id) { index, step in
         if index > 0 {
           Image(systemName: "chevron.right")
             .font(.system(size: 8, weight: .bold))
             .foregroundStyle(.white.opacity(0.5))
+            .padding(.leading, gapBefore(index, in: steps))
+            .padding(.trailing, 4)
         }
         HStack(spacing: 3) {
           Image(systemName: timelineActionIcon(step.action))

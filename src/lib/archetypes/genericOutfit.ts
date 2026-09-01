@@ -52,7 +52,7 @@ export interface GenericOutfit {
   /** The layering advice in prose. Empty when the day needs no layering. */
   recommendation: string;
   /** Morning/afternoon/evening steps on a variable day. */
-  timeline?: { time: string; action: string }[];
+  timeline?: { time: string; action: string; hour: number }[];
   /** Weather-driven notes (rain, UV, wind) — the same ones a real outfit gets. */
   notes: string[];
   /** Which climate shaped the answer. Surfaced in the copy. */

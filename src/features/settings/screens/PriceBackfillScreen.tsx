@@ -162,7 +162,12 @@ export default function PriceBackfillScreen() {
                       onPress={() => save(row)}
                       disabled={!valid || isSaving}
                       accessibilityRole="button"
-                      accessibilityLabel={`Save price for ${articleDisplayName(article)}`}
+                      accessibilityLabel={
+                        isSaving
+                          ? `Saving price for ${articleDisplayName(article)}`
+                          : `Save price for ${articleDisplayName(article)}`
+                      }
+                      accessibilityState={{ busy: isSaving, disabled: !valid || isSaving }}
                     >
                       {isSaving ? (
                         <ActivityIndicator size="small" color={colors.saveBtnText} />

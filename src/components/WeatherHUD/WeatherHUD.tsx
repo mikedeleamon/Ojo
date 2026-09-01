@@ -787,10 +787,16 @@ const WeatherHUD = ({
                 <Pressable
                     style={st.retryBtn}
                     onPress={() => onRefresh?.()}
+                    accessibilityRole='button'
+                    accessibilityLabel='Try again'
                 >
                     <Text style={st.retryBtnText}>Try again</Text>
                 </Pressable>
-                <Pressable onPress={() => nav.push('/account')}>
+                <Pressable
+                    onPress={() => nav.push('/account')}
+                    accessibilityRole='button'
+                    accessibilityLabel='Check settings'
+                >
                     <Text style={st.settingsLink}>Check settings</Text>
                 </Pressable>
             </View>
@@ -1140,7 +1146,7 @@ const WeatherHUD = ({
                                 accessibilityLabel='Share forecast to Instagram'
                             >
                                 <View style={st.shareForecastBtnRow}>
-                                    <CameraIcon size={15} color={colors.textSecondary} />
+                                    <CameraIcon size={15} color={colors.textSecondary} decorative />
                                     <Text style={st.shareForecastBtnText}>
                                         Share forecast
                                     </Text>
@@ -1185,12 +1191,13 @@ const WeatherHUD = ({
                                 <Pressable
                                     onPress={onOpenLocations}
                                     accessibilityLabel='Switch location'
+                                    accessibilityRole='button'
                                     style={({ pressed }) => [
                                         st.locationsBtnInner,
                                         { opacity: pressed ? 0.6 : 1 },
                                     ]}
                                 >
-                                    <LocationsIcon />
+                                    <LocationsIcon decorative />
                                 </Pressable>
                             </GlassCard>
                         ) : (
@@ -1239,12 +1246,13 @@ const WeatherHUD = ({
                             <Pressable
                                 onPress={() => nav.push('/account')}
                                 accessibilityLabel='Account settings'
+                                accessibilityRole='button'
                                 style={({ pressed }) => [
                                     st.gearBtnInner,
                                     { opacity: pressed ? 0.6 : 1 },
                                 ]}
                             >
-                                <GearIcon />
+                                <GearIcon decorative />
                             </Pressable>
                         </GlassCard>
                     </View>

@@ -21,9 +21,13 @@ interface GlyphProps {
     size?: number;
     color?: string;
     strokeWidth?: number;
+    /** Already decorative by default — these icons have no label of their
+     *  own and are meant to sit inside an already-labeled control. Pass
+     *  false to expose one to the accessibility tree. */
+    decorative?: boolean;
 }
 
-const base = (size: number, color: string, strokeWidth: number) => ({
+const base = (size: number, color: string, strokeWidth: number, decorative: boolean = true) => ({
     width: size,
     height: size,
     viewBox: '0 0 24 24',
@@ -32,8 +36,8 @@ const base = (size: number, color: string, strokeWidth: number) => ({
     strokeWidth,
     strokeLinecap: 'round' as const,
     strokeLinejoin: 'round' as const,
-    accessibilityElementsHidden: true,
-    importantForAccessibility: 'no' as const,
+    accessibilityElementsHidden: decorative,
+    importantForAccessibility: (decorative ? 'no' : 'auto') as 'no' | 'auto',
 });
 
 /** Paper plane — replaces ✈️ on trip/flight affordances. */
@@ -41,8 +45,9 @@ export const PlaneIcon = ({
     size = 16,
     color = 'rgba(255,255,255,0.85)',
     strokeWidth = 1.6,
+    decorative = true,
 }: GlyphProps) => (
-    <Svg {...base(size, color, strokeWidth)}>
+    <Svg {...base(size, color, strokeWidth, decorative)}>
         <Path d='M22 2 11 13' />
         <Path d='M22 2 15 22l-4-9-9-4z' />
     </Svg>
@@ -53,8 +58,9 @@ export const PinIcon = ({
     size = 16,
     color = 'rgba(255,255,255,0.85)',
     strokeWidth = 1.6,
+    decorative = true,
 }: GlyphProps) => (
-    <Svg {...base(size, color, strokeWidth)}>
+    <Svg {...base(size, color, strokeWidth, decorative)}>
         <Path d='M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z' />
         <Circle cx={12} cy={10} r={3} />
     </Svg>
@@ -65,8 +71,9 @@ export const RefreshIcon = ({
     size = 16,
     color = 'rgba(255,255,255,0.85)',
     strokeWidth = 1.6,
+    decorative = true,
 }: GlyphProps) => (
-    <Svg {...base(size, color, strokeWidth)}>
+    <Svg {...base(size, color, strokeWidth, decorative)}>
         <Path d='M23 4v6h-6' />
         <Path d='M1 20v-6h6' />
         <Path d='M3.51 9a9 9 0 0 1 14.85-3.36L23 10' />
@@ -79,8 +86,9 @@ export const GlobeIcon = ({
     size = 16,
     color = 'rgba(255,255,255,0.85)',
     strokeWidth = 1.6,
+    decorative = true,
 }: GlyphProps) => (
-    <Svg {...base(size, color, strokeWidth)}>
+    <Svg {...base(size, color, strokeWidth, decorative)}>
         <Circle cx={12} cy={12} r={10} />
         <Line x1={2} y1={12} x2={22} y2={12} />
         <Path d='M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z' />
@@ -92,8 +100,9 @@ export const PhotoLibraryIcon = ({
     size = 16,
     color = 'rgba(255,255,255,0.85)',
     strokeWidth = 1.6,
+    decorative = true,
 }: GlyphProps) => (
-    <Svg {...base(size, color, strokeWidth)}>
+    <Svg {...base(size, color, strokeWidth, decorative)}>
         <Rect x={3} y={3} width={18} height={18} rx={2} ry={2} />
         <Circle cx={8.5} cy={8.5} r={1.5} />
         <Path d='m21 15-5-5L5 21' />

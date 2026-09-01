@@ -176,9 +176,11 @@ export default function InsightsPage() {
       setDonationQueue(queue);
 
       // Inputs to computeInsights: the closets' articles, the history, and the
-      // time window. Cheap to fingerprint, expensive to recompute.
+      // time window. Cheap to fingerprint, expensive to recompute. Include each
+      // article's price so editing a price (e.g. via the price-backfill screen)
+      // invalidates the cache even though article counts stay the same.
       const sig = JSON.stringify({
-        c: closets.map((c) => [c._id, c.articles.length]),
+        c: closets.map((c) => [c._id, c.articles.length, c.articles.map((a) => a.purchasePrice ?? null)]),
         w: windowDays,
         h: history.length,
         last: history[0]?.id ?? null,
@@ -288,6 +290,7 @@ export default function InsightsPage() {
               <Pressable
                 style={styles.ctaBtn}
                 onPress={() => nav.push('/(tabs)/closet')}
+                accessibilityRole="button"
               >
                 <Text style={styles.ctaBtnText}>
                   {closets.length === 0 ? 'Create a closet' : 'Go to Closet'}
@@ -662,6 +665,7 @@ export default function InsightsPage() {
                           <Pressable
                             style={styles.actionChip}
                             onPress={() => handleAddDonation(insight.article._id)}
+                            accessibilityRole="button"
                             accessibilityLabel={`Add ${articleLabel(insight)} to donation queue`}
                           >
                             <Text style={styles.actionChipText}>Donate</Text>
@@ -683,6 +687,7 @@ export default function InsightsPage() {
                 <Pressable
                   style={styles.showMoreBtn}
                   onPress={() => setSleepExpanded(e => !e)}
+                  accessibilityRole="button"
                 >
                   <Text style={styles.showMoreText}>
                     {sleepExpanded
@@ -738,6 +743,7 @@ export default function InsightsPage() {
                         <Pressable
                           style={styles.actionChip}
                           onPress={() => handleRemoveDonation(insight.article._id)}
+                          accessibilityRole="button"
                           accessibilityLabel={`Remove ${articleLabel(insight)} from donation queue`}
                         >
                           <Text style={styles.actionChipText}>Remove</Text>
@@ -745,6 +751,7 @@ export default function InsightsPage() {
                         <Pressable
                           style={[styles.actionChip, styles.actionChipDanger]}
                           onPress={() => handleMarkDonated(insight)}
+                          accessibilityRole="button"
                           accessibilityLabel={`Mark ${articleLabel(insight)} as donated`}
                         >
                           <Text style={[styles.actionChipText, styles.actionChipDangerText]}>
@@ -760,6 +767,7 @@ export default function InsightsPage() {
                   <Pressable
                     style={styles.showMoreBtn}
                     onPress={() => setDonateExpanded(e => !e)}
+                    accessibilityRole="button"
                   >
                     <Text style={styles.showMoreText}>
                       {donateExpanded
@@ -772,6 +780,7 @@ export default function InsightsPage() {
                 <Pressable
                   style={styles.shareBtn}
                   onPress={handleShareDonationList}
+                  accessibilityRole="button"
                   accessibilityLabel="Share donation list"
                 >
                   <Text style={styles.shareBtnText}>Share donation list</Text>
@@ -793,6 +802,7 @@ export default function InsightsPage() {
                   <Pressable
                     style={styles.gapShopBtn}
                     onPress={() => Linking.openURL(shopUrl(gap.message))}
+                    accessibilityRole="button"
                     accessibilityLabel={`Shop for ${gap.type.replace(/_/g, ' ')}`}
                   >
                     <Text style={styles.gapShopBtnText}>Shop →</Text>

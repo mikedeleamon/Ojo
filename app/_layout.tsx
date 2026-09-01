@@ -18,7 +18,7 @@ import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { isOnboardingComplete, isOnboardingPending } from '../src/lib/onboarding';
 import { isAgeVerificationNeeded } from '../src/lib/ageGate';
 import { recordAppOpen } from '../src/services/reviewManager';
-import { reconcileWeeklyRecap, reconcileMorningBriefs } from '../src/lib/notifications';
+import { reconcileWeeklyRecap, reconcileMorningBriefs, reconcileSameDayNudges } from '../src/lib/notifications';
 import * as Sentry from '@sentry/react-native';
 import { scrubBreadcrumb, scrubEvent } from '../src/lib/sentryScrub';
 
@@ -70,6 +70,10 @@ let weeklyRecapReconciledThisLaunch = false;
 // the window needs weather and closet data, so that stays with
 // useMorningBriefScheduler on the home screen.
 let morningBriefReconciledThisLaunch = false;
+
+// Same guard for the Same-Day Weather Nudge — cancel-only, same reasoning as
+// the Brief's reconcile above.
+let sameDayNudgeReconciledThisLaunch = false;
 
 // ─── Splash ──────────────────────────────────────────────────────────────────
 function CustomSplash() {
@@ -143,6 +147,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
         if (!morningBriefReconciledThisLaunch) {
           morningBriefReconciledThisLaunch = true;
           reconcileMorningBriefs().catch(() => {});
+        }
+
+        if (!sameDayNudgeReconciledThisLaunch) {
+          sameDayNudgeReconciledThisLaunch = true;
+          reconcileSameDayNudges().catch(() => {});
         }
 
         // Onboarding is shown only when it was explicitly requested by completing

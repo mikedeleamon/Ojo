@@ -95,10 +95,17 @@ const WeatherDetails = ({ weather, settings, forecasts, daily, city, coords }: P
         <Stat label="Humidity" value={`${weather.RelativeHumidity}%`} />
       </GlassGroup>
 
-      <Pressable style={st.toggle} onPress={() => setExpanded(v => !v)}>
+      <Pressable
+        style={st.toggle}
+        onPress={() => setExpanded(v => !v)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+      >
         <Text style={st.toggleText}>{expanded ? 'Less' : 'More details'}</Text>
         <Svg width={16} height={16} viewBox="0 0 16 16" fill="none"
-          style={{ transform: [{ rotate: expanded ? '180deg' : '0deg' }] }}>
+          style={{ transform: [{ rotate: expanded ? '180deg' : '0deg' }] }}
+          accessibilityElementsHidden
+          importantForAccessibility="no">
           <Path d="M4 6l4 4 4-4" stroke={colors.textSecondary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"/>
         </Svg>
       </Pressable>

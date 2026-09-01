@@ -314,6 +314,7 @@ interface ClearNightIconProps {
      * the lit limb appears on the correct side. Does not affect stars.
      */
     mirrorDisc?: boolean;
+    decorative?: boolean;
 }
 
 export default function ClearNightIcon({
@@ -325,6 +326,7 @@ export default function ClearNightIcon({
     animate = true,
     moonPhase,
     mirrorDisc = false,
+    decorative = false,
 }: ClearNightIconProps) {
     const reduceMotion = useReduceMotion();
     const animateStars = animate && !reduceMotion;
@@ -365,7 +367,12 @@ export default function ClearNightIcon({
     }, [starCount, extraCount, vbW, vbH]);
 
     return (
-        <View style={{ width, height }} accessibilityLabel='Clear night'>
+        <View
+            style={{ width, height }}
+            accessibilityLabel='Clear night'
+            accessibilityElementsHidden={decorative}
+            importantForAccessibility={decorative ? 'no' : 'auto'}
+        >
             {/* Moon disc — static, and mirrored independently so Southern
                 Hemisphere observers see the correct lit limb without flipping
                 the stars. */}

@@ -245,6 +245,10 @@ export function ColorChord({ pairs, colors, reduceMotion }: Props) {
                 key={node.name}
                 onPress={() => toggle(node.name)}
                 opacity={on ? 1 : 0.3}
+                accessible
+                accessibilityLabel={
+                  isSel ? `${node.name}, selected` : `Show pairings for ${node.name}`
+                }
               >
                 {/* Invisible larger hit area */}
                 <Circle cx={node.x} cy={node.y} r={HIT_R} fill={colors.white} fillOpacity={0} />

@@ -148,20 +148,29 @@ export default function BirthdayField({
                     animationType="slide"
                     onRequestClose={() => setShowPicker(false)}
                 >
-                    {/* Outer: tap overlay to dismiss */}
+                    {/* Outer: tap overlay to dismiss. accessible={false} so this
+                        wrapper doesn't collapse the Cancel/Done buttons and the
+                        picker below into one unlabeled VoiceOver node — the
+                        backdrop-tap-to-dismiss gesture itself isn't meant to be
+                        a screen-reader stop; Cancel already covers that. */}
                     <TouchableOpacity
                         style={local.pickerOverlay}
                         activeOpacity={1}
                         onPress={() => setShowPicker(false)}
+                        accessible={false}
                     >
                         {/* Inner: absorb taps so they don't reach the overlay */}
                         <TouchableOpacity
                             style={local.pickerSheet}
                             activeOpacity={1}
                             onPress={() => { /* intentionally empty */ }}
+                            accessible={false}
                         >
                             <View style={local.pickerHeader}>
-                                <Pressable onPress={() => setShowPicker(false)}>
+                                <Pressable
+                                    onPress={() => setShowPicker(false)}
+                                    accessibilityRole="button"
+                                >
                                     <Text style={local.pickerHeaderBtn}>Cancel</Text>
                                 </Pressable>
                                 <Pressable
@@ -169,6 +178,7 @@ export default function BirthdayField({
                                         applyPickerDate(pickerDate);
                                         setShowPicker(false);
                                     }}
+                                    accessibilityRole="button"
                                 >
                                     <Text style={[local.pickerHeaderBtn, local.pickerHeaderBtnDone]}>
                                         Done

@@ -93,6 +93,7 @@ export default function TripModeScreen() {
                 onValueChange={v => save({ tripModeEnabled: v })}
                 trackColor={{ false: colors.glassBorder, true: colors.toggleTrackActive }}
                 thumbColor={enabled ? colors.toggleThumbActive : colors.textMuted}
+                accessibilityLabel='Enable Trip Mode'
               />
             </View>
 
@@ -105,6 +106,9 @@ export default function TripModeScreen() {
                       key={v}
                       style={[s.chip, v === radiusMi && s.chipActive]}
                       onPress={() => save({ tripModeRadiusMi: v })}
+                      accessibilityRole='button'
+                      accessibilityLabel={`${v} miles`}
+                      accessibilityState={{ selected: v === radiusMi }}
                     >
                       <Text style={[s.chipText, v === radiusMi && s.chipTextActive]}>
                         {v} mi

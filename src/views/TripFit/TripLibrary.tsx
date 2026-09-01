@@ -163,7 +163,7 @@ const TripCard = ({
                         />
                         <GlassCard glassStyle='regular' style={st.card}>
                             <RNView style={st.cardTopRow}>
-                                <PhraseWeatherIcon phrase={dominantPhrase} size={30} />
+                                <PhraseWeatherIcon phrase={dominantPhrase} size={30} decorative />
                                 <GlassCard glassStyle='clear' style={st.badge}>
                                     <Text style={[st.badgeText, { color: darkColors.textSecondary }]}>
                                         {badgeLabel}

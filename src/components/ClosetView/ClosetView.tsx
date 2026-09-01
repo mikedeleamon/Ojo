@@ -9,7 +9,7 @@ import {
     useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { View, Text, GlassGroup, GlassCard } from '../primitives';
+import { View, Text, GlassGroup, GlassCard, IconButton } from '../primitives';
 import { HangerIcon } from '../shared/HangerIcon';
 import { useConfirm } from '../ConfirmDialog';
 import ArticleModal from '../ArticleModal/ArticleModal';
@@ -311,7 +311,13 @@ const ClosetView = ({
     }) => {
         const gradient = METALLIC_GRADIENTS[label];
         return (
-            <Pressable style={[styles.chip, active && styles.chipActive]} onPress={onPress}>
+            <Pressable
+                style={[styles.chip, active && styles.chipActive]}
+                onPress={onPress}
+                accessibilityRole='checkbox'
+                accessibilityLabel={label}
+                accessibilityState={{ checked: active }}
+            >
                 {gradient ? (
                     <LinearGradient
                         colors={gradient}
@@ -348,6 +354,7 @@ const ClosetView = ({
                             <HangerIcon
                                 size={12}
                                 color={active ? colors.saveBtnText : colors.textSecondary}
+                                decorative
                             />
                             <Text
                                 style={[
@@ -404,7 +411,7 @@ const ClosetView = ({
                         accessibilityLabel='New closet'
                         accessibilityRole='button'
                     >
-                        <PlusIcon size={18} color={colors.textSecondary} />
+                        <PlusIcon size={18} color={colors.textSecondary} decorative />
                     </Pressable>
                 </GlassCard>
             </ScrollView>
@@ -429,7 +436,7 @@ const ClosetView = ({
                         accessibilityRole="button"
                         accessibilityLabel="Confirm rename"
                     >
-                        <CheckIcon size={16} color={colors.saveBtnText} />
+                        <CheckIcon size={16} color={colors.saveBtnText} decorative />
                     </Pressable>
                     <Pressable
                         style={styles.inlineCancel}
@@ -437,7 +444,7 @@ const ClosetView = ({
                         accessibilityRole="button"
                         accessibilityLabel="Cancel rename"
                     >
-                        <CloseIcon size={16} color={colors.textMuted} />
+                        <CloseIcon size={16} color={colors.textMuted} decorative />
                     </Pressable>
                 </View>
             )}
@@ -469,7 +476,7 @@ const ClosetView = ({
                         accessibilityRole="button"
                         accessibilityLabel="Cancel"
                     >
-                        <CloseIcon size={16} color={colors.textMuted} />
+                        <CloseIcon size={16} color={colors.textMuted} decorative />
                     </Pressable>
                 </View>
             )}
@@ -489,9 +496,9 @@ const ClosetView = ({
                             accessibilityRole='button'
                         >
                             {viewMode === 'list' ? (
-                                <GridIcon size={17} color={colors.textSecondary} />
+                                <GridIcon size={17} color={colors.textSecondary} decorative />
                             ) : (
-                                <ListIcon size={17} color={colors.textSecondary} />
+                                <ListIcon size={17} color={colors.textSecondary} decorative />
                             )}
                         </Pressable>
                     </GlassCard>
@@ -503,7 +510,7 @@ const ClosetView = ({
                                 accessibilityLabel='Closet options'
                                 accessibilityRole='button'
                             >
-                                <MoreIcon size={17} color={colors.textSecondary} />
+                                <MoreIcon size={17} color={colors.textSecondary} decorative />
                             </Pressable>
                         </GlassCard>
                     )}
@@ -523,9 +530,12 @@ const ClosetView = ({
                         accessibilityLabel="Search articles"
                     />
                     {query ? (
-                        <Pressable onPress={() => setQuery('')} hitSlop={8}>
-                            <CloseIcon size={14} color={colors.textMuted} />
-                        </Pressable>
+                        <IconButton
+                            onPress={() => setQuery('')}
+                            hitSlop={8}
+                            accessibilityLabel='Clear search'
+                            icon={<CloseIcon size={14} color={colors.textMuted} decorative />}
+                        />
                     ) : null}
                 </GlassCard>
                 <GlassCard
@@ -541,6 +551,7 @@ const ClosetView = ({
                         <SortIcon
                             size={17}
                             color={sortBy !== 'default' ? colors.textPrimary : colors.textSecondary}
+                            decorative
                         />
                     </Pressable>
                 </GlassCard>
@@ -554,7 +565,7 @@ const ClosetView = ({
                         accessibilityLabel={filterCount > 0 ? `Filters, ${filterCount} active` : 'Filters'}
                         accessibilityRole='button'
                     >
-                        <FilterIcon size={15} color={filterCount > 0 ? colors.textPrimary : colors.textSecondary} />
+                        <FilterIcon size={15} color={filterCount > 0 ? colors.textPrimary : colors.textSecondary} decorative />
                         {filterCount > 0 && (
                             <View style={styles.filterCountBadge}>
                                 <Text style={styles.filterCountText}>{filterCount}</Text>
@@ -615,7 +626,11 @@ const ClosetView = ({
                         ))}
                     </View>
                     {hasFilters && (
-                        <Pressable onPress={clearFilters}>
+                        <Pressable
+                            onPress={clearFilters}
+                            accessibilityRole='button'
+                            accessibilityLabel='Clear all filters'
+                        >
                             <Text style={styles.clearFiltersText}>Clear all filters</Text>
                         </Pressable>
                     )}
@@ -631,14 +646,14 @@ const ClosetView = ({
                         accessibilityRole='button'
                         accessibilityLabel='Open TripFit packing planner'
                     >
-                        <TripFitIcon size={42} />
+                        <TripFitIcon size={42} decorative />
                         <View style={styles.tripBannerInfo}>
                             <Text style={styles.tripBannerTitle}>TripFit</Text>
                             <Text style={styles.tripBannerDesc}>
                                 Pack smarter for your next trip
                             </Text>
                         </View>
-                        <ChevronRightIcon size={18} color={colors.textMuted} />
+                        <ChevronRightIcon size={18} color={colors.textMuted} decorative />
                     </Pressable>
                 </GlassCard>
             )}
@@ -701,6 +716,8 @@ const ClosetView = ({
                             <Pressable
                                 style={styles.addBtn}
                                 onPress={openAddChooser}
+                                accessibilityRole='button'
+                                accessibilityLabel='Add your first piece'
                             >
                                 <Text style={styles.addBtnText}>Add your first piece</Text>
                             </Pressable>
@@ -708,7 +725,11 @@ const ClosetView = ({
                     ) : (
                         <View style={styles.emptyState}>
                             <Text style={styles.emptyTitle}>No matches</Text>
-                            <Pressable onPress={clearFilters}>
+                            <Pressable
+                                onPress={clearFilters}
+                                accessibilityRole='button'
+                                accessibilityLabel='Clear filters'
+                            >
                                 <Text style={styles.clearFiltersText}>Clear filters</Text>
                             </Pressable>
                         </View>
@@ -724,7 +745,7 @@ const ClosetView = ({
                     accessibilityLabel='Add article'
                     accessibilityRole='button'
                 >
-                    <PlusIcon size={24} color={colors.saveBtnText} />
+                    <PlusIcon size={24} color={colors.saveBtnText} decorative />
                 </Pressable>
             )}
 

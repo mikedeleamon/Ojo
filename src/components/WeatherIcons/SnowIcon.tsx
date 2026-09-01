@@ -26,11 +26,19 @@ const FLAKE_BOTTOM_RIGHT_D =
 interface SnowIconProps {
     size?: number;
     color?: string;
+    decorative?: boolean;
 }
 
-export default function SnowIcon({ size = 180, color = '#fefefe' }: SnowIconProps) {
+export default function SnowIcon({ size = 180, color = '#fefefe', decorative = false }: SnowIconProps) {
     return (
-        <Svg viewBox="0 0 1280 1280" width={size} height={size} accessibilityLabel="Snow">
+        <Svg
+            viewBox="0 0 1280 1280"
+            width={size}
+            height={size}
+            accessibilityLabel="Snow"
+            accessibilityElementsHidden={decorative}
+            importantForAccessibility={decorative ? 'no' : 'auto'}
+        >
             <Path id="cloud"             fill={color} d={CLOUD_D} />
             <Path id="flake-right"       fill={color} fillRule="evenodd" d={FLAKE_RIGHT_D} />
             <Path id="flake-left"        fill={color} fillRule="evenodd" d={FLAKE_LEFT_D} />

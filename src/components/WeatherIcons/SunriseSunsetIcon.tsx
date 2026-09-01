@@ -22,15 +22,24 @@ interface SunriseSunsetIconProps {
     size?: number;
     color?: string;
     horizonColor?: string;
+    decorative?: boolean;
 }
 
 export default function SunriseSunsetIcon({
     size = 36,
     color = '#fefefe',
     horizonColor = '#ffffff',
+    decorative = false,
 }: SunriseSunsetIconProps) {
     return (
-        <Svg viewBox="0 0 1024 1024" width={size} height={size} accessibilityLabel="Sunrise / sunset">
+        <Svg
+            viewBox="0 0 1024 1024"
+            width={size}
+            height={size}
+            accessibilityLabel="Sunrise / sunset"
+            accessibilityElementsHidden={decorative}
+            importantForAccessibility={decorative ? 'no' : 'auto'}
+        >
             <G id="sun-main">
                 <Path fill={color} fillRule="evenodd" d={SUN_MAIN_D} />
             </G>

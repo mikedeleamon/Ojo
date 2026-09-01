@@ -17,11 +17,19 @@ export const BOLT_RIGHT_PTS =
 interface StormIconProps {
     size?: number;
     color?: string;
+    decorative?: boolean;
 }
 
-export default function StormIcon({ size = 180, color = '#fefefe' }: StormIconProps) {
+export default function StormIcon({ size = 180, color = '#fefefe', decorative = false }: StormIconProps) {
     return (
-        <Svg viewBox="0 0 1280 1280" width={size} height={size} accessibilityLabel="Storm">
+        <Svg
+            viewBox="0 0 1280 1280"
+            width={size}
+            height={size}
+            accessibilityLabel="Storm"
+            accessibilityElementsHidden={decorative}
+            importantForAccessibility={decorative ? 'no' : 'auto'}
+        >
             <Path id="cloud" fill={color} d={CLOUD_D} />
             <Polygon id="bolt-left"   fill={color} points={BOLT_LEFT_PTS} />
             <Polygon id="bolt-center" fill={color} points={BOLT_CENTER_PTS} />

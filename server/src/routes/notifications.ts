@@ -44,6 +44,7 @@ router.put('/settings', requireAuth, async (req: AuthRequest, res: Response): Pr
       closetGapEnabled,
       weeklyRecapEnabled,
       weeklyRecapDay,
+      sameDayNudgeEnabled,
     } = req.body;
 
     await User.findByIdAndUpdate(req.userId, {
@@ -56,6 +57,7 @@ router.put('/settings', requireAuth, async (req: AuthRequest, res: Response): Pr
         closetGapEnabled:     Boolean(closetGapEnabled),
         weeklyRecapEnabled:   Boolean(weeklyRecapEnabled),
         weeklyRecapDay:       Number(weeklyRecapDay)       || 0,
+        sameDayNudgeEnabled:  Boolean(sameDayNudgeEnabled),
       },
     });
     res.json({ success: true });

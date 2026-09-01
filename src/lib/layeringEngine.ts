@@ -152,7 +152,7 @@ const buildTimeline = (
   high:         number,
   low:          number,
   feelsOffset:  number,
-): { time: string; action: string }[] | undefined => {
+): { time: string; action: string; hour: number }[] | undefined => {
   if ((!mid && !outer) || forecasts.length === 0) return undefined;
 
   const hasTempSwing = high - low >= MEANINGFUL_DELTA_F;
@@ -165,7 +165,7 @@ const buildTimeline = (
   const primaryName  = articleDisplayName(primaryLayer!.article);
   const outerName    = outer ? articleDisplayName(outer.article) : undefined;
 
-  const steps: { time: string; action: string }[] = [];
+  const steps: { time: string; action: string; hour: number }[] = [];
 
   // ── Temperature-based steps (sunset-aware) ──────────────────────────────────
   // Uses actual sunset detection from IsDaylight forecast data to determine when
@@ -173,8 +173,8 @@ const buildTimeline = (
   if (hasTempSwing) {
     const sunsetHour = estimateSunsetHour(forecasts);
 
-    let shedStep: { time: string; action: string } | null = null;
-    let relayerStep: { time: string; action: string } | null = null;
+    let shedStep: { time: string; action: string; hour: number } | null = null;
+    let relayerStep: { time: string; action: string; hour: number } | null = null;
     let peakReached = false;
 
     for (const f of forecasts) {
@@ -182,7 +182,7 @@ const buildTimeline = (
       const temp = f.Temperature.Value + feelsOffset;
 
       if (!peakReached && temp >= TEMP_SHED_THRESHOLD && outer) {
-        shedStep = { time: hourLabel(h), action: `Remove ${outerName} — warming up` };
+        shedStep = { time: hourLabel(h), action: `Remove ${outerName} — warming up`, hour: h };
         peakReached = true;
       } else if (peakReached && !relayerStep) {
         // Trigger re-layer when BOTH conditions are met:
@@ -190,10 +190,10 @@ const buildTimeline = (
         // 2. We're at or past sunset (cooling will accelerate)
         const pastSunset = h >= sunsetHour - 1; // 1 hour before sunset, cooling begins
         if (temp < TEMP_RELAYER_THRESHOLD && pastSunset) {
-          relayerStep = { time: hourLabel(h), action: `Add ${primaryName} back — sun is setting, cooling down` };
+          relayerStep = { time: hourLabel(h), action: `Add ${primaryName} back — sun is setting, cooling down`, hour: h };
         } else if (temp < TEMP_RELAYER_THRESHOLD - 5) {
           // Hard fallback: if it drops significantly regardless of sunset
-          relayerStep = { time: hourLabel(h), action: `Add ${primaryName} back — cooling down` };
+          relayerStep = { time: hourLabel(h), action: `Add ${primaryName} back — cooling down`, hour: h };
         }
       }
     }
@@ -201,7 +201,8 @@ const buildTimeline = (
     // Morning cold check
     const firstTemp = forecasts[0] ? forecasts[0].Temperature.Value + feelsOffset : null;
     if (firstTemp !== null && firstTemp < TEMP_COLD_THRESHOLD) {
-      steps.push({ time: hourLabel(new Date(forecasts[0].DateTime).getHours()), action: `Keep your ${primaryName} on` });
+      const firstHour = new Date(forecasts[0].DateTime).getHours();
+      steps.push({ time: hourLabel(firstHour), action: `Keep your ${primaryName} on`, hour: firstHour });
     }
 
     if (shedStep) steps.push(shedStep);
@@ -212,15 +213,16 @@ const buildTimeline = (
   for (const t of precipTransitions) {
     if (t.starting) {
       const layerName = outerName ?? primaryName;
-      steps.push({ time: hourLabel(t.hour), action: `Rain starts — keep ${layerName} on` });
+      steps.push({ time: hourLabel(t.hour), action: `Rain starts — keep ${layerName} on`, hour: t.hour });
     } else {
-      steps.push({ time: hourLabel(t.hour), action: `Rain clears — safe to shed layers` });
+      steps.push({ time: hourLabel(t.hour), action: `Rain clears — safe to shed layers`, hour: t.hour });
     }
   }
 
-  // Cap at 5 steps, sorted by approximate chronological order
-  const ORDER = ['Early morning', 'Morning', 'Late morning', 'Early afternoon', 'Afternoon', 'Evening', 'Night'];
-  steps.sort((a, b) => ORDER.indexOf(a.time) - ORDER.indexOf(b.time));
+  // Cap at 5 steps, sorted chronologically by actual hour (now that one's
+  // tracked) rather than by day-part bucket order, which couldn't break ties
+  // between two steps in the same bucket.
+  steps.sort((a, b) => a.hour - b.hour);
 
   return steps.length > 0 ? steps.slice(0, 5) : undefined;
 };

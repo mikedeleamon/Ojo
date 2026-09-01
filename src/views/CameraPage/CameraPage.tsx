@@ -462,7 +462,8 @@ function CropPreview({ image, onCancel, onConfirm }: CropPreviewProps) {
           onPress={applyCrop}
           disabled={processing}
           accessibilityRole="button"
-          accessibilityLabel="Use this crop"
+          accessibilityLabel={processing ? 'Processing crop' : 'Use this crop'}
+          accessibilityState={{ busy: processing }}
         >
           {processing ? (
             <ActivityIndicator color="#0D1B2A" />
