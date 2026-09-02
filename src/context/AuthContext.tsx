@@ -13,6 +13,7 @@ import { clearWidgetSnapshot } from '../lib/widget/updateWidgetSnapshot';
 import { resetClosetsCache } from '../hooks/useClosets';
 import { resetOnboardingCache } from '../lib/onboarding';
 import { resetAgeGateCache } from '../lib/ageGate';
+import { clearGapHistory } from '../lib/wardrobeGaps';
 
 interface AuthState {
   isReady: boolean;
@@ -80,6 +81,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Same reason: the next account must not inherit this account's age-gate
     // state, in either direction.
     resetAgeGateCache();
+    // Wardrobe-gap events live under a single global key rather than a per-user
+    // one, so nothing else scopes them to an account and the next user to sign
+    // in on this device would inherit the previous user's gap history.
+    // (The settings cache has the same problem; SettingsProvider clears that
+    // one itself off isLoggedIn, rather than importing it here — AuthContext
+    // importing SettingsContext would close an import cycle, since
+    // SettingsContext consumes useAuth.)
+    void clearGapHistory().catch(() => {});
     // Wipe the widget so a signed-out device doesn't keep showing the last
     // user's outfit/trip. No-ops off-iOS / without the native bridge.
     void clearWidgetSnapshot();

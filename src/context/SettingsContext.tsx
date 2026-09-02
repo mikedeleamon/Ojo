@@ -9,6 +9,7 @@ import {
 import axios from '../api/client';
 import { Settings } from '../types';
 import { getToken, authHeaders, getErrorMessage } from '../lib/auth';
+import { useAuth } from './AuthContext';
 import { storage, storageGetJSON } from '../lib/storage';
 
 const CACHE_KEY = 'ojo_settings_cache';
@@ -68,6 +69,7 @@ const SettingsContext = createContext<SettingsCtx>({
 });
 
 export const SettingsProvider = ({ children }: { children: ReactNode }) => {
+    const { isReady, isLoggedIn } = useAuth();
     const [settings, setSettings] = useState<Settings>(defaults);
     const [settingsReady, setSettingsReady] = useState(false);
 
@@ -82,10 +84,32 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
         );
     }, []);
 
+    // Keyed on the auth state rather than running once on mount, for two
+    // reasons. First, this provider never unmounts (it sits above AuthGate), so
+    // without a re-run the previous account's settings stayed in memory after a
+    // logout/login — clearing the on-disk cache alone would not have dropped
+    // them. Second, getToken() reads a cache that initAuthCache() only fills
+    // after a SecureStore round-trip; reading it at mount raced that round-trip
+    // and, on the common outcome, took the `!token` branch and skipped server
+    // revalidation entirely for the whole launch.
     useEffect(() => {
+        if (!isReady) return;
+
         let cancelled = false;
 
         const init = async () => {
+            if (!isLoggedIn) {
+                // Signed out: drop to defaults AND drop the on-disk copy. The
+                // cache key is global, not per-user like history/trips/weather,
+                // so without this the next account to sign in on this device
+                // reads the previous user's location, temperature thresholds
+                // and gender straight out of it.
+                applySettings(defaults);
+                setSettingsReady(true);
+                await clearSettingsCache();
+                return;
+            }
+
             const cached = await readCache();
             if (cached && !cancelled) {
                 applySettings(normalize(cached));
@@ -122,7 +146,7 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [isReady, isLoggedIn, applySettings]);
 
     const saveSettings = useCallback(
         async (next: Settings) => {

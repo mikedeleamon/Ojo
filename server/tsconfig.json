@@ -11,5 +11,9 @@
     "resolveJsonModule": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  // Tests are excluded from the BUILD config on purpose: they need jest globals
+  // that this project deliberately doesn't declare, and `npm run build` (which
+  // Railway runs on deploy) would otherwise fail on them. Test compilation is
+  // owned by the root tsconfig.test.json / ts-jest instead.
+  "exclude": ["node_modules", "dist", "src/**/__tests__/**", "src/**/*.test.ts"]
 }

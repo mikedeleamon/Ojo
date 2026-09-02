@@ -8,6 +8,12 @@ export interface ISettings {
   // without re-geocoding every tick.
   lat?: number;
   lon?: number;
+  // IANA zone name for the device that last registered a push token, e.g.
+  // "Europe/Berlin". The notification crons re-derive each user's UTC send hour
+  // from this on every tick, which is what makes the schedule survive a DST
+  // change — see lib/timeZone.ts. Optional: accounts that predate it fall back
+  // to the DST-frozen `notificationSettings.morningBriefHourUTC`.
+  timeZone?: string;
   temperatureScale: string;
   hiTempThreshold: number;
   lowTempThreshold: number;
@@ -34,6 +40,15 @@ export interface ISavedLocation {
 export interface INotificationSettings {
   morningBriefEnabled:    boolean;
   morningBriefHourUTC:    number;
+  /**
+   * The hour the user actually picked, in their own wall clock (0–23).
+   *
+   * This is the durable value; `morningBriefHourUTC` is a derived cache of it
+   * that goes stale at every DST transition. Paired with `settings.timeZone`,
+   * it is what the crons schedule from. Optional so accounts that predate it
+   * keep working on the legacy path.
+   */
+  morningBriefHourLocal?: number;
   weatherChangeEnabled:   boolean;
   tempSwingEnabled:       boolean;
   tempSwingThresholdF:    number;
@@ -100,6 +115,7 @@ const settingsSchema = new Schema<ISettings>({
   location:           { type: String, default: '' },
   lat:                { type: Number },
   lon:                { type: Number },
+  timeZone:           { type: String },
   temperatureScale:   { type: String, default: 'Imperial' },
   hiTempThreshold:    { type: Number, default: 85 },
   lowTempThreshold:   { type: Number, default: 50 },
@@ -113,6 +129,7 @@ const settingsSchema = new Schema<ISettings>({
 const notificationSettingsSchema = new Schema<INotificationSettings>({
   morningBriefEnabled:  { type: Boolean, default: false },
   morningBriefHourUTC:  { type: Number,  default: 12 },
+  morningBriefHourLocal:{ type: Number },
   weatherChangeEnabled: { type: Boolean, default: false },
   tempSwingEnabled:     { type: Boolean, default: false },
   tempSwingThresholdF:  { type: Number,  default: 20 },

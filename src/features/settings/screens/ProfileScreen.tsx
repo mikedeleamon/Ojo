@@ -4,7 +4,7 @@ import { ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { View, Text, TextInput, Pressable, GlassCard } from '../../../components/primitives';
 import axios from '../../../api/client';
-import { auth, getToken, getErrorMessage, updateAuthUser, clearAuth } from '../../../lib/auth';
+import { auth, getToken, getErrorMessage, updateAuthUser, updateToken, clearAuth } from '../../../lib/auth';
 import { storage } from '../../../lib/storage';
 import { hapticWarning } from '../../../lib/haptics';
 import { useFormSubmit } from '../../../hooks/useFormSubmit';
@@ -111,7 +111,15 @@ export default function ProfileScreen({ onLogout }: Props) {
   }, []);
 
   const save = () => submit(async () => {
-    await axios.put('/api/user/profile', { username, email }, auth());
+    // Changing the email changes the login identifier, so the server bumps
+    // tokenVersion to revoke sessions on other devices and hands back a freshly
+    // signed token for this one. Without storing it, the device that made the
+    // change would 401 on its very next request. Same contract as PasswordScreen;
+    // a username-only edit returns 204 and no token.
+    const { data } = await axios.put<{ token?: string } | undefined>(
+      '/api/user/profile', { username, email }, auth(),
+    );
+    if (data?.token) await updateToken(data.token);
     await updateAuthUser({ email, username });
   });
 

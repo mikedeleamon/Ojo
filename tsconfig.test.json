@@ -8,8 +8,22 @@
   // typecheck:test` uses this project to catch those directly.
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "types": ["node", "jest"]
+    "types": ["node", "jest"],
+    // server/src/lib/timeZone.ts uses Intl.DateTimeFormat#formatToParts and the
+    // `hourCycle` option, whose type declarations live in the ES2021 Intl libs.
+    // The app itself still targets ES2020 (tsconfig.json) — this widening is
+    // test-compilation only and does not change what ships.
+    "lib": ["ES2021"]
   },
+  // "server" stays excluded, exactly as in tsconfig.json. `exclude` only filters
+  // which files seed the program as ROOTS — anything reached by an import is
+  // compiled regardless — so server/src/lib/__tests__/timeZone.test.ts still
+  // type-checks its import of ../timeZone.
+  //
+  // Un-excluding it took a single-file run from 4s to 488s: every server file
+  // became a root, including lib/gmailParser.ts, which pulls in the whole
+  // `googleapis` type surface (tens of thousands of generated declarations) for
+  // a test that touches none of it.
   "exclude": [
     "node_modules",
     "dist",

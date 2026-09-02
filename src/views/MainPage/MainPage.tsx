@@ -35,9 +35,16 @@ export default function MainPage() {
     : savedLocations.find(l => l.id === activeId) ?? null;
 
   // If the active saved city was deleted elsewhere, fall back to My Location.
+  //
+  // Gated on settingsReady: `savedLocations` is empty until settings resolve,
+  // so before that EVERY saved-city id looks deleted. Now that
+  // ActiveLocationContext actually restores a persisted city on launch, an
+  // ungated check would race it — reset the restored id to My Location and
+  // persist that reset, undoing the restore on every cold start.
   useEffect(() => {
+    if (!settingsReady) return;
     if (activeId !== CURRENT_LOCATION_ID && !active) setActiveId(CURRENT_LOCATION_ID);
-  }, [activeId, active, setActiveId]);
+  }, [settingsReady, activeId, active, setActiveId]);
 
   // Prime the in-memory snapshot map from cache once on mount.
   useEffect(() => {

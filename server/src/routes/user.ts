@@ -48,20 +48,81 @@ router.get('/check-username', async (req: AuthRequest, res: Response): Promise<v
   }
 });
 
+/**
+ * Shape check only — deliberately permissive about what an address may contain
+ * (plus-tags, subdomains, long TLDs are all legal), strict about the structure
+ * every address must have. The point is not to prove the mailbox exists; it is
+ * to stop a value that cannot possibly receive mail from being written.
+ *
+ * That mattered because email is the ONLY account-recovery channel: forgot
+ * password sends here, and there is no secondary factor. A typo saved without a
+ * shape check locks the account out of recovery permanently, and the user has
+ * no way to discover it until the day they need it.
+ */
+const EMAIL_RE = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/;
+
+/** Display name rules, matched to what the signup form already enforces. */
+const USERNAME_RE = /^[A-Za-z0-9._-]{3,30}$/;
+
 router.put('/profile', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { username, email } = req.body;
+    const rawUsername = typeof req.body.username === 'string' ? req.body.username.trim() : undefined;
+    const rawEmail    = typeof req.body.email    === 'string' ? req.body.email.trim().toLowerCase() : undefined;
+
+    if (rawUsername !== undefined && !USERNAME_RE.test(rawUsername)) {
+      res.status(400).json({
+        error: 'Username must be 3–30 characters, using letters, numbers, dots, dashes or underscores.',
+      });
+      return;
+    }
+    if (rawEmail !== undefined && (!EMAIL_RE.test(rawEmail) || rawEmail.length > 254)) {
+      res.status(400).json({ error: 'Enter a valid email address.' });
+      return;
+    }
+
+    const current = await User.findById(req.userId).select('email tokenVersion');
+    if (!current) { res.status(404).json({ error: 'User not found' }); return; }
+
+    // Pre-check so the common case gets a useful 409 rather than a duplicate-key
+    // 500. It is NOT the guarantee — two concurrent requests can both pass it —
+    // so the unique index is still the thing that actually enforces uniqueness,
+    // and the catch below translates its error into the same 409.
     const conflict = await User.findOne({
       _id: { $ne: req.userId },
-      $or: [{ email: email?.toLowerCase() }, { username }],
+      $or: [
+        ...(rawEmail    ? [{ email: rawEmail }]       : []),
+        ...(rawUsername ? [{ username: rawUsername }] : []),
+      ],
     });
     if (conflict) { res.status(409).json({ error: 'Email or username already in use' }); return; }
+
+    // Changing the email changes the login identifier, so every other session
+    // holding a token minted against the old address is revoked. The caller gets
+    // a freshly-signed token back so the device doing the change stays signed in
+    // — same contract as PUT /password.
+    const emailChanged = !!rawEmail && rawEmail !== current.email;
+    const nextVersion  = (current.tokenVersion ?? 0) + (emailChanged ? 1 : 0);
+
     await User.findByIdAndUpdate(req.userId, {
-      ...(username && { username }),
-      ...(email && { email: email.toLowerCase() }),
+      $set: {
+        ...(rawUsername ? { username: rawUsername } : {}),
+        ...(rawEmail    ? { email: rawEmail }       : {}),
+        ...(emailChanged ? { tokenVersion: nextVersion } : {}),
+      },
     });
+
+    if (emailChanged) {
+      res.json({ token: signToken(String(current._id), nextVersion) });
+      return;
+    }
     res.sendStatus(204);
   } catch (err) {
+    // E11000 is the unique index rejecting a race the pre-check let through.
+    // It is the caller's problem to fix, not a server fault.
+    if ((err as { code?: number })?.code === 11000) {
+      res.status(409).json({ error: 'Email or username already in use' });
+      return;
+    }
     console.error('[user] profile update error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }

@@ -187,7 +187,13 @@ export function useMorningBriefScheduler({
 
         await scheduleMorningBriefs({
           enabled: true,
-          localHour: Math.round(utcHourToLocal(ns.morningBriefHourUTC ?? 12)),
+          // Same preference order as NotificationsScreen: the hour the user
+          // picked, falling back to deriving it only for accounts that predate
+          // morningBriefHourLocal. These are local notifications scheduled with
+          // a wall-clock hour, so the OS already handles DST for them — the
+          // stale value being avoided here is the derivation, not the trigger.
+          localHour: ns.morningBriefHourLocal ??
+                     Math.round(utcHourToLocal(ns.morningBriefHourUTC ?? 12)),
           days,
         });
       } catch {

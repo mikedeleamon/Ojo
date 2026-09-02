@@ -209,7 +209,20 @@ export const articleDisplayName = (
 
 export interface NotificationSettings {
   morningBriefEnabled:    boolean;
-  morningBriefHourUTC:    number;   // 0–23 in UTC
+  /**
+   * 0–23 in UTC. DERIVED, and it goes stale at every DST transition — it is the
+   * hour the device computed on the day the user last saved. Kept because older
+   * clients and the server's legacy scheduling path both still read it.
+   * Prefer `morningBriefHourLocal` for anything user-facing.
+   */
+  morningBriefHourUTC:    number;
+  /**
+   * 0–23 on the user's own clock — the hour they actually picked, and the
+   * durable one. The server pairs it with the device time zone to re-derive the
+   * send hour on every cron tick, so the schedule follows DST.
+   * Optional: absent on accounts that last saved before this shipped.
+   */
+  morningBriefHourLocal?: number;
   weatherChangeEnabled:   boolean;
   tempSwingEnabled:       boolean;
   tempSwingThresholdF:    number;   // degrees F, default 20
@@ -221,7 +234,7 @@ export interface NotificationSettings {
   tripModeMorningEnabled: boolean;
   /** Clock-hour-precise push for a same-day temp swing or rain start/stop from
    *  today's layering timeline. Separate from tempSwingEnabled (Morning Brief
-   *  copy only) and weatherChangeEnabled (server cron, fixed 2pm UTC) — see
+   *  copy only) and weatherChangeEnabled (server cron, per-user afternoon) — see
    *  lib/sameDayNudge.ts. */
   sameDayNudgeEnabled:    boolean;
 }

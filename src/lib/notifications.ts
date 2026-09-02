@@ -79,7 +79,14 @@ export const registerPushToken = async (): Promise<string | null> => {
   if (!token) return null;
 
   try {
-    await axios.post('/api/notifications/token', { pushToken: token }, authHeaders());
+    // The zone rides along with the token because this runs on every cold start,
+    // while the settings screen may be visited once and never again — that's
+    // what keeps a traveller's server-sent notifications on their new clock.
+    await axios.post(
+      '/api/notifications/token',
+      { pushToken: token, timeZone: deviceTimeZone() },
+      authHeaders(),
+    );
     return token;
   } catch (err) {
     console.warn('[notifications] Failed to register push token:', err);
@@ -136,18 +143,69 @@ export const reconcileWeeklyRecap = async (): Promise<void> => {
   }
 };
 
-// ─── UTC conversion helper ────────────────────────────────────────────────────
-// Convert a user's chosen local hour (0–23) to UTC hour for server storage.
+// ─── UTC conversion helpers ───────────────────────────────────────────────────
+// Convert a user's chosen local hour (0–23) to a UTC hour.
+//
+// These are no longer the source of truth for scheduling. The hour the user
+// picked is now sent to the server as `morningBriefHourLocal` alongside
+// `deviceTimeZone()`, and the server re-derives the UTC hour from the zone on
+// every cron tick (server/src/lib/timeZone.ts). That is what makes the schedule
+// survive a DST change: the offset these helpers read describes the device
+// *right now*, so a value computed today is wrong the moment the clocks move,
+// and it stayed wrong until the user happened to re-save the settings screen.
+//
+// They remain because `morningBriefHourUTC` is still written (older servers and
+// older clients both read it) and because useMorningBriefScheduler needs a local
+// hour when reading back an account that predates `morningBriefHourLocal`.
+// utcHourForLocalHour on the server is an exact match for localHourToUTC here —
+// see the parity assertion in server/src/lib/__tests__/timeZone.test.ts.
+//
+// The offset is quantised to whole hours BEFORE the arithmetic, not after.
+// That matters in the zones with a sub-hour offset (India +5:30, Nepal +5:45,
+// Adelaide, Newfoundland, Chatham): adding the raw offset produced a fractional
+// UTC hour, e.g. 8am in India stored as 2.5. Two things broke silently on that
+// value — runMorningCheck in the server's notificationService matches
+// `morningBriefHourUTC` against an integer `getUTCHours()`, so 2.5 matched no
+// hour and the closet-gap nudge simply never fired (and `lastMorningSnapshot`
+// was never written, degrading the afternoon weather-change check with it);
+// and the round trip was not stable, so re-saving the screen walked the hour
+// forward. Rounding the SUM instead would still drift — round(2.5)=3 converts
+// back to round(8.5)=9 — because a fractional offset makes integer↔integer
+// conversion non-invertible. Quantising the offset makes the pair exact
+// inverses for all 24 hours in every zone.
+//
+// The cost is a sub-hour skew in those zones (India's 8am nudge fires at 8:30
+// local). That is inherent, not a regression: the server cron runs hourly on
+// the hour, so an integer UTC hour is the finest granularity it can honour.
 
-export const localHourToUTC = (localHour: number): number => {
-  const offsetMinutes = new Date().getTimezoneOffset(); // positive = behind UTC
-  return ((localHour + offsetMinutes / 60) % 24 + 24) % 24;
+/**
+ * The device's IANA zone name, e.g. "Europe/Berlin", or undefined if the
+ * runtime can't report one.
+ *
+ * This is the value the SERVER schedules from. A zone name carries its own DST
+ * rules, so the server can re-derive the correct UTC hour on every cron tick;
+ * the fixed offset below can only describe the moment it was read. Sent with
+ * every push-token registration (which happens on each cold start) so it also
+ * follows the user when they travel.
+ */
+export const deviceTimeZone = (): string | undefined => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
+  } catch {
+    return undefined;
+  }
 };
 
-export const utcHourToLocal = (utcHour: number): number => {
-  const offsetMinutes = new Date().getTimezoneOffset();
-  return ((utcHour - offsetMinutes / 60) % 24 + 24) % 24;
-};
+/** Device UTC offset in whole hours. Positive = behind UTC (matches getTimezoneOffset). */
+const offsetHours = (): number => Math.round(new Date().getTimezoneOffset() / 60);
+
+/** Local hour (0–23) → UTC hour (0–23). Always an integer. */
+export const localHourToUTC = (localHour: number): number =>
+  ((localHour + offsetHours()) % 24 + 24) % 24;
+
+/** UTC hour (0–23) → local hour (0–23). Exact inverse of localHourToUTC. */
+export const utcHourToLocal = (utcHour: number): number =>
+  ((utcHour - offsetHours()) % 24 + 24) % 24;
 
 // ─── Trip packing reminders ───────────────────────────────────────────────────
 // Scheduled locally, per saved TripFit plan, when a plan is created or updated.

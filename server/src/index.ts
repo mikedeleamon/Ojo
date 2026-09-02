@@ -22,7 +22,8 @@ import historyRoutes from './routes/history';
 import tripsRoutes from './routes/trips';
 import tripFitRoutes from './routes/tripfit';
 import shareRoutes from './routes/share';
-import { requireAuth, requireAgeVerified } from './middleware/auth';
+import resetRoutes from './routes/reset';
+import { requireAuth, requireAgeVerified, AuthRequest } from './middleware/auth';
 import { startNotificationService } from './services/notificationService';
 import { weatherStats, resetWeatherStats } from './lib/weatherKit';
 
@@ -93,9 +94,24 @@ app.use(cors({
 }));
 
 // ─── Rate limiting ────────────────────────────────────────────────────────────
-// Tight limit on auth to slow brute-force, but only failed attempts count so
-// legitimate sign-ins never burn quota. Refresh has its own (looser) limiter
-// since the client may call it on every cold start.
+// Two families of limiter, and the difference matters more than the numbers.
+//
+// PRE-AUTH routes (/api/auth, and the public /s and /r landing pages) are keyed
+// by IP, because there is no account yet to key on.
+//
+// AUTHENTICATED routes are keyed by USER. IP is the wrong key for a mobile app:
+// carriers put very large numbers of subscribers behind a single CGNAT egress
+// address, so an IP-keyed budget is silently shared between strangers on the
+// same network. One heavy user — or one coffee shop, office, or university —
+// could exhaust the allowance for everyone behind that address, and the
+// resulting 429s are close to undebuggable from the outside. Keying on the
+// authenticated user makes each number mean what it appears to mean: a budget
+// per account, per window.
+//
+// This is what makes it safe to set the authenticated ceilings generously
+// below, which an IP-keyed limiter could not be.
+const keyByUser = (req: Request): string => (req as AuthRequest).userId ?? req.ip ?? 'unknown';
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 50,
@@ -113,15 +129,45 @@ const refreshLimiter = rateLimit({
   message: { error: 'Too many requests, please try again later.' },
 });
 
+// Viewing one city costs THREE requests today — WeatherHUD fetches /current,
+// /hourly and /daily in a Promise.all — so the old 30/min ceiling was really
+// "ten city switches a minute", which the Locations screen can exhaust just by
+// being scrolled through at a normal pace.
+//
+// 120/min is ~40 city views per minute, comfortably past the rate a person can
+// tap. It is affordable because these requests are nearly free to serve: every
+// one of them is answered from the coalesced L1/L2 bundle cache in
+// lib/weatherKit.ts, snapped onto a shared coordinate grid, and only a genuine
+// cache miss costs a billable WeatherKit call. The thing that protects the
+// upstream bill is the 30-minute cache TTL, not this limiter — this limiter
+// exists to bound server CPU, and 120 cached slices a minute is not a load.
 const weatherLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 30,
+  max: 120,
+  keyGenerator: keyByUser,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests, please try again later.' },
 });
 
+// 600 per 15 min ≈ 40/min sustained. The old 200 worked out at ~13/min shared
+// across every route under it, which a closet sync of any size can spend in a
+// burst — reconciling a large wardrobe issues one request per article.
 const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 600,
+  keyGenerator: keyByUser,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later.' },
+});
+
+/**
+ * IP-keyed limiter for the public landing pages, which have no user to key on.
+ * Unchanged in spirit from the old generalLimiter: these routes do no database
+ * work, so this is about bounding abuse volume rather than protecting a lookup.
+ */
+const publicLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 200,
   standardHeaders: true,
@@ -130,7 +176,21 @@ const generalLimiter = rateLimit({
 });
 
 // ─── Body parsing ─────────────────────────────────────────────────────────────
-app.use(express.json({ limit: '10mb' }));
+// A 10mb ceiling used to apply to EVERY route, which meant an unauthenticated
+// caller could push 10MB at /api/auth/login (50x per 15 min per IP, and failed
+// auth is the only thing that burns that quota) — a lot of parser work for a
+// request whose legitimate body is a couple of hundred bytes.
+//
+// Only one endpoint has any business receiving a large body: the base64 image
+// upload. It gets the big parser; everything else gets a limit sized for JSON
+// settings payloads. Matched on an explicit path pattern rather than mounting
+// inside the router, because the first json() to run is the one that enforces a
+// limit — a large parser mounted later never gets the chance to say yes.
+const UPLOAD_PATH = /^\/api\/closets\/[^/]+\/upload-image\/?$/;
+const uploadJson = express.json({ limit: '10mb' });
+const standardJson = express.json({ limit: '100kb' });
+app.use((req, res, next) =>
+  UPLOAD_PATH.test(req.path) ? uploadJson(req, res, next) : standardJson(req, res, next));
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 // /api/auth/refresh has its own (looser) limiter applied inside auth.ts;
@@ -151,14 +211,35 @@ app.use('/api/auth', (req, res, next) => {
 // view or delete their account if they'd rather not supply a date of birth.
 const gated = [requireAuth, requireAgeVerified];
 
-app.use('/api/weather',       weatherLimiter, ...gated, weatherRoutes);
-app.use('/api/user',          generalLimiter, userRoutes);
-app.use('/api/closets',       generalLimiter, ...gated, closetRoutes);
-app.use('/api/notifications', generalLimiter, ...gated, notificationRoutes);
-app.use('/api/history',       generalLimiter, ...gated, historyRoutes);
-app.use('/api/trips',         generalLimiter, ...gated, tripsRoutes);
-app.use('/api/tripfit',       generalLimiter, ...gated, tripFitRoutes);
-app.use('/s',                 generalLimiter, shareRoutes);
+//
+// ORDERING: the limiter is mounted AFTER the auth middleware on every
+// authenticated router, not before it. keyByUser reads `req.userId`, which
+// requireAuth is what sets — with the old ordering (limiter first) that field
+// was always undefined and every one of these limiters would silently fall back
+// to keying by IP, which is the exact behaviour being fixed.
+//
+// Putting auth first costs nothing against an unauthenticated flood: requireAuth
+// rejects a missing or malformed Authorization header outright, and a bad
+// signature fails in verifyToken. Only a validly-signed token reaches the
+// database lookup, so there is no cheap way to make this path expensive.
+//
+// requireAuth is idempotent (it returns early when req.userId is already set),
+// so the routers that also mount it internally don't pay for a second lookup.
+app.use('/api/weather',       ...gated, weatherLimiter, weatherRoutes);
+// /api/user takes requireAuth but NOT the age gate — an unverified account must
+// still be able to read its profile or delete itself (see the note above).
+app.use('/api/user',          requireAuth, generalLimiter, userRoutes);
+app.use('/api/closets',       ...gated, generalLimiter, closetRoutes);
+app.use('/api/notifications', ...gated, generalLimiter, notificationRoutes);
+app.use('/api/history',       ...gated, generalLimiter, historyRoutes);
+app.use('/api/trips',         ...gated, generalLimiter, tripsRoutes);
+app.use('/api/tripfit',       ...gated, generalLimiter, tripFitRoutes);
+// Public pages: no user to key on, so these stay IP-keyed.
+app.use('/s',                 publicLimiter, shareRoutes);
+// Public https landing page for the password-reset email. Rate limited like the
+// other public pages; it does no database work, so this is about abuse volume
+// rather than protecting a lookup.
+app.use('/r',                 publicLimiter, resetRoutes);
 
 // ─── Global error handler ─────────────────────────────────────────────────────
 // Sentry's handler goes first: it reports the error and calls next(), so ours

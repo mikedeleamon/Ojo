@@ -162,13 +162,17 @@ router.put('/:closetId/articles/:articleId', async (req: AuthRequest, res: Respo
       }
     }
 
-    // Clean up old R2 image if it changed
+    await closet.save();
+    res.json(closet);
+
+    // Clean up the old R2 image AFTER the save is durable. Deleting first meant
+    // a failing save (validation, a Mongo blip) left the document still
+    // pointing at an object that no longer existed — a permanently broken image
+    // with nothing to reconcile it, since the route answers 500 and the client
+    // retries against the same stale URL.
     if (req.body.imageUrl && oldImageUrl && oldImageUrl !== req.body.imageUrl && !oldImageUrl.startsWith('data:')) {
       deleteFromR2(oldImageUrl).catch(err => console.error('[closets] R2 cleanup error:', err));
     }
-
-    await closet.save();
-    res.json(closet);
   } catch (err) {
     console.error('[closets] update article error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -180,13 +184,20 @@ router.delete('/:closetId/articles/:articleId', async (req: AuthRequest, res: Re
     const closet = await Closet.findOne({ _id: req.params.closetId, userId: req.userId });
     if (!closet) { res.status(404).json({ error: 'Closet not found' }); return; }
     const article = closet.articles.id(req.params.articleId);
-    if (article?.imageUrl && !article.imageUrl.startsWith('data:')) {
-      // Clean up R2 image (fire-and-forget, don't block deletion)
-      deleteFromR2(article.imageUrl).catch(err => console.error('[closets] R2 cleanup error:', err));
-    }
+    // Read the URL off the subdoc before pulling it — the reference is detached
+    // once it leaves the array.
+    const imageUrl = article?.imageUrl;
+
     closet.articles.pull({ _id: req.params.articleId });
     await closet.save();
     res.json(closet);
+
+    // Same ordering rule as the update handler above: the object is only
+    // unreachable once the removal is durable. Deleting before the save meant a
+    // failed save left the article in the closet with its image already gone.
+    if (imageUrl && !imageUrl.startsWith('data:')) {
+      deleteFromR2(imageUrl).catch(err => console.error('[closets] R2 cleanup error:', err));
+    }
   } catch (err) {
     console.error('[closets] delete article error:', err);
     res.status(500).json({ error: 'Internal server error' });

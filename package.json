@@ -19,7 +19,8 @@
     "testEnvironment": "node",
     "testMatch": [
       "<rootDir>/src/**/__tests__/**/*.test.ts",
-      "<rootDir>/src/**/*.test.ts"
+      "<rootDir>/src/**/*.test.ts",
+      "<rootDir>/server/src/**/__tests__/**/*.test.ts"
     ],
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/src/$1"

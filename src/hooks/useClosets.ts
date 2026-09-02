@@ -115,7 +115,7 @@ function load(force = false, bypassThrottle = false): Promise<void> {
       if (changed || hadError || !wasLoaded) publish();
     })
     .catch(() => {
-      error = 'Could not load closets. Is the server running?';
+      error = 'Could not load closets. Please try again later.';
       inFlight = null;
       loaded = true;
       publish();

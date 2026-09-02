@@ -1,7 +1,31 @@
 import axios, { AxiosError } from 'axios';
 
+/**
+ * Base URL for the API, inlined by Metro at bundle time from the build
+ * profile's `EXPO_PUBLIC_API_URL` (see eas.json).
+ *
+ * A release build that reaches here without one is unshippable, so it fails
+ * loudly at import instead of falling back. The old `?? 'http://localhost:4000'`
+ * default made a misconfigured production build look healthy: every request
+ * would quietly go nowhere, and NSAllowsLocalNetworking is true in
+ * ios/Ojo/Info.plist, so the OS wouldn't even flag the cleartext localhost call.
+ * The failure would surface as "the app just doesn't load anything" — in
+ * TestFlight, or in review.
+ *
+ * The localhost default is kept for __DEV__ only, where it is the correct
+ * behaviour for `npm run dev`.
+ */
+const API_URL = process.env.EXPO_PUBLIC_API_URL ?? (__DEV__ ? 'http://localhost:4000' : '');
+
+if (!API_URL) {
+  throw new Error(
+    'EXPO_PUBLIC_API_URL is not set. A release build cannot reach the API without it — ' +
+    'set it in the eas.json build profile.',
+  );
+}
+
 const client = axios.create({
-  baseURL: process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:4000',
+  baseURL: API_URL,
   headers: { 'Content-Type': 'application/json' },
   timeout: 15_000,
 });

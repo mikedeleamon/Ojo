@@ -24,8 +24,11 @@ const saveLocalPlans = async (plans: SavedTripFitPlan[]): Promise<void> =>
 
 // ─── Server sync helpers (fire-and-forget, swallow errors) ──────────────────────
 
-const syncPost = (plan: SavedTripFitPlan) =>
-  api.post('/api/tripfit', plan, authHeaders()).catch(() => {});
+// Resolves true when the post landed, false when it didn't. Fire-and-forget
+// callers can keep ignoring the result; the one-time migration below needs it,
+// because it must not latch its "done" flag on a batch that silently failed.
+const syncPost = (plan: SavedTripFitPlan): Promise<boolean> =>
+  api.post('/api/tripfit', plan, authHeaders()).then(() => true).catch(() => false);
 
 const syncDelete = (id: string) =>
   api.delete(`/api/tripfit/${id}`, authHeaders()).catch(() => {});
@@ -39,8 +42,12 @@ const migrateLocalToServer = async (serverIds: Set<string>, local: SavedTripFitP
   const alreadyMigrated = await storage.getItem(migratedKey());
   if (alreadyMigrated) return;
   const unsynced = local.filter(p => !serverIds.has(p.id));
-  await Promise.all(unsynced.map(syncPost));
-  await storage.setItem(migratedKey(), '1');
+  const results = await Promise.all(unsynced.map(syncPost));
+  // Only latch the flag once every plan actually landed — syncPost swallows its
+  // own failures, so Promise.all resolved even when all of them failed, latching
+  // the flag and stranding those plans on the device forever. Empty batch is a
+  // success: [].every() is true.
+  if (results.every(Boolean)) await storage.setItem(migratedKey(), '1');
 };
 
 // ─── Public API ─────────────────────────────────────────────────────────────────

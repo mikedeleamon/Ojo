@@ -35,6 +35,7 @@ import {
     TRIP_MODE_MORNING_PREF_KEY,
     localHourToUTC,
     utcHourToLocal,
+    deviceTimeZone,
     PermissionStatus,
     type BriefDay,
 } from '../../../lib/notifications';
@@ -290,7 +291,15 @@ export default function NotificationsScreen() {
                             localTripMorning === 'true';
                     }
                     setNs(merged);
-                    setLocalHour(utcHourToLocal(merged.morningBriefHourUTC));
+                    // Prefer the hour the user actually picked. Deriving it
+                    // from the stored UTC hour is only correct until the clocks
+                    // change — after a DST transition that round trip shows an
+                    // hour the user never chose. Accounts saved before
+                    // morningBriefHourLocal existed still take the old path.
+                    setLocalHour(
+                        merged.morningBriefHourLocal ??
+                        utcHourToLocal(merged.morningBriefHourUTC),
+                    );
                 }
             } catch {
                 // Fall back to defaults; still try to read local trip-packing pref
@@ -370,12 +379,15 @@ export default function NotificationsScreen() {
 
             const toSave: NotificationSettings = {
                 ...ns,
+                // Both are sent: the local hour + zone is what the server
+                // schedules from, the UTC hour stays as a compatibility cache.
+                morningBriefHourLocal: localHour,
                 morningBriefHourUTC: localHourToUTC(localHour),
             };
 
             await axios.put(
                 '/api/notifications/settings',
-                toSave,
+                { ...toSave, timeZone: deviceTimeZone() },
                 authHeaders(),
             );
 
