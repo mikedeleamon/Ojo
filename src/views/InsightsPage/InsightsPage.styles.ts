@@ -153,6 +153,17 @@ export const makeStyles = (colors: ColorTokens) =>
     dnaBadgeTextLearning: {
       color: colors.textMuted,
     },
+    dnaLockedSub: {
+      fontFamily: fonts.body,
+      fontSize: fontSizes.sm,
+      color: colors.textMuted,
+      lineHeight: fontSizes.sm * 1.4,
+    },
+    dnaLockedCta: {
+      fontFamily: fonts.bodySemiBold,
+      fontSize: fontSizes.sm,
+      color: colors.textPrimary,
+    },
     colorRow: {
       flexDirection: 'row',
       gap: spacing.md,

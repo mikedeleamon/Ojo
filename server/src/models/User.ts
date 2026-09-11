@@ -80,6 +80,9 @@ export interface IUser extends Document {
   pushToken?: string;
   notificationSettings: INotificationSettings;
   tokenVersion: number;
+  // Mirrored from RevenueCat via the webhook in routes/revenuecat.ts — see
+  // lib/revenuecatEntitlement.ts for which event types flip this and why.
+  isPro: boolean;
   lastMorningSnapshot?: IMorningSnapshot;
   // Gmail integration (Trip Planner)
   googleRefreshToken?: string;
@@ -161,6 +164,7 @@ const userSchema = new Schema<IUser>({
   pushToken:            { type: String },
   notificationSettings: { type: notificationSettingsSchema, default: () => ({}) },
   tokenVersion:         { type: Number, default: 0 },
+  isPro:                { type: Boolean, default: false },
   lastMorningSnapshot:  { type: morningSnapshotSchema },
   // Gmail integration (Trip Planner)
   googleRefreshToken:   { type: String, select: false }, // excluded from default queries

@@ -41,6 +41,7 @@ export default function AccountLayout() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="profile" options={subScreen} />
+      <Stack.Screen name="upgrade" options={{ ...subScreen, title: 'Ojo Pro' }} />
       <Stack.Screen name="password" options={{ ...subScreen, title: 'Password' }} />
       <Stack.Screen name="history" options={{ ...subScreen, title: 'History' }} />
       {/* Recap ships its own always-dark masthead + nav row (redesign). */}

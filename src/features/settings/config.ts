@@ -17,6 +17,12 @@ export interface SettingsSectionConfig {
 
 export const SETTINGS_CONFIG: SettingsSectionConfig[] = [
   {
+    title: 'Ojo Pro',
+    items: [
+      { key: 'ojo-pro', label: 'Upgrade to Ojo Pro', action: { type: 'navigate', to: '/account/upgrade' } },
+    ],
+  },
+  {
     title: 'Account',
     items: [
       { key: 'profile',        label: 'Profile',         action: { type: 'navigate', to: '/account/profile' } },

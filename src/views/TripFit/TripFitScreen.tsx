@@ -64,6 +64,7 @@ export default function TripFitScreen() {
                 settings={settings}
                 existingPlan={mode.existing}
                 prefill={mode.prefill}
+                savedTripCount={plans.length}
                 onBack={openLibrary}
                 onPersist={upsert}
                 onDeleted={handleDeleted}

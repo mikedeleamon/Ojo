@@ -122,6 +122,7 @@ export const PRIVACY_POLICY: LegalDocument = {
         'Resend — transactional email provider used to deliver account emails such as password resets. It receives your email address and the contents of that message. We do not send marketing email.',
         'Open-Meteo — a free geocoding service used to power the city search box (e.g. when setting your default city or planning a trip). It receives the text you type and returns matching places with their coordinates. It does not receive your account identifier or any other information about you.',
         'Sentry — error and crash reporting. When the App or our API hits an error, Sentry receives the error itself, your device model, OS version, and app version, so we can find and fix it. We have switched off the features that would send more than that: it does not receive your IP address, it does not record your screen or your session, and it does not receive your console logs. It never receives your closet images, your outfit history, or the contents of your account.',
+        'RevenueCat — manages in-app purchases and subscription status for Ojo Pro. It receives your purchase and subscription history and the same account identifier used elsewhere in the App, so your subscription stays in sync across your devices. RevenueCat does not receive your payment card details — those are handled entirely by Apple\'s or Google\'s own purchase system and never pass through our servers or RevenueCat.',
       ],
       subsections: [
         {
@@ -204,7 +205,18 @@ export const TERMS_OF_SERVICE: LegalDocument = {
       body: [
         'Ojo is a free mobile wardrobe management application. It allows you to create and manage a digital wardrobe, receive outfit suggestions generated from your wardrobe and local weather conditions, and track your outfit wear history. Garment recognition from photos you take runs on your device using an on-device machine learning model.',
         'The App also provides wardrobe insights and a weekly recap, wardrobe gap detection, optional trip planning and packing lists, Trip Mode, home-screen and lock-screen widgets, and optional push notifications. Individual features may be added, changed, or removed over time.',
-        'The App is provided free of charge with no paid features, subscriptions, or in-app purchases. We reserve the right to modify, suspend, or discontinue any part of the App at any time without liability.',
+        `The App's core features are free to use. Ojo Pro is an optional auto-renewing subscription described in Section 2.1. We reserve the right to modify, suspend, or discontinue any part of the App at any time without liability.`,
+      ],
+      subsections: [
+        {
+          heading: '2.1  Ojo Pro Subscription',
+          body: [
+            'Ojo Pro is an optional, auto-renewing subscription that unlocks additional features, including saving more than one trip at a time in the Trip Planner and deeper wardrobe insights (Style DNA). The core outfit-suggestion, closet, and weather features described above remain free whether or not you subscribe.',
+            'Subscription length and price are shown in the App and in your Apple App Store or Google Play account settings before you purchase, and may vary by promotion or region. Payment is charged to your Apple ID or Google Play account at confirmation of purchase.',
+            'Your subscription automatically renews for the same length and price unless you cancel at least 24 hours before the end of the current period. Your account will be charged for renewal within 24 hours before the end of the current period. You can manage or cancel your subscription at any time in your Apple App Store or Google Play account settings — we cannot process a cancellation or refund on your behalf.',
+            'Where a free trial or introductory offer is shown, any unused portion is forfeited if you purchase a subscription before the trial ends. Purchases and subscriptions are processed entirely by Apple or Google; we never receive your payment card details — see Section 5 of our Privacy Policy for what our subscription-management provider, RevenueCat, does receive.',
+          ],
+        },
       ],
     },
     {
@@ -265,7 +277,7 @@ export const TERMS_OF_SERVICE: LegalDocument = {
       heading: '10. Limitation of Liability',
       body: [
         `TO THE MAXIMUM EXTENT PERMITTED BY LAW, ${DEVELOPER_NAME} SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES ARISING FROM YOUR USE OF THE APP.`,
-        'In no event shall our total liability exceed $100 (as the App is currently free).',
+        'In no event shall our total liability exceed the greater of $100 or the amount you paid us in the twelve months preceding the claim.',
       ],
     },
     {

@@ -13,6 +13,7 @@ import { SettingsProvider } from '../src/context/SettingsContext';
 import { ActiveLocationProvider } from '../src/context/ActiveLocationContext';
 import { WeatherProvider } from '../src/context/WeatherContext';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
+import { PurchasesProvider } from '../src/context/PurchasesContext';
 import { ConfirmProvider } from '../src/components/ConfirmDialog';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { isOnboardingComplete, isOnboardingPending } from '../src/lib/onboarding';
@@ -245,6 +246,7 @@ export default Sentry.wrap(function RootLayout() {
         <ThemeProvider>
           <SafeAreaProvider>
             <AuthProvider>
+              <PurchasesProvider>
               <SettingsProvider>
                 <ActiveLocationProvider>
                 <WeatherProvider>
@@ -270,6 +272,7 @@ export default Sentry.wrap(function RootLayout() {
                 </WeatherProvider>
                 </ActiveLocationProvider>
               </SettingsProvider>
+              </PurchasesProvider>
             </AuthProvider>
           </SafeAreaProvider>
         </ThemeProvider>

@@ -23,6 +23,7 @@ import tripsRoutes from './routes/trips';
 import tripFitRoutes from './routes/tripfit';
 import shareRoutes from './routes/share';
 import resetRoutes from './routes/reset';
+import revenuecatRoutes from './routes/revenuecat';
 import { requireAuth, requireAgeVerified, AuthRequest } from './middleware/auth';
 import { startNotificationService } from './services/notificationService';
 import { weatherStats, resetWeatherStats } from './lib/weatherKit';
@@ -240,6 +241,11 @@ app.use('/s',                 publicLimiter, shareRoutes);
 // other public pages; it does no database work, so this is about abuse volume
 // rather than protecting a lookup.
 app.use('/r',                 publicLimiter, resetRoutes);
+// RevenueCat's webhook caller — no user JWT to gate on, verifies itself via a
+// shared secret (see lib/revenuecatEntitlement.ts). IP-keyed like the other
+// public routes is fine here too: the caller is RevenueCat's own servers, not
+// end users, so there's no CGNAT concern to key around.
+app.use('/api/revenuecat',    publicLimiter, revenuecatRoutes);
 
 // ─── Global error handler ─────────────────────────────────────────────────────
 // Sentry's handler goes first: it reports the error and calls next(), so ours

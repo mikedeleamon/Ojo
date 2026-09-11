@@ -18,6 +18,7 @@ import { useTabBarPadding } from '../../hooks/useTabBarPadding';
 import { useReduceMotion } from '../../hooks/useReduceMotion';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { useConfirm } from '../../components/ConfirmDialog';
+import { usePurchases } from '../../context/PurchasesContext';
 import { hapticSelection, hapticSuccess } from '../../lib/haptics';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, fonts, fontSizes } from '../../theme/tokens';
@@ -137,6 +138,7 @@ export default function InsightsPage() {
   const reduceMotion = useReduceMotion();
   const nav = useAppNavigation();
   const confirm = useConfirm();
+  const { isPro } = usePurchases();
 
   const [data,          setData]          = useState<InsightsData | null>(null);
   const [loading,       setLoading]       = useState(true);
@@ -424,7 +426,25 @@ export default function InsightsPage() {
         </GlassCard>
 
         {/* ── Style DNA ── */}
-        {styleDNA.level !== 'none' && (
+        {styleDNA.level !== 'none' && !isPro && (
+          <Pressable
+            onPress={() => nav.push('/account/upgrade')}
+            accessibilityRole="button"
+            accessibilityLabel="Unlock Style DNA with Ojo Pro"
+          >
+            <GlassCard style={styles.dnaCard}>
+              <View style={styles.dnaHeader}>
+                <Text style={styles.dnaTitle}>Style DNA</Text>
+              </View>
+              <Text style={styles.dnaLockedSub}>
+                Your top colors, fabrics, and color pairings — unlock with Ojo Pro.
+              </Text>
+              <Text style={styles.dnaLockedCta}>Unlock →</Text>
+            </GlassCard>
+          </Pressable>
+        )}
+
+        {styleDNA.level !== 'none' && isPro && (
           <GlassCard style={styles.dnaCard}>
             <View style={styles.dnaHeader}>
               <Text style={styles.dnaTitle}>Style DNA</Text>

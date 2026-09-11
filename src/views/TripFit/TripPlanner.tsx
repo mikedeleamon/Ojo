@@ -12,6 +12,7 @@ import {
     View as RNView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { View, Text, GlassCard, GlassGroup } from '../../components/primitives';
 import OccasionChips from '../../components/OccasionChips';
@@ -30,6 +31,7 @@ import {
 } from '../../theme/tokens';
 import type { ColorTokens } from '../../theme/tokens';
 import { useReduceMotion } from '../../hooks/useReduceMotion';
+import { usePurchases } from '../../context/PurchasesContext';
 import { generateOutfits } from '../../lib/outfitEngine';
 import { recordGapsFromNotes } from '../../lib/wardrobeGaps';
 import { gradientFor } from '../../components/WeatherHUD/weatherPalette';
@@ -544,12 +546,20 @@ export interface PlannerPrefill {
     sourceAirlineTripId?: string;
 }
 
+// Free tier: one saved trip. Saving a second requires Ojo Pro. Only gates
+// *new* saves (onSave / onSaveForLater below) — updates to an already-saved
+// trip (replan, forecast refresh, packing checkmarks) go through `persist`
+// directly and are never blocked by this.
+const FREE_TRIP_LIMIT = 1;
+
 interface TripPlannerProps {
     articles: ClothingArticle[];
     closetId: string;
     settings: Settings;
     existingPlan?: SavedTripFitPlan;
     prefill?: PlannerPrefill;
+    /** Count of already-saved trips, for the free-tier cap. */
+    savedTripCount: number;
     onBack: () => void;
     onPersist: (plan: SavedTripFitPlan) => Promise<SavedTripFitPlan>;
     onDeleted: (id: string) => void;
@@ -563,6 +573,7 @@ export default function TripPlanner({
     settings,
     existingPlan,
     prefill,
+    savedTripCount,
     onBack,
     onPersist,
     onDeleted,
@@ -570,6 +581,8 @@ export default function TripPlanner({
     const { colors } = useTheme();
     const reduceMotion = useReduceMotion();
     const { width: windowWidth } = useWindowDimensions();
+    const router = useRouter();
+    const { isPro } = usePurchases();
 
     // One card per page: a card must be exactly as wide as the pager's frame, or
     // snapToInterval lands each card off-centre and leaks a clipped sliver of the
@@ -824,11 +837,19 @@ export default function TripPlanner({
 
     // ── Save a brand-new in-window trip ──
     const onSave = useCallback(async () => {
+        if (!isPro && savedTripCount >= FREE_TRIP_LIMIT) {
+            router.push('/account/upgrade');
+            return;
+        }
         await persist();
-    }, [persist]);
+    }, [persist, isPro, savedTripCount, router]);
 
     // ── Save a beyond-window trip for later (pending, no outfits yet) ──
     const onSaveForLater = useCallback(async () => {
+        if (!isPro && savedTripCount >= FREE_TRIP_LIMIT) {
+            router.push('/account/upgrade');
+            return;
+        }
         if (!destination.trim() || !(latRef.current || lonRef.current) || !tripStart || !tripEnd) {
             Alert.alert('Add details', 'Choose a destination from the suggestions list and pick trip dates.');
             return;
@@ -840,7 +861,7 @@ export default function TripPlanner({
         } finally {
             setSavingPending(false);
         }
-    }, [destination, tripStart, tripEnd, persist, onBack]);
+    }, [destination, tripStart, tripEnd, persist, onBack, isPro, savedTripCount, router]);
 
     // ── Replan a single day ──
     const onReplanDay = useCallback(
