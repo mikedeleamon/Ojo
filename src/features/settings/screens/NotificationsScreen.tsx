@@ -39,6 +39,7 @@ import {
     PermissionStatus,
     type BriefDay,
 } from '../../../lib/notifications';
+import { releaseReconcile } from '../../../lib/launchReconcile';
 import { storage } from '../../../lib/storage';
 import { hapticSuccess } from '../../../lib/haptics';
 import axios from '../../../api/client';
@@ -431,6 +432,14 @@ export default function NotificationsScreen() {
             }
             // When enabled, per-trip nudges are (re)scheduled by useTripPlans on next
             // load — its reconcile pass self-gates on this pref + notification permission.
+            //
+            // That pass runs once per session, and by the time this screen can be
+            // reached it has already run and read the old value of this pref. Release
+            // the claim so the next mount of useTripPlans acts on the new one:
+            // without it, switching the nudges back on left them unscheduled until
+            // the app was force-quit, and switching them off left the pass believing
+            // it had already scheduled a set that has since been cancelled.
+            releaseReconcile('tripPlans');
 
             setSaved(true);
             hapticSuccess();

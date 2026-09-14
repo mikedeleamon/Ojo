@@ -6,6 +6,7 @@ import { useTripPlans } from './useTripPlans';
 import { useClosets } from './useClosets';
 import { useSettings } from './useSettings';
 import { getCurrentLocation, type Coords } from '../lib/location';
+import { reportTripPresence } from '../lib/tripPresence';
 import {
     selectActiveTrip,
     todayDayIndex,
@@ -120,6 +121,18 @@ export const useTripMode = (): TripModeState => {
     const enabled = settings.tripModeEnabled !== false; // default on
     const radiusMi = settings.tripModeRadiusMi ?? DEFAULT_TRIP_MODE_RADIUS_MI;
 
+    // The resolution effect below reads a plan's dates, coordinates, closet,
+    // occasion and saved days — never `checkedIds`. Now that plans live in a
+    // shared store, ticking a packing checkbox on the TripFit tab publishes a
+    // new array to every consumer, and keying this effect on that array re-ran a
+    // GPS fix and a full generateOutfits here for a change it cannot see. Key it
+    // on everything *except* the packed set: the countdown's packed count
+    // (`upcomingBase`, below) is a separate memo and still updates instantly.
+    const planDigest = useMemo(
+        () => JSON.stringify(plans.map(({ checkedIds, ...rest }) => rest)),
+        [plans],
+    );
+
     // The resolution effect below only re-runs when plans/closets/settings
     // change — nothing re-checks `todayISO` on its own, so a trip whose end
     // date has passed can keep showing as active if the app was simply left
@@ -144,6 +157,10 @@ export const useTripMode = (): TripModeState => {
             setWorking(true);
 
             if (!enabled) {
+                // Trip Mode off is the user saying don't treat me as travelling.
+                // Withdraw any standing confirmation so the server stops
+                // steering their notifications by it too.
+                reportTripPresence(null).catch(() => {});
                 if (!cancelled) { setResolved(INACTIVE); setWorking(false); }
                 return;
             }
@@ -153,6 +170,10 @@ export const useTripMode = (): TripModeState => {
             // Cheap pre-check with no GPS: bail (and skip the location prompt)
             // unless a trip's date window covers today.
             if (!selectActiveTrip(plans, todayISO, null, radiusMi)) {
+                // No trip is running, so there is nothing to be present at.
+                // Costs nothing for the user who has never travelled: a clear
+                // is only sent if a confirmation was sent before it.
+                reportTripPresence(null).catch(() => {});
                 if (!cancelled) { setResolved(INACTIVE); setWorking(false); }
                 return;
             }
@@ -165,11 +186,25 @@ export const useTripMode = (): TripModeState => {
                 radiusMi,
             );
             if (!sel) {
+                // Only GPS can produce this: the date pre-check above already
+                // passed, so a trip covers today and the fix put the user at
+                // none of their trip cities. That is a real answer — tell the
+                // server, so notifications about that city stop.
+                reportTripPresence(null).catch(() => {});
                 if (!cancelled) { setResolved(INACTIVE); setWorking(false); }
                 return;
             }
 
             const { trip, locationConfirmed, distanceMi } = sel;
+
+            // Report only a GPS-backed verdict. Without a fix, `sel` is the
+            // date-only fallback — enough to show the card the user asked for,
+            // not enough to vouch for their whereabouts to the server. Staying
+            // quiet lets the last real answer expire on the server's schedule
+            // instead of being overwritten by a guess.
+            if (locationConfirmed) {
+                reportTripPresence(trip.id).catch(() => {});
+            }
             const { index, total } = todayDayIndex(trip, todayISO);
 
             const closet =
@@ -253,7 +288,7 @@ export const useTripMode = (): TripModeState => {
 
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [settingsReady, plansLoading, closetsLoading, enabled, radiusMi, plans, closets, nonce]);
+    }, [settingsReady, plansLoading, closetsLoading, enabled, radiusMi, planDigest, closets, nonce]);
 
     // Soonest saved trip that hasn't started yet. Independent of the async
     // GPS/weather resolution above — a pure function of `plans` + today's date,

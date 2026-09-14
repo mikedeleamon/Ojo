@@ -6,6 +6,7 @@ import { View, Text, Pressable, GlassCard, GlassGroup } from '../../components/p
 import { SETTINGS_CONFIG, SettingsAction } from './config';
 import SettingsSection from './components/SettingsSection';
 import { useSettings } from '../../hooks/useSettings';
+import { usePurchases } from '../../context/PurchasesContext';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { useDeferredMount } from '../../hooks/useDeferredMount';
 import { clearAuth } from '../../lib/auth';
@@ -18,6 +19,7 @@ interface Props {
 
 export default function SettingsScreen({ onLogout }: Props) {
     const { colors } = useTheme();
+    const { isPro, isReady } = usePurchases();
     const styles = useMemo(() => StyleSheet.create({
         root: { flex: 1, backgroundColor: colors.bgDefault },
         header: {
@@ -158,6 +160,25 @@ export default function SettingsScreen({ onLogout }: Props) {
         onLogout?.();
     };
 
+    // The Ojo Pro row is the one piece of SETTINGS_CONFIG whose copy depends on
+    // state the static config can't see. A subscriber being told to "Upgrade to
+    // Ojo Pro" — and then taken to a purchase CTA for something they already
+    // pay for — is the complaint, so the row states what they have instead.
+    // Until the entitlement resolves the row keeps its neutral label rather
+    // than flashing the wrong one in either direction.
+    const sections = useMemo(
+        () =>
+            SETTINGS_CONFIG.map((section) => ({
+                ...section,
+                items: section.items.map((item) =>
+                    item.key === 'ojo-pro' && isReady && isPro
+                        ? { ...item, label: 'Ojo Pro', sublabel: 'Active' }
+                        : item,
+                ),
+            })),
+        [isPro, isReady],
+    );
+
     return (
         <SafeAreaView style={styles.root}>
             <View style={styles.header}>
@@ -175,7 +196,7 @@ export default function SettingsScreen({ onLogout }: Props) {
             {showBody ? (
                 <ScrollView contentContainerStyle={styles.content}>
                     <View style={{ gap: spacing.md }}>
-                        {SETTINGS_CONFIG.map((section) => (
+                        {sections.map((section) => (
                             <SettingsSection
                                 key={section.title}
                                 section={section}

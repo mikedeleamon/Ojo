@@ -38,7 +38,7 @@ import { gradientFor } from '../../components/WeatherHUD/weatherPalette';
 import { humanizeCondition } from '../../lib/weather/humanizeCondition';
 import api from '../../api/client';
 import { authHeaders } from '../../lib/auth';
-import { newPlanId } from '../../lib/tripStorage';
+import { newPlanId, findTwinPlan } from '../../lib/tripStorage';
 import CityAutocomplete from '../../features/settings/components/CityAutocomplete';
 import type { CitySuggestion } from '../../lib/citySearch';
 import TripCalendar from './TripCalendar';
@@ -558,8 +558,12 @@ interface TripPlannerProps {
     settings: Settings;
     existingPlan?: SavedTripFitPlan;
     prefill?: PlannerPrefill;
-    /** Count of already-saved trips, for the free-tier cap. */
-    savedTripCount: number;
+    /**
+     * Every already-saved trip. The free-tier cap needs the records, not just a
+     * count: saving a trip the user already has adopts that record rather than
+     * adding one (see upsertPlan's dedupe), so it must not be charged a slot.
+     */
+    savedPlans: SavedTripFitPlan[];
     onBack: () => void;
     onPersist: (plan: SavedTripFitPlan) => Promise<SavedTripFitPlan>;
     onDeleted: (id: string) => void;
@@ -573,7 +577,7 @@ export default function TripPlanner({
     settings,
     existingPlan,
     prefill,
-    savedTripCount,
+    savedPlans,
     onBack,
     onPersist,
     onDeleted,
@@ -582,7 +586,7 @@ export default function TripPlanner({
     const reduceMotion = useReduceMotion();
     const { width: windowWidth } = useWindowDimensions();
     const router = useRouter();
-    const { isPro } = usePurchases();
+    const { isPro, isReady } = usePurchases();
 
     // One card per page: a card must be exactly as wide as the pager's frame, or
     // snapToInterval lands each card off-centre and leaks a clipped sliver of the
@@ -735,7 +739,13 @@ export default function TripPlanner({
     const persist = useCallback(
         async (override?: Partial<SavedTripFitPlan>) => {
             const plan = buildPlan(override);
-            await onPersist(plan);
+            const saved = await onPersist(plan);
+            // The store folds a new plan into an existing record for the same
+            // trip (see upsertPlan's dedupe), so the id this session minted may
+            // not be the one that was written. Adopt the real one — delete and
+            // share both read planIdRef, and would otherwise address a record
+            // that does not exist.
+            planIdRef.current = saved.id;
             setIsSaved(true);
             setRefreshAvailable(false);
         },
@@ -828,28 +838,68 @@ export default function TripPlanner({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    /**
+     * True when the free-tier cap should send the user to the paywall instead
+     * of planning or saving — and it has pushed that route already.
+     *
+     * Checked at *plan* time as well as at save time. Generating a full trip's
+     * outfits and only then refusing to keep them is the worst version of this:
+     * the user waits through a forecast fetch and a per-day generation pass,
+     * sees the thing they wanted, and is told no. Asking up front costs them a
+     * tap. The save-side checks stay as a backstop — the plan-time count can be
+     * stale if another device saved a trip since this screen loaded.
+     *
+     * Three things have to be true before a trip costs a slot:
+     *
+     *  - The entitlement is actually known. `isPro` is false for the whole
+     *    window between launch and RevenueCat resolving CustomerInfo, so
+     *    gating on it alone bounces a paying subscriber to the paywall on a
+     *    cold start. Unresolved fails open: the window is short, and wrongly
+     *    letting a free user through is far cheaper than wrongly blocking
+     *    someone who paid.
+     *  - This planner isn't already editing a saved plan. Those go back to
+     *    their own record by id, whatever the user has since retyped.
+     *  - The trip isn't one the user already has saved. `upsertPlan` adopts
+     *    the existing record for the same city and dates rather than adding a
+     *    second one, so re-planning a saved trip creates nothing to charge for.
+     */
+    const blockedByFreeLimit = useCallback((): boolean => {
+        if (!isReady || isPro) return false;
+        if (isSaved) return false;
+        if (savedPlans.length < FREE_TRIP_LIMIT) return false;
+        if (tripStart && tripEnd && findTwinPlan(savedPlans, {
+            destination,
+            startDate: toISODate(tripStart),
+            endDate:   toISODate(tripEnd),
+        })) return false;
+
+        router.push('/account/upgrade');
+        return true;
+    }, [isReady, isPro, isSaved, savedPlans, destination, tripStart, tripEnd, router]);
+
     // ── New-trip: plan (generate only; user saves explicitly) ──
     const onPlan = useCallback(async () => {
+        // Ahead of generate(), not after it — see blockedByFreeLimit. Also
+        // ahead of generate's own "pick a city" / "pick dates" alerts: a user
+        // who cannot plan another trip at all shouldn't first be coached
+        // through filling the form in. The refresh-banner call site is
+        // unaffected, since that only fires on an already-saved trip and the
+        // guard returns false for those.
+        if (blockedByFreeLimit()) return;
         const ok = await generate();
         // An already-saved trip (e.g. forecast refresh) persists immediately.
         if (ok && isSaved) await persist();
-    }, [generate, isSaved, persist]);
+    }, [generate, isSaved, persist, blockedByFreeLimit]);
 
     // ── Save a brand-new in-window trip ──
     const onSave = useCallback(async () => {
-        if (!isPro && savedTripCount >= FREE_TRIP_LIMIT) {
-            router.push('/account/upgrade');
-            return;
-        }
+        if (blockedByFreeLimit()) return;
         await persist();
-    }, [persist, isPro, savedTripCount, router]);
+    }, [persist, blockedByFreeLimit]);
 
     // ── Save a beyond-window trip for later (pending, no outfits yet) ──
     const onSaveForLater = useCallback(async () => {
-        if (!isPro && savedTripCount >= FREE_TRIP_LIMIT) {
-            router.push('/account/upgrade');
-            return;
-        }
+        if (blockedByFreeLimit()) return;
         if (!destination.trim() || !(latRef.current || lonRef.current) || !tripStart || !tripEnd) {
             Alert.alert('Add details', 'Choose a destination from the suggestions list and pick trip dates.');
             return;
@@ -861,7 +911,7 @@ export default function TripPlanner({
         } finally {
             setSavingPending(false);
         }
-    }, [destination, tripStart, tripEnd, persist, onBack, isPro, savedTripCount, router]);
+    }, [destination, tripStart, tripEnd, persist, onBack, blockedByFreeLimit]);
 
     // ── Replan a single day ──
     const onReplanDay = useCallback(

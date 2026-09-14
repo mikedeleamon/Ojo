@@ -39,7 +39,7 @@ const SettingsSection = ({ section, settings, onAction }: Props) => {
           <SettingsItem
             key={item.key}
             label={item.label}
-            sublabel={item.sublabelKey ? getSublabel(item.sublabelKey, settings) : undefined}
+            sublabel={item.sublabel ?? (item.sublabelKey ? getSublabel(item.sublabelKey, settings) : undefined)}
             onPress={() => onAction(item.action)}
             isFirst={i === 0}
           />

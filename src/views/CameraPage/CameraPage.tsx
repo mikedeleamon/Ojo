@@ -44,6 +44,8 @@ import { Svg, Path, Circle } from 'react-native-svg';
 import * as ImageManipulator from 'expo-image-manipulator';
 import ArticleModal from '../../components/ArticleModal/ArticleModal';
 import { useClosets } from '../../hooks/useClosets';
+import { useClosetLimits } from '../../hooks/useClosetLimits';
+import { FREE_ITEM_LIMIT, UPGRADE_ROUTE } from '../../config/limits';
 import { hapticImpact } from '../../lib/haptics';
 import axios from '../../api/client';
 import { auth } from '../../lib/auth';
@@ -121,6 +123,44 @@ function PermissionScreen({
         accessibilityRole="button"
       >
         <Text style={st.linkText}>Cancel</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+/**
+ * Shown instead of the camera when a free account is already at its item cap.
+ *
+ * Deliberately placed ahead of the capture flow rather than at the save: being
+ * refused after photographing, cropping and describing a garment is the worst
+ * moment to meet a paywall, and the server will refuse that save regardless.
+ * The copy leads with what the user keeps, because nothing is being taken away
+ * — the cap only stops the next addition.
+ */
+function LimitReachedScreen({
+  limit,
+  onUpgrade,
+  onCancel,
+}: {
+  limit: number;
+  onUpgrade: () => void;
+  onCancel: () => void;
+}) {
+  const { colors } = useTheme();
+  const st = useMemo(() => makePStyles(colors), [colors]);
+  return (
+    <View style={st.root}>
+      <Text style={st.title}>Closet full</Text>
+      <Text style={st.body}>
+        You've filled all {limit} items on the free plan. Everything you've
+        added stays exactly where it is — Ojo Pro lifts the cap so you can keep
+        going.
+      </Text>
+      <Pressable style={st.btn} onPress={onUpgrade} accessibilityRole="button">
+        <Text style={st.btnText}>See Ojo Pro</Text>
+      </Pressable>
+      <Pressable style={st.linkBtn} onPress={onCancel} accessibilityRole="button">
+        <Text style={st.linkText}>Not now</Text>
       </Pressable>
     </View>
   );
@@ -570,6 +610,7 @@ export default function CameraPage() {
   const [cropped,   setCropped]   = useState<ImageData | null>(null);
 
   const { closets, loading: closetsLoading, addArticle, createCloset } = useClosets();
+  const { canAddItem, itemLimit } = useClosetLimits();
   // Prefer the closet the user launched from (passed by the Closet tab's add
   // chooser); fall back to the preferred/first closet for the global Add tab.
   const targetCloset = useMemo(
@@ -675,18 +716,30 @@ export default function CameraPage() {
   );
 
   // ─── Guards ─────────────────────────────────────────────────────────────────
-  if (!permission) return null;
-  if (!permission.granted) {
-    return (
-      <PermissionScreen onRequest={requestPermission} onCancel={dismiss} />
-    );
-  }
+  // Order matters: the closet count has to load before the cap can be judged,
+  // and the cap is judged before the camera permission prompt — there is no
+  // point asking for camera access to take a photo that cannot be saved.
   if (closetsLoading) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center',
                      backgroundColor: '#0F172A' }}>
         <ActivityIndicator color="#fff" />
       </View>
+    );
+  }
+  if (!canAddItem) {
+    return (
+      <LimitReachedScreen
+        limit={itemLimit ?? FREE_ITEM_LIMIT}
+        onUpgrade={() => router.replace(UPGRADE_ROUTE as any)}
+        onCancel={dismiss}
+      />
+    );
+  }
+  if (!permission) return null;
+  if (!permission.granted) {
+    return (
+      <PermissionScreen onRequest={requestPermission} onCancel={dismiss} />
     );
   }
   if (!targetCloset) return <NoClosetScreen onClose={dismiss} />;

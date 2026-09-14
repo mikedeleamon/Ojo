@@ -38,10 +38,12 @@ import {
     GlassCard,
     IconButton,
 } from '../../components/primitives';
-import { CloseIcon, TripFitIcon } from '../../components/icons/ClosetIcons';
+import { CloseIcon, GridIcon, TripFitIcon } from '../../components/icons/ClosetIcons';
+import { HangerIcon } from '../../components/shared/HangerIcon';
 import SunnyIcon from '../../components/WeatherIcons/SunnyIcon';
 import { useTheme, ForceDarkPalette } from '../../theme/ThemeContext';
 import { usePurchases, ENTITLEMENT_ID } from '../../context/PurchasesContext';
+import { FREE_ITEM_LIMIT } from '../../config/limits';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { nativeLoop, pingPong } from '../../lib/animation/nativeLoop';
 import {
@@ -139,7 +141,7 @@ const BLOOM_B_BAND = '32%';
 export default function UpgradeScreen() {
     const router = useRouter();
     const { colors } = useTheme();
-    const { isConfigured } = usePurchases();
+    const { isConfigured, isPro, isReady } = usePurchases();
 
     const close = () => {
         if (router.canGoBack()) router.back();
@@ -192,6 +194,86 @@ export default function UpgradeScreen() {
                             style={[
                                 styles.placeholderBtnText,
                                 { color: colors.textPrimary },
+                            ]}
+                        >
+                            Go back
+                        </Text>
+                    </Pressable>
+                </GlassCard>
+            </View>
+        );
+    }
+
+    // Already subscribed. Re-presenting the purchase CTA to a paying subscriber
+    // is how they end up buying again and hitting StoreKit's
+    // PRODUCT_ALREADY_PURCHASED — and App Review opens this screen from the
+    // settings row after purchasing. Show what they have, and the one action
+    // that is actually theirs to take: Apple and Google own cancellation and
+    // refunds, so this hands off to the store's own sheet rather than
+    // pretending we can do it here.
+    if (isReady && isPro) {
+        return (
+            <View
+                style={[
+                    styles.placeholderRoot,
+                    { backgroundColor: colors.bgDefault },
+                ]}
+            >
+                <GlassCard style={styles.placeholderCard}>
+                    <Text
+                        style={[
+                            styles.placeholderTitle,
+                            { color: colors.textPrimary },
+                        ]}
+                    >
+                        Ojo Pro is active
+                    </Text>
+                    <Text
+                        style={[
+                            styles.placeholderBody,
+                            { color: colors.textMuted },
+                        ]}
+                    >
+                        Unlimited saved trips and Style DNA are unlocked on this
+                        account. Your renewal date and plan live in your App
+                        Store subscription settings.
+                    </Text>
+                    <Pressable
+                        style={[
+                            styles.placeholderBtn,
+                            {
+                                backgroundColor: colors.glassBg,
+                                borderColor: colors.glassBorder,
+                            },
+                        ]}
+                        // Resolves when the sheet is dismissed and rejects when
+                        // the platform can't open it (Android without Play, a
+                        // purchase made on another store). Either way there is
+                        // nothing useful to say, and no state of ours to undo.
+                        onPress={() => {
+                            Purchases.showManageSubscriptions().catch(() => {});
+                        }}
+                        accessibilityRole='button'
+                        accessibilityLabel='Manage subscription'
+                    >
+                        <Text
+                            style={[
+                                styles.placeholderBtnText,
+                                { color: colors.textPrimary },
+                            ]}
+                        >
+                            Manage subscription
+                        </Text>
+                    </Pressable>
+                    <Pressable
+                        onPress={close}
+                        accessibilityRole='button'
+                        accessibilityLabel='Go back'
+                    >
+                        <Text
+                            style={[
+                                styles.placeholderBtnText,
+                                { color: colors.textMuted },
                             ]}
                         >
                             Go back
@@ -517,15 +599,27 @@ function OjoProPaywall({ onClose }: { onClose: () => void }) {
                         />
                         <Text style={styles.eyebrow}>Ojo Pro</Text>
                         <Text style={styles.headline}>
-                            Plan more trips.{'\n'}Know your style.
+                            Room for{'\n'}everything you own.
                         </Text>
                         <Text style={styles.subhead}>
-                            Ojo gets smarter every time you use it. Pro opens
-                            up what it learns.
+                            Ojo gets smarter every time you use it. Pro lifts
+                            the limits and opens up what it learns.
                         </Text>
                     </View>
 
                     <View style={styles.features}>
+                        {/* Ordered by how often each gate is actually met, so
+                            the first row is the reason most people are here. */}
+                        <FeatureRow
+                            icon={<HangerIcon size={23} color='#ffffff' decorative />}
+                            title='Unlimited items'
+                            body={`Free covers ${FREE_ITEM_LIMIT} items — enough for a full year of weather. Pro removes the cap.`}
+                        />
+                        <FeatureRow
+                            icon={<GridIcon size={22} color='#ffffff' />}
+                            title='Unlimited closets'
+                            body='Free includes one closet. Pro adds a travel closet, a seasonal one, as many as you like.'
+                        />
                         <FeatureRow
                             icon={<TripFitIcon size={24} />}
                             title='Unlimited saved trips'

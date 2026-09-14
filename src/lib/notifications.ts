@@ -133,6 +133,7 @@ export const cancelWeeklyRecap = async (): Promise<void> => {
 // current schedule for anyone who already has it enabled.
 export const reconcileWeeklyRecap = async (): Promise<void> => {
   if (!getToken()) return;
+  await awaitNotificationWipe();
   try {
     const { data } = await axios.get('/api/notifications/settings', authHeaders());
     if (data?.weeklyRecapEnabled) {
@@ -216,8 +217,10 @@ export const utcHourToLocal = (utcHour: number): number =>
 export const TRIP_PACKING_PREF_KEY = 'ojo_trip_packing_enabled';
 const TRIP_REGISTRY_KEY = 'ojo_trip_reminder_plan_ids';
 
-const weekReminderId    = (planId: string) => `ojo_trip_${planId}_wk`;
-const twoDayReminderId  = (planId: string) => `ojo_trip_${planId}_2d`;
+const TRIP_REMINDER_PREFIX = 'ojo_trip_';
+
+const weekReminderId    = (planId: string) => `${TRIP_REMINDER_PREFIX}${planId}_wk`;
+const twoDayReminderId  = (planId: string) => `${TRIP_REMINDER_PREFIX}${planId}_2d`;
 
 interface TripReminderInput {
   id:          string;          // plan id
@@ -421,6 +424,108 @@ export const scheduleTripMorningNotifications = async (
   }
 };
 
+// ─── Orphaned trip notifications ──────────────────────────────────────────────
+// Every cancel path above needs a plan id in hand: `remove()` cancels the plan
+// it just deleted, `upsert()` re-schedules the plan it just saved. Nothing
+// cancels notifications belonging to a plan that disappeared without passing
+// through either — one stranded on a signed-out account (plans are stored per
+// user, scheduled notifications are not), or one that only ever lived locally
+// and went with its storage bucket.
+//
+// Those pending notifications can never be addressed by id again, so they keep
+// firing next to the replacement trip's own: one identical 8am nudge per
+// stranded copy, which is exactly what three plan records for one trip to the
+// same city look like from the notification shade.
+//
+// This is the reconciliation that closes the hole — anything under the trip
+// prefixes whose plan id is not in the live set gets cancelled.
+
+/** The plan id inside a trip notification identifier, or null if it isn't one. */
+const planIdFromTripNotifId = (identifier: string): string | null => {
+  for (const prefix of [TRIP_MODE_PREFIX, TRIP_REMINDER_PREFIX]) {
+    if (!identifier.startsWith(prefix)) continue;
+    // `<prefix><planId>_<suffix>`, where the suffix is always a single trailing
+    // segment (a date, `wk`, `2d`) — so the id is everything before the last
+    // `_`, and a plan id containing underscores still round-trips.
+    const rest = identifier.slice(prefix.length);
+    const cut = rest.lastIndexOf('_');
+    if (cut > 0) return rest.slice(0, cut);
+  }
+  return null;
+};
+
+/**
+ * Cancel every pending trip reminder and Trip Mode nudge whose plan is no
+ * longer in `livePlanIds`, and drop the same dead ids from the reminder
+ * registry.
+ *
+ * Callers must pass *every* plan they hold, not just the ones they intend to
+ * schedule — a completed trip is still a live plan, and dropping it from the
+ * set would cancel notifications the normal paths still own.
+ */
+export const cancelOrphanedTripNotifications = async (
+  livePlanIds: string[],
+): Promise<void> => {
+  const live = new Set(livePlanIds);
+
+  try {
+    const all = await Notifications.getAllScheduledNotificationsAsync();
+    const orphans = all.filter((n) => {
+      const planId = planIdFromTripNotifId(n.identifier ?? '');
+      return planId !== null && !live.has(planId);
+    });
+    await Promise.all(
+      orphans.map((n) =>
+        Notifications.cancelScheduledNotificationAsync(n.identifier).catch(() => {}),
+      ),
+    );
+  } catch {
+    /* ignore */
+  }
+
+  // The packing-reminder registry strands the same ids: `cancelTripReminders`
+  // only prunes the plan it was handed, so ids of vanished plans accumulate and
+  // make the master-toggle cancel do pointless work forever.
+  try {
+    const reg = await loadRegistry();
+    const kept = reg.filter((id) => live.has(id));
+    if (kept.length !== reg.length) await saveRegistry(kept);
+  } catch {
+    /* ignore */
+  }
+};
+
+// Sign-out's wipe is fire-and-forget — `logout` is a synchronous callback with
+// nothing to await it — but it must still be ordered ahead of the next
+// account's reconcilers, or a fast account switch schedules a set that the
+// in-flight wipe then deletes. Reconcilers wait on this barrier, which is
+// already-resolved except while a wipe is actually running.
+let wipeInFlight: Promise<void> = Promise.resolve();
+
+/** Resolves once any in-flight sign-out wipe has finished. */
+export const awaitNotificationWipe = (): Promise<void> => wipeInFlight;
+
+/**
+ * Cancel every local notification this app has scheduled, of any kind.
+ *
+ * For sign-out: scheduled notifications are device state, not account state, so
+ * without this the previous account's briefs, recaps and trip nudges keep
+ * firing for whoever signs in next — copy naming a city and a trip they have no
+ * record of. The next account's own reconcilers re-schedule what it's entitled
+ * to (see `resetLaunchReconcilers`).
+ */
+export const cancelAllLocalNotifications = (): Promise<void> => {
+  wipeInFlight = (async () => {
+    try {
+      await Notifications.cancelAllScheduledNotificationsAsync();
+    } catch {
+      /* ignore */
+    }
+    await storage.removeItem(TRIP_REGISTRY_KEY).catch(() => {});
+  })();
+  return wipeInFlight;
+};
+
 // ─── Morning Outfit Brief ─────────────────────────────────────────────────────
 // A rolling window of per-day DATE triggers at the user's chosen local hour,
 // each carrying copy built from that day's forecast and the outfit the engine
@@ -557,6 +662,7 @@ export const getBriefPreview = async (): Promise<BriefDay | null> => {
  */
 export const reconcileMorningBriefs = async (): Promise<void> => {
   if (!getToken()) return;
+  await awaitNotificationWipe();
   try {
     const { data } = await axios.get('/api/notifications/settings', authHeaders());
     if (!data?.morningBriefEnabled) await cancelMorningBriefs();
@@ -648,6 +754,7 @@ export const scheduleSameDayNudges = async (items: SameDayNudgeItem[]): Promise<
  */
 export const reconcileSameDayNudges = async (): Promise<void> => {
   if (!getToken()) return;
+  await awaitNotificationWipe();
   try {
     const { data } = await axios.get('/api/notifications/settings', authHeaders());
     if (!data?.sameDayNudgeEnabled) await cancelSameDayNudges();

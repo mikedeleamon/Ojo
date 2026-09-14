@@ -14,14 +14,23 @@ router.use(requireAuth);
 
 router.get('/me', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const user = await User.findById(req.userId).select('username email');
+    const user = await User.findById(req.userId).select('username email isPro');
     if (!user) { res.status(404).json({ error: 'User not found' }); return; }
     // Surfaced here so a cold start with a remembered token still learns it has
     // to run the age gate — the login response that would have carried the flag
     // happened on some earlier launch.
+    //
+    // isPro is the RevenueCat webhook's mirror of the entitlement (see
+    // routes/revenuecat.ts). It is NOT what the client gates on: the SDK's own
+    // CustomerInfo is authoritative, resolves without a round trip to us, and
+    // reflects a purchase the instant it completes, whereas this field only
+    // moves when a webhook lands. It is here so the value is readable at all —
+    // for support ("does the server think they're Pro?"), and as the field any
+    // future server-side Pro check would read.
     res.json({
       username: user.username,
       email: user.email,
+      isPro: user.isPro,
       needsAgeVerification: !req.ageVerified,
     });
   } catch (err) {

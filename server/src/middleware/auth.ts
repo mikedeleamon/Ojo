@@ -11,6 +11,13 @@ export interface AuthRequest extends Request {
    * tokenVersion, so requireAgeVerified below costs no extra query.
    */
   ageVerified?: boolean;
+  /**
+   * Whether the account holds the `pro` entitlement, mirrored from RevenueCat
+   * by routes/revenuecat.ts. Resolved here from the same document lookup that
+   * checks tokenVersion, so the free-tier caps in routes/closets.ts cost no
+   * extra query — same arrangement as `ageVerified` above.
+   */
+  isPro?: boolean;
 }
 
 export const requireAuth = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
@@ -32,7 +39,7 @@ export const requireAuth = async (req: AuthRequest, res: Response, next: NextFun
   try {
     const payload = verifyToken(token);
     const user = await User.findById(payload.sub)
-      .select('tokenVersion birthday ageVerifiedAt')
+      .select('tokenVersion birthday ageVerifiedAt isPro')
       .lean();
     if (!user || (payload.ver ?? 0) !== user.tokenVersion) {
       res.status(401).json({ error: 'Unauthorized' });
@@ -44,6 +51,7 @@ export const requireAuth = async (req: AuthRequest, res: Response, next: NextFun
     // predate the field don't all get re-prompted on deploy — only the ones
     // that genuinely never supplied a usable date of birth.
     req.ageVerified = !!user.ageVerifiedAt || isAgeVerified(user.birthday);
+    req.isPro = !!user.isPro;
     next();
   } catch {
     res.status(401).json({ error: 'Unauthorized' });

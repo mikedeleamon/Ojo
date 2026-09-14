@@ -17,6 +17,8 @@ import { Closet, ClothingArticle, ArticleFormData } from '../../types';
 import { spacing } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 import { hapticImpact } from '../../lib/haptics';
+import { getErrorMessage } from '../../lib/auth';
+import { limitCodeOf } from '../../config/limits';
 import { makeStyles } from './ClosetView.styles';
 import {
     SearchIcon,
@@ -63,6 +65,17 @@ interface Props {
     onRemoveArticle: (closetId: string, articleId: string) => Promise<void>;
     onSetPreferred: (id: string) => Promise<void>;
     onTripFit?: () => void;
+    /** Free-tier state from useClosetLimits. Omitted (or uncapped) means no
+     *  ceiling — a Pro account, or the entitlement not yet resolved. */
+    itemCount?: number;
+    /** `null`/undefined = unlimited. Drives the counter and the banner. */
+    itemLimit?: number | null;
+    canAddItem?: boolean;
+    canAddCloset?: boolean;
+    showItemWarning?: boolean;
+    /** Route to the paywall. Called instead of opening an add flow the account
+     *  cannot complete, so the user meets the wall BEFORE doing the work. */
+    onUpgrade?: () => void;
     /** Pull-to-refresh handler; resolves when the refetch settles. */
     onRefresh?: () => Promise<void>;
     /** Bottom padding so scroll content clears the floating pill tab bar */
@@ -81,6 +94,12 @@ const ClosetView = ({
     onRemoveArticle,
     onSetPreferred,
     onTripFit,
+    itemCount = 0,
+    itemLimit = null,
+    canAddItem = true,
+    canAddCloset = true,
+    showItemWarning = false,
+    onUpgrade,
     onRefresh,
     tabClearance = 0,
 }: Props) => {
@@ -135,8 +154,12 @@ const ClosetView = ({
     // create-closet form. Fires once when the flag flips true; if the user then
     // cancels, it won't reopen (deps unchanged) until a fresh navigation.
     useEffect(() => {
-        if (autoCreate) setCreating(true);
-    }, [autoCreate]);
+        if (!autoCreate) return;
+        // The widget's ojo://closet/new deep link lands here directly, so it
+        // has to respect the cap too — otherwise it is a way around the "+".
+        if (canAddCloset) setCreating(true);
+        else onUpgrade?.();
+    }, [autoCreate, canAddCloset, onUpgrade]);
 
     const selected = closets.find((c) => c._id === selectedId) ?? closets[0];
     const filterCount = activeCategories.length + activeColors.length + activeFabrics.length + activeGenders.length;
@@ -215,8 +238,16 @@ const ClosetView = ({
             await onCreateCloset(newName.trim());
             setNewName('');
             setCreating(false);
-        } catch {
-            Alert.alert('Error', 'Failed to create closet.');
+        } catch (err) {
+            // The server refused on the closet cap — offer the paywall rather
+            // than reporting this as a failure, which it isn't.
+            if (limitCodeOf(err)) {
+                setNewName('');
+                setCreating(false);
+                onUpgrade?.();
+                return;
+            }
+            Alert.alert('Error', getErrorMessage(err, 'Failed to create closet.'));
         }
     };
 
@@ -272,6 +303,10 @@ const ClosetView = ({
 
     const openAddChooser = () => {
         if (!selected) return;
+        // Checked before the chooser opens, not after the photo is taken and
+        // the attributes are filled in. The server refuses either way; the
+        // point of checking here is that the user hasn't spent the effort yet.
+        if (!canAddItem) { onUpgrade?.(); return; }
         // Pass the closet the user is viewing so the photo path files the new
         // item here too — matching "Enter Manually" (which uses selected._id)
         // instead of silently defaulting to the preferred closet.
@@ -407,8 +442,8 @@ const ClosetView = ({
                 <GlassCard glassStyle='clear' style={styles.newClosetBtn}>
                     <Pressable
                         style={styles.iconBtnFill}
-                        onPress={() => setCreating(true)}
-                        accessibilityLabel='New closet'
+                        onPress={() => (canAddCloset ? setCreating(true) : onUpgrade?.())}
+                        accessibilityLabel={canAddCloset ? 'New closet' : 'New closet — requires Ojo Pro'}
                         accessibilityRole='button'
                     >
                         <PlusIcon size={18} color={colors.textSecondary} decorative />
@@ -486,6 +521,14 @@ const ClosetView = ({
                 <Text style={styles.mainTitle} numberOfLines={1}>
                     {selected?.name ?? ''}
                 </Text>
+                {itemLimit !== null && (
+                    <Text
+                        style={styles.itemCounter}
+                        accessibilityLabel={`${itemCount} of ${itemLimit} free item slots used`}
+                    >
+                        {itemCount}/{itemLimit}
+                    </Text>
+                )}
                 <View style={styles.headerRight}>
                     {/* Single cycling view-mode button — shows the mode you'll switch TO */}
                     <GlassCard glassStyle='clear' style={styles.viewCycleBtn}>
@@ -516,6 +559,23 @@ const ClosetView = ({
                     )}
                 </View>
             </View>
+
+            {/* ── Free-tier banner: heads-up near the cap, offer at it ── */}
+            {itemLimit !== null && (showItemWarning || !canAddItem) && (
+                <Pressable
+                    style={styles.limitBanner}
+                    onPress={onUpgrade}
+                    accessibilityRole='button'
+                    accessibilityLabel='Upgrade to Ojo Pro for unlimited items'
+                >
+                    <Text style={styles.limitBannerText}>
+                        {canAddItem
+                            ? `${itemLimit - itemCount} item${itemLimit - itemCount === 1 ? '' : 's'} left on the free plan.`
+                            : `You've filled all ${itemLimit} free item slots. Everything you've added stays right here.`}
+                    </Text>
+                    <Text style={styles.limitBannerCta}>Go Pro →</Text>
+                </Pressable>
+            )}
 
             {/* ── Search + sort + filter row ── */}
             <View style={styles.searchBar}>

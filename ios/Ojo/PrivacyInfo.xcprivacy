@@ -139,6 +139,22 @@
 				<string>NSPrivacyCollectedDataTypePurposeProductPersonalization</string>
 			</array>
 		</dict>
+		<!-- Purchases — subscription status for Ojo Pro, handled by RevenueCat.
+		     Linked: RevenueCat is passed the account's own id so the entitlement
+		     follows the account across devices. Payment card details are handled
+		     entirely by Apple and never reach us or RevenueCat. -->
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypePurchaseHistory</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<true/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+			</array>
+		</dict>
 		<!-- Crash data — Sentry, enabled only outside development. Not linked to
 		     identity: sendDefaultPii is off and app/_layout.tsx scrubs coordinates
 		     from every event before it leaves the device. -->

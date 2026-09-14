@@ -7,6 +7,9 @@ export interface SettingsItemConfig {
   key:          string;
   label:        string;
   sublabelKey?: 'clothingStyle' | 'location' | 'temperatureScale';
+  /** A literal sublabel, for state that doesn't live in Settings (e.g. the
+   *  subscription status on the Ojo Pro row). Wins over `sublabelKey`. */
+  sublabel?:    string;
   action:       SettingsAction;
 }
 

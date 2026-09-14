@@ -21,6 +21,12 @@
  * Do not re-add a brief push here without removing the client scheduler first,
  * or users get two notifications every morning.
  *
+ * WHERE these describe is resolved per user too: a user whose device has
+ * confirmed it is at a saved trip's city, during that trip's dates, gets the
+ * trip city; everyone else gets their home city (see lib/activeTrip.ts). Before
+ * that, every one of these named `settings.location` unconditionally, so a user
+ * three days into a trip was told about rain at home.
+ *
  * Cron ticks are hourly and in UTC, but WHO fires on a given tick is resolved
  * per user from their own IANA zone (see lib/timeZone.ts), so both passes land
  * in the user's real local morning/afternoon in every zone and stay correct
@@ -35,6 +41,7 @@ import User from '../models/User';
 import Closet from '../models/Closet';
 import { getCurrent } from '../lib/weatherKit';
 import { candidateHours, healedHour, scheduledUtcHour } from '../lib/notificationSchedule';
+import { loadConfirmedTrips, resolveWeatherLocation, locationKey } from '../lib/activeTrip';
 
 const expo = new Expo();
 
@@ -275,16 +282,17 @@ async function runMorningCheck(): Promise<void> {
   const users = candidates.filter(u => scheduledUtcHour(u, 0, now) === currentUTCHour);
   if (users.length === 0) return;
 
-  await mapWithConcurrency(users, SEND_CONCURRENCY, async (user) => {
-    const city = user.settings?.location;
-    const lat  = user.settings?.lat;
-    const lon  = user.settings?.lon;
-    // Without coords we can't call WeatherKit. The client is responsible for
-    // geocoding `location` and PATCHing lat/lon up; users on old clients (no
-    // coords yet) get skipped until they re-save their location.
-    if (!city || typeof lat !== 'number' || typeof lon !== 'number') return;
+  // One query for the whole pass, not one per user.
+  const activeTrips = await loadConfirmedTrips(users, now);
 
-    const weather = await getCurrentWeather(lat, lon);
+  await mapWithConcurrency(users, SEND_CONCURRENCY, async (user) => {
+    // The trip city while a trip is running, the home city otherwise. Null when
+    // neither has usable coords: the client geocodes `location` and PATCHes
+    // lat/lon up, so users on old clients are skipped until they re-save it.
+    const place = resolveWeatherLocation(user, activeTrips.get(String(user._id)));
+    if (!place) return;
+
+    const weather = await getCurrentWeather(place.lat, place.lon);
     if (!weather) return;
 
     const heal = healedHour(user, now);
@@ -294,6 +302,9 @@ async function runMorningCheck(): Promise<void> {
           hasPrecipitation: weather.hasPrecipitation,
           tempF: weather.tempF,
           recordedAt: new Date(),
+          // Stamped so runAfternoonCheck can tell whether this baseline is
+          // still about the city the user is in — see the check there.
+          locationKey: locationKey(place.lat, place.lon),
         },
         ...(heal === null ? {} : { 'notificationSettings.morningBriefHourUTC': heal }),
       },
@@ -301,13 +312,15 @@ async function runMorningCheck(): Promise<void> {
 
     const ns = user.notificationSettings;
 
-    // Closet gap nudge (optional, same morning window)
+    // Closet gap nudge (optional, same morning window). Named for the trip city
+    // too: while travelling, the gap that matters is in what they packed for
+    // where they are, not in the closet they left at home.
     if (ns?.closetGapEnabled) {
       const closets = await Closet.find({ userId: user._id }).lean();
       const articleTypes = new Set(
         closets.flatMap(c => c.articles.map((a: any) => a.clothingType as string)),
       );
-      const gapMsg = buildGapMessage(city, weather, articleTypes);
+      const gapMsg = buildGapMessage(place.city, weather, articleTypes);
       if (gapMsg) await sendPush(user.pushToken!, gapMsg, 'ojo://closet');
     }
   });
@@ -342,22 +355,31 @@ async function runAfternoonCheck(): Promise<void> {
   );
   if (users.length === 0) return;
 
-  await mapWithConcurrency(users, SEND_CONCURRENCY, async (user) => {
-    const city = user.settings?.location;
-    const lat  = user.settings?.lat;
-    const lon  = user.settings?.lon;
-    if (!city || typeof lat !== 'number' || typeof lon !== 'number') return;
+  const activeTrips = await loadConfirmedTrips(users, now);
 
-    const weather = await getCurrentWeather(lat, lon);
+  await mapWithConcurrency(users, SEND_CONCURRENCY, async (user) => {
+    const place = resolveWeatherLocation(user, activeTrips.get(String(user._id)));
+    if (!place) return;
+
+    const weather = await getCurrentWeather(place.lat, place.lon);
     if (!weather) return;
 
     const snap  = user.lastMorningSnapshot;
     const scale = user.settings?.temperatureScale ?? 'Imperial';
 
-    // Only use morning snapshot if it was recorded today (within 24 h)
-    const morning = snap && (Date.now() - new Date(snap.recordedAt).getTime() < MS_24H)
-      ? snap
-      : null;
+    // The baseline has to be both recent and about the same place. A snapshot
+    // taken this morning in the user's home city describes nothing about the
+    // trip city they are in now: comparing across the two turned "flew
+    // somewhere 20° cooler" into "the temperature dropped 15°" and fired a
+    // weather-change alert on a day the weather hadn't changed at all. A
+    // snapshot with no key predates the field, so it can't be vouched for.
+    const key = locationKey(place.lat, place.lon);
+    const morning =
+      snap &&
+      Date.now() - new Date(snap.recordedAt).getTime() < MS_24H &&
+      snap.locationKey === key
+        ? snap
+        : null;
 
     const precipChanged = morning
       ? !morning.hasPrecipitation && weather.hasPrecipitation
@@ -368,8 +390,11 @@ async function runAfternoonCheck(): Promise<void> {
       : false;
 
     if (precipChanged || tempDropped) {
-      const msg = buildWeatherChangeMessage(city, weather, scale);
-      await sendPush(user.pushToken!, msg, 'ojo://outfit');
+      const msg = buildWeatherChangeMessage(place.city, weather, scale);
+      // On a trip, send them to that trip's day rather than the home-screen
+      // outfit — that's where the outfit for this weather actually lives.
+      const url = place.tripId ? `ojo://trip/${place.tripId}` : 'ojo://outfit';
+      await sendPush(user.pushToken!, msg, url);
     }
   });
 }

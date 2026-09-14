@@ -8,7 +8,9 @@ import ClosetView from '../../components/ClosetView/ClosetView';
 import Loading from '../../components/Loading/Loading';
 import { HangerIcon } from '../../components/shared/HangerIcon';
 import { useClosets } from '../../hooks/useClosets';
+import { useClosetLimits } from '../../hooks/useClosetLimits';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
+import { UPGRADE_ROUTE } from '../../config/limits';
 import { useTabBarPadding } from '../../hooks/useTabBarPadding';
 import { fonts, fontSizes, spacing, radius } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
@@ -46,6 +48,9 @@ export default function ClosetPage() {
     createCloset, renameCloset, deleteCloset,
     addArticle, editArticle, removeArticle, setPreferred,
   } = useClosets();
+
+  const { itemCount, itemLimit, canAddItem, canAddCloset, showItemWarning } =
+    useClosetLimits();
 
   useFocusEffect(useCallback(() => {
     refresh();
@@ -93,6 +98,12 @@ export default function ClosetPage() {
         onEditArticle={editArticle}
         onRemoveArticle={removeArticle}
         onSetPreferred={setPreferred}
+        itemCount={itemCount}
+        itemLimit={itemLimit}
+        canAddItem={canAddItem}
+        canAddCloset={canAddCloset}
+        showItemWarning={showItemWarning}
+        onUpgrade={() => push(UPGRADE_ROUTE)}
         onTripFit={() => push('/(tabs)/tripfit')}
         onRefresh={hardRefresh}
         tabClearance={tabPad}

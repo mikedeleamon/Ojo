@@ -1,10 +1,71 @@
 import { Router, Response } from 'express';
+import { Types } from 'mongoose';
 import Closet from '../models/Closet';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 import { uploadToR2, deleteFromR2, deleteManyFromR2, UploadValidationError } from '../lib/r2';
+import { checkLimit, limitsEnforced, type LimitKind } from '../lib/entitlements';
 
 const router = Router();
 router.use(requireAuth);
+
+/**
+ * Items this account holds, summed across every one of its closets.
+ *
+ * Counted globally rather than per-closet on purpose: a grandfathered account
+ * holding several closets must not thereby get a larger item budget than the
+ * cap intends, and once closets are capped at one the distinction is moot for
+ * everyone else.
+ *
+ * `$size` over the subdocument array means Mongo returns a single number —
+ * the articles themselves never cross the wire for a count.
+ */
+const countItems = async (userId: string): Promise<number> => {
+  const [agg] = await Closet.aggregate<{ total: number }>([
+    // Aggregation pipelines bypass Mongoose's schema casting, so the string
+    // userId has to be an ObjectId here or $match silently returns nothing —
+    // which would read as "0 items" and wave every addition through.
+    { $match: { userId: new Types.ObjectId(userId) } },
+    { $group: { _id: null, total: { $sum: { $size: '$articles' } } } },
+  ]);
+  return agg?.total ?? 0;
+};
+
+/**
+ * Whether this request may add one more of `kind`. Answers 403 and returns
+ * false when it may not, so call sites read `if (!(await withinLimit(...))) return;`.
+ *
+ * `count` is a thunk, not a number, so the counting query is skipped entirely
+ * while enforcement is off — which is its default state (see limitsEnforced).
+ *
+ * The refusal log line is the whole instrumentation story for these caps: there
+ * is no analytics SDK in this project, so `grep '\[limits\] refused'` over
+ * Railway's logs is how you find out whether the ceiling is ever actually
+ * reached, by how many accounts, and at what count. Correlating those userIds
+ * against RevenueCat's conversions is how you find out whether hitting it sells
+ * anything.
+ */
+const withinLimit = async (
+  req: AuthRequest,
+  res: Response,
+  kind: LimitKind,
+  count: () => Promise<number>,
+): Promise<boolean> => {
+  if (!limitsEnforced()) return true;
+
+  const check = checkLimit(kind, await count(), !!req.isPro);
+  if (check.allowed) return true;
+
+  console.warn(
+    `[limits] refused kind=${kind} user=${req.userId} current=${check.current} limit=${check.limit}`,
+  );
+  res.status(403).json({
+    error:   check.error,
+    code:    check.code,
+    limit:   check.limit,
+    current: check.current,
+  });
+  return false;
+};
 
 router.get('/', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -20,6 +81,11 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { name } = req.body;
     if (!name) { res.status(400).json({ error: 'name is required' }); return; }
+
+    const withinCap = await withinLimit(req, res, 'closet', () =>
+      Closet.countDocuments({ userId: req.userId }));
+    if (!withinCap) return;
+
     const closet = await Closet.create({ name, userId: req.userId });
     res.status(201).json(closet);
   } catch (err) {
@@ -91,6 +157,14 @@ router.post('/:closetId/upload-image', async (req: AuthRequest, res: Response): 
       res.status(400).json({ error: 'Valid base64 data URI is required' });
       return;
     }
+
+    // Checked HERE, before the object is written, as well as on the article
+    // POST below. This route runs first in the add flow, so gating only the
+    // article create would bill an R2 write for an item that is about to be
+    // refused — and leave that object orphaned, with nothing referencing it and
+    // nothing to reconcile it against.
+    if (!(await withinLimit(req, res, 'item', () => countItems(req.userId!)))) return;
+
     const imageUrl = await uploadToR2(base64);
     res.json({ imageUrl });
   } catch (err) {
@@ -129,6 +203,12 @@ router.post('/:closetId/articles', async (req: AuthRequest, res: Response): Prom
   try {
     const closet = await Closet.findOne({ _id: req.params.closetId, userId: req.userId });
     if (!closet) { res.status(404).json({ error: 'Closet not found' }); return; }
+
+    // The actual enforcement point. The upload-image route above checks too,
+    // but only to avoid orphaning an object — an item can reach this route with
+    // no upload at all (the "Enter Manually" path in ClosetView), so this check
+    // is the one that cannot be skipped.
+    if (!(await withinLimit(req, res, 'item', () => countItems(req.userId!)))) return;
 
     // Whitelist incoming fields so callers cannot plant arbitrary keys on the subdoc
     const articleInput: Record<string, unknown> = {};

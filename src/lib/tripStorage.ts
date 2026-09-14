@@ -83,10 +83,60 @@ export const loadPlans = async (): Promise<SavedTripFitPlan[]> => {
   }
 };
 
-/** Create or update a plan (idempotent by `id`). Writes locally, then syncs. */
+/** The fields that decide whether two records describe the same trip. */
+export interface TripIdentity {
+  destination: string;
+  startDate:   string;
+  endDate:     string;
+}
+
+/** Two plans describe the same trip when the city and both dates line up. */
+export const isSameTrip = (a: TripIdentity, b: TripIdentity): boolean =>
+  a.startDate === b.startDate &&
+  a.endDate === b.endDate &&
+  a.destination.trim().toLowerCase() === b.destination.trim().toLowerCase();
+
+/**
+ * The already-saved plan `candidate` would be adopted by rather than added to,
+ * if there is one.
+ *
+ * Exported because `upsertPlan` is not the only caller that needs the answer:
+ * the free-tier trip cap has to know whether a save would actually create a
+ * record before it charges a slot for it.
+ */
+export const findTwinPlan = <T extends TripIdentity>(
+  plans: T[],
+  candidate: TripIdentity,
+): T | undefined => plans.find(p => isSameTrip(p, candidate));
+
+/**
+ * Create or update a plan (idempotent by `id`). Writes locally, then syncs.
+ *
+ * Also idempotent by *trip*: a planner session that didn't open a saved plan
+ * mints a fresh id, so planning a trip the user already had saved — from the
+ * "Plan a new trip" button, or from the flight chip for a trip they'd already
+ * planned by hand — wrote a second record for it. Duplicates are easy to miss
+ * in the library and impossible to miss at 8am, when every copy's Trip Mode
+ * nudge fires side by side with identical copy. Same city, same dates is the
+ * same trip: adopt the record that already exists rather than adding to it.
+ */
 export const upsertPlan = async (plan: SavedTripFitPlan): Promise<SavedTripFitPlan> => {
-  const stamped: SavedTripFitPlan = { ...plan, updatedAt: new Date().toISOString() };
   const existing = await loadLocalPlans();
+
+  // Only when the incoming id is unknown — an edit to a plan already saved
+  // under its own id is never a duplicate of anything, even if the user has
+  // just retyped its dates to match another trip's.
+  const twin = existing.some(p => p.id === plan.id)
+    ? undefined
+    : findTwinPlan(existing, plan);
+
+  const stamped: SavedTripFitPlan = {
+    ...plan,
+    id:        twin?.id ?? plan.id,
+    createdAt: twin?.createdAt ?? plan.createdAt,
+    updatedAt: new Date().toISOString(),
+  };
+
   const idx = existing.findIndex(p => p.id === stamped.id);
   const next = idx >= 0
     ? existing.map(p => (p.id === stamped.id ? stamped : p))

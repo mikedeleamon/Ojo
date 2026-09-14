@@ -27,6 +27,7 @@ import {
   offsetMinutes,
   utcHourForLocalHour,
   localHourNow,
+  localDateISO,
 } from '../timeZone';
 
 /**
@@ -167,5 +168,26 @@ describe('localHourNow', () => {
     // Must be 0 and never 24 — the h23 hour cycle is what guarantees that, and
     // a 24 here would match no getUTCHours() the scheduler ever compares to.
     expect(localHourNow('Europe/London', new Date('2026-07-15T23:30:00Z'))).toBe(0);
+  });
+});
+
+describe('localDateISO', () => {
+  it('reads the calendar date in the target zone, zero-padded', () => {
+    const at = new Date('2026-07-05T23:30:00Z');
+    expect(localDateISO('UTC', at)).toBe('2026-07-05');
+    expect(localDateISO('Asia/Tokyo', at)).toBe('2026-07-06');     // already tomorrow
+    expect(localDateISO('America/Los_Angeles', at)).toBe('2026-07-05');
+  });
+
+  // The case the trip-city resolution turns on: a trip ending on the 11th is
+  // still running at 9pm on the 11th in Jamaica, where UTC has rolled over.
+  it('keeps the traveller on their own date, not UTC’s', () => {
+    const at = new Date('2026-09-12T02:00:00Z'); // 9pm Sep 11 in Jamaica
+    expect(localDateISO('UTC', at)).toBe('2026-09-12');
+    expect(localDateISO('America/Jamaica', at)).toBe('2026-09-11');
+  });
+
+  it('pads single-digit months and days', () => {
+    expect(localDateISO('UTC', new Date('2026-01-02T12:00:00Z'))).toBe('2026-01-02');
   });
 });

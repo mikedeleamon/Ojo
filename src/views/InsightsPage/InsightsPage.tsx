@@ -138,7 +138,7 @@ export default function InsightsPage() {
   const reduceMotion = useReduceMotion();
   const nav = useAppNavigation();
   const confirm = useConfirm();
-  const { isPro } = usePurchases();
+  const { isPro, isReady } = usePurchases();
 
   const [data,          setData]          = useState<InsightsData | null>(null);
   const [loading,       setLoading]       = useState(true);
@@ -426,7 +426,13 @@ export default function InsightsPage() {
         </GlassCard>
 
         {/* ── Style DNA ── */}
-        {styleDNA.level !== 'none' && !isPro && (
+        {/* isReady gates the LOCKED variant only. isPro is false for the whole
+            window between launch and RevenueCat resolving CustomerInfo, so
+            without this a subscriber gets a "Unlock →" teaser for their own
+            paid feature on every cold start. Neither variant renders in that
+            window; the unlocked one below needs no such guard, since isPro
+            can only be true once the entitlement has actually resolved. */}
+        {styleDNA.level !== 'none' && isReady && !isPro && (
           <Pressable
             onPress={() => nav.push('/account/upgrade')}
             accessibilityRole="button"

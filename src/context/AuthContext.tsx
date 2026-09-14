@@ -7,10 +7,13 @@ import {
   refreshToken,
   onSessionExpired,
 } from '../lib/auth';
-import { registerPushToken } from '../lib/notifications';
+import { registerPushToken, cancelAllLocalNotifications } from '../lib/notifications';
+import { resetLaunchReconcilers } from '../lib/launchReconcile';
+import { clearTripPresenceCache } from '../lib/tripPresence';
 import { loadHistory } from '../lib/outfitHistory';
 import { clearWidgetSnapshot } from '../lib/widget/updateWidgetSnapshot';
 import { resetClosetsCache } from '../hooks/useClosets';
+import { resetTripPlansCache } from '../hooks/useTripPlans';
 import { resetOnboardingCache } from '../lib/onboarding';
 import { resetAgeGateCache } from '../lib/ageGate';
 import { clearGapHistory } from '../lib/wardrobeGaps';
@@ -65,6 +68,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(() => {
     setIsLoggedIn(true);
+    // Re-arm the per-session notification reconcilers for this account. Also
+    // covers the one sign-out that doesn't run `logout` below — a rejected
+    // token expiring the session through the 401 interceptor.
+    resetLaunchReconcilers();
     // Migrate any locally-accumulated (anon) entries to the server immediately
     // so history isn't stranded if the user authenticated after using the app.
     loadHistory().catch(() => {});
@@ -75,6 +82,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Drop the shared closet cache so the next account doesn't briefly see the
     // previous user's wardrobe before its own fetch resolves.
     resetClosetsCache();
+    // Same reason for the shared trip-plan cache: it is keyed per user in
+    // storage, but the in-memory copy outlives the account it was loaded for.
+    resetTripPlansCache();
     // Onboarding's "done" flag is keyed by userId; clearing the in-memory
     // mirror forces the next account to read its own state fresh from storage.
     resetOnboardingCache();
@@ -92,6 +102,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Wipe the widget so a signed-out device doesn't keep showing the last
     // user's outfit/trip. No-ops off-iOS / without the native bridge.
     void clearWidgetSnapshot();
+    // Same reasoning, for the other thing this device keeps showing on the
+    // previous account's behalf: scheduled local notifications. They are device
+    // state, not account state, so nothing here used to touch them — the last
+    // user's morning briefs, recap and Trip Mode nudges kept firing for whoever
+    // signed in next, naming a city and a trip the new account has no record
+    // of, and stacking with that account's own once it saved a trip of its own.
+    // Trip plans are stored per user, so those notifications were also
+    // unreachable by every cancel path, which all need a live plan id.
+    //
+    // Everything cancelled here is re-scheduled for the next account by the
+    // reconcilers the reset below re-arms.
+    void cancelAllLocalNotifications();
+    resetLaunchReconcilers();
+    // The cache that suppresses redundant trip-presence posts is per-device,
+    // not per-account: left in place, the next account would inherit "already
+    // told them" for someone else's trip and skip its own first report.
+    void clearTripPresenceCache().catch(() => {});
   }, []);
 
   return (

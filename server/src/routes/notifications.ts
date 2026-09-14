@@ -75,6 +75,45 @@ router.post('/token', requireAuth, async (req: AuthRequest, res: Response): Prom
   }
 });
 
+/**
+ * POST /trip-presence — the device reporting whether it is at a saved trip.
+ *
+ * `{ tripId }` confirms the device's GPS put it within Trip Mode's radius of
+ * that trip's city; `{ tripId: null }` says GPS was available and put it near
+ * none of them. Nothing is posted when GPS is unavailable, so the last known
+ * answer ages out on its own rather than being overwritten by a guess.
+ *
+ * This is what lets the notification passes talk about the trip city (see
+ * lib/activeTrip.ts). Deliberately just an id: the destination is already on
+ * the plan, so confirming presence needs no coordinates to leave the device.
+ *
+ * An id that matches no plan of this user's is inert rather than rejected — the
+ * gate resolves it against their real trips, so the worst a bogus one does is
+ * fail to confirm anything. That keeps a plan the client saved but hasn't
+ * synced yet from being refused here and then silently failing to confirm once
+ * it lands.
+ */
+router.post('/trip-presence', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { tripId } = req.body;
+    const confirmed =
+      typeof tripId === 'string' && tripId.length > 0 && tripId.length <= 200
+        ? tripId
+        : null;
+
+    await User.findByIdAndUpdate(
+      req.userId,
+      confirmed
+        ? { $set: { tripPresence: { tripId: confirmed, confirmedAt: new Date() } } }
+        : { $unset: { tripPresence: '' } },
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[notifications] trip presence save error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Get notification settings
 router.get('/settings', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
   try {

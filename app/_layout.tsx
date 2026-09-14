@@ -20,6 +20,7 @@ import { isOnboardingComplete, isOnboardingPending } from '../src/lib/onboarding
 import { isAgeVerificationNeeded } from '../src/lib/ageGate';
 import { recordAppOpen } from '../src/services/reviewManager';
 import { reconcileWeeklyRecap, reconcileMorningBriefs, reconcileSameDayNudges } from '../src/lib/notifications';
+import { claimReconcile } from '../src/lib/launchReconcile';
 import * as Sentry from '@sentry/react-native';
 import { scrubBreadcrumb, scrubEvent } from '../src/lib/sentryScrub';
 
@@ -60,21 +61,19 @@ Sentry.init({
 
 SplashScreen.preventAutoHideAsync();
 
-// Launch-scoped guard mirroring useTripPlans' reconcile pattern — AuthGate's
-// effect can re-run on every segment change, but the recap re-schedule only
-// needs to happen once per app process.
-let weeklyRecapReconciledThisLaunch = false;
-
-// Same guard for the Morning Outfit Brief. This one only ever *cancels* — it
-// catches the case where the brief was switched off on another device, since
-// settings sync through the server but scheduled notifications don't. Refilling
-// the window needs weather and closet data, so that stays with
-// useMorningBriefScheduler on the home screen.
-let morningBriefReconciledThisLaunch = false;
-
-// Same guard for the Same-Day Weather Nudge — cancel-only, same reasoning as
-// the Brief's reconcile above.
-let sameDayNudgeReconciledThisLaunch = false;
+// The reconcilers below are claimed through lib/launchReconcile: AuthGate's
+// effect can re-run on every segment change, but each of them only needs to
+// happen once — and, since the answer is per-account, once *per signed-in
+// session* rather than per app process, which is what the guards they replaced
+// got wrong. Signing into a second account re-arms all of them (AuthContext).
+//
+//   weeklyRecap  — re-applies the current schedule, self-healing stale copy.
+//   morningBrief — cancel-only: catches the brief being switched off on another
+//                  device, since settings sync through the server but scheduled
+//                  notifications don't. Refilling the window needs weather and
+//                  closet data, so that stays with useMorningBriefScheduler on
+//                  the home screen.
+//   sameDayNudge — cancel-only, same reasoning as the Brief's.
 
 // ─── Splash ──────────────────────────────────────────────────────────────────
 function CustomSplash() {
@@ -140,18 +139,15 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
         // Deferred until past the gate so an unverified account doesn't spend
         // every launch firing requests the server is going to 403.
-        if (!weeklyRecapReconciledThisLaunch) {
-          weeklyRecapReconciledThisLaunch = true;
+        if (claimReconcile('weeklyRecap')) {
           reconcileWeeklyRecap().catch(() => {});
         }
 
-        if (!morningBriefReconciledThisLaunch) {
-          morningBriefReconciledThisLaunch = true;
+        if (claimReconcile('morningBrief')) {
           reconcileMorningBriefs().catch(() => {});
         }
 
-        if (!sameDayNudgeReconciledThisLaunch) {
-          sameDayNudgeReconciledThisLaunch = true;
+        if (claimReconcile('sameDayNudge')) {
           reconcileSameDayNudges().catch(() => {});
         }
 

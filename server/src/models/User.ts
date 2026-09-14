@@ -62,6 +62,34 @@ export interface IMorningSnapshot {
   hasPrecipitation: boolean;
   tempF: number;
   recordedAt: Date;
+  /**
+   * Rounded "lat,lon" of the place this was recorded (lib/activeTrip.ts ·
+   * locationKey). The afternoon weather-change check compares against this
+   * baseline, and a snapshot taken in the user's home city says nothing about
+   * the trip city they woke up in — without this, flying somewhere cooler read
+   * as "the temperature dropped 15°" and fired an alert about the weather
+   * changing when all that changed was the city. Absent on snapshots written
+   * before this field existed, which are treated as having no baseline.
+   */
+  locationKey?: string;
+}
+
+/**
+ * The device's own confirmation that it is at a saved trip's destination.
+ *
+ * Written by the client when Trip Mode resolves a GPS fix within its radius of
+ * the trip city (src/hooks/useTripMode.ts), and cleared when GPS says the user
+ * is not near any trip city. It is the only evidence this side has that a saved
+ * trip is actually being taken — a trip's date range alone says the user
+ * *planned* to be somewhere, not that they went — so notification copy about a
+ * trip city is gated on it. No coordinates are stored or sent: the trip id is
+ * enough, since the destination is already on the plan.
+ */
+export interface ITripPresence {
+  /** TripFitPlan.clientId the device confirmed it was at. */
+  tripId: string;
+  /** When the device last confirmed it — stale confirmations stop counting. */
+  confirmedAt: Date;
 }
 
 export interface IUser extends Document {
@@ -84,6 +112,7 @@ export interface IUser extends Document {
   // lib/revenuecatEntitlement.ts for which event types flip this and why.
   isPro: boolean;
   lastMorningSnapshot?: IMorningSnapshot;
+  tripPresence?: ITripPresence;
   // Gmail integration (Trip Planner)
   googleRefreshToken?: string;
   googleConnectedAt?: Date;
@@ -142,10 +171,16 @@ const notificationSettingsSchema = new Schema<INotificationSettings>({
   sameDayNudgeEnabled:  { type: Boolean, default: false },
 }, { _id: false });
 
+const tripPresenceSchema = new Schema<ITripPresence>({
+  tripId:      { type: String, required: true },
+  confirmedAt: { type: Date,   required: true },
+}, { _id: false });
+
 const morningSnapshotSchema = new Schema<IMorningSnapshot>({
   hasPrecipitation: { type: Boolean, required: true },
   tempF:            { type: Number,  required: true },
   recordedAt:       { type: Date,    required: true },
+  locationKey:      { type: String },
 }, { _id: false });
 
 const userSchema = new Schema<IUser>({
@@ -166,6 +201,7 @@ const userSchema = new Schema<IUser>({
   tokenVersion:         { type: Number, default: 0 },
   isPro:                { type: Boolean, default: false },
   lastMorningSnapshot:  { type: morningSnapshotSchema },
+  tripPresence:         { type: tripPresenceSchema },
   // Gmail integration (Trip Planner)
   googleRefreshToken:   { type: String, select: false }, // excluded from default queries
   googleConnectedAt:    { type: Date },

@@ -102,6 +102,21 @@ export function utcHourForLocalHour(tz: string, localHour: number, at: Date = ne
   return ((shifted % 24) + 24) % 24;
 }
 
+/**
+ * The calendar date (yyyy-mm-dd) it currently is in `tz`.
+ *
+ * Needed because "is the user on their trip today" is a question about the
+ * traveller's own date, not UTC's: a trip ending on the 11th is still running
+ * at 9pm on the 11th in Jamaica, which is already the 12th in UTC.
+ */
+export function localDateISO(tz: string, at: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(at);
+  const f = (type: string): string => parts.find(p => p.type === type)?.value ?? '';
+  return `${f('year')}-${f('month')}-${f('day')}`;
+}
+
 /** Current wall-clock hour (0–23) in `tz`. */
 export function localHourNow(tz: string, at: Date = new Date()): number {
   const h = new Intl.DateTimeFormat('en-US', {

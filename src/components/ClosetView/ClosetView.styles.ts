@@ -125,6 +125,43 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         alignItems: 'center',
         gap: 4,
     },
+
+    // ── Free-tier item counter + cap banner ───────────────────────────────────
+    // The counter is visible from the first item, not just once the ceiling is
+    // close: a cap the user only discovers by hitting it is a trap, and one
+    // they can see approaching is just a number. Rendered only for free
+    // accounts — a subscriber has no ceiling to count toward.
+    itemCounter: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.sm,
+        color: colors.textMuted,
+        // Stops the row from twitching as the count crosses digit widths.
+        fontVariant: ['tabular-nums'],
+    },
+    limitBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginHorizontal: spacing.md,
+        marginBottom: spacing.sm,
+        paddingVertical: 8,
+        paddingHorizontal: 10,
+        borderRadius: radius.sm,
+        borderWidth: 1,
+        borderColor: colors.glassBorder,
+        backgroundColor: colors.glassBg,
+    },
+    limitBannerText: {
+        flex: 1,
+        fontFamily: fonts.body,
+        fontSize: fontSizes.sm,
+        color: colors.textSecondary,
+    },
+    limitBannerCta: {
+        fontFamily: fonts.bodySemiBold,
+        fontSize: fontSizes.sm,
+        color: colors.textPrimary,
+    },
     overflowBtn: {
         width: 30,
         height: 30,

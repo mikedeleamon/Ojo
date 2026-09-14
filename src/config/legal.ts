@@ -15,7 +15,7 @@ export const LEGAL_URLS = {
   termsOfService:  'https://www.ojoapp.io/terms',
 } as const;
 
-export const EFFECTIVE_DATE = 'August 15, 2026';
+export const EFFECTIVE_DATE = 'September 12, 2026';
 export const DEVELOPER_NAME = 'Ojo Studio, LLC';
 export const CONTACT_EMAIL  = 'support@ojoapp.io';
 export const WEBSITE_URL    = 'https://www.ojoapp.io';
@@ -203,7 +203,7 @@ export const TERMS_OF_SERVICE: LegalDocument = {
     {
       heading: '2. Description of the Service',
       body: [
-        'Ojo is a free mobile wardrobe management application. It allows you to create and manage a digital wardrobe, receive outfit suggestions generated from your wardrobe and local weather conditions, and track your outfit wear history. Garment recognition from photos you take runs on your device using an on-device machine learning model.',
+        'Ojo is a mobile wardrobe management application. It allows you to create and manage a digital wardrobe, receive outfit suggestions generated from your wardrobe and local weather conditions, and track your outfit wear history. Garment recognition from photos you take runs on your device using an on-device machine learning model.',
         'The App also provides wardrobe insights and a weekly recap, wardrobe gap detection, optional trip planning and packing lists, Trip Mode, home-screen and lock-screen widgets, and optional push notifications. Individual features may be added, changed, or removed over time.',
         `The App's core features are free to use. Ojo Pro is an optional auto-renewing subscription described in Section 2.1. We reserve the right to modify, suspend, or discontinue any part of the App at any time without liability.`,
       ],
@@ -211,7 +211,8 @@ export const TERMS_OF_SERVICE: LegalDocument = {
         {
           heading: '2.1  Ojo Pro Subscription',
           body: [
-            'Ojo Pro is an optional, auto-renewing subscription that unlocks additional features, including saving more than one trip at a time in the Trip Planner and deeper wardrobe insights (Style DNA). The core outfit-suggestion, closet, and weather features described above remain free whether or not you subscribe.',
+            'Ojo Pro is an optional, auto-renewing subscription that unlocks additional features, including adding clothing items and closets beyond the limits that apply to a free account, saving more than one trip at a time in the Trip Planner, and deeper wardrobe insights (Style DNA). The current limits for free accounts are shown in the App.',
+            'The daily outfit-suggestion and weather features described above remain free whether or not you subscribe, and are not limited by the number of items in your closet. If a free account holds more items or closets than a limit allows — because the limit changed, or because a subscription ended — it keeps everything already added and those items continue to work normally; only adding more is affected.',
             'Subscription length and price are shown in the App and in your Apple App Store or Google Play account settings before you purchase, and may vary by promotion or region. Payment is charged to your Apple ID or Google Play account at confirmation of purchase.',
             'Your subscription automatically renews for the same length and price unless you cancel at least 24 hours before the end of the current period. Your account will be charged for renewal within 24 hours before the end of the current period. You can manage or cancel your subscription at any time in your Apple App Store or Google Play account settings — we cannot process a cancellation or refund on your behalf.',
             'Where a free trial or introductory offer is shown, any unused portion is forfeited if you purchase a subscription before the trial ends. Purchases and subscriptions are processed entirely by Apple or Google; we never receive your payment card details — see Section 5 of our Privacy Policy for what our subscription-management provider, RevenueCat, does receive.',
