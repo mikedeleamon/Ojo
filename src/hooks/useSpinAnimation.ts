@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useMemo } from 'react';
 import { Animated, Easing } from 'react-native';
 import { useReduceMotion } from './useReduceMotion';
 
@@ -24,10 +24,20 @@ export const useSpinAnimation = (durationMs = 10_000) => {
         return () => loop.stop();
     }, [reduceMotion, durationMs]);
 
-    const rotate = anim.interpolate({
-        inputRange: [0, 1],
-        outputRange: ['0deg', '360deg'],
-    });
+    // Memoised because `AnimatedProps` is keyed on the IDENTITY of the animated
+    // nodes in its style (createAnimatedPropsMemoHook → areCompositeKeysEqual
+    // compares AnimatedNode instances with ===). A fresh interpolation object
+    // every render therefore tore down and rebuilt the whole native node chain
+    // — createAnimatedNode + connect + disconnect + drop — on every render of
+    // every caller, including mid-scroll re-renders of the weather HUD.
+    const rotate = useMemo(
+        () =>
+            anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: ['0deg', '360deg'],
+            }),
+        [anim],
+    );
 
     return rotate;
 };

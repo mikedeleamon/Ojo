@@ -21,6 +21,11 @@ interface Props {
  * The documents open in a self-contained Modal (reusing LegalWebViewScreen)
  * rather than navigating to /account/legal, because that route is behind the
  * AuthGate and would bounce a logged-out user back to login.
+ *
+ * The minimum age (Terms §3) is stated here rather than asked. The app used to
+ * require a date of birth at sign-up and after Apple/Google sign-in; App Review
+ * rejected build 31 for it under guideline 5.1.1(v), since nothing in Ojo needs
+ * it. Keep 13 in step with the Terms if either changes.
  */
 export default function LegalConsentNotice({ prefix = 'By continuing' }: Props) {
   const { colors } = useTheme();
@@ -52,7 +57,7 @@ export default function LegalConsentNotice({ prefix = 'By continuing' }: Props) 
   return (
     <View accessible accessibilityRole="text">
       <Text style={styles.text}>
-        {prefix}, you agree to our{' '}
+        {prefix}, you confirm you're at least 13 and agree to our{' '}
         <Text
           style={styles.link}
           onPress={() => setOpenDoc('terms')}

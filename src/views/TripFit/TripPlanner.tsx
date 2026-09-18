@@ -586,7 +586,7 @@ export default function TripPlanner({
     const reduceMotion = useReduceMotion();
     const { width: windowWidth } = useWindowDimensions();
     const router = useRouter();
-    const { isPro, isReady } = usePurchases();
+    const { isPro, isReady, isConfigured } = usePurchases();
 
     // One card per page: a card must be exactly as wide as the pager's frame, or
     // snapToInterval lands each card off-centre and leaks a clipped sliver of the
@@ -849,8 +849,12 @@ export default function TripPlanner({
      * tap. The save-side checks stay as a backstop — the plan-time count can be
      * stale if another device saved a trip since this screen loaded.
      *
-     * Three things have to be true before a trip costs a slot:
+     * Four things have to be true before a trip costs a slot:
      *
+     *  - There is something to buy. With no RevenueCat key configured the
+     *    paywall has no products, and capping would strand the user in front of
+     *    a screen that cannot sell them anything (the rule useClosetLimits
+     *    applies to the closet caps).
      *  - The entitlement is actually known. `isPro` is false for the whole
      *    window between launch and RevenueCat resolving CustomerInfo, so
      *    gating on it alone bounces a paying subscriber to the paywall on a
@@ -864,7 +868,7 @@ export default function TripPlanner({
      *    second one, so re-planning a saved trip creates nothing to charge for.
      */
     const blockedByFreeLimit = useCallback((): boolean => {
-        if (!isReady || isPro) return false;
+        if (!isConfigured || !isReady || isPro) return false;
         if (isSaved) return false;
         if (savedPlans.length < FREE_TRIP_LIMIT) return false;
         if (tripStart && tripEnd && findTwinPlan(savedPlans, {
@@ -875,7 +879,7 @@ export default function TripPlanner({
 
         router.push('/account/upgrade');
         return true;
-    }, [isReady, isPro, isSaved, savedPlans, destination, tripStart, tripEnd, router]);
+    }, [isConfigured, isReady, isPro, isSaved, savedPlans, destination, tripStart, tripEnd, router]);
 
     // ── New-trip: plan (generate only; user saves explicitly) ──
     const onPlan = useCallback(async () => {

@@ -13,11 +13,13 @@
  *   confirm crop               →  ArticleModal opens with cropped image
  */
 
-import { useState, useRef, useCallback, useMemo } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   StyleSheet,
   Pressable,
   Alert,
+  AppState,
+  Linking,
   View,
   Text,
   TextInput,
@@ -50,7 +52,7 @@ import { hapticImpact } from '../../lib/haptics';
 import axios from '../../api/client';
 import { auth } from '../../lib/auth';
 import { useTheme } from '../../theme/ThemeContext';
-import { pickImage, MAX_FILE_BYTES } from '../../lib/imageService';
+import { pickImage, showAccessDeniedAlert, MAX_FILE_BYTES } from '../../lib/imageService';
 import { ArticleFormData } from '../../types';
 import { fonts, fontSizes, fontWeights, radius, spacing } from '../../theme/tokens';
 
@@ -99,30 +101,61 @@ const CloseIcon = ({ color }: { color: string }) => (
 
 // ─── Permission / no-closet screens ──────────────────────────────────────────
 
-function PermissionScreen({
-  onRequest,
-  onCancel,
-}: {
-  onRequest: () => void;
-  onCancel: () => void;
-}) {
+/**
+ * Shown before the system camera prompt, while the OS is still able to ask.
+ *
+ * One button, and it always leads to the system prompt. App Review rejected
+ * build 31 (guideline 5.1.1(iv)) for the version this replaced, which labelled
+ * the button "Allow Camera" and put a Cancel beside it: a screen in front of a
+ * permission request may explain it, but must not read as the grant itself or
+ * let the user back out before iOS asks. Declining belongs to "Don't Allow" in
+ * the system alert, which lands on CameraDeniedScreen below. Don't add a second
+ * action here.
+ */
+function CameraPrePromptScreen({ onContinue }: { onContinue: () => void }) {
   const { colors } = useTheme();
   const st = useMemo(() => makePStyles(colors), [colors]);
   return (
     <View style={st.root}>
       <Text style={st.title}>Camera Access</Text>
       <Text style={st.body}>
-        Ojo needs camera permission to capture garments for your closet.
+        Ojo uses your camera so you can photograph clothing to add to your closet.
       </Text>
-      <Pressable style={st.btn} onPress={onRequest} accessibilityRole="button">
-        <Text style={st.btnText}>Allow Camera</Text>
+      <Pressable style={st.btn} onPress={onContinue} accessibilityRole="button">
+        <Text style={st.btnText}>Continue</Text>
       </Pressable>
-      <Pressable
-        style={st.linkBtn}
-        onPress={onCancel}
-        accessibilityRole="button"
-      >
-        <Text style={st.linkText}>Cancel</Text>
+    </View>
+  );
+}
+
+/**
+ * Shown once the OS will no longer ask: the user chose "Don't Allow", or camera
+ * access is restricted on this device. requestPermission would resolve straight
+ * back to denied without showing anything, so Settings is the only way to the
+ * camera. Closing is offered here and not on the pre-prompt, because the system
+ * prompt has already been shown and there is no request left to put off.
+ */
+function CameraDeniedScreen({
+  onOpenSettings,
+  onClose,
+}: {
+  onOpenSettings: () => void;
+  onClose: () => void;
+}) {
+  const { colors } = useTheme();
+  const st = useMemo(() => makePStyles(colors), [colors]);
+  return (
+    <View style={st.root}>
+      <Text style={st.title}>Camera access is off</Text>
+      <Text style={st.body}>
+        To photograph clothing for your closet, turn on camera access for Ojo in
+        Settings.
+      </Text>
+      <Pressable style={st.btn} onPress={onOpenSettings} accessibilityRole="button">
+        <Text style={st.btnText}>Open Settings</Text>
+      </Pressable>
+      <Pressable style={st.linkBtn} onPress={onClose} accessibilityRole="button">
+        <Text style={st.linkText}>Close</Text>
       </Pressable>
     </View>
   );
@@ -603,7 +636,18 @@ export default function CameraPage() {
   const { return: returnParam, closetId: closetIdParam } =
     useLocalSearchParams<{ return?: string; closetId?: string }>();
 
-  const [permission, requestPermission] = useCameraPermissions();
+  const [permission, requestPermission, getPermission] = useCameraPermissions();
+
+  // The hook reads the permission once, on mount. Without this, someone who
+  // goes from CameraDeniedScreen to Settings and turns the camera on comes back
+  // to a screen still telling them it's off.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', next => {
+      if (next === 'active') getPermission();
+    });
+    return () => sub.remove();
+  }, [getPermission]);
+
   const [facing,    setFacing]    = useState<CameraType>('back');
   const [capturing, setCapturing] = useState(false);
   const [raw,       setRaw]       = useState<ImageData | null>(null);
@@ -665,6 +709,10 @@ export default function CameraPage() {
   // ── Pick from gallery ──────────────────────────────────────────────────────
   const handleGallery = useCallback(async () => {
     const result = await pickImage();
+    if (result.denied) {
+      showAccessDeniedAlert('library');
+      return;
+    }
     if (result.error) {
       Alert.alert('Error', result.error);
       return;
@@ -738,8 +786,13 @@ export default function CameraPage() {
   }
   if (!permission) return null;
   if (!permission.granted) {
-    return (
-      <PermissionScreen onRequest={requestPermission} onCancel={dismiss} />
+    return permission.canAskAgain ? (
+      <CameraPrePromptScreen onContinue={requestPermission} />
+    ) : (
+      <CameraDeniedScreen
+        onOpenSettings={() => Linking.openSettings()}
+        onClose={dismiss}
+      />
     );
   }
   if (!targetCloset) return <NoClosetScreen onClose={dismiss} />;

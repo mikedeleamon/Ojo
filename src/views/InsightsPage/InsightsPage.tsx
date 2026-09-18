@@ -138,7 +138,7 @@ export default function InsightsPage() {
   const reduceMotion = useReduceMotion();
   const nav = useAppNavigation();
   const confirm = useConfirm();
-  const { isPro, isReady } = usePurchases();
+  const { isPro, isReady, isConfigured } = usePurchases();
 
   const [data,          setData]          = useState<InsightsData | null>(null);
   const [loading,       setLoading]       = useState(true);
@@ -431,8 +431,13 @@ export default function InsightsPage() {
             without this a subscriber gets a "Unlock →" teaser for their own
             paid feature on every cold start. Neither variant renders in that
             window; the unlocked one below needs no such guard, since isPro
-            can only be true once the entitlement has actually resolved. */}
-        {styleDNA.level !== 'none' && isReady && !isPro && (
+            can only be true once the entitlement has actually resolved.
+
+            With no store configured there is nothing to buy, so Style DNA is
+            simply unlocked (the rule useClosetLimits applies to the closet
+            caps). Otherwise a build shipped without a RevenueCat key locks this
+            card behind a paywall that can only say "check back soon". */}
+        {styleDNA.level !== 'none' && isConfigured && isReady && !isPro && (
           <Pressable
             onPress={() => nav.push('/account/upgrade')}
             accessibilityRole="button"
@@ -450,7 +455,7 @@ export default function InsightsPage() {
           </Pressable>
         )}
 
-        {styleDNA.level !== 'none' && isPro && (
+        {styleDNA.level !== 'none' && (isPro || !isConfigured) && (
           <GlassCard style={styles.dnaCard}>
             <View style={styles.dnaHeader}>
               <Text style={styles.dnaTitle}>Style DNA</Text>

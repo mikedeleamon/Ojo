@@ -17,7 +17,6 @@ import { PurchasesProvider } from '../src/context/PurchasesContext';
 import { ConfirmProvider } from '../src/components/ConfirmDialog';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { isOnboardingComplete, isOnboardingPending } from '../src/lib/onboarding';
-import { isAgeVerificationNeeded } from '../src/lib/ageGate';
 import { recordAppOpen } from '../src/services/reviewManager';
 import { reconcileWeeklyRecap, reconcileMorningBriefs, reconcileSameDayNudges } from '../src/lib/notifications';
 import { claimReconcile } from '../src/lib/launchReconcile';
@@ -47,8 +46,8 @@ Sentry.init({
   enableLogs: false,
 
   // Session Replay records the screen — closet photos, name, email, city.
-  // Undeclared, and this app gates to 13+ under COPPA, so replay of a minor's
-  // session is not something to enable casually.
+  // Undeclared, and the app is open to users as young as 13, so replay of a
+  // minor's session is not something to enable casually.
   replaysSessionSampleRate: 0,
   replaysOnErrorSampleRate: 0,
 
@@ -108,37 +107,21 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     const inAuthGroup    = segs[0] === '(auth)';
     const onResetScreen  = segs[1] === 'reset-password';
     const onOnboarding   = segs[1] === 'onboarding';
-    const onAgeGate      = segs[1] === 'verify-age';
 
     // Reset-password deep link must always reach its screen, even for users
     // who are already signed in.
     if (onResetScreen) return;
 
-    // `onAgeGate` is called out explicitly because the gate offers a sign-out.
-    // Every other (auth) screen is already somewhere a signed-out user belongs,
-    // but the gate is not — without this it would keep rendering after logout
-    // and the button would look broken.
-    if (!isLoggedIn && (!inAuthGroup || onAgeGate)) {
+    if (!isLoggedIn && !inAuthGroup) {
       router.replace('/(auth)/login');
       return;
     }
 
     if (isLoggedIn) {
       Promise.all([
-        isAgeVerificationNeeded(),
         isOnboardingPending(),
         isOnboardingComplete(),
-      ]).then(([needsAge, pending, done]) => {
-        // The age gate outranks everything else. The server refuses every data
-        // route until it's satisfied, so there is nothing for onboarding or the
-        // tabs to load until this clears.
-        if (needsAge) {
-          if (!onAgeGate) router.replace('/(auth)/verify-age');
-          return;
-        }
-
-        // Deferred until past the gate so an unverified account doesn't spend
-        // every launch firing requests the server is going to 403.
+      ]).then(([pending, done]) => {
         if (claimReconcile('weeklyRecap')) {
           reconcileWeeklyRecap().catch(() => {});
         }

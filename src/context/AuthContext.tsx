@@ -15,7 +15,6 @@ import { clearWidgetSnapshot } from '../lib/widget/updateWidgetSnapshot';
 import { resetClosetsCache } from '../hooks/useClosets';
 import { resetTripPlansCache } from '../hooks/useTripPlans';
 import { resetOnboardingCache } from '../lib/onboarding';
-import { resetAgeGateCache } from '../lib/ageGate';
 import { clearGapHistory } from '../lib/wardrobeGaps';
 
 interface AuthState {
@@ -88,9 +87,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Onboarding's "done" flag is keyed by userId; clearing the in-memory
     // mirror forces the next account to read its own state fresh from storage.
     resetOnboardingCache();
-    // Same reason: the next account must not inherit this account's age-gate
-    // state, in either direction.
-    resetAgeGateCache();
     // Wardrobe-gap events live under a single global key rather than a per-user
     // one, so nothing else scopes them to an account and the next user to sign
     // in on this device would inherit the previous user's gap history.

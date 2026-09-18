@@ -11,7 +11,6 @@ import { Platform } from 'react-native';
 import axios from '../api/client';
 import { AuthState, Settings } from '../types';
 import { saveAuth } from './auth';
-import { setAgeVerificationNeeded } from './ageGate';
 
 export const isAppleSignInAvailable = async (): Promise<boolean> => {
   if (Platform.OS !== 'ios') return false;
@@ -60,7 +59,7 @@ export const signInWithApple = async (): Promise<AppleSignInOutcome> => {
     }
 
     const { data } = await axios.post<
-      AuthState & { settings: Settings; isNewUser?: boolean; needsAgeVerification?: boolean }
+      AuthState & { settings: Settings; isNewUser?: boolean }
     >(
       '/api/auth/apple',
       {
@@ -75,9 +74,6 @@ export const signInWithApple = async (): Promise<AppleSignInOutcome> => {
     );
 
     await saveAuth(data.token, data.user);
-    // Apple never returns a date of birth, so a new account always owes us one.
-    // AuthGate reads this flag and routes to the age gate before anything else.
-    await setAgeVerificationNeeded(data.needsAgeVerification === true);
     return { ok: true, isNewUser: data.isNewUser === true };
   } catch (err: any) {
     // ERR_REQUEST_CANCELED is fired when the user dismisses the sheet

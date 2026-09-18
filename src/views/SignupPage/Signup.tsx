@@ -6,16 +6,13 @@ import {
     AuthField,
     AuthStatus,
     AuthButton,
-    BirthdayField,
     makeAuthStyles,
 } from '../../components/auth';
 import axios from '../../api/client';
 import { AuthState, Settings } from '../../types';
 import { getErrorMessage, saveAuth } from '../../lib/auth';
 import { markOnboardingPending } from '../../lib/onboarding';
-import { setAgeVerificationNeeded } from '../../lib/ageGate';
 import { validatePassword } from '../../lib/passwordPolicy';
-import { validateBirthday } from '../../lib/age';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { useTheme } from '../../theme/ThemeContext';
 import LegalConsentNotice from '../../components/LegalConsentNotice';
@@ -53,13 +50,6 @@ function validateField(
             if (!val) return 'Required';
             if (val !== all.password) return "Passwords don't match";
             return undefined;
-        case 'birthday': {
-            // Same rules the server enforces — see lib/age.ts. This is for
-            // immediate feedback only; /api/auth/signup re-checks and refuses
-            // an underage date regardless of what happens here.
-            const result = validateBirthday(val);
-            return result.ok ? undefined : result.message;
-        }
         default:
             return undefined;
     }
@@ -74,7 +64,6 @@ interface FormState {
     email: string;
     password: string;
     confirmPassword: string;
-    birthday: string;
 }
 
 interface Props {
@@ -104,7 +93,6 @@ export default function SignupPage({ onLogin }: Props) {
         email: '',
         password: '',
         confirmPassword: '',
-        birthday: '',
     });
     const [fieldErrors, setFieldErrors] = useState<
         Partial<Record<keyof FormState, string>>
@@ -138,17 +126,6 @@ export default function SignupPage({ onLogin }: Props) {
     const errorFor = (key: keyof FormState) =>
         touched.has(key) ? fieldErrors[key] : undefined;
 
-    /* ── Birthday ──────────────────────────────────────────────────────────── */
-
-    // BirthdayField hands the committed value straight back, so validation reads
-    // it directly rather than going through handleBlur — which would see the
-    // pre-update `form` when the commit came from the picker.
-    const handleBirthdayCommit = (formatted: string) => {
-        setTouched(t => new Set(t).add('birthday'));
-        const err = validateField('birthday', formatted, { ...form, birthday: formatted });
-        setFieldErrors(e => ({ ...e, birthday: err }));
-    };
-
     /* ── Submit ────────────────────────────────────────────────────────────── */
 
     const handleSubmit = async () => {
@@ -177,14 +154,9 @@ export default function SignupPage({ onLogin }: Props) {
                     username: form.username,
                     email: form.email,
                     password: form.password,
-                    birthday: form.birthday,
                 },
             );
             await saveAuth(data.token, data.user);
-            // The form collects a date of birth and the server validated it, so
-            // this account is already through the age gate. Recording that keeps
-            // a stale flag from a previous account on this device out of the way.
-            await setAgeVerificationNeeded(false);
             // Completing the sign-up form is the only thing that triggers
             // first-run onboarding; AuthGate reads this flag to redirect.
             await markOnboardingPending();
@@ -225,13 +197,6 @@ export default function SignupPage({ onLogin }: Props) {
                     onChangeText={v => setField('lastName', v)}
                     onBlur={() => handleBlur('lastName')}
                     error={errorFor('lastName')}
-                />
-
-                <BirthdayField
-                    value={form.birthday}
-                    onChange={v => setField('birthday', v)}
-                    onCommit={handleBirthdayCommit}
-                    error={errorFor('birthday')}
                 />
 
                 <AuthField

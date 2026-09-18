@@ -15,7 +15,7 @@ export const LEGAL_URLS = {
   termsOfService:  'https://www.ojoapp.io/terms',
 } as const;
 
-export const EFFECTIVE_DATE = 'September 12, 2026';
+export const EFFECTIVE_DATE = 'September 16, 2026';
 export const DEVELOPER_NAME = 'Ojo Studio, LLC';
 export const CONTACT_EMAIL  = 'support@ojoapp.io';
 export const WEBSITE_URL    = 'https://www.ojoapp.io';
@@ -66,7 +66,6 @@ export const PRIVACY_POLICY: LegalDocument = {
             'Email address — used to create and authenticate your account',
             'Password — if you sign up with email, your password is stored only as a salted cryptographic hash. We never store or have access to it in plain text. If you sign in with Apple or Google instead, no password is created',
             'Username — a display name of your choosing',
-            'Date of birth — collected at sign-up to confirm you meet the minimum age requirement described in Section 9',
             'Location — either a city name you enter manually, or, if you choose "My Location," your device\'s GPS coordinates read on demand at that moment. The coordinates for the location you set are saved to your account so that scheduled notifications, such as your morning brief, can retrieve local weather while the App is closed. If you turn on Trip Mode, the App also reads your location on demand to detect when you have arrived at a saved trip destination. We do not track your location continuously or in the background, and we do not keep a history of where you have been',
             'Style preferences — your clothing style, temperature and humidity comfort thresholds, unit preferences, any additional cities you save, and — only if you choose to provide it — gender, which is used to tailor outfit suggestions',
             'Clothing item photos and metadata — images you upload or capture of your garments, plus descriptions, categories, colours, fabrics, and (optionally) merchant and purchase price',
@@ -167,9 +166,8 @@ export const PRIVACY_POLICY: LegalDocument = {
       heading: '9. Children\'s Privacy',
       body: [
         `The App is not intended for children under the age of 13 and complies with the Children's Online Privacy Protection Act (COPPA). We do not knowingly collect personal information from children under 13.`,
-        'We ask for your date of birth when you create an account, and we check it on our servers rather than only in the app. If you sign in with Apple or Google, neither service tells us your date of birth, so we ask you for it directly before the account can be used. Until we have it, the account cannot store or retrieve any of your information.',
-        'If the date of birth given puts you under 13, the account and everything stored in it are deleted rather than kept.',
-        `If you believe a child under 13 has provided us information under a different date of birth, contact us at ${CONTACT_EMAIL} and we will delete it promptly.`,
+        'You must be at least 13 years old to create an account, as set out in our Terms of Service. We do not ask for your date of birth.',
+        `If we learn that an account belongs to a child under 13, we will delete the account and everything stored in it. If you believe a child under 13 has provided us information, contact us at ${CONTACT_EMAIL} and we will delete it promptly.`,
         'Users aged 13–17 may use the App with parental awareness.',
       ],
     },

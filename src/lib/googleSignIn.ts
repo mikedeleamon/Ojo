@@ -17,7 +17,6 @@
 import axios from '../api/client';
 import { AuthState, Settings } from '../types';
 import { saveAuth } from './auth';
-import { setAgeVerificationNeeded } from './ageGate';
 
 const IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
 const WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
@@ -75,15 +74,12 @@ export const signInWithGoogle = async (): Promise<GoogleSignInOutcome> => {
     }
 
     const { data } = await axios.post<
-      AuthState & { settings: Settings; isNewUser?: boolean; needsAgeVerification?: boolean }
+      AuthState & { settings: Settings; isNewUser?: boolean }
     >(
       '/api/auth/google',
       { idToken },
     );
     await saveAuth(data.token, data.user);
-    // Google never returns a date of birth, so a new account always owes us one.
-    // AuthGate reads this flag and routes to the age gate before anything else.
-    await setAgeVerificationNeeded(data.needsAgeVerification === true);
     return { ok: true, isNewUser: data.isNewUser === true };
   } catch (err: any) {
     const code = err?.code;

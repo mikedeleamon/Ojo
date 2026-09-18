@@ -234,8 +234,9 @@ export default function OnboardingPage({ onComplete }: Props) {
   };
 
   // Step 4 → 5: persist preferences, then move on to the notifications step.
-  // Completion is marked later (when leaving the notifications step) so a user
-  // can still back out to tweak preferences.
+  // Completion is marked later, when leaving the notifications step, so an app
+  // closed on that step brings onboarding back rather than silently skipping
+  // the notification prompt.
   const handleFinish = async () => {
     const hiTempF  = isMetric ? cToF(hotTemp)  : hotTemp;
     const lowTempF = isMetric ? cToF(coldTemp) : coldTemp;
@@ -734,38 +735,29 @@ export default function OnboardingPage({ onComplete }: Props) {
                     ))}
                   </View>
 
+                  {/* This step sits in front of the system notification prompt,
+                      so it follows the rule App Review enforced on the camera
+                      pre-prompt in build 31 (5.1.1(iv)), as the HIG words it:
+                      "Include only one button", titled "Continue" or "Next", and
+                      no way to "leave the screen or window without viewing the
+                      system alert". So: no "Enable"/"Allow" label, no "Maybe
+                      later", and no Back — every other step keeps its Back, and
+                      preferences stay editable in Settings. The choice is made
+                      in the system alert; handleEnableNotifications finishes
+                      onboarding whatever the answer. */}
                   <View style={st.navRow}>
-                    <Pressable
-                      style={st.ghostBtn}
-                      onPress={() => goBack(4)}
-                      disabled={notifLoading}
-                      accessibilityRole="button"
-                      accessibilityLabel="Back"
-                    >
-                      <Text style={st.ghostBtnText}>Back</Text>
-                    </Pressable>
                     <Pressable
                       style={[st.primaryBtn, notifLoading && st.primaryBtnDisabled]}
                       onPress={handleEnableNotifications}
                       disabled={notifLoading}
                       accessibilityRole="button"
-                      accessibilityLabel={notifLoading ? 'Enabling notifications' : 'Enable notifications'}
+                      accessibilityLabel="Continue"
                       accessibilityState={{ busy: notifLoading, disabled: notifLoading }}
                     >
-                      <Text style={st.primaryBtnText}>
-                        {notifLoading ? 'Enabling…' : 'Enable notifications'}
-                      </Text>
+                      <Text style={st.primaryBtnText}>Continue</Text>
                       <ArrowRight color={colors.saveBtnText} />
                     </Pressable>
                   </View>
-                  <Pressable
-                    onPress={finishOnboarding}
-                    disabled={notifLoading}
-                    accessibilityRole="button"
-                    accessibilityLabel="Maybe later"
-                  >
-                    <Text style={st.skipLink}>Maybe later</Text>
-                  </Pressable>
                 </View>
               )}
 

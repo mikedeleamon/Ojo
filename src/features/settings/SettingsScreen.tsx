@@ -19,7 +19,7 @@ interface Props {
 
 export default function SettingsScreen({ onLogout }: Props) {
     const { colors } = useTheme();
-    const { isPro, isReady } = usePurchases();
+    const { isPro, isReady, isConfigured } = usePurchases();
     const styles = useMemo(() => StyleSheet.create({
         root: { flex: 1, backgroundColor: colors.bgDefault },
         header: {
@@ -166,17 +166,22 @@ export default function SettingsScreen({ onLogout }: Props) {
     // pay for — is the complaint, so the row states what they have instead.
     // Until the entitlement resolves the row keeps its neutral label rather
     // than flashing the wrong one in either direction.
+    //
+    // With no store configured the row, and so its section, is left out
+    // entirely: it could only lead to a paywall with nothing to sell.
     const sections = useMemo(
         () =>
             SETTINGS_CONFIG.map((section) => ({
                 ...section,
-                items: section.items.map((item) =>
-                    item.key === 'ojo-pro' && isReady && isPro
-                        ? { ...item, label: 'Ojo Pro', sublabel: 'Active' }
-                        : item,
-                ),
-            })),
-        [isPro, isReady],
+                items: section.items
+                    .filter((item) => item.key !== 'ojo-pro' || isConfigured)
+                    .map((item) =>
+                        item.key === 'ojo-pro' && isReady && isPro
+                            ? { ...item, label: 'Ojo Pro', sublabel: 'Active' }
+                            : item,
+                    ),
+            })).filter((section) => section.items.length > 0),
+        [isPro, isReady, isConfigured],
     );
 
     return (

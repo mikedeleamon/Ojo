@@ -471,14 +471,17 @@ export default function NotificationsScreen() {
             edges={['bottom']}
         >
             <ScrollView contentContainerStyle={st.content}>
+                {/* Before iOS has asked, this button opens the system prompt, so it
+                    follows the rule App Review enforced on the camera pre-prompt in
+                    build 31 (5.1.1(iv)): titled "Continue", never "Enable" or
+                    "Allow". Once a denial is recorded iOS won't ask again, and the
+                    button hands off to Settings instead. */}
                 {permission !== 'granted' && (
                     <View style={st.permBanner}>
                         <Text style={st.permText}>
-                            Push notifications are{' '}
                             {permission === 'denied'
-                                ? 'blocked'
-                                : 'not yet enabled'}{' '}
-                            for Ojo.
+                                ? 'Push notifications are blocked for Ojo.'
+                                : 'Ojo will ask your permission before sending notifications.'}
                         </Text>
                         <Pressable
                             style={st.permBtn}
@@ -487,13 +490,13 @@ export default function NotificationsScreen() {
                             accessibilityLabel={
                                 permission === 'denied'
                                     ? 'Open Settings'
-                                    : 'Enable Notifications'
+                                    : 'Continue'
                             }
                         >
                             <Text style={st.permBtnText}>
                                 {permission === 'denied'
                                     ? 'Open Settings'
-                                    : 'Enable Notifications'}
+                                    : 'Continue'}
                             </Text>
                         </Pressable>
                     </View>

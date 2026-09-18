@@ -3,6 +3,7 @@
  * Images are uploaded to Cloudflare R2 via the server.
  */
 
+import { Alert, Linking } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import client from '../api/client';
 import { authHeaders } from './auth';
@@ -16,13 +17,39 @@ export interface ImageResult {
   width:    number | null;
   height:   number | null;
   error:    string | null;
+  /** The OS refused camera or photo access. Callers show
+   *  showAccessDeniedAlert rather than `error`, so the user gets a way to
+   *  Settings instead of a bare "Error" alert. */
+  denied?:  boolean;
 }
+
+/**
+ * Explains a refused camera or photo permission and links to Settings.
+ *
+ * Only ever shown after the system prompt has been answered: once iOS has
+ * recorded a denial it never asks again, so without this link the button just
+ * fails forever. App Review suggested exactly this pairing when it rejected
+ * build 31's camera pre-prompt (5.1.1(iv)) — tell the user the feature needs
+ * access and link to Settings, rather than nudging them before the prompt.
+ */
+export const showAccessDeniedAlert = (source: 'camera' | 'library'): void => {
+  Alert.alert(
+    source === 'camera' ? 'Camera access is off' : 'Photo access is off',
+    source === 'camera'
+      ? 'To photograph clothing for your closet, turn on camera access for Ojo in Settings.'
+      : 'To add clothing photos from your library, turn on photo access for Ojo in Settings.',
+    [
+      { text: 'Close', style: 'cancel' },
+      { text: 'Open Settings', onPress: () => { void Linking.openSettings(); } },
+    ],
+  );
+};
 
 export const pickImage = async (): Promise<ImageResult> => {
   try {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      return { uri: null, localUri: null, width: null, height: null, error: 'Photo library access denied.' };
+      return { uri: null, localUri: null, width: null, height: null, error: 'Photo library access denied.', denied: true };
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -66,7 +93,7 @@ export const captureImage = async (): Promise<ImageResult> => {
   try {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      return { uri: null, localUri: null, width: null, height: null, error: 'Camera access denied.' };
+      return { uri: null, localUri: null, width: null, height: null, error: 'Camera access denied.', denied: true };
     }
 
     const result = await ImagePicker.launchCameraAsync({

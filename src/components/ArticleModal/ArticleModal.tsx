@@ -18,6 +18,7 @@ import { View, Text } from '../primitives';
 import {
     pickImage,
     captureImage,
+    showAccessDeniedAlert,
     uploadImageToR2,
 } from '../../lib/imageService';
 import { getErrorMessage } from '../../lib/auth';
@@ -643,6 +644,10 @@ const ArticleModal = ({
 
     const handlePickImage = async () => {
         const result = await pickImage();
+        if (result.denied) {
+            showAccessDeniedAlert('library');
+            return;
+        }
         if (result.error) {
             Alert.alert('Error', result.error);
             return;
@@ -674,6 +679,10 @@ const ArticleModal = ({
 
     const handleCaptureImage = async () => {
         const result = await captureImage();
+        if (result.denied) {
+            showAccessDeniedAlert('camera');
+            return;
+        }
         if (result.error) {
             Alert.alert('Error', result.error);
             return;

@@ -66,9 +66,9 @@ export const FREE_CLOSET_LIMIT = 1;
 
 export type LimitKind = 'item' | 'closet';
 
-/** Machine-readable refusal codes, matching the `code` convention already used
- *  by requireAgeVerified in middleware/auth.ts. The app branches on these to
- *  route to the paywall rather than string-matching the message. */
+/** Machine-readable refusal codes, matching the `code` convention the auth
+ *  routes use (e.g. EMAIL_NOT_VERIFIED). The app branches on these to route to
+ *  the paywall rather than string-matching the message. */
 export const LIMIT_CODES: Record<LimitKind, string> = {
   item:   'FREE_ITEM_LIMIT_REACHED',
   closet: 'FREE_CLOSET_LIMIT_REACHED',

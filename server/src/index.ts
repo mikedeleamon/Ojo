@@ -24,7 +24,7 @@ import tripFitRoutes from './routes/tripfit';
 import shareRoutes from './routes/share';
 import resetRoutes from './routes/reset';
 import revenuecatRoutes from './routes/revenuecat';
-import { requireAuth, requireAgeVerified, AuthRequest } from './middleware/auth';
+import { requireAuth, AuthRequest } from './middleware/auth';
 import { startNotificationService } from './services/notificationService';
 import { weatherStats, resetWeatherStats } from './lib/weatherKit';
 
@@ -202,17 +202,6 @@ app.use('/api/auth', (req, res, next) => {
   if (req.path === '/refresh') return refreshLimiter(req, res, next);
   return authLimiter(req, res, next);
 }, authRoutes);
-// Everything that stores or returns personal data sits behind the minimum-age
-// gate. requireAuth is mounted here so requireAgeVerified has a resolved
-// account to read; it is idempotent, so the routers that also mount it
-// internally don't pay for a second lookup.
-//
-// /api/user and /api/auth are intentionally NOT gated — an unverified user
-// still needs to reach POST /api/auth/verify-age to escape the state, and to
-// view or delete their account if they'd rather not supply a date of birth.
-const gated = [requireAuth, requireAgeVerified];
-
-//
 // ORDERING: the limiter is mounted AFTER the auth middleware on every
 // authenticated router, not before it. keyByUser reads `req.userId`, which
 // requireAuth is what sets — with the old ordering (limiter first) that field
@@ -226,15 +215,13 @@ const gated = [requireAuth, requireAgeVerified];
 //
 // requireAuth is idempotent (it returns early when req.userId is already set),
 // so the routers that also mount it internally don't pay for a second lookup.
-app.use('/api/weather',       ...gated, weatherLimiter, weatherRoutes);
-// /api/user takes requireAuth but NOT the age gate — an unverified account must
-// still be able to read its profile or delete itself (see the note above).
+app.use('/api/weather',       requireAuth, weatherLimiter, weatherRoutes);
 app.use('/api/user',          requireAuth, generalLimiter, userRoutes);
-app.use('/api/closets',       ...gated, generalLimiter, closetRoutes);
-app.use('/api/notifications', ...gated, generalLimiter, notificationRoutes);
-app.use('/api/history',       ...gated, generalLimiter, historyRoutes);
-app.use('/api/trips',         ...gated, generalLimiter, tripsRoutes);
-app.use('/api/tripfit',       ...gated, generalLimiter, tripFitRoutes);
+app.use('/api/closets',       requireAuth, generalLimiter, closetRoutes);
+app.use('/api/notifications', requireAuth, generalLimiter, notificationRoutes);
+app.use('/api/history',       requireAuth, generalLimiter, historyRoutes);
+app.use('/api/trips',         requireAuth, generalLimiter, tripsRoutes);
+app.use('/api/tripfit',       requireAuth, generalLimiter, tripFitRoutes);
 // Public pages: no user to key on, so these stay IP-keyed.
 app.use('/s',                 publicLimiter, shareRoutes);
 // Public https landing page for the password-reset email. Rate limited like the

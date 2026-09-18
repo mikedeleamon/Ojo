@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useFocusEffect } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 import {
     ScrollView,
     RefreshControl,
@@ -742,10 +743,37 @@ const WeatherHUD = ({
     const isRainBg = !!weather && isRain(weather.WeatherText);
     const isDrizzleBg = !!weather && isDrizzle(weather.WeatherText);
 
+    // ── Backdrop animation gate ──────────────────────────────────────────────
+    //
+    // NativeTabs is a UITabBarController: switching tabs detaches this view but
+    // keeps the component MOUNTED (that's why the focus effect above has to
+    // reset scroll by hand). Without this gate the sky kept animating on every
+    // other tab, inside the camera modal, and behind every pushed route — the
+    // whole backdrop's per-frame cost was being paid on screens that can't see
+    // a single pixel of it.
+    //
+    // That cost is not the fill rate this file usually worries about; it's main
+    // thread CPU in RCTNativeAnimatedNodesManager. Its CADisplayLink runs in
+    // NSRunLoopCommonModes, and `updateAnimations` walks EVERY animated node
+    // each frame, then pushes each dirty props node through
+    // `synchronouslyUpdateViewOnUIThread` — one folly::dynamic conversion and
+    // one full `cloneProps` per animated view, per frame. The clear-night field
+    // is 32 independently-animated stars, so that is 32 prop clones a frame,
+    // forever, on whatever screen the user is actually looking at. When the
+    // main thread spikes for any other reason the display link overruns its
+    // interval, re-fires immediately, and starves the run loop — which is what
+    // an "App Hang Non Fully Blocked" report with stepAnimations: on the stack
+    // actually is.
+    //
+    // Focus is the correct axis: backgrounding already pauses CADisplayLink,
+    // but leaving the tab did not.
+    const isFocused = useIsFocused();
+    const backdropAnimate = perf.twinkle && isFocused;
+
     // Shared by both star-field parallax layers below, so the near and far
     // bands freeze on scroll together rather than drifting out of sync.
     const starsAnimate =
-        perf.twinkle && !(perf.freezeTwinkleOnScroll && twinkleFrozen);
+        backdropAnimate && !(perf.freezeTwinkleOnScroll && twinkleFrozen);
 
     // Precipitation slant from the reported wind. Gust is preferred when present
     // — it's what makes a squall look like a squall rather than steady drizzle.
@@ -880,7 +908,7 @@ const WeatherHUD = ({
                     showRain
                     showFlash
                     rainAngle={rainAngle}
-                    animate={perf.twinkle}
+                    animate={backdropAnimate}
                 />
             </BackdropLayer>
 
@@ -903,7 +931,7 @@ const WeatherHUD = ({
                     showFlash={false}
                     rainAngle={rainAngle}
                     rainVariant="light"
-                    animate={perf.twinkle}
+                    animate={backdropAnimate}
                 />
             </BackdropLayer>
 
@@ -925,7 +953,7 @@ const WeatherHUD = ({
                     showFlash={false}
                     rainAngle={rainAngle}
                     rainVariant="drizzle"
-                    animate={perf.twinkle}
+                    animate={backdropAnimate}
                 />
             </BackdropLayer>
 

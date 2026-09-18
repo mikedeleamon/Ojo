@@ -217,14 +217,27 @@ function RainLayer({
 
     // The SVG itself stays in place; we translate the Animated.View wrapper.
     // Y travels one segment (drops slot back to start), X travels rainAngle * segment.
-    const translateY = progress.interpolate({
-        inputRange: [0, 1],
-        outputRange: [0, segmentH],
-    });
-    const translateX = progress.interpolate({
-        inputRange: [0, 1],
-        outputRange: [0, rainAngle * segmentH],
-    });
+    //
+    // Memoised for the same reason as Bolt's `opacity` just above: AnimatedProps
+    // is keyed on animated-node identity, so returning fresh interpolation nodes
+    // each render rebuilt this layer's native node chain every time the parent
+    // re-rendered.
+    const translateY = useMemo(
+        () =>
+            progress.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, segmentH],
+            }),
+        [progress, segmentH],
+    );
+    const translateX = useMemo(
+        () =>
+            progress.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, rainAngle * segmentH],
+            }),
+        [progress, rainAngle, segmentH],
+    );
 
     // Pre-stack DROPS_PER_GROUP+1 streaks per column, starting one segment ABOVE
     // the viewBox. After translating one segment downward and snapping back, the
