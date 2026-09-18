@@ -37,6 +37,7 @@
         "EXPO_PUBLIC_SHARE_BASE_URL": "https://ojo-production-0f30.up.railway.app",
         "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "555153415751-ejhgihp9r6tgkssuj8qhchess3blbmml.apps.googleusercontent.com",
         "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "555153415751-fvl7meivgou05m8pqtc4kipmudo89qms.apps.googleusercontent.com",
+        "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "appl_HRhjucDYLuexThhEddnxfavhYHu",
         "SENTRY_ORG": "ojo-studio-llc",
         "SENTRY_PROJECT": "react-native",
         "SENTRY_URL": "https://sentry.io/"
@@ -48,7 +49,7 @@
       "ios": {
         "language": "en-US",
         "appleId": "mikeamon@ojoapp.io",
-        "ascAppId": "6743219085",
+        "ascAppId": "6775698216",
         "appleTeamId": "37L8H5D9PQ"
       },
       "android": {
