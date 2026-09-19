@@ -13,7 +13,7 @@ import { Router, Request, Response } from 'express';
  */
 const router = Router();
 
-const APP_STORE_URL = process.env.APP_STORE_URL ?? 'https://apps.apple.com/app/ojo';
+const APP_STORE_URL = process.env.APP_STORE_URL ?? 'https://apps.apple.com/app/id6775698216';
 
 function landingHtml(opts: { title: string; deepLink: string }): string {
   const { title, deepLink } = opts;

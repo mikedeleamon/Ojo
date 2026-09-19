@@ -724,7 +724,7 @@ export default function NotificationsScreen() {
                             <RowLabel
                                 st={st}
                                 title='Trip Mode Morning Outfit'
-                                subtitle="While you're on a trip, a morning nudge points you to the outfit you planned for that day."
+                                subtitle="A morning nudge points you to the outfit you planned for that day: on a trip's first day, then each day after once Ojo confirms you've arrived."
                             />
                             <Switch
                                 value={ns.tripModeMorningEnabled}

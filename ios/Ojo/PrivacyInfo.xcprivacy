@@ -69,13 +69,15 @@
 				<string>NSPrivacyCollectedDataTypePurposeProductPersonalization</string>
 			</array>
 		</dict>
-		<!-- Precise location — used to fetch local weather for outfit suggestions.
-		     Linked: the coordinates for the location you set are saved on your
-		     account (keyed by user) so scheduled notifications can fetch local
-		     weather while the app is closed. -->
+		<!-- Coarse location — used to fetch local weather for outfit suggestions.
+		     The device fix is rounded to ~1 km before it leaves the phone
+		     (src/lib/coarseLocation.ts), so the exact position is never collected.
+		     Linked: the rounded coordinates for the location you set are saved on
+		     your account (keyed by user) so scheduled notifications can fetch
+		     local weather while the app is closed. -->
 		<dict>
 			<key>NSPrivacyCollectedDataType</key>
-			<string>NSPrivacyCollectedDataTypePreciseLocation</string>
+			<string>NSPrivacyCollectedDataTypeCoarseLocation</string>
 			<key>NSPrivacyCollectedDataTypeLinked</key>
 			<true/>
 			<key>NSPrivacyCollectedDataTypeTracking</key>

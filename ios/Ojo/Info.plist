@@ -69,9 +69,9 @@
     <key>NSCameraUsageDescription</key>
     <string>Ojo uses your camera so you can photograph clothing items to add to your closet.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>Ojo uses your location for local weather.</string>
+    <string>Ojo uses your location to fetch local weather for outfit suggestions.</string>
     <key>NSPhotoLibraryUsageDescription</key>
-    <string>Ojo uses your photo library to add clothing images to add to your closet.</string>
+    <string>Ojo uses your photo library so you can add images of your clothing items.</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
     <string>Ojo saves images you choose to share, like outfit and recap cards, to your photo library.</string>
     <key>NSUserActivityTypes</key>

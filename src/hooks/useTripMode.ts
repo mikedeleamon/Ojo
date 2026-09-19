@@ -7,6 +7,7 @@ import { useClosets } from './useClosets';
 import { useSettings } from './useSettings';
 import { getCurrentLocation, type Coords } from '../lib/location';
 import { reportTripPresence } from '../lib/tripPresence';
+import { setTripNudgePresence } from '../lib/notifications';
 import {
     selectActiveTrip,
     todayDayIndex,
@@ -152,15 +153,23 @@ export const useTripMode = (): TripModeState => {
     useEffect(() => {
         let cancelled = false;
 
+        // One verdict, two consumers: the server's notification passes, and this
+        // device's Trip Mode morning nudges, whose mornings after the first wait
+        // for a confirmation (lib/notifications.ts · setTripNudgePresence).
+        const reportPresence = (tripId: string | null) => {
+            reportTripPresence(tripId).catch(() => {});
+            setTripNudgePresence(tripId, plans).catch(() => {});
+        };
+
         const run = async () => {
             if (!settingsReady || plansLoading || closetsLoading) return;
             setWorking(true);
 
             if (!enabled) {
                 // Trip Mode off is the user saying don't treat me as travelling.
-                // Withdraw any standing confirmation so the server stops
-                // steering their notifications by it too.
-                reportTripPresence(null).catch(() => {});
+                // Withdraw any standing confirmation so neither the server nor
+                // the morning nudges keep acting on it.
+                reportPresence(null);
                 if (!cancelled) { setResolved(INACTIVE); setWorking(false); }
                 return;
             }
@@ -173,7 +182,7 @@ export const useTripMode = (): TripModeState => {
                 // No trip is running, so there is nothing to be present at.
                 // Costs nothing for the user who has never travelled: a clear
                 // is only sent if a confirmation was sent before it.
-                reportTripPresence(null).catch(() => {});
+                reportPresence(null);
                 if (!cancelled) { setResolved(INACTIVE); setWorking(false); }
                 return;
             }
@@ -190,7 +199,7 @@ export const useTripMode = (): TripModeState => {
                 // passed, so a trip covers today and the fix put the user at
                 // none of their trip cities. That is a real answer — tell the
                 // server, so notifications about that city stop.
-                reportTripPresence(null).catch(() => {});
+                reportPresence(null);
                 if (!cancelled) { setResolved(INACTIVE); setWorking(false); }
                 return;
             }
@@ -203,7 +212,7 @@ export const useTripMode = (): TripModeState => {
             // quiet lets the last real answer expire on the server's schedule
             // instead of being overwritten by a guess.
             if (locationConfirmed) {
-                reportTripPresence(trip.id).catch(() => {});
+                reportPresence(trip.id);
             }
             const { index, total } = todayDayIndex(trip, todayISO);
 

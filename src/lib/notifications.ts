@@ -332,11 +332,18 @@ export const cancelTripPackingReminder = cancelAllTripReminders;
 // triggers scheduled per trip day. Identifiers are namespaced by plan id + date
 // so we can cancel a plan's whole set by prefix without a separate registry.
 //
-// Limitation: these are date-based — they fire during the trip window regardless
-// of where the device actually is (no background location). The in-app Trip Mode
-// card is what confirms the user is really at the destination.
+// A DATE trigger fires without running any app code, so nothing can check where
+// the phone is at 8am (and Ojo does no background location). Dates only say the
+// user planned to be somewhere, so on their own they earn just the first
+// morning — "your trip starts today" is true wherever the user wakes up. Every
+// later morning waits for Trip Mode's GPS check to confirm the device reached
+// the trip city (setTripNudgePresence), the same verdict the server's
+// notification passes act on (lib/tripPresence.ts). A trip the user never took
+// costs them one nudge, not one per day.
 
 export const TRIP_MODE_MORNING_PREF_KEY = 'ojo_trip_mode_morning_enabled';
+/** The trip Trip Mode's GPS check last confirmed this device at, if any. */
+const TRIP_NUDGE_PRESENCE_KEY = 'ojo_trip_nudge_confirmed_trip';
 const TRIP_MODE_PREFIX = 'ojo_tripmode_';
 const TRIP_MODE_HOUR = 8; // 8am local
 const TRIP_MODE_MAX_DAYS = 14;
@@ -393,10 +400,32 @@ export const cancelTripMorningNotifications = async (planId: string): Promise<vo
 export const cancelAllTripMorningNotifications = async (): Promise<void> =>
   cancelByPrefix(TRIP_MODE_PREFIX);
 
-/** (Re)schedule the per-day 8am morning nudges for one trip. */
-export const scheduleTripMorningNotifications = async (
-  plan: TripMorningInput,
-): Promise<void> => {
+/**
+ * Title for one day's nudge. It is scheduled days ahead and fires without
+ * knowing where the phone is, so it names the trip and never claims the user
+ * is in the city — on day one most people are still at home or in transit.
+ * (The server's morning brief can say more: it only switches to a trip city
+ * once the device has confirmed being there, see server lib/activeTrip.ts.)
+ */
+export const tripMorningTitle = (destination: string, day: number): string =>
+  day === 1
+    ? `Your ${destination} trip starts today 🧳`
+    : `Day ${day} of your ${destination} trip 🧳`;
+
+// Each pass below cancels a plan's nudges, then re-adds them from the confirmed
+// trip as it reads it. Run concurrently, a pass that read the old verdict could
+// finish last and re-add mornings a newer one had just withdrawn — and the
+// plans reconcile and a GPS verdict routinely land together on app open. One
+// at a time, the last pass always reflects the latest verdict.
+let nudgeQueue: Promise<void> = Promise.resolve();
+const inNudgeQueue = (task: () => Promise<void>): Promise<void> => {
+  const run = nudgeQueue.then(task);
+  nudgeQueue = run.catch(() => {});
+  return run;
+};
+
+/** The body of scheduleTripMorningNotifications; call only from inside the queue. */
+const scheduleTripMorningNow = async (plan: TripMorningInput): Promise<void> => {
   // Always clear this plan's existing nudges first so updates don't duplicate.
   await cancelTripMorningNotifications(plan.id);
 
@@ -406,8 +435,12 @@ export const scheduleTripMorningNotifications = async (
   const { status } = await Notifications.getPermissionsAsync();
   if (status !== 'granted') return;
 
+  const confirmed = (await storage.getItem(TRIP_NUDGE_PRESENCE_KEY)) === plan.id;
   const now = new Date();
-  for (const dateISO of datesInRange(plan.startDate, plan.endDate)) {
+  const dates = datesInRange(plan.startDate, plan.endDate);
+  for (let i = 0; i < dates.length; i++) {
+    if (i > 0 && !confirmed) break; // later mornings wait for GPS to confirm
+    const dateISO = dates[i];
     const fireAt = new Date(dateISO + 'T00:00:00');
     fireAt.setHours(TRIP_MODE_HOUR, 0, 0, 0);
     if (fireAt <= now) continue; // skip days already past 8am
@@ -415,7 +448,9 @@ export const scheduleTripMorningNotifications = async (
     await Notifications.scheduleNotificationAsync({
       identifier: morningNotifId(plan.id, dateISO),
       content: {
-        title: `Good morning in ${plan.destination}! ☀️`,
+        // i + 1 counts from the trip's first date, not the first one still
+        // ahead, so a trip rescheduled mid-way keeps its real day numbers.
+        title: tripMorningTitle(plan.destination, i + 1),
         body: "Open Ojo to see the outfit you planned for today.",
         data: { url: `ojo://trip/${plan.id}` },
       },
@@ -423,6 +458,41 @@ export const scheduleTripMorningNotifications = async (
     }).catch(() => {});
   }
 };
+
+/**
+ * (Re)schedule one trip's 8am nudges: the first morning always, the rest only
+ * once Trip Mode has confirmed the device is at this trip's destination.
+ */
+export const scheduleTripMorningNotifications = (plan: TripMorningInput): Promise<void> =>
+  inNudgeQueue(() => scheduleTripMorningNow(plan));
+
+/**
+ * Apply a Trip Mode GPS verdict to the nudges: `tripId` when the device was
+ * confirmed at that trip's destination, `null` when GPS put it at none of the
+ * user's trip cities or Trip Mode can no longer tell. Confirming schedules the
+ * trip's remaining mornings; clearing takes the previously confirmed trip back
+ * to its first morning only, which by then has usually passed.
+ *
+ * `plans` must include the trips involved; the caller's full list is fine. A
+ * no-op when the verdict hasn't changed, so it is cheap to call on every
+ * Trip Mode resolution.
+ */
+export const setTripNudgePresence = (
+  tripId: string | null,
+  plans: TripMorningInput[],
+): Promise<void> =>
+  inNudgeQueue(async () => {
+    const prev = await storage.getItem(TRIP_NUDGE_PRESENCE_KEY);
+    if (prev === tripId) return;
+
+    if (tripId) await storage.setItem(TRIP_NUDGE_PRESENCE_KEY, tripId);
+    else await storage.removeItem(TRIP_NUDGE_PRESENCE_KEY);
+
+    for (const id of [prev, tripId]) {
+      const plan = id ? plans.find((p) => p.id === id) : undefined;
+      if (plan) await scheduleTripMorningNow(plan);
+    }
+  });
 
 // ─── Orphaned trip notifications ──────────────────────────────────────────────
 // Every cancel path above needs a plan id in hand: `remove()` cancels the plan
@@ -522,6 +592,7 @@ export const cancelAllLocalNotifications = (): Promise<void> => {
       /* ignore */
     }
     await storage.removeItem(TRIP_REGISTRY_KEY).catch(() => {});
+    await storage.removeItem(TRIP_NUDGE_PRESENCE_KEY).catch(() => {});
   })();
   return wipeInFlight;
 };
