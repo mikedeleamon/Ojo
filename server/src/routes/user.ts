@@ -8,6 +8,7 @@ import TripFitPlan from '../models/TripFitPlan';
 import { signToken } from '../lib/jwt';
 import { deleteManyFromR2 } from '../lib/r2';
 import { requireAuth, AuthRequest } from '../middleware/auth';
+import { coarsenSettingsField } from '../lib/coarseLocation';
 
 const router = Router();
 router.use(requireAuth);
@@ -215,10 +216,12 @@ router.put('/settings', async (req: AuthRequest, res: Response): Promise<void> =
   try {
     // Merge individual fields rather than replacing the whole sub-document.
     // Whitelist keys so callers cannot write arbitrary settings paths.
+    // Locations are stored at ~1 km whatever the client sent (lib/coarseLocation.ts):
+    // current builds round before sending, older ones don't.
     const updateFields: Record<string, unknown> = {};
     for (const field of SETTINGS_EDITABLE_FIELDS) {
       if (Object.prototype.hasOwnProperty.call(req.body, field)) {
-        updateFields[`settings.${field}`] = req.body[field];
+        updateFields[`settings.${field}`] = coarsenSettingsField(field, req.body[field]);
       }
     }
     if (Object.keys(updateFields).length === 0) {

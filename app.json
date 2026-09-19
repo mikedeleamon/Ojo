@@ -16,6 +16,7 @@
         "NSLocationWhenInUseUsageDescription": "Ojo uses your location to fetch local weather for outfit suggestions.",
         "NSCameraUsageDescription": "Ojo uses your camera so you can photograph clothing items to add to your closet.",
         "NSPhotoLibraryUsageDescription": "Ojo uses your photo library so you can add images of your clothing items.",
+        "NSPhotoLibraryAddUsageDescription": "Ojo saves images you choose to share, like outfit and recap cards, to your photo library.",
         "NSUserNotificationsUsageDescription": "Ojo sends daily outfit suggestions and weather alerts to help you dress for the day.",
         "ITSAppUsesNonExemptEncryption": false
       },

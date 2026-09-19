@@ -12,6 +12,7 @@ import { useReduceMotion } from '../../hooks/useReduceMotion';
 import { markOnboardingComplete } from '../../lib/onboarding';
 import CityAutocomplete from '../../features/settings/components/CityAutocomplete';
 import { getCurrentLocation } from '../../lib/location';
+import { coarsen } from '../../lib/coarseLocation';
 import { reverseGeocode } from '../../lib/geocoding';
 import { requestPermission, registerPushToken, NOTIF_DEFAULTS } from '../../lib/notifications';
 import { hapticSuccess } from '../../lib/haptics';
@@ -190,12 +191,16 @@ export default function OnboardingPage({ onComplete }: Props) {
   const advance = (toStep: number) => transition(toStep, 'forward');
   const goBack  = (toStep: number) => transition(toStep, 'back');
 
-  /** Persist whatever coordinates we ended up with, however they were obtained. */
+  /**
+   * Persist whatever coordinates we ended up with, however they were obtained.
+   * Only the ~1 km rounding is stored (lib/coarseLocation.ts); a GPS label has
+   * already been looked up from the exact fix by the time this runs.
+   */
   const persistLocation = async (lat: number, lon: number, label: string) => {
     setHasCoords(true);
     setCityLabel(label);
     try {
-      await saveSettings({ ...settings, location: label, lat, lon });
+      await saveSettings({ ...settings, location: label, lat: coarsen(lat), lon: coarsen(lon) });
     } catch { /* non-fatal — the value still stands for this session */ }
   };
 

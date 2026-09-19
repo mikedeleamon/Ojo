@@ -15,7 +15,7 @@ export const LEGAL_URLS = {
   termsOfService:  'https://www.ojoapp.io/terms',
 } as const;
 
-export const EFFECTIVE_DATE = 'September 16, 2026';
+export const EFFECTIVE_DATE = 'September 18, 2026';
 export const DEVELOPER_NAME = 'Ojo Studio, LLC';
 export const CONTACT_EMAIL  = 'support@ojoapp.io';
 export const WEBSITE_URL    = 'https://www.ojoapp.io';
@@ -66,7 +66,7 @@ export const PRIVACY_POLICY: LegalDocument = {
             'Email address — used to create and authenticate your account',
             'Password — if you sign up with email, your password is stored only as a salted cryptographic hash. We never store or have access to it in plain text. If you sign in with Apple or Google instead, no password is created',
             'Username — a display name of your choosing',
-            'Location — either a city name you enter manually, or, if you choose "My Location," your device\'s GPS coordinates read on demand at that moment. The coordinates for the location you set are saved to your account so that scheduled notifications, such as your morning brief, can retrieve local weather while the App is closed. If you turn on Trip Mode, the App also reads your location on demand to detect when you have arrived at a saved trip destination. We do not track your location continuously or in the background, and we do not keep a history of where you have been',
+            'Location — either a city name you enter manually, or, if you choose "My Location," your device\'s location read on demand at that moment. Before your location leaves your device, the App rounds it to about 1 km (two decimal places of latitude and longitude); your precise position never reaches our servers. The rounded coordinates for the location you set are saved to your account so that scheduled notifications, such as your morning brief, can retrieve local weather while the App is closed. If you turn on Trip Mode, the App also reads your location on demand to detect when you have arrived at a saved trip destination; that check happens on your device, and only which trip you are on is sent to us. We do not track your location continuously or in the background, and we do not keep a history of where you have been',
             'Style preferences — your clothing style, temperature and humidity comfort thresholds, unit preferences, any additional cities you save, and — only if you choose to provide it — gender, which is used to tailor outfit suggestions',
             'Clothing item photos and metadata — images you upload or capture of your garments, plus descriptions, categories, colours, fabrics, and (optionally) merchant and purchase price',
             'Outfit wear history — records of which outfit suggestions you marked as "Wore this today," and the weather conditions at the time, which is what allows the App to learn your preferences',
