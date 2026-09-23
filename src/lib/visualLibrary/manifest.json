@@ -1,0 +1,245 @@
+{
+  "version": 2,
+  "loops": {
+    "cloudy": {
+      "path": "loops/cloudy.d3940ade.mp4",
+      "bytes": 257244,
+      "w": 1080,
+      "h": 1920,
+      "poster": {
+        "path": "loops/cloudy.poster.83a36814.jpg",
+        "bytes": 17883
+      }
+    },
+    "drizzle": {
+      "path": "loops/drizzle.02af8a38.mp4",
+      "bytes": 903995,
+      "w": 1080,
+      "h": 1920,
+      "poster": {
+        "path": "loops/drizzle.poster.60442d62.jpg",
+        "bytes": 30324
+      }
+    },
+    "fog": {
+      "path": "loops/fog.75f1e749.mp4",
+      "bytes": 898033,
+      "w": 1080,
+      "h": 1920,
+      "poster": {
+        "path": "loops/fog.poster.25a25944.jpg",
+        "bytes": 29720
+      }
+    },
+    "haze": {
+      "path": "loops/haze.9807a316.mp4",
+      "bytes": 267875,
+      "w": 1080,
+      "h": 1920,
+      "poster": {
+        "path": "loops/haze.poster.63cd90b2.jpg",
+        "bytes": 24850
+      }
+    },
+    "hot": {
+      "path": "loops/hot.78c2b934.mp4",
+      "bytes": 806115,
+      "w": 1080,
+      "h": 1920,
+      "poster": {
+        "path": "loops/hot.poster.04531718.jpg",
+        "bytes": 35483
+      }
+    },
+    "ice": {
+      "path": "loops/ice.c14d9bf7.mp4",
+      "bytes": 1276921,
+      "w": 1080,
+      "h": 1920,
+      "poster": {
+        "path": "loops/ice.poster.4be5dac3.jpg",
+        "bytes": 36537
+      }
+    },
+    "partlyCloudy.day": {
+      "path": "loops/partlyCloudy.day.a0c17945.mp4",
+      "bytes": 323944,
+      "w": 1080,
+      "h": 1920,
+      "poster": {
+        "path": "loops/partlyCloudy.day.poster.4082c8f7.jpg",
+        "bytes": 18363
+      }
+    },
+    "partlyCloudy.night": {
+      "path": "loops/partlyCloudy.night.f8333b54.mp4",
+      "bytes": 354643,
+      "w": 1080,
+      "h": 1920,
+      "poster": {
+        "path": "loops/partlyCloudy.night.poster.121b956a.jpg",
+        "bytes": 17833
+      }
+    },
+    "rain": {
+      "path": "loops/rain.01afcf76.mp4",
+      "bytes": 755313,
+      "w": 1080,
+      "h": 1920,
+      "poster": {
+        "path": "loops/rain.poster.8ef8b312.jpg",
+        "bytes": 27698
+      }
+    },
+    "recap": {
+      "path": "loops/recap.d5549db1.mp4",
+      "bytes": 1369998,
+      "w": 1080,
+      "h": 1920,
+      "poster": {
+        "path": "loops/recap.poster.2f0fc78d.jpg",
+        "bytes": 24988
+      }
+    },
+    "sky.afterglow": {
+      "path": "loops/sky.afterglow.fcfee6ff.mp4",
+      "bytes": 422708,
+      "w": 1080,
+      "h": 1920,
+      "poster": {
+        "path": "loops/sky.afterglow.poster.9572c7b1.jpg",
+        "bytes": 30675
+      }
+    },
+    "sky.blueHour": {
+      "path": "loops/sky.blueHour.c4e75394.mp4",
+      "bytes": 440760,
+      "w": 1080,
+      "h": 1920,
+      "poster": {
+        "path": "loops/sky.blueHour.poster.d4cf8d93.jpg",
+        "bytes": 32236
+      }
+    },
+    "sky.clearDay": {
+      "path": "loops/sky.clearDay.322cb2c0.mp4",
+      "bytes": 847218,
+      "w": 1080,
+      "h": 1920,
+      "poster": {
+        "path": "loops/sky.clearDay.poster.7a91fd42.jpg",
+        "bytes": 27854
+      }
+    },
+    "sky.clearNight": {
+      "path": "loops/sky.clearNight.c65c8211.mp4",
+      "bytes": 440202,
+      "w": 1080,
+      "h": 1920,
+      "poster": {
+        "path": "loops/sky.clearNight.poster.d8238fe3.jpg",
+        "bytes": 25599
+      }
+    },
+    "sky.dawn": {
+      "path": "loops/sky.dawn.477da5a1.mp4",
+      "bytes": 451145,
+      "w": 1080,
+      "h": 1920,
+      "poster": {
+        "path": "loops/sky.dawn.poster.1a3d2705.jpg",
+        "bytes": 37197
+      }
+    },
+    "sky.dawnAfterglow": {
+      "path": "loops/sky.dawnAfterglow.f3517761.mp4",
+      "bytes": 453939,
+      "w": 1080,
+      "h": 1920,
+      "poster": {
+        "path": "loops/sky.dawnAfterglow.poster.d6f2cc9f.jpg",
+        "bytes": 30928
+      }
+    },
+    "sky.dawnBlue": {
+      "path": "loops/sky.dawnBlue.36f8dd9f.mp4",
+      "bytes": 456169,
+      "w": 1080,
+      "h": 1920,
+      "poster": {
+        "path": "loops/sky.dawnBlue.poster.efac673a.jpg",
+        "bytes": 33175
+      }
+    },
+    "sky.dawnGold": {
+      "path": "loops/sky.dawnGold.2cde1540.mp4",
+      "bytes": 776931,
+      "w": 1080,
+      "h": 1920,
+      "poster": {
+        "path": "loops/sky.dawnGold.poster.7c7d136c.jpg",
+        "bytes": 34267
+      }
+    },
+    "sky.dawnPale": {
+      "path": "loops/sky.dawnPale.266a4a2a.mp4",
+      "bytes": 768512,
+      "w": 1080,
+      "h": 1920,
+      "poster": {
+        "path": "loops/sky.dawnPale.poster.8a6ece79.jpg",
+        "bytes": 32068
+      }
+    },
+    "sky.goldenHour": {
+      "path": "loops/sky.goldenHour.7a023b1f.mp4",
+      "bytes": 785762,
+      "w": 1080,
+      "h": 1920,
+      "poster": {
+        "path": "loops/sky.goldenHour.poster.c169beea.jpg",
+        "bytes": 36538
+      }
+    },
+    "sky.lowSun": {
+      "path": "loops/sky.lowSun.4e8ac4f6.mp4",
+      "bytes": 771964,
+      "w": 1080,
+      "h": 1920,
+      "poster": {
+        "path": "loops/sky.lowSun.poster.41190a7c.jpg",
+        "bytes": 31998
+      }
+    },
+    "sky.sunset": {
+      "path": "loops/sky.sunset.ce0838ba.mp4",
+      "bytes": 464828,
+      "w": 1080,
+      "h": 1920,
+      "poster": {
+        "path": "loops/sky.sunset.poster.84418b25.jpg",
+        "bytes": 39822
+      }
+    },
+    "snow": {
+      "path": "loops/snow.39aadb48.mp4",
+      "bytes": 848511,
+      "w": 1080,
+      "h": 1920,
+      "poster": {
+        "path": "loops/snow.poster.03cd32b5.jpg",
+        "bytes": 35844
+      }
+    },
+    "thunderstorm": {
+      "path": "loops/thunderstorm.f0c6fa59.mp4",
+      "bytes": 1256860,
+      "w": 1080,
+      "h": 1920,
+      "poster": {
+        "path": "loops/thunderstorm.poster.c809e081.jpg",
+        "bytes": 35150
+      }
+    }
+  }
+}

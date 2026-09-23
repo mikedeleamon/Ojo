@@ -72,6 +72,7 @@ import FogDrift from './FogDrift';
 import ShootingStar from './ShootingStar';
 import SunGlare from './SunGlare';
 import { solarPosition, type SolarPosition } from '../../lib/solarPosition';
+import { lookFor } from '../../lib/visualLibrary/looks';
 import { rainAngleFor } from '../../lib/weather/windSlant';
 import BackdropLayer, { SCROLL_RANGE } from './BackdropLayer';
 import PerfPanel from '../debug/PerfPanel';
@@ -1381,9 +1382,20 @@ const WeatherHUD = ({
                                 isMetric={isMetric}
                             />
                         )}
+                        renderSticker={(stickerRef) => (
+                            <WeatherForecastShareCard
+                                ref={stickerRef}
+                                variant='sticker'
+                                place={place?.name ?? 'My Location'}
+                                weather={weather}
+                                hourly={forecasts}
+                                isMetric={isMetric}
+                            />
+                        )}
                         attributionURL={weatherShareLink()}
                         backgroundTopColor='#0C4A6E'
                         backgroundBottomColor='#0F172A'
+                        look={weather ? lookFor({ condition: bgCondition, isDayTime: bgIsDay, sun }) : undefined}
                     />
                 </View>
             )}

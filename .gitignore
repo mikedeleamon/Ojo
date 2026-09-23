@@ -83,3 +83,8 @@ react-native/
 sentry.properties
 ios/sentry.properties
 android/sentry.properties
+
+# Visual library pipeline output (scripts/visual-library/README.md) — only
+# src/lib/visualLibrary/manifest.json is committed.
+scripts/visual-library/work/
+__pycache__/

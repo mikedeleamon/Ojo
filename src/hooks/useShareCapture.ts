@@ -7,17 +7,19 @@ import { CARD_WIDTH, CARD_HEIGHT } from '../components/ShareCard/ShareCardFrame.
 // capture at a fixed 3× so the output is always exactly 1080×1920 — Instagram
 // Stories' native resolution — regardless of the device's pixel density (a 2×
 // phone would otherwise export 720×1280 and get upscaled).
-const EXPORT_SCALE = 3;
+export const EXPORT_SCALE = 3;
 
 /**
- * Captures whatever is rendered under `ref` as a base64 PNG data URI, sized to
- * 1080×1920, for handing straight to instagramShare.ts (no temp-file plumbing).
+ * Captures whatever is rendered under `ref` as a base64 PNG data URI, for
+ * handing straight to instagramShare.ts (no temp-file plumbing). Sized to
+ * 1080×1920 unless `size` (in pixels) says otherwise — a Story sticker is
+ * captured at its own size. PNG keeps transparency outside rounded corners.
  */
 export function useShareCapture() {
   const ref = useRef<View>(null);
   const [capturing, setCapturing] = useState(false);
 
-  const capture = useCallback(async (): Promise<string> => {
+  const capture = useCallback(async (size?: { width: number; height: number }): Promise<string> => {
     if (!ref.current) throw new Error('Nothing to capture yet');
     setCapturing(true);
     try {
@@ -25,8 +27,8 @@ export function useShareCapture() {
         format: 'png',
         quality: 1,
         result: 'data-uri',
-        width: CARD_WIDTH * EXPORT_SCALE,
-        height: CARD_HEIGHT * EXPORT_SCALE,
+        width: size?.width ?? CARD_WIDTH * EXPORT_SCALE,
+        height: size?.height ?? CARD_HEIGHT * EXPORT_SCALE,
       });
     } finally {
       setCapturing(false);

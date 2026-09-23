@@ -5,6 +5,7 @@ import { humanizeConditionShort } from '../../lib/weather/humanizeCondition';
 import { fToC } from '../../lib/units';
 import WeatherIconDisplay from '../WeatherIconDisplay/WeatherIconDisplay';
 import ShareCardFrame from './ShareCardFrame';
+import type { ShareCardVariant } from './ShareCardFrame.styles';
 import cs from './shareCardCommon.styles';
 import { fonts, fontSizes } from '../../theme/tokens';
 import { StyleSheet } from 'react-native';
@@ -16,6 +17,8 @@ interface WeatherForecastShareCardProps {
   hourly: Forecast[];
   /** Render temperatures in °C rather than °F. */
   isMetric?: boolean;
+  /** 'sticker' for a video Story; see ShareCardFrame. */
+  variant?: ShareCardVariant;
 }
 
 const styles = StyleSheet.create({
@@ -60,7 +63,7 @@ const hourLabel = (iso: string) =>
     .replace(/\s+/g, '');
 
 const WeatherForecastShareCard = forwardRef<View, WeatherForecastShareCardProps>(
-  ({ place, weather, hourly, isMetric = false }, ref) => {
+  ({ place, weather, hourly, isMetric = false, variant = 'poster' }, ref) => {
     // Hourly forecast temps are always Fahrenheit; convert per the unit setting.
     const currentTemp = Math.round(
       isMetric
@@ -70,7 +73,7 @@ const WeatherForecastShareCard = forwardRef<View, WeatherForecastShareCardProps>
     const upcoming = hourly.slice(0, 5);
 
     return (
-      <ShareCardFrame gradientColors={['#0C4A6E', '#0F172A', '#0F172A']} ref={ref}>
+      <ShareCardFrame gradientColors={['#0C4A6E', '#0F172A', '#0F172A']} variant={variant} ref={ref}>
         <Text style={cs.eyebrow}>{place}</Text>
         <Text style={cs.headline}>{currentTemp}°</Text>
         <View style={styles.conditionRow}>

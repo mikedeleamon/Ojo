@@ -11,10 +11,14 @@
  * Rendered on-screen at CARD_WIDTH×CARD_HEIGHT (9:16) and captured by
  * useShareCapture at a fixed 1080×1920, so the exported PNG matches this
  * preview 1:1. Deliberately theme-independent — a shared card is brand surface.
+ *
+ * The 'sticker' variant is a compact version for a video Story, laid over the
+ * recap loop (the same gradient cycle, pre-rendered): no background of its
+ * own, just the week, the count, the color bar and the stats on a rounded card.
  */
 
 import { forwardRef } from 'react';
-import { StyleSheet } from 'react-native';
+import { Image, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { View, Text } from '../primitives';
 import { RecapCard, RecapWeekMeta } from '../../lib/recapEngine';
@@ -28,7 +32,7 @@ import {
 } from '../../lib/recapVisuals';
 import OjoLogo from '../OjoLogo';
 import RecapColorBar from '../recap/RecapColorBar';
-import { CARD_WIDTH, CARD_HEIGHT } from './ShareCardFrame.styles';
+import { CARD_WIDTH, CARD_HEIGHT, STICKER_LOGO, STICKER_WIDTH, type ShareCardVariant } from './ShareCardFrame.styles';
 import { fonts } from '../../theme/tokens';
 
 interface RecapShareCardProps {
@@ -36,6 +40,8 @@ interface RecapShareCardProps {
   meta: RecapWeekMeta;
   /** The gradient showing on the page at share time; falls back to the brand. */
   gradientColors?: RecapGradient;
+  /** 'sticker' for a video Story over the recap loop. */
+  variant?: ShareCardVariant;
 }
 
 interface Stat { value: string; label: string; color: string }
@@ -61,9 +67,49 @@ const pickStats = (cards: RecapCard[], meta: RecapWeekMeta): Stat[] => {
 };
 
 const RecapShareCard = forwardRef<View, RecapShareCardProps>(
-  ({ cards, meta, gradientColors = RECAP_BRAND_GRADIENT }, ref) => {
+  ({ cards, meta, gradientColors = RECAP_BRAND_GRADIENT, variant = 'poster' }, ref) => {
   const opener = cards.find(c => c.section === 'opener');
   const stats = pickStats(cards, meta);
+
+  const statRow = (
+    <View style={styles.statRow}>
+      {stats.map((s, i) => (
+        <View key={i} style={styles.statCol}>
+          <Text style={[styles.statValue, { color: s.color }]} numberOfLines={1} allowFontScaling={false}>
+            {s.value}
+          </Text>
+          <Text style={styles.statLabel} numberOfLines={1}>{s.label}</Text>
+        </View>
+      ))}
+    </View>
+  );
+  const footer = (
+    <View style={styles.footer}>
+      <Text style={styles.footerText}>STYLED BY</Text>
+      {variant === 'sticker'
+        ? <Image source={STICKER_LOGO} style={{ width: 26, height: 26 }} accessibilityLabel='Ojo' />
+        : <OjoLogo size={22} />}
+    </View>
+  );
+
+  if (variant === 'sticker') {
+    return (
+      <View ref={ref} style={styles.sticker} collapsable={false}>
+        <View style={styles.topRow}>
+          <Image source={STICKER_LOGO} style={{ width: 34, height: 34 }} accessibilityLabel='Ojo' />
+          <Text style={styles.weekStamp}>{meta.weekLabel}</Text>
+        </View>
+        <Text style={[styles.eyebrow, styles.stickerEyebrow]}>THE WEEK IN WEAR</Text>
+        <Text style={[styles.heroNumber, styles.stickerHero]} numberOfLines={1} allowFontScaling={false}>
+          {meta.outfitsThisWeek}
+        </Text>
+        <Text style={[styles.tagline, styles.stickerTagline]}>{opener?.headline ?? 'Your week, worn well.'}</Text>
+        <RecapColorBar palette={meta.palette} height={20} showLegend={false} style={styles.stickerBar} />
+        {statRow}
+        {footer}
+      </View>
+    );
+  }
 
   return (
     <View ref={ref} style={styles.frame} collapsable={false}>
@@ -98,22 +144,10 @@ const RecapShareCard = forwardRef<View, RecapShareCardProps>(
         </View>
 
         {/* 3-up stats */}
-        <View style={styles.statRow}>
-          {stats.map((s, i) => (
-            <View key={i} style={styles.statCol}>
-              <Text style={[styles.statValue, { color: s.color }]} numberOfLines={1} allowFontScaling={false}>
-                {s.value}
-              </Text>
-              <Text style={styles.statLabel} numberOfLines={1}>{s.label}</Text>
-            </View>
-          ))}
-        </View>
+        {statRow}
 
         {/* Footer */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>STYLED BY</Text>
-          <OjoLogo size={22} />
-        </View>
+        {footer}
       </View>
     </View>
   );
@@ -164,6 +198,22 @@ const styles = StyleSheet.create({
 
   footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   footerText: { fontFamily: fonts.bodySemiBold, fontSize: 11, letterSpacing: 1.4, color: 'rgba(242,240,234,0.85)' },
+
+  // Sticker: the recap loop is the background, so the card only needs to
+  // carry the text. P.ink at 88%; transparent outside the corners.
+  sticker: {
+    width: STICKER_WIDTH,
+    padding: 22,
+    borderRadius: 28,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(8,11,20,0.88)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  stickerEyebrow: { marginTop: 18 },
+  stickerHero: { fontSize: 84, lineHeight: 96, letterSpacing: -3, marginTop: 0, marginBottom: -6 },
+  stickerTagline: { fontSize: 22, lineHeight: 27 },
+  stickerBar: { marginTop: 14, marginBottom: 18 },
 });
 
 RecapShareCard.displayName = 'RecapShareCard';
