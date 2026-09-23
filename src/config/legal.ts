@@ -15,7 +15,7 @@ export const LEGAL_URLS = {
   termsOfService:  'https://www.ojoapp.io/terms',
 } as const;
 
-export const EFFECTIVE_DATE = 'September 18, 2026';
+export const EFFECTIVE_DATE = 'September 23, 2026';
 export const DEVELOPER_NAME = 'Ojo Studio, LLC';
 export const CONTACT_EMAIL  = 'support@ojoapp.io';
 export const WEBSITE_URL    = 'https://www.ojoapp.io';
@@ -70,7 +70,9 @@ export const PRIVACY_POLICY: LegalDocument = {
             'Style preferences — your clothing style, temperature and humidity comfort thresholds, unit preferences, any additional cities you save, and — only if you choose to provide it — gender, which is used to tailor outfit suggestions',
             'Clothing item photos and metadata — images you upload or capture of your garments, plus descriptions, categories, colours, fabrics, and (optionally) merchant and purchase price',
             'Outfit wear history — records of which outfit suggestions you marked as "Wore this today," and the weather conditions at the time, which is what allows the App to learn your preferences',
-            'Trip information (optional) — for trips you add, the airline, confirmation number, travel dates, origin/destination airports, and destination city, plus any outfit plans you build for them',
+            // Parked until airline-trip import ships — the App doesn't collect airline, confirmation number, or airports yet.
+            // 'Trip information (optional) — for trips you add, the airline, confirmation number, travel dates, origin/destination airports, and destination city, plus any outfit plans you build for them',
+            'Trip information (optional) — for trips you add, the destination city, travel dates, and an optional trip name, plus the outfit plans and packing lists you build for them',
           ],
         },
         {
