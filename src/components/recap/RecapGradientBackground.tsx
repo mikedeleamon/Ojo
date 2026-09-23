@@ -21,11 +21,12 @@ import {
   RECAP_GRADIENT_START,
   RECAP_GRADIENT_END,
   RECAP_SCRIM,
+  RECAP_GRADIENT_HOLD_MS as HOLD_MS,
+  RECAP_GRADIENT_FADE_MS as FADE_MS,
+  RECAP_GRADIENT_EASING,
   RecapGradient,
 } from '../../lib/recapVisuals';
 
-const HOLD_MS = 2500;  // fully displayed
-const FADE_MS = 8000;  // crossfade
 const LEN = RECAP_GRADIENT_CYCLE.length;
 
 interface Layers { a: number; b: number; cur: number }
@@ -66,7 +67,7 @@ export function useRecapGradientCycle(): RecapGradientCycle {
         anim = Animated.timing(t, {
           toValue: target,
           duration: FADE_MS,
-          easing: Easing.bezier(0.76, 0, 0.24, 1),
+          easing: Easing.bezier(...RECAP_GRADIENT_EASING),
           useNativeDriver: true,
         });
         anim.start(({ finished }) => {

@@ -128,6 +128,14 @@ export const RECAP_SCRIM = 'rgba(8, 11, 20, 0.82)';
 export const RECAP_GRADIENT_START = { x: 0, y: 0 } as const;
 export const RECAP_GRADIENT_END   = { x: 0.35, y: 1 } as const;
 
+// Cycle timing. Lives here rather than in RecapGradientBackground so the
+// visual-library pipeline (scripts/visual-library/render_recap_loop.py) renders
+// the recap's Instagram loop with the same motion the page shows.
+export const RECAP_GRADIENT_HOLD_MS = 2500;  // fully displayed
+export const RECAP_GRADIENT_FADE_MS = 8000;  // crossfade
+/** Cubic-bezier control points for the crossfade (Easing.bezier arguments). */
+export const RECAP_GRADIENT_EASING = [0.76, 0, 0.24, 1] as const;
+
 export type RecapTint =
   | { kind: 'brand' }
   | { kind: 'gradient'; colors: readonly [string, string] }

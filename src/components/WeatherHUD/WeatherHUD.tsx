@@ -64,7 +64,13 @@ import { blendHsl, flattenHsl, hslToHex, lerpHslFlat } from './colorMath';
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 import { gradientFor, footerBgFor } from './weatherPalette';
 import { accentFromGradient } from '../../lib/weather/accentColor';
-import { isClearNight, isDrizzle, isRain, isThunderstorm } from '../../lib/weather/conditions';
+import { backdropLayersFor, NO_LAYERS } from '../../lib/weather/backdropLayers';
+import { SLEET_PELLET_GROUPS, SNOW_GROUPS } from '../../lib/weather/backdropSpec';
+import { devCondition, devIsDay } from '../../lib/debug/devWeatherOverride';
+import FlakeFall from './FlakeFall';
+import FogDrift from './FogDrift';
+import ShootingStar from './ShootingStar';
+import SunGlare from './SunGlare';
 import { solarPosition, type SolarPosition } from '../../lib/solarPosition';
 import { rainAngleFor } from '../../lib/weather/windSlant';
 import BackdropLayer, { SCROLL_RANGE } from './BackdropLayer';
@@ -498,10 +504,14 @@ const WeatherHUD = ({
     // minute for no visible change.
     // `sun` is a fresh object each tick, but the memo below keys on the joined
     // colours, so that identity churn never reaches the gradient animation.
+    // The condition the backdrop (gradient + particle layers) draws. Always the
+    // real one outside dev; see lib/debug/devWeatherOverride.
+    const bgCondition = weather ? devCondition(weather.WeatherText) : '';
+    const bgIsDay = weather ? devIsDay(weather.IsDayTime) : true;
     const rawGradient = weather
         ? gradientFor(
-              weather.WeatherText,
-              weather.IsDayTime,
+              bgCondition,
+              bgIsDay,
               sun?.elevationDeg,
               sun?.isRising,
           )
@@ -738,10 +748,18 @@ const WeatherHUD = ({
     // Full-screen star backdrop for clear nights; storm backdrop for thunder;
     // light-rain backdrop for plain rain; drizzle backdrop for drizzle. All
     // derive from the shared classifier so they track the icon/gradient.
-    const isClearNightBg = !!weather && isClearNight(weather.WeatherText, weather.IsDayTime);
-    const isStormBg = !!weather && isThunderstorm(weather.WeatherText);
-    const isRainBg = !!weather && isRain(weather.WeatherText);
-    const isDrizzleBg = !!weather && isDrizzle(weather.WeatherText);
+    // Snow, sleet and fog get flat particle layers too (FlakeFall, FogDrift).
+    // lib/weather/backdropLayers is the single decision — the story-loop
+    // renderer runs it too, so shared stories match what's on screen.
+    const layers = weather ? backdropLayersFor(bgCondition, bgIsDay) : NO_LAYERS;
+    const isClearNightBg = layers.stars;
+    const isStormBg = layers.rain === 'storm';
+    const isRainBg = layers.rain === 'light';
+    const isDrizzleBg = layers.rain === 'drizzle';
+    const isSnowBg = layers.flakes === 'snow';
+    const isSleetBg = layers.rain === 'sleet';
+    const isFogBg = layers.fog;
+    const isGlareBg = layers.glare;
 
     // ── Backdrop animation gate ──────────────────────────────────────────────
     //
@@ -838,6 +856,17 @@ const WeatherHUD = ({
             animatedProps={animatedGradientProps}
             style={st.root}
         >
+            {/* Sun glare on clear and sunny days. The sun is the farthest
+                thing in the sky, so it barely tracks the scroll. */}
+            <BackdropLayer
+                visible={isGlareBg && perf.backdrop}
+                scrollY={scrollY}
+                depth={0.1}
+                parallax={perf.parallax}
+            >
+                <SunGlare animate={backdropAnimate} />
+            </BackdropLayer>
+
             {/* Full-screen star field — two absolute layers behind all content,
                 split by depth rather than doubled in star count (see
                 `starLayer` on ClearNightIconMoon). BackdropLayer cross-fades
@@ -889,6 +918,9 @@ const WeatherHUD = ({
                     starLayer='near'
                     animate={starsAnimate}
                 />
+                {/* Rides the near layer's parallax, and stops with the
+                    twinkle once scrolled past SCROLL_RANGE. */}
+                <ShootingStar animate={starsAnimate} />
             </BackdropLayer>
 
             {/* Full-screen storm backdrop — falling rain + occasional sheet flash.
@@ -955,6 +987,51 @@ const WeatherHUD = ({
                     rainVariant="drizzle"
                     animate={backdropAnimate}
                 />
+            </BackdropLayer>
+
+            {/* Full-screen snowfall — small dots far back, six-arm flakes in
+                front, both swaying as they fall. Slower parallax than rain:
+                snow hangs in the air rather than rushing past. */}
+            <BackdropLayer
+                visible={isSnowBg && perf.backdrop}
+                scrollY={scrollY}
+                depth={0.6}
+                parallax={perf.parallax}
+            >
+                <FlakeFall groups={SNOW_GROUPS} animate={backdropAnimate} />
+            </BackdropLayer>
+
+            {/* Full-screen sleet — short quick streaks with ice pellets among
+                them, both taking the wind slant. */}
+            <BackdropLayer
+                visible={isSleetBg && perf.backdrop}
+                scrollY={scrollY}
+                depth={1}
+                parallax={perf.parallax}
+            >
+                <StormIconLightning
+                    fullWidth
+                    fullHeight
+                    showCloud={false}
+                    showBolts={false}
+                    showRain
+                    showFlash={false}
+                    rainAngle={rainAngle}
+                    rainVariant="sleet"
+                    animate={backdropAnimate}
+                />
+                <FlakeFall groups={SLEET_PELLET_GROUPS} slant={rainAngle} animate={backdropAnimate} />
+            </BackdropLayer>
+
+            {/* Full-screen fog — soft banks drifting sideways. Shallow depth:
+                fog sits far off, so it barely tracks the scroll. */}
+            <BackdropLayer
+                visible={isFogBg && perf.backdrop}
+                scrollY={scrollY}
+                depth={0.3}
+                parallax={perf.parallax}
+            >
+                <FogDrift animate={backdropAnimate} />
             </BackdropLayer>
 
             {/* Transparent loading spinner — sits over the animating gradient.

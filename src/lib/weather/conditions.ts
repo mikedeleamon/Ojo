@@ -155,6 +155,14 @@ const KIND_STYLES: Record<WeatherKind, KindStyle> = {
     },
 };
 
+/**
+ * Every WeatherKind, at runtime. Read off KIND_STYLES rather than listed again:
+ * that table is a Record<WeatherKind, …>, so the compiler already forces it to
+ * name every kind exactly once — a hand-written array could silently miss one.
+ * The visual library's coverage tests and asset pipeline iterate this.
+ */
+export const WEATHER_KINDS: readonly WeatherKind[] = Object.keys(KIND_STYLES) as WeatherKind[];
+
 export const iconTypeFor = (condition: string, isDay: boolean): WeatherIconType =>
     KIND_STYLES[classifyCondition(condition)].icon(isDay);
 
