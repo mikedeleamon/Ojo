@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { v4 as uuid } from 'uuid';
 
 const r2 = new S3Client({
@@ -87,6 +87,52 @@ export async function uploadToR2(base64: string, fileName?: string): Promise<str
 
   return `${PUBLIC_URL}/${key}`;
 }
+
+// ─── Visual library ───────────────────────────────────────────────────────────
+
+/** Public root the library is served from; the app's EXPO_PUBLIC_LIBRARY_BASE_URL is this + `/library/v1`. */
+export const R2_PUBLIC_BASE_URL = PUBLIC_URL;
+
+const LIBRARY_KEY = /^library\/v\d+\/loops\/[A-Za-z0-9._-]+$/;
+const LIBRARY_TYPES = new Set(['image/jpeg', 'video/mp4']);
+
+/**
+ * Uploads one pre-rendered visual-library file (a story-loop MP4 or its poster JPEG)
+ * from server/src/scripts/publishVisualLibrary.ts. Separate from uploadToR2 on
+ * purpose: that path takes user uploads and enforces the image allow-list and
+ * size cap, while these come from our own offline pipeline
+ * (scripts/visual-library/). Keys are content-hashed, so objects never change
+ * and share the same immutable cache header.
+ *
+ * Nothing user-driven can delete these: deleteFromR2 and deleteManyFromR2 only
+ * ever match keys under `articles/`.
+ */
+export async function putLibraryObject(key: string, body: Buffer, contentType: string): Promise<string> {
+  if (!LIBRARY_KEY.test(key) || key.includes('..')) throw new Error(`Refusing library key: ${key}`);
+  if (!LIBRARY_TYPES.has(contentType)) throw new Error(`Unsupported library content type: ${contentType}`);
+
+  await r2.send(new PutObjectCommand({
+    Bucket:       BUCKET,
+    Key:          key,
+    Body:         body,
+    ContentType:  contentType,
+    CacheControl: CACHE_CONTROL,
+  }));
+  return `${PUBLIC_URL}/${key}`;
+}
+
+/** True if the object is already in the bucket — content-hashed keys make re-uploading pointless. */
+export async function libraryObjectExists(key: string): Promise<boolean> {
+  try {
+    await r2.send(new HeadObjectCommand({ Bucket: BUCKET, Key: key }));
+    return true;
+  } catch (err: any) {
+    if (err?.name === 'NotFound' || err?.$metadata?.httpStatusCode === 404) return false;
+    throw err;
+  }
+}
+
+// ─── Deletes ──────────────────────────────────────────────────────────────────
 
 export async function deleteFromR2(url: string): Promise<void> {
   try {
