@@ -15,20 +15,18 @@
  * isInstagramShareAvailable() gates the UI so share buttons quietly fall back
  * to the generic share sheet until both the native module and the App ID are
  * in place.
+ *
+ * Two kinds of Story: an image (the whole card as a PNG background) or a video
+ * (a library loop as the background, the card as a transparent sticker on
+ * top — see ShareToInstagramSheet and docs/prerendered-visuals-plan.md, Phase 1).
  */
 
 import { Linking, Platform } from 'react-native';
+import { buildStoryOptions, type ShareStoryInput } from './storyOptions';
+
+export { buildStoryOptions, type ShareStoryInput };
 
 const FACEBOOK_APP_ID = process.env.EXPO_PUBLIC_FACEBOOK_APP_ID;
-
-export interface ShareStoryInput {
-  /** data:image/png;base64,... — the full card, used as the Story background. */
-  backgroundImage: string;
-  /** Optional https URL rendered as a tappable "Link" sticker on the story. */
-  attributionURL?: string | null;
-  backgroundTopColor?: string;
-  backgroundBottomColor?: string;
-}
 
 export type ShareStoryOutcome =
   | { ok: true; via: 'instagram-stories' | 'share-sheet' }
@@ -57,10 +55,11 @@ async function isInstagramInstalled(): Promise<boolean> {
 }
 
 /**
- * Shares a pre-rendered PNG (base64) to Instagram Stories, falling back to
- * the OS share sheet (Save Image / Messages / etc.) when Instagram isn't
- * installed or the App ID isn't configured — the card is always shareable
- * somehow, never a dead end.
+ * Shares to Instagram Stories. An image Story falls back to the OS share sheet
+ * (Save Image / Messages / etc.) when Instagram isn't installed or the App ID
+ * isn't configured — the card is always shareable somehow, never a dead end.
+ * A video Story has no image of its own to fall back with, so it resolves
+ * 'not-installed' / 'unavailable' / 'error' and the caller shares the image instead.
  */
 export async function shareToInstagramStory(
   input: ShareStoryInput,
@@ -69,15 +68,10 @@ export async function shareToInstagramStory(
   if (!Share) return { ok: false, reason: 'unavailable' };
 
   if (FACEBOOK_APP_ID && (await isInstagramInstalled())) {
+    const options = buildStoryOptions(input, FACEBOOK_APP_ID);
+    if (!options) return { ok: false, reason: 'error', error: 'backgroundVideo must be a file:// URI' };
     try {
-      await Share.shareSingle({
-        social: Share.Social.INSTAGRAM_STORIES,
-        appId: FACEBOOK_APP_ID,
-        backgroundImage: input.backgroundImage,
-        backgroundTopColor: input.backgroundTopColor ?? '#0F172A',
-        backgroundBottomColor: input.backgroundBottomColor ?? '#1E293B',
-        ...(input.attributionURL ? { attributionURL: input.attributionURL } : {}),
-      });
+      await Share.shareSingle({ social: Share.Social.INSTAGRAM_STORIES, ...options });
       return { ok: true, via: 'instagram-stories' };
     } catch (err: any) {
       // react-native-share rejects on user-cancel too; treat both the same
@@ -87,6 +81,7 @@ export async function shareToInstagramStory(
     }
   }
 
+  if (input.kind === 'video') return { ok: false, reason: FACEBOOK_APP_ID ? 'not-installed' : 'unavailable' };
   return shareViaGenericSheet(input.backgroundImage);
 }
 

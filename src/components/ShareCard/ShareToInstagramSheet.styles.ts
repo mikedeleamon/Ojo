@@ -101,4 +101,15 @@ export default StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 24,
   },
+  // Video-mode preview: the loop's poster frame filling the 9:16 story, the
+  // sticker centered on it. Same box as a poster card, so it scales and
+  // captures the same way.
+  videoPreview: {
+    width: CARD_WIDTH,
+    height: CARD_HEIGHT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    backgroundColor: '#0F172A',
+  },
 });

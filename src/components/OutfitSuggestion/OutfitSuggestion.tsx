@@ -36,6 +36,7 @@ import { buildTripWeather } from '../../views/TripFit/shared';
 import TripModeCard from '../TripMode/TripModeCard';
 import ShareToInstagramSheet from '../ShareCard/ShareToInstagramSheet';
 import TodayOutfitShareCard from '../ShareCard/TodayOutfitShareCard';
+import { lookFor } from '../../lib/visualLibrary/looks';
 import { outfitShareLink } from '../../lib/share/deepLinks';
 import {
     generateOutfits,
@@ -1484,6 +1485,17 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
                         weather={weather}
                     />
                 )}
+                renderSticker={(stickerRef) => (
+                    <TodayOutfitShareCard
+                        ref={stickerRef}
+                        variant='sticker'
+                        slots={confirmSlots}
+                        score={confirmScore}
+                        isPersonalized={scoreLevel === 'active'}
+                        weather={weather}
+                    />
+                )}
+                look={lookFor({ condition: weather.WeatherText, isDayTime: weather.IsDayTime, coords })}
                 attributionURL={outfitShareLink()}
             />
         </View>

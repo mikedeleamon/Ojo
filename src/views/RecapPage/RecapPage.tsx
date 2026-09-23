@@ -345,6 +345,10 @@ export default function RecapPage() {
             gradientColors={gradient.currentColors}
           />
         )}
+        renderSticker={ref => (
+          <RecapShareCard ref={ref} variant='sticker' cards={cards} meta={meta} />
+        )}
+        look='recap'
         attributionURL={recapShareLink()}
       />
     </View>

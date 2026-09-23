@@ -70,6 +70,7 @@ import PhraseWeatherIcon from '../../components/WeatherIcons/PhraseWeatherIcon';
 import { PlaneIcon, PinIcon, RefreshIcon } from '../../components/icons/GlyphIcons';
 import ShareToInstagramSheet from '../../components/ShareCard/ShareToInstagramSheet';
 import TripFitShareCard from '../../components/ShareCard/TripFitShareCard';
+import { lookFor } from '../../lib/visualLibrary/looks';
 import PackingListShareCard from '../../components/ShareCard/PackingListShareCard';
 import { tripShareLink } from '../../lib/share/deepLinks';
 
@@ -1408,6 +1409,18 @@ export default function TripPlanner({
                             dayLabel={`Day ${shareDayIdx + 1} of ${plans.length}`}
                         />
                     )}
+                    renderSticker={(stickerRef) => (
+                        <TripFitShareCard
+                            ref={stickerRef}
+                            variant='sticker'
+                            destination={destination}
+                            day={plans[shareDayIdx].day}
+                            slots={activeOutfit(plans[shareDayIdx]).slots}
+                            dayLabel={`Day ${shareDayIdx + 1} of ${plans.length}`}
+                        />
+                    )}
+                    // A forecast day has no time of day: show its weather in daylight.
+                    look={lookFor({ condition: plans[shareDayIdx].day.dayPhrase, isDayTime: true })}
                     attributionURL={tripShareLink(planIdRef.current)}
                 />
             )}
