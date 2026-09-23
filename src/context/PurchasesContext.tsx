@@ -11,6 +11,13 @@ const API_KEY = Platform.select({
   android: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY,
 });
 
+/** RevenueCat's Test Store (keys prefixed `test_` — the local .env's, never a
+ *  store build's) shows its purchase UI as an alert inside the app rather than
+ *  a system sheet, so the app never loses focus while it is up. The paywall
+ *  reads focus loss as "the store sheet appeared" (see handlePurchase), and
+ *  needs to know when that signal can't exist. */
+export const IS_TEST_STORE = API_KEY?.startsWith('test_') ?? false;
+
 interface PurchasesState {
   isReady: boolean;
   /** False until a RevenueCat API key is set — see API_KEY above. Screens

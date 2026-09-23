@@ -10,6 +10,8 @@ import {
     ActivityIndicator,
     Animated,
     AccessibilityInfo,
+    AppState,
+    Platform,
     StyleSheet,
 } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
@@ -30,6 +32,7 @@ import Purchases, {
     PurchasesPackage,
     PURCHASES_ERROR_CODE,
 } from 'react-native-purchases';
+import * as Sentry from '@sentry/react-native';
 import {
     View,
     Text,
@@ -42,8 +45,24 @@ import { CloseIcon, GridIcon, TripFitIcon } from '../../components/icons/ClosetI
 import { HangerIcon } from '../../components/shared/HangerIcon';
 import SunnyIcon from '../../components/WeatherIcons/SunnyIcon';
 import { useTheme, ForceDarkPalette } from '../../theme/ThemeContext';
-import { usePurchases, ENTITLEMENT_ID } from '../../context/PurchasesContext';
+import {
+    usePurchases,
+    ENTITLEMENT_ID,
+    IS_TEST_STORE,
+} from '../../context/PurchasesContext';
 import { FREE_ITEM_LIMIT } from '../../config/limits';
+import {
+    cancelFeedback,
+    offeringStateFrom,
+    purchaseIssue,
+    stalledFeedback,
+} from '../../lib/purchaseOutcome';
+import type {
+    Feedback,
+    OfferingState,
+    PurchaseIssue,
+    StoreName,
+} from '../../lib/purchaseOutcome';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { nativeLoop, pingPong } from '../../lib/animation/nativeLoop';
 import {
@@ -289,18 +308,35 @@ export default function UpgradeScreen() {
 
 type PlanKey = 'monthly' | 'annual';
 
-type OfferingState =
-    | { status: 'loading' }
-    | {
-          status: 'ready';
-          monthly: PurchasesPackage | null;
-          annual: PurchasesPackage | null;
-          // Only used when the offering exposes neither a monthly nor an annual
-          // package — we can show its price but can't name its period, so the
-          // per-period suffixes are suppressed for it.
-          other: PurchasesPackage | null;
-      }
-    | { status: 'error' };
+/** Which store a purchase goes through, as the user would name it. */
+const STORE: StoreName =
+    Platform.OS === 'android' ? 'Google Play' : 'the App Store';
+
+// How long the paywall waits for prices before offering a retry. Nothing below
+// us gives up on its own: RevenueCat's StoreKit 2 product request has no
+// timeout (it only logs when slow), so a stuck request would otherwise leave
+// the button on "Loading prices…" for good.
+const OFFERINGS_TIMEOUT_MS = 15000;
+
+// How long a purchase may run without the store's sheet appearing before the
+// paywall says so. On an iPad Air on iPadOS 27 the sheet was on screen 0.7s
+// after the tap, so 10s is well past slow and into not-coming.
+const PURCHASE_STALL_MS = 10000;
+
+// One object, so a sheet that turns up late can withdraw exactly this note —
+// matched by identity — without clearing anything else.
+const STALLED = stalledFeedback(STORE);
+
+/** Send a paywall miss to Sentry. Only the fields purchaseIssue() builds are
+ *  sent; see src/lib/purchaseOutcome.ts for why each one is safe. */
+function report(issue: PurchaseIssue) {
+    Sentry.captureMessage(issue.message, {
+        level: issue.level,
+        fingerprint: issue.fingerprint,
+        tags: issue.tags,
+        extra: issue.extra,
+    });
+}
 
 const PERIOD_SUFFIX: Record<PlanKey, string> = {
     monthly: ' per month',
@@ -334,11 +370,6 @@ function trialWindow(pkg: PurchasesPackage | null): string | null {
     }
 }
 
-/** 'error' = it failed. 'info' = it did NOT fail, but the user has to know
- *  something — the two must not look alike, or a pending payment reads as a
- *  rejected card and the user buys again. */
-type Feedback = { tone: 'error' | 'info'; text: string };
-
 /**
  * Turn a RevenueCat failure into something a person can act on, or null when
  * there is nothing to say.
@@ -354,8 +385,10 @@ function purchaseFailure(error: unknown): Feedback | null {
     const code = (error as { code?: PURCHASES_ERROR_CODE } | null)?.code;
 
     switch (code) {
-        // Backing out is not a failure. Saying anything here turns the user's own
-        // deliberate choice into what looks like a rejection.
+        // Purchases never reach this with a cancel: handlePurchase answers those
+        // itself, because StoreKit also reports a sheet that never appeared as a
+        // cancel, and only the caller knows whether the sheet came up. Restore
+        // falls back to its own message.
         case PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR:
             return null;
 
@@ -417,6 +450,18 @@ function purchaseFailure(error: unknown): Feedback | null {
 function OjoProPaywall({ onClose }: { onClose: () => void }) {
     const insets = useSafeAreaInsets();
     const nav = useAppNavigation();
+    const scrollRef = useRef<ScrollView>(null);
+
+    // Purchases and restores can outlive this screen — the "still waiting"
+    // note tells people to close it — and a result that lands after that must
+    // not call onClose, which would navigate back a second time.
+    const mounted = useRef(true);
+    useEffect(() => {
+        mounted.current = true;
+        return () => {
+            mounted.current = false;
+        };
+    }, []);
 
     const [offering, setOffering] = useState<OfferingState>({
         status: 'loading',
@@ -428,31 +473,71 @@ function OjoProPaywall({ onClose }: { onClose: () => void }) {
     const [restoring, setRestoring] = useState(false);
     const [feedback, setFeedback] = useState<Feedback | null>(null);
 
-    useEffect(() => {
-        let alive = true;
+    // Each load is numbered so a slow earlier attempt can't overwrite a retry
+    // with its failure. Its prices, though, are welcome whenever they arrive:
+    // showing them beats a second round of spinner.
+    const loadAttempt = useRef(0);
+    const loadOfferings = useCallback(() => {
+        const attempt = ++loadAttempt.current;
+        const startedAt = Date.now();
+        let timedOut = false;
+        const fail = () =>
+            setOffering((current) =>
+                current.status === 'loading' ? { status: 'error' } : current,
+            );
+
+        setOffering({ status: 'loading' });
+
+        const timer = setTimeout(() => {
+            timedOut = true;
+            if (!mounted.current || loadAttempt.current !== attempt) return;
+            fail();
+            report(
+                purchaseIssue('offerings_failed', {
+                    timedOut: true,
+                    elapsedMs: Date.now() - startedAt,
+                }),
+            );
+        }, OFFERINGS_TIMEOUT_MS);
+
         Purchases.getOfferings()
             .then((offerings) => {
-                if (!alive) return;
-                const current = offerings.current;
-                const monthly = current?.monthly ?? null;
-                const annual = current?.annual ?? null;
-                const other =
-                    monthly || annual
-                        ? null
-                        : (current?.availablePackages[0] ?? null);
-                setOffering(
-                    monthly || annual || other
-                        ? { status: 'ready', monthly, annual, other }
-                        : { status: 'error' },
-                );
+                clearTimeout(timer);
+                if (!mounted.current) return;
+                const next = offeringStateFrom(offerings.current);
+                if (next.status === 'ready') {
+                    setOffering(next);
+                } else if (!timedOut && loadAttempt.current === attempt) {
+                    fail();
+                    report(
+                        purchaseIssue('offerings_failed', {
+                            elapsedMs: Date.now() - startedAt,
+                        }),
+                    );
+                }
             })
-            .catch(() => {
-                if (alive) setOffering({ status: 'error' });
+            .catch((error) => {
+                clearTimeout(timer);
+                if (
+                    timedOut ||
+                    !mounted.current ||
+                    loadAttempt.current !== attempt
+                ) {
+                    return;
+                }
+                fail();
+                report(
+                    purchaseIssue('offerings_failed', {
+                        error,
+                        elapsedMs: Date.now() - startedAt,
+                    }),
+                );
             });
-        return () => {
-            alive = false;
-        };
     }, []);
+
+    useEffect(() => {
+        loadOfferings();
+    }, [loadOfferings]);
 
     const plans = offering.status === 'ready' ? offering : null;
     const bothPlans = Boolean(plans?.monthly && plans?.annual);
@@ -489,6 +574,7 @@ function OjoProPaywall({ onClose }: { onClose: () => void }) {
     // A failure that only appears visually is no failure state at all for a
     // screen reader user, who may well be mid-purchase with the screen off.
     const say = useCallback((next: Feedback | null) => {
+        if (!mounted.current) return;
         setFeedback(next);
         if (next) AccessibilityInfo.announceForAccessibility(next.text);
     }, []);
@@ -497,6 +583,42 @@ function OjoProPaywall({ onClose }: { onClose: () => void }) {
         if (!selectedPkg || purchasing) return;
         setPurchasing(true);
         say(null);
+
+        const startedAt = Date.now();
+        const productId = selectedPkg.product.identifier;
+
+        // Whether the store's own UI came up. StoreKit reports the person
+        // closing the sheet and a sheet that never appeared as the same cancel,
+        // so this is the only way to tell them apart. The sheet is a system
+        // overlay, so the app resigns active while it is up: on an iPad on
+        // iPadOS 27, Ojo logged applicationWillResignActive 0.16s after
+        // SpringBoard presented the sheet, and became active again when it
+        // closed. Any other App Store prompt (sign-in, Face ID, Ask to Buy)
+        // does the same, and counts. The Test Store's in-app alert can't, so
+        // there it is taken as read.
+        let sheetSeen = IS_TEST_STORE;
+        const focus = AppState.addEventListener('change', (state) => {
+            if (state === 'active' || sheetSeen) return;
+            sheetSeen = true;
+            // The sheet made it after all — withdraw the "still waiting" note.
+            if (mounted.current) {
+                setFeedback((current) =>
+                    current === STALLED ? null : current,
+                );
+            }
+        });
+
+        const watchdog = setTimeout(() => {
+            if (sheetSeen) return;
+            say(STALLED);
+            report(
+                purchaseIssue('stalled', {
+                    elapsedMs: Date.now() - startedAt,
+                    productId,
+                }),
+            );
+        }, PURCHASE_STALL_MS);
+
         try {
             const { customerInfo } =
                 await Purchases.purchasePackage(selectedPkg);
@@ -504,17 +626,43 @@ function OjoProPaywall({ onClose }: { onClose: () => void }) {
             // ended up entitled. Closing on the strength of the promise alone would
             // dismiss the paywall with nothing unlocked and no explanation.
             if (customerInfo.entitlements.active[ENTITLEMENT_ID]) {
-                onClose();
+                if (mounted.current) onClose();
             } else {
+                report(
+                    purchaseIssue('not_entitled', {
+                        sheetSeen,
+                        elapsedMs: Date.now() - startedAt,
+                        productId,
+                    }),
+                );
                 say({
                     tone: 'error',
                     text: 'Your payment went through but Pro could not be unlocked. Tap Restore purchases, or contact us if it keeps happening.',
                 });
             }
         } catch (error) {
-            say(purchaseFailure(error));
+            const cancelled =
+                (error as { code?: PURCHASES_ERROR_CODE } | null)?.code ===
+                PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR;
+            report(
+                purchaseIssue(cancelled ? 'cancelled' : 'failed', {
+                    error,
+                    sheetSeen,
+                    elapsedMs: Date.now() - startedAt,
+                    productId,
+                }),
+            );
+            // Never silent. Saying nothing on a cancel is what App Review read as
+            // "unresponsive" on 1.0 (33) — see src/lib/purchaseOutcome.ts.
+            say(
+                cancelled
+                    ? cancelFeedback(sheetSeen, STORE)
+                    : purchaseFailure(error),
+            );
         } finally {
-            setPurchasing(false);
+            clearTimeout(watchdog);
+            focus.remove();
+            if (mounted.current) setPurchasing(false);
         }
     }, [selectedPkg, purchasing, onClose, say]);
 
@@ -525,7 +673,7 @@ function OjoProPaywall({ onClose }: { onClose: () => void }) {
         try {
             const info = await Purchases.restorePurchases();
             if (info.entitlements.active[ENTITLEMENT_ID]) {
-                onClose();
+                if (mounted.current) onClose();
             } else {
                 say({
                     tone: 'info',
@@ -533,6 +681,7 @@ function OjoProPaywall({ onClose }: { onClose: () => void }) {
                 });
             }
         } catch (error) {
+            report(purchaseIssue('restore_failed', { error }));
             const mapped = purchaseFailure(error);
             say(
                 mapped ?? {
@@ -541,17 +690,24 @@ function OjoProPaywall({ onClose }: { onClose: () => void }) {
                 },
             );
         } finally {
-            setRestoring(false);
+            if (mounted.current) setRestoring(false);
         }
     }, [restoring, onClose, say]);
 
-    const ctaDisabled = !selectedPkg || purchasing;
-    const ctaLabel =
-        offering.status === 'error'
-            ? 'Unavailable'
-            : trial
-              ? `Start ${trial} free`
-              : 'Unlock Ojo Pro';
+    // The button always says what a tap will do. Build 33 labelled it "Unlock
+    // Ojo Pro" while prices were still loading (disabled, only dimmed) and
+    // "Unavailable" once they failed — a live-looking button that ignored taps,
+    // then a dead end. A failed load now turns it into the retry.
+    const loadingPrices = offering.status === 'loading';
+    const pricesFailed = offering.status === 'error';
+    const ctaDisabled = loadingPrices || purchasing;
+    const ctaLabel = loadingPrices
+        ? 'Loading prices…'
+        : pricesFailed
+          ? 'Try again'
+          : trial
+            ? `Start ${trial} free`
+            : 'Unlock Ojo Pro';
 
     return (
         // The paywall is a fixed dark brand moment whatever theme the app is in,
@@ -567,6 +723,7 @@ function OjoProPaywall({ onClose }: { onClose: () => void }) {
                 <BrandField />
 
                 <ScrollView
+                    ref={scrollRef}
                     style={styles.scroll}
                     contentContainerStyle={[
                         styles.content,
@@ -639,7 +796,8 @@ function OjoProPaywall({ onClose }: { onClose: () => void }) {
                     ) : offering.status === 'error' ? (
                         <GlassCard style={styles.planPlaceholder}>
                             <Text style={styles.priceUnavailable}>
-                                Pricing unavailable — check back soon
+                                Could not load prices. Check your connection,
+                                then tap Try again.
                             </Text>
                         </GlassCard>
                     ) : bothPlans ? (
@@ -690,7 +848,9 @@ function OjoProPaywall({ onClose }: { onClose: () => void }) {
 
                     <View style={styles.ctaWrap}>
                         <Pressable
-                            onPress={handlePurchase}
+                            onPress={
+                                pricesFailed ? loadOfferings : handlePurchase
+                            }
                             disabled={ctaDisabled}
                             accessibilityRole='button'
                             accessibilityLabel={ctaLabel}
@@ -725,6 +885,17 @@ function OjoProPaywall({ onClose }: { onClose: () => void }) {
 
                     {feedback && (
                         <View
+                            // Keyed by the message so every new one mounts
+                            // fresh and fires onLayout, which scrolls it into
+                            // view: on a short screen, or the iPhone-sized
+                            // window an iPad runs Ojo in, the space under the
+                            // button can sit below the fold.
+                            key={feedback.text}
+                            onLayout={() =>
+                                scrollRef.current?.scrollToEnd({
+                                    animated: true,
+                                })
+                            }
                             style={[
                                 styles.feedback,
                                 feedback.tone === 'error'
