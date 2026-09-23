@@ -1,240 +1,485 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { StyleSheet, Modal, AccessibilityInfo, findNodeHandle, View as RNView } from 'react-native';
-import { ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import {
+    StyleSheet,
+    Modal,
+    AccessibilityInfo,
+    findNodeHandle,
+    View as RNView,
+} from 'react-native';
+import {
+    ScrollView,
+    KeyboardAvoidingView,
+    Platform,
+    Linking,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { View, Text, TextInput, Pressable, GlassCard } from '../../../components/primitives';
+import Purchases from 'react-native-purchases';
+import {
+    View,
+    Text,
+    TextInput,
+    Pressable,
+    GlassCard,
+} from '../../../components/primitives';
 import axios from '../../../api/client';
-import { auth, getToken, getErrorMessage, updateAuthUser, updateToken, clearAuth } from '../../../lib/auth';
+import {
+    auth,
+    getToken,
+    getErrorMessage,
+    updateAuthUser,
+    updateToken,
+    clearAuth,
+} from '../../../lib/auth';
 import { storage } from '../../../lib/storage';
 import { hapticWarning } from '../../../lib/haptics';
 import { useFormSubmit } from '../../../hooks/useFormSubmit';
+import { usePurchases } from '../../../context/PurchasesContext';
 import { StatusMessage } from '../../../components/shared';
 import { makeStyles } from '../screens/screens.styles';
 import { spacing, radius, fonts, fontSizes } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/ThemeContext';
 
-interface Props { onLogout?: () => void; }
+interface Props {
+    onLogout?: () => void;
+}
+
+const STORE_NAME = Platform.OS === 'android' ? 'Google Play' : 'Apple';
+
+// The store's own subscriptions page, for when RevenueCat can't open its sheet.
+// Apple's is the link its account-deletion guidance itself gives.
+const SUBSCRIPTIONS_URL =
+    Platform.OS === 'android'
+        ? 'https://play.google.com/store/account/subscriptions'
+        : 'https://apps.apple.com/account/subscriptions';
+
+/** StoreKit's manage-subscriptions sheet (via RevenueCat), falling back to the
+ *  store's subscriptions page when RevenueCat can't show it — it rejects when
+ *  the account has no management URL, for one. The button must never do
+ *  nothing: silence is what App Review called "unresponsive" on 1.0 (33). */
+function openManageSubscriptions() {
+    Purchases.showManageSubscriptions().catch(() => {
+        Linking.openURL(SUBSCRIPTIONS_URL).catch(() => {});
+    });
+}
 
 export default function ProfileScreen({ onLogout }: Props) {
-  const { colors } = useTheme();
-  const s = useMemo(() => makeStyles(colors), [colors]);
-  const styles = useMemo(() => StyleSheet.create({
-    root:        { flex: 1, backgroundColor: colors.bgDefault },
-    content:     { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xl },
-    saveBtnText: { fontFamily: fonts.body, fontSize: fontSizes.base, fontWeight: '600', color: colors.saveBtnText },
-    backdrop:    { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.55)' },
-    modalCard: {
-      position: 'absolute', left: 24, right: 24,
-      top: '30%',
-      backgroundColor: colors.glassBgStrong,
-      borderRadius: radius.lg, padding: spacing.lg,
-      borderWidth: 1, borderColor: colors.glassBorder, gap: 12,
-    },
-    modalIcon: {
-      width: 44, height: 44, borderRadius: 22,
-      backgroundColor: 'rgba(239,68,68,0.10)',
-      alignItems: 'center', justifyContent: 'center',
-    },
-    fieldHint: {
-      fontFamily: fonts.body, fontSize: fontSizes.xs,
-      color: colors.textMuted, lineHeight: fontSizes.xs * 1.5,
-    },
-    // "Underline" validation line that sits directly under the username field.
-    usernameNote: {
-      fontFamily: fonts.body, fontSize: fontSizes.xs,
-      lineHeight: fontSizes.xs * 1.5,
-    },
-  }), [colors]);
-
-  const [username,     setUsername]     = useState('');
-  const [email,        setEmail]        = useState('');
-  const [usernameStatus, setUsernameStatus] =
-    useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle');
-  const originalUsername = useRef('');
-  const [deleteStep,   setDeleteStep]   = useState(false);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [deleteError,  setDeleteError]  = useState<string | null>(null);
-  const { status, loading, submit } = useFormSubmit('Profile updated.');
-
-  // 3–20 chars, letters/numbers/underscore/period. Mirrors what the server stores.
-  const USERNAME_RE = /^[a-zA-Z0-9_.]{3,20}$/;
-
-  // Runs when the username field loses focus. Skips the network call when the
-  // name is unchanged or malformed; otherwise asks the server if it's taken.
-  const checkUsername = async () => {
-    const name = username.trim();
-    if (!name || name === originalUsername.current) { setUsernameStatus('idle'); return; }
-    if (!USERNAME_RE.test(name)) { setUsernameStatus('invalid'); return; }
-    setUsernameStatus('checking');
-    try {
-      const { data } = await axios.get<{ available: boolean }>(
-        '/api/user/check-username',
-        { ...auth(), params: { username: name } },
-      );
-      setUsernameStatus(data.available ? 'available' : 'taken');
-    } catch {
-      setUsernameStatus('idle');
-    }
-  };
-
-  const usernameNote = (() => {
-    switch (usernameStatus) {
-      case 'checking':  return { text: 'Checking availability…',           color: colors.textMuted };
-      case 'available': return { text: '✓ Username available',             color: colors.successText };
-      case 'taken':     return { text: '✗ That username is already taken', color: colors.errorText };
-      case 'invalid':   return { text: 'Use 3–20 letters, numbers, “_” or “.”', color: colors.errorText };
-      default:          return null;
-    }
-  })();
-
-  const deleteModalTitleRef = useRef<RNView>(null);
-  useEffect(() => {
-    if (!deleteStep) return;
-    const id = setTimeout(() => {
-      if (deleteModalTitleRef.current) {
-        const node = findNodeHandle(deleteModalTitleRef.current);
-        if (node) AccessibilityInfo.setAccessibilityFocus(node);
-      }
-    }, 100);
-    return () => clearTimeout(id);
-  }, [deleteStep]);
-
-  useEffect(() => {
-    if (!getToken()) return;
-    axios.get('/api/user/me', auth())
-      .then(({ data }) => {
-        setUsername(data.username ?? '');
-        originalUsername.current = data.username ?? '';
-        setEmail(data.email ?? '');
-      })
-      .catch(() => {});
-  }, []);
-
-  const save = () => submit(async () => {
-    // Changing the email changes the login identifier, so the server bumps
-    // tokenVersion to revoke sessions on other devices and hands back a freshly
-    // signed token for this one. Without storing it, the device that made the
-    // change would 401 on its very next request. Same contract as PasswordScreen;
-    // a username-only edit returns 204 and no token.
-    const { data } = await axios.put<{ token?: string } | undefined>(
-      '/api/user/profile', { username, email }, auth(),
+    const { colors } = useTheme();
+    const s = useMemo(() => makeStyles(colors), [colors]);
+    const styles = useMemo(
+        () =>
+            StyleSheet.create({
+                root: { flex: 1, backgroundColor: colors.bgDefault },
+                content: {
+                    padding: spacing.md,
+                    gap: spacing.md,
+                    paddingBottom: spacing.xl,
+                },
+                saveBtnText: {
+                    fontFamily: fonts.body,
+                    fontSize: fontSizes.base,
+                    fontWeight: '600',
+                    color: colors.saveBtnText,
+                },
+                backdrop: {
+                    ...StyleSheet.absoluteFillObject,
+                    backgroundColor: 'rgba(0,0,0,0.55)',
+                },
+                modalCard: {
+                    position: 'absolute',
+                    left: 24,
+                    right: 24,
+                    top: '30%',
+                    backgroundColor: colors.glassBgStrong,
+                    borderRadius: radius.lg,
+                    padding: spacing.lg,
+                    borderWidth: 1,
+                    borderColor: colors.glassBorder,
+                    gap: 12,
+                },
+                modalIcon: {
+                    width: 44,
+                    height: 44,
+                    borderRadius: 22,
+                    backgroundColor: 'rgba(239,68,68,0.10)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                },
+                // The Ojo Pro note in the delete confirmation. Set apart from the warning
+                // above it because it asks for something (cancel first) rather than
+                // stating a consequence.
+                proNotice: {
+                    backgroundColor: colors.glassBg,
+                    borderWidth: 1,
+                    borderColor: colors.glassBorder,
+                    borderRadius: radius.sm,
+                    padding: spacing.sm,
+                    gap: spacing.xs,
+                },
+                proNoticeLink: {
+                    fontFamily: fonts.body,
+                    fontSize: fontSizes.sm,
+                    fontWeight: '600',
+                    color: colors.textPrimary,
+                    paddingVertical: 4,
+                },
+                fieldHint: {
+                    fontFamily: fonts.body,
+                    fontSize: fontSizes.xs,
+                    color: colors.textMuted,
+                    lineHeight: fontSizes.xs * 1.5,
+                },
+                // "Underline" validation line that sits directly under the username field.
+                usernameNote: {
+                    fontFamily: fonts.body,
+                    fontSize: fontSizes.xs,
+                    lineHeight: fontSizes.xs * 1.5,
+                },
+            }),
+        [colors],
     );
-    if (data?.token) await updateToken(data.token);
-    await updateAuthUser({ email, username });
-  });
 
-  const handleDelete = async () => {
-    setDeleteLoading(true);
-    setDeleteError(null);
-    try {
-      await axios.delete('/api/user/me', auth());
-      await clearAuth();
-      await storage.clear();
-      onLogout?.();
-    } catch (err: unknown) {
-      setDeleteError(getErrorMessage(err, 'Could not delete account.'));
-      setDeleteLoading(false);
-    }
-  };
+    const [username, setUsername] = useState('');
+    const [email, setEmail] = useState('');
+    const [usernameStatus, setUsernameStatus] = useState<
+        'idle' | 'checking' | 'available' | 'taken' | 'invalid'
+    >('idle');
+    const originalUsername = useRef('');
+    const [deleteStep, setDeleteStep] = useState(false);
+    const [deleteLoading, setDeleteLoading] = useState(false);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
+    const { status, loading, submit } = useFormSubmit('Profile updated.');
+    const { isPro } = usePurchases();
+    // Set by "Manage subscription"; the sheet opens once the modal is gone.
+    const manageAfterClose = useRef(false);
 
-  return (
-    <SafeAreaView style={styles.root} edges={['bottom']}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <StatusMessage status={status} />
+    // 3–20 chars, letters/numbers/underscore/period. Mirrors what the server stores.
+    const USERNAME_RE = /^[a-zA-Z0-9_.]{3,20}$/;
 
-          <View style={s.formGroup}>
-            <Text style={s.label}>Username</Text>
-            <TextInput style={s.input} placeholder="@yourname"
-              placeholderTextColor={colors.textMuted}
-              value={username}
-              onChangeText={(t) => { setUsername(t); setUsernameStatus('idle'); }}
-              onBlur={checkUsername}
-              autoCapitalize="none"
-              autoCorrect={false}
-              accessibilityLabel="Username" />
-            {usernameNote ? (
-              <Text style={[styles.usernameNote, { color: usernameNote.color }]}
-                accessibilityLiveRegion="polite">
-                {usernameNote.text}
-              </Text>
-            ) : (
-              <Text style={styles.fieldHint}>
-                You can change your username anytime — it must be unique.
-              </Text>
-            )}
-          </View>
+    // Runs when the username field loses focus. Skips the network call when the
+    // name is unchanged or malformed; otherwise asks the server if it's taken.
+    const checkUsername = async () => {
+        const name = username.trim();
+        if (!name || name === originalUsername.current) {
+            setUsernameStatus('idle');
+            return;
+        }
+        if (!USERNAME_RE.test(name)) {
+            setUsernameStatus('invalid');
+            return;
+        }
+        setUsernameStatus('checking');
+        try {
+            const { data } = await axios.get<{ available: boolean }>(
+                '/api/user/check-username',
+                { ...auth(), params: { username: name } },
+            );
+            setUsernameStatus(data.available ? 'available' : 'taken');
+        } catch {
+            setUsernameStatus('idle');
+        }
+    };
 
-          <View style={s.formGroup}>
-            <Text style={s.label}>Email</Text>
-            <TextInput style={s.input} placeholder="you@example.com"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="email-address" autoCapitalize="none"
-              textContentType="emailAddress"
-              value={email} onChangeText={setEmail}
-              accessibilityLabel="Email" />
-          </View>
+    const usernameNote = (() => {
+        switch (usernameStatus) {
+            case 'checking':
+                return {
+                    text: 'Checking availability…',
+                    color: colors.textMuted,
+                };
+            case 'available':
+                return {
+                    text: '✓ Username available',
+                    color: colors.successText,
+                };
+            case 'taken':
+                return {
+                    text: '✗ That username is already taken',
+                    color: colors.errorText,
+                };
+            case 'invalid':
+                return {
+                    text: 'Use 3–20 letters, numbers, “_” or “.”',
+                    color: colors.errorText,
+                };
+            default:
+                return null;
+        }
+    })();
 
-          <Pressable style={[s.saveBtn, loading && { opacity: 0.5 }]}
-            onPress={save} disabled={loading}
-            accessibilityRole="button"
-            accessibilityLabel={loading ? 'Saving' : 'Save changes'}
-            accessibilityState={{ busy: loading, disabled: loading }}>
-            <Text style={styles.saveBtnText}>{loading ? 'Saving…' : 'Save changes'}</Text>
-          </Pressable>
+    const deleteModalTitleRef = useRef<RNView>(null);
+    useEffect(() => {
+        if (!deleteStep) return;
+        const id = setTimeout(() => {
+            if (deleteModalTitleRef.current) {
+                const node = findNodeHandle(deleteModalTitleRef.current);
+                if (node) AccessibilityInfo.setAccessibilityFocus(node);
+            }
+        }, 100);
+        return () => clearTimeout(id);
+    }, [deleteStep]);
 
-          {/* Danger zone */}
-          <View style={s.dangerCard}>
-            <Text style={s.dangerTitle}>Delete account</Text>
-            <Text style={s.dangerBody}>
-              Permanently removes your account, closets, clothing articles, and outfit history. Cannot be undone.
-            </Text>
-            <Pressable style={s.dangerBtn} onPress={() => { hapticWarning(); setDeleteStep(true); }}
-              accessibilityRole="button">
-              <Text style={s.dangerBtnText}>Delete my account</Text>
-            </Pressable>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+    useEffect(() => {
+        if (!getToken()) return;
+        axios
+            .get('/api/user/me', auth())
+            .then(({ data }) => {
+                setUsername(data.username ?? '');
+                originalUsername.current = data.username ?? '';
+                setEmail(data.email ?? '');
+            })
+            .catch(() => {});
+    }, []);
 
-      <Modal visible={deleteStep} transparent animationType="fade">
-        <Pressable style={styles.backdrop}
-          onPress={() => { if (!deleteLoading) { setDeleteStep(false); setDeleteError(null); } }}
-          accessibilityLabel="Dismiss"
-          accessibilityRole="button"
-          accessibilityState={{ disabled: deleteLoading }} />
-        <GlassCard style={styles.modalCard}>
-          <View style={styles.modalIcon}>
-            <Text style={{ fontSize: 20 }}>⚠️</Text>
-          </View>
-          <RNView ref={deleteModalTitleRef} accessible={true} accessibilityLabel="Are you sure? This will permanently delete your account.">
-            <Text style={s.modalTitle}>Are you sure?</Text>
-          </RNView>
-          <Text style={s.modalBody}>
-            This will permanently delete your account and all data. This action cannot be undone.
-          </Text>
-          {deleteError ? (
-            <View style={[s.statusMsgBase, s.error]}>
-              <Text style={{ color: colors.errorText, fontSize: 13 }}>{deleteError}</Text>
-            </View>
-          ) : null}
-          <View style={s.modalActions}>
-            <Pressable style={s.modalCancel}
-              onPress={() => { setDeleteStep(false); setDeleteError(null); }}
-              disabled={deleteLoading}
-              accessibilityRole="button"
-              accessibilityState={{ disabled: deleteLoading }}>
-              <Text style={s.modalCancelText}>Cancel</Text>
-            </Pressable>
-            <Pressable style={s.modalConfirm} onPress={handleDelete} disabled={deleteLoading}
-              accessibilityRole="button"
-              accessibilityLabel={deleteLoading ? 'Deleting' : 'Yes, delete'}
-              accessibilityState={{ busy: deleteLoading, disabled: deleteLoading }}>
-              <Text style={s.modalConfirmText}>{deleteLoading ? 'Deleting…' : 'Yes, delete'}</Text>
-            </Pressable>
-          </View>
-        </GlassCard>
-      </Modal>
-    </SafeAreaView>
-  );
+    const save = () =>
+        submit(async () => {
+            // Changing the email changes the login identifier, so the server bumps
+            // tokenVersion to revoke sessions on other devices and hands back a freshly
+            // signed token for this one. Without storing it, the device that made the
+            // change would 401 on its very next request. Same contract as PasswordScreen;
+            // a username-only edit returns 204 and no token.
+            const { data } = await axios.put<{ token?: string } | undefined>(
+                '/api/user/profile',
+                { username, email },
+                auth(),
+            );
+            if (data?.token) await updateToken(data.token);
+            await updateAuthUser({ email, username });
+        });
+
+    const handleDelete = async () => {
+        setDeleteLoading(true);
+        setDeleteError(null);
+        try {
+            await axios.delete('/api/user/me', auth());
+            await clearAuth();
+            await storage.clear();
+            onLogout?.();
+        } catch (err: unknown) {
+            setDeleteError(getErrorMessage(err, 'Could not delete account.'));
+            setDeleteLoading(false);
+        }
+    };
+
+    // Apple's account-deletion guidance: tell a subscriber that billing carries
+    // on through Apple, and ask them to cancel before deleting. This closes the
+    // confirmation before opening the store's sheet rather than stacking a
+    // system sheet on a React Native modal — whether that presents at all is not
+    // something to find out on App Review's device. iOS opens it from the
+    // modal's onDismiss; Android's Modal has no onDismiss.
+    const manageSubscriptionFirst = () => {
+        setDeleteStep(false);
+        setDeleteError(null);
+        if (Platform.OS === 'ios') manageAfterClose.current = true;
+        else openManageSubscriptions();
+    };
+
+    return (
+        <SafeAreaView
+            style={styles.root}
+            edges={['bottom']}
+        >
+            <KeyboardAvoidingView
+                style={{ flex: 1 }}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            >
+                <ScrollView
+                    contentContainerStyle={styles.content}
+                    keyboardShouldPersistTaps='handled'
+                >
+                    <StatusMessage status={status} />
+
+                    <View style={s.formGroup}>
+                        <Text style={s.label}>Username</Text>
+                        <TextInput
+                            style={s.input}
+                            placeholder='@yourname'
+                            placeholderTextColor={colors.textMuted}
+                            value={username}
+                            onChangeText={(t) => {
+                                setUsername(t);
+                                setUsernameStatus('idle');
+                            }}
+                            onBlur={checkUsername}
+                            autoCapitalize='none'
+                            autoCorrect={false}
+                            accessibilityLabel='Username'
+                        />
+                        {usernameNote ? (
+                            <Text
+                                style={[
+                                    styles.usernameNote,
+                                    { color: usernameNote.color },
+                                ]}
+                                accessibilityLiveRegion='polite'
+                            >
+                                {usernameNote.text}
+                            </Text>
+                        ) : (
+                            <Text style={styles.fieldHint}>
+                                You can change your username anytime — it must
+                                be unique.
+                            </Text>
+                        )}
+                    </View>
+
+                    <View style={s.formGroup}>
+                        <Text style={s.label}>Email</Text>
+                        <TextInput
+                            style={s.input}
+                            placeholder='you@example.com'
+                            placeholderTextColor={colors.textMuted}
+                            keyboardType='email-address'
+                            autoCapitalize='none'
+                            textContentType='emailAddress'
+                            value={email}
+                            onChangeText={setEmail}
+                            accessibilityLabel='Email'
+                        />
+                    </View>
+
+                    <Pressable
+                        style={[s.saveBtn, loading && { opacity: 0.5 }]}
+                        onPress={save}
+                        disabled={loading}
+                        accessibilityRole='button'
+                        accessibilityLabel={loading ? 'Saving' : 'Save changes'}
+                        accessibilityState={{
+                            busy: loading,
+                            disabled: loading,
+                        }}
+                    >
+                        <Text style={styles.saveBtnText}>
+                            {loading ? 'Saving…' : 'Save changes'}
+                        </Text>
+                    </Pressable>
+
+                    {/* Danger zone */}
+                    <View style={s.dangerCard}>
+                        <Text style={s.dangerTitle}>Delete account</Text>
+                        <Text style={s.dangerBody}>
+                            Permanently removes your account, closets, clothing
+                            articles, and outfit history. Cannot be undone.
+                        </Text>
+                        <Pressable
+                            style={s.dangerBtn}
+                            onPress={() => {
+                                hapticWarning();
+                                manageAfterClose.current = false;
+                                setDeleteStep(true);
+                            }}
+                            accessibilityRole='button'
+                        >
+                            <Text style={s.dangerBtnText}>
+                                Delete my account
+                            </Text>
+                        </Pressable>
+                    </View>
+                </ScrollView>
+            </KeyboardAvoidingView>
+
+            <Modal
+                visible={deleteStep}
+                transparent
+                animationType='fade'
+                onDismiss={() => {
+                    if (!manageAfterClose.current) return;
+                    manageAfterClose.current = false;
+                    openManageSubscriptions();
+                }}
+            >
+                <Pressable
+                    style={styles.backdrop}
+                    onPress={() => {
+                        if (!deleteLoading) {
+                            setDeleteStep(false);
+                            setDeleteError(null);
+                        }
+                    }}
+                    accessibilityLabel='Dismiss'
+                    accessibilityRole='button'
+                    accessibilityState={{ disabled: deleteLoading }}
+                />
+                <GlassCard style={styles.modalCard}>
+                    <View style={styles.modalIcon}>
+                        <Text style={{ fontSize: 20 }}>⚠️</Text>
+                    </View>
+                    <RNView
+                        ref={deleteModalTitleRef}
+                        accessible={true}
+                        accessibilityLabel='Are you sure? This will permanently delete your account.'
+                    >
+                        <Text style={s.modalTitle}>Are you sure?</Text>
+                    </RNView>
+                    <Text style={s.modalBody}>
+                        This will permanently delete your account and all data.
+                        This action cannot be undone.
+                    </Text>
+                    {isPro ? (
+                        <View style={styles.proNotice}>
+                            <Text style={s.modalBody}>
+                                Deleting your account doesn't cancel Ojo Pro.
+                                It's billed through {STORE_NAME}, so cancel it
+                                first if it's set to renew — otherwise you'll
+                                keep being charged.
+                            </Text>
+                            <Pressable
+                                onPress={manageSubscriptionFirst}
+                                disabled={deleteLoading}
+                                hitSlop={8}
+                                accessibilityRole='button'
+                                accessibilityState={{ disabled: deleteLoading }}
+                            >
+                                <Text style={styles.proNoticeLink}>
+                                    Manage subscription
+                                </Text>
+                            </Pressable>
+                        </View>
+                    ) : null}
+                    {deleteError ? (
+                        <View style={[s.statusMsgBase, s.error]}>
+                            <Text
+                                style={{
+                                    color: colors.errorText,
+                                    fontSize: 13,
+                                }}
+                            >
+                                {deleteError}
+                            </Text>
+                        </View>
+                    ) : null}
+                    <View style={s.modalActions}>
+                        <Pressable
+                            style={s.modalCancel}
+                            onPress={() => {
+                                setDeleteStep(false);
+                                setDeleteError(null);
+                            }}
+                            disabled={deleteLoading}
+                            accessibilityRole='button'
+                            accessibilityState={{ disabled: deleteLoading }}
+                        >
+                            <Text style={s.modalCancelText}>Cancel</Text>
+                        </Pressable>
+                        <Pressable
+                            style={s.modalConfirm}
+                            onPress={handleDelete}
+                            disabled={deleteLoading}
+                            accessibilityRole='button'
+                            accessibilityLabel={
+                                deleteLoading ? 'Deleting' : 'Yes, delete'
+                            }
+                            accessibilityState={{
+                                busy: deleteLoading,
+                                disabled: deleteLoading,
+                            }}
+                        >
+                            <Text style={s.modalConfirmText}>
+                                {deleteLoading ? 'Deleting…' : 'Yes, delete'}
+                            </Text>
+                        </Pressable>
+                    </View>
+                </GlassCard>
+            </Modal>
+        </SafeAreaView>
+    );
 }

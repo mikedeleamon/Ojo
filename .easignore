@@ -7,6 +7,9 @@
 server/
 web-server/
 
+# --- Visual library pipeline output (rendered loops live on R2, not in the app) ---
+scripts/visual-library/work/
+
 # --- Python virtualenv ---
 .venv/
 __pycache__/
