@@ -9,7 +9,12 @@ import { lerpColor } from '../../components/WeatherHUD/colorMath';
 // storm the sky is not what you're looking at, and those palettes already carry
 // the condition's identity.
 
-type Stops = readonly { elevation: number; colors: readonly string[] }[];
+/** A named stage of the clear sky — the key of its palette in weatherGradients. */
+export type SkyStage =
+    | 'clearDay' | 'lowSun' | 'goldenHour' | 'sunset' | 'afterglow' | 'blueHour' | 'clearNight'
+    | 'dawnPale' | 'dawnGold' | 'dawn' | 'dawnAfterglow' | 'dawnBlue';
+
+type Stops = readonly { stage: SkyStage; elevation: number; colors: readonly string[] }[];
 
 /**
  * Elevation (deg) → palette, from highest sun to deepest night.
@@ -26,25 +31,39 @@ type Stops = readonly { elevation: number; colors: readonly string[] }[];
  * long blue → gold journey; the afterglow stop at −7° does the same for
  * gold → violet, which was crossing magenta at full strength.
  */
-const DUSK_STOPS: Stops = [
-    { elevation:  10, colors: weatherGradients.clearDay },
-    { elevation:   6, colors: weatherGradients.lowSun },
-    { elevation:   2, colors: weatherGradients.goldenHour },
-    { elevation:  -4, colors: weatherGradients.sunset },
-    { elevation:  -7, colors: weatherGradients.afterglow },
-    { elevation: -10, colors: weatherGradients.blueHour },
-    { elevation: -16, colors: weatherGradients.clearNight },
+export const DUSK_STOPS: Stops = [
+    { stage: 'clearDay',   elevation:  10, colors: weatherGradients.clearDay },
+    { stage: 'lowSun',     elevation:   6, colors: weatherGradients.lowSun },
+    { stage: 'goldenHour', elevation:   2, colors: weatherGradients.goldenHour },
+    { stage: 'sunset',     elevation:  -4, colors: weatherGradients.sunset },
+    { stage: 'afterglow',  elevation:  -7, colors: weatherGradients.afterglow },
+    { stage: 'blueHour',   elevation: -10, colors: weatherGradients.blueHour },
+    { stage: 'clearNight', elevation: -16, colors: weatherGradients.clearNight },
 ] as const;
 
-const DAWN_STOPS: Stops = [
-    { elevation:  10, colors: weatherGradients.clearDay },
-    { elevation:   6, colors: weatherGradients.dawnPale },
-    { elevation:   2, colors: weatherGradients.dawnGold },
-    { elevation:  -4, colors: weatherGradients.dawn },
-    { elevation:  -7, colors: weatherGradients.dawnAfterglow },
-    { elevation: -10, colors: weatherGradients.dawnBlue },
-    { elevation: -16, colors: weatherGradients.clearNight },
+export const DAWN_STOPS: Stops = [
+    { stage: 'clearDay',      elevation:  10, colors: weatherGradients.clearDay },
+    { stage: 'dawnPale',      elevation:   6, colors: weatherGradients.dawnPale },
+    { stage: 'dawnGold',      elevation:   2, colors: weatherGradients.dawnGold },
+    { stage: 'dawn',          elevation:  -4, colors: weatherGradients.dawn },
+    { stage: 'dawnAfterglow', elevation:  -7, colors: weatherGradients.dawnAfterglow },
+    { stage: 'dawnBlue',      elevation: -10, colors: weatherGradients.dawnBlue },
+    { stage: 'clearNight',    elevation: -16, colors: weatherGradients.clearNight },
 ] as const;
+
+/**
+ * The palette stop closest to a sun position. The live sky blends between
+ * stops; things that can only show one fixed sky (the pre-rendered story
+ * loops) show the nearest stop instead.
+ */
+export function nearestSkyStage(elevationDeg: number, isRising = false): SkyStage {
+    const STOPS = isRising ? DAWN_STOPS : DUSK_STOPS;
+    let best = STOPS[0];
+    for (const stop of STOPS) {
+        if (Math.abs(stop.elevation - elevationDeg) < Math.abs(best.elevation - elevationDeg)) best = stop;
+    }
+    return best.stage;
+}
 
 /**
  * Interpolated sky palette for a solar elevation.

@@ -9,6 +9,17 @@ import {
 } from './StormIcon';
 import { useReduceMotion } from '../../hooks/useReduceMotion';
 import {
+    DEFAULT_RAIN_ANGLE,
+    DROPS_PER_GROUP,
+    FLASH_CURVE,
+    FLASH_GAP_MIN_MS,
+    FLASH_GAP_SPREAD_MS,
+    FLASH_MS,
+    RAIN_VARIANTS,
+    STREAK_WIDTH,
+    type RainVariant,
+} from '../../lib/weather/backdropSpec';
+import {
     nativeLoop,
     stepped,
     steppedDuration,
@@ -71,51 +82,6 @@ const BOLT_CONFIGS = [
     startDelay: number;
     pattern: readonly (readonly [number, number])[];
 }[];
-
-// ─── Rain group configurations ──────────────────────────────────────────────
-// Each group is one Animated.View loop translating an SVG of stacked streaks.
-// Within a group, streaks are pre-offset vertically so the falling stream looks
-// continuous as the group translates by one segment. Different durations
-// across groups give a parallax / depth feel.
-
-const RAIN_GROUPS = [
-    { id: 'A', xOffsets: [0.07, 0.22, 0.38, 0.55, 0.71, 0.88], duration: 820,  startDelay: 0   },
-    { id: 'B', xOffsets: [0.13, 0.29, 0.45, 0.61, 0.78, 0.94], duration: 950,  startDelay: 210 },
-    { id: 'C', xOffsets: [0.04, 0.19, 0.34, 0.50, 0.66, 0.83], duration: 1100, startDelay: 420 },
-] as const;
-
-// Plain-rain variant: fewer columns and a slower fall than the storm rain
-// above, so ordinary rain/drizzle reads as gentler without touching the
-// thunderstorm backdrop's look. No sheet flash or bolts accompany this one —
-// callers pass showFlash={false} showBolts={false}.
-const RAIN_GROUPS_LIGHT = [
-    { id: 'A', xOffsets: [0.10, 0.35, 0.60, 0.85], duration: 1300, startDelay: 0   },
-    { id: 'B', xOffsets: [0.22, 0.48, 0.73],       duration: 1550, startDelay: 260 },
-] as const;
-
-// Drizzle variant: NOT the slow fall above — fine droplets fall quickly, just
-// short and faint. Denser columns than the light-rain variant (closer to the
-// storm count) since drizzle reads as a mist of many tiny drops rather than a
-// few long streaks.
-const RAIN_GROUPS_DRIZZLE = [
-    { id: 'A', xOffsets: [0.08, 0.24, 0.40, 0.56, 0.72, 0.88], duration: 620, startDelay: 0   },
-    { id: 'B', xOffsets: [0.16, 0.32, 0.48, 0.64, 0.80, 0.96], duration: 700, startDelay: 140 },
-] as const;
-
-const STREAK_OPACITY_STORM = 0.55;
-const STREAK_OPACITY_LIGHT = 0.32;
-const STREAK_OPACITY_DRIZZLE = 0.30;
-
-const DROPS_PER_GROUP = 6;
-
-// Streak dimensions in POINTS. The rain SVG is given a viewBox in points (see
-// RainLayer) rather than the component's 1280-unit artwork space, which the
-// full-screen canvas scaled by ~0.14: a 3-unit-wide streak came out 0.42 pt
-// across — a sub-pixel hairline that aliases and shimmers as it translates,
-// which is its own source of visible chop independent of frame rate.
-const STREAK_WIDTH = 1.5;
-const STREAK_HEIGHT_STORM = 14;
-const STREAK_HEIGHT_DRIZZLE = 6;
 
 // ─── Bolt component ──────────────────────────────────────────────────────────
 // A single bolt polygon wrapped in an Animated.View whose opacity is driven by
@@ -295,18 +261,6 @@ interface SheetFlashProps {
     animate: boolean;
 }
 
-/**
- * One strike: bright, near-dark, bright again, then a slow decay. Expressed as
- * a single interpolated timing rather than four chained ones, so a strike costs
- * one JS round-trip instead of four and its shape can't be stretched by a busy
- * JS thread mid-flash.
- */
-const FLASH_MS = 400;
-const FLASH_CURVE = {
-    inputRange: [0, 50 / FLASH_MS, 110 / FLASH_MS, 180 / FLASH_MS, 1],
-    outputRange: [0, 0.35, 0.05, 0.3, 0],
-};
-
 function SheetFlash({ animate }: SheetFlashProps) {
     const progress = useRef(new Animated.Value(0)).current;
 
@@ -323,7 +277,7 @@ function SheetFlash({ animate }: SheetFlashProps) {
         // a JS timer — but it runs once per strike, ~every 4.5–9 s.
         const scheduleNext = () => {
             if (cancelled) return;
-            const gap = 4500 + Math.random() * 4500;
+            const gap = FLASH_GAP_MIN_MS + Math.random() * FLASH_GAP_SPREAD_MS;
             timer = setTimeout(() => {
                 if (cancelled) return;
                 progress.setValue(0);
@@ -382,10 +336,12 @@ interface StormIconLightningProps {
     /**
      * 'storm' is the dense, fast rain used behind thunderstorms. 'light' is
      * fewer streaks falling much slower and fainter, for plain rain. 'drizzle'
-     * is dense but short, faint, quick-falling droplets. Pair 'light'/'drizzle'
-     * with showBolts={false} showFlash={false}. Default 'storm'.
+     * is dense but short, faint, quick-falling droplets. 'sleet' is short,
+     * quick and a little brighter — WeatherHUD layers ice pellets (FlakeFall)
+     * over it. Pair everything but 'storm' with showBolts={false}
+     * showFlash={false}. Default 'storm'. Values: lib/weather/backdropSpec.
      */
-    rainVariant?: 'storm' | 'light' | 'drizzle';
+    rainVariant?: RainVariant;
     decorative?: boolean;
 }
 
@@ -399,7 +355,7 @@ export default function StormIconLightning({
     showBolts = true,
     showRain = false,
     showFlash = false,
-    rainAngle = 0.12,
+    rainAngle = DEFAULT_RAIN_ANGLE,
     rainVariant = 'storm',
     decorative = false,
 }: StormIconLightningProps) {
@@ -453,24 +409,17 @@ export default function StormIconLightning({
             {/* Rain — parallax groups, each native-driver translateY+translateX.
                 'light' swaps in fewer, much slower, fainter columns for plain
                 rain. 'drizzle' keeps storm-like density and speed but with
-                short, faint droplets instead of long streaks. */}
-            {showRain && (
-                rainVariant === 'light' ? RAIN_GROUPS_LIGHT
-                : rainVariant === 'drizzle' ? RAIN_GROUPS_DRIZZLE
-                : RAIN_GROUPS
-            ).map((g) => (
+                short, faint droplets instead of long streaks. 'sleet' is short
+                and quick. See RAIN_VARIANTS. */}
+            {showRain && RAIN_VARIANTS[rainVariant].groups.map((g) => (
                 <RainLayer
                     key={g.id}
                     xOffsets={g.xOffsets}
                     duration={g.duration}
                     startDelay={g.startDelay}
                     fill={color}
-                    opacity={
-                        rainVariant === 'light' ? STREAK_OPACITY_LIGHT
-                        : rainVariant === 'drizzle' ? STREAK_OPACITY_DRIZZLE
-                        : STREAK_OPACITY_STORM
-                    }
-                    streakHeight={rainVariant === 'drizzle' ? STREAK_HEIGHT_DRIZZLE : STREAK_HEIGHT_STORM}
+                    opacity={RAIN_VARIANTS[rainVariant].opacity}
+                    streakHeight={RAIN_VARIANTS[rainVariant].streakHeight}
                     width={width}
                     height={height}
                     rainAngle={rainAngle}
