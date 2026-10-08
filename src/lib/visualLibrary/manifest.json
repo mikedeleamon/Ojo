@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "loops": {
     "cloudy": {
       "path": "loops/cloudy.d3940ade.mp4",
@@ -12,13 +12,13 @@
       }
     },
     "drizzle": {
-      "path": "loops/drizzle.02af8a38.mp4",
-      "bytes": 903995,
+      "path": "loops/drizzle.41843348.mp4",
+      "bytes": 1413077,
       "w": 1080,
       "h": 1920,
       "poster": {
-        "path": "loops/drizzle.poster.60442d62.jpg",
-        "bytes": 30324
+        "path": "loops/drizzle.poster.53272d4b.jpg",
+        "bytes": 35662
       }
     },
     "fog": {
@@ -52,13 +52,13 @@
       }
     },
     "ice": {
-      "path": "loops/ice.c14d9bf7.mp4",
-      "bytes": 1276921,
+      "path": "loops/ice.6fb32432.mp4",
+      "bytes": 1822131,
       "w": 1080,
       "h": 1920,
       "poster": {
-        "path": "loops/ice.poster.4be5dac3.jpg",
-        "bytes": 36537
+        "path": "loops/ice.poster.561051f3.jpg",
+        "bytes": 38589
       }
     },
     "partlyCloudy.day": {
@@ -82,13 +82,13 @@
       }
     },
     "rain": {
-      "path": "loops/rain.01afcf76.mp4",
-      "bytes": 755313,
+      "path": "loops/rain.1ad0b94d.mp4",
+      "bytes": 1850258,
       "w": 1080,
       "h": 1920,
       "poster": {
-        "path": "loops/rain.poster.8ef8b312.jpg",
-        "bytes": 27698
+        "path": "loops/rain.poster.f3a3ca6b.jpg",
+        "bytes": 40008
       }
     },
     "recap": {
@@ -232,13 +232,13 @@
       }
     },
     "thunderstorm": {
-      "path": "loops/thunderstorm.f0c6fa59.mp4",
-      "bytes": 1256860,
+      "path": "loops/thunderstorm.f54f02cb.mp4",
+      "bytes": 3378068,
       "w": 1080,
       "h": 1920,
       "poster": {
-        "path": "loops/thunderstorm.poster.c809e081.jpg",
-        "bytes": 35150
+        "path": "loops/thunderstorm.poster.73c4902f.jpg",
+        "bytes": 58966
       }
     }
   }

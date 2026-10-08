@@ -19,6 +19,7 @@ import { join } from 'path';
 import { gradientFor } from '../../src/lib/weather/conditions';
 import { backdropLayersFor } from '../../src/lib/weather/backdropLayers';
 import * as spec from '../../src/lib/weather/backdropSpec';
+import { rainTiles } from '../../src/lib/weather/rainField';
 import { ALL_LOOKS, REQUIRED_LOOP_KEYS, recipeFor } from '../../src/lib/visualLibrary/looks';
 import {
   RECAP_GRADIENT_CYCLE,
@@ -62,9 +63,14 @@ const library = {
   loops: { required: REQUIRED_LOOP_KEYS },
   spec: {
     rain: {
-      variants: spec.RAIN_VARIANTS,
-      dropsPerGroup: spec.DROPS_PER_GROUP,
-      streakWidth: spec.STREAK_WIDTH,
+      // The drops themselves, laid out by the app's rainField for the story
+      // canvas at the default slant, so the renderer only has to draw them.
+      tiles: Object.fromEntries(
+        (Object.keys(spec.RAIN_VARIANTS) as spec.RainVariant[]).map((v) => [
+          v,
+          rainTiles(v, CANVAS_WIDTH_PT, (CANVAS_WIDTH_PT * 16) / 9, spec.DEFAULT_RAIN_ANGLE),
+        ]),
+      ),
       angle: spec.DEFAULT_RAIN_ANGLE,
     },
     flash: {
@@ -93,7 +99,6 @@ const library = {
       perColumn: spec.FLAKES_PER_COLUMN,
       stroke: spec.FLAKE_STROKE,
       snow: spec.SNOW_GROUPS,
-      pellets: spec.SLEET_PELLET_GROUPS,
     },
     fog: spec.FOG_LAYERS,
   },

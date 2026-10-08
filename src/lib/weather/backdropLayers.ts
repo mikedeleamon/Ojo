@@ -18,8 +18,8 @@ export interface BackdropLayers {
     rain: RainVariant | null;
     /** Sheet lightning over the rain. */
     flash: boolean;
-    /** Snowflakes, or the ice pellets that fall with sleet (FlakeFall). */
-    flakes: 'snow' | 'pellets' | null;
+    /** Snowflakes (FlakeFall). Sleet's ice pellets are part of its rain variant. */
+    flakes: 'snow' | null;
     /** Drifting fog banks (FogDrift). */
     fog: boolean;
     /** Sun glare from the top-right corner (SunGlare), on clear and sunny days. */
@@ -36,7 +36,7 @@ export function layersForKind(kind: WeatherKind, isDay: boolean): BackdropLayers
         case 'thunderstorm': return { ...NO_LAYERS, rain: 'storm', flash: true };
         case 'rain':         return { ...NO_LAYERS, rain: 'light' };
         case 'drizzle':      return { ...NO_LAYERS, rain: 'drizzle' };
-        case 'ice':          return { ...NO_LAYERS, rain: 'sleet', flakes: 'pellets' };
+        case 'ice':          return { ...NO_LAYERS, rain: 'sleet' };
         case 'snow':         return { ...NO_LAYERS, flakes: 'snow' };
         case 'fog':          return { ...NO_LAYERS, fog: true };
         // Haze, cloudy and partly cloudy are gradient-only.

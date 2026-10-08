@@ -10,8 +10,8 @@ describe('backdropLayersFor', () => {
 
     it('adds snow, sleet and fog', () => {
         expect(backdropLayersFor('Light snow', true)).toEqual({ ...NO_LAYERS, flakes: 'snow' });
-        expect(backdropLayersFor('Sleet', true)).toEqual({ ...NO_LAYERS, rain: 'sleet', flakes: 'pellets' });
-        expect(backdropLayersFor('Freezing rain', false)).toEqual({ ...NO_LAYERS, rain: 'sleet', flakes: 'pellets' });
+        expect(backdropLayersFor('Sleet', true)).toEqual({ ...NO_LAYERS, rain: 'sleet' });
+        expect(backdropLayersFor('Freezing rain', false)).toEqual({ ...NO_LAYERS, rain: 'sleet' });
         expect(backdropLayersFor('Fog', true)).toEqual({ ...NO_LAYERS, fog: true });
         expect(backdropLayersFor('Mist', false)).toEqual({ ...NO_LAYERS, fog: true });
     });

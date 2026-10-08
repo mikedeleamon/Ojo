@@ -10,15 +10,13 @@ import {
 import { useReduceMotion } from '../../hooks/useReduceMotion';
 import {
     DEFAULT_RAIN_ANGLE,
-    DROPS_PER_GROUP,
     FLASH_CURVE,
     FLASH_GAP_MIN_MS,
     FLASH_GAP_SPREAD_MS,
     FLASH_MS,
-    RAIN_VARIANTS,
-    STREAK_WIDTH,
     type RainVariant,
 } from '../../lib/weather/backdropSpec';
+import { rainTiles, streakTiltDeg, type RainTile } from '../../lib/weather/rainField';
 import {
     nativeLoop,
     stepped,
@@ -139,96 +137,61 @@ function Bolt({
 }
 
 // ─── Rain layer component ────────────────────────────────────────────────────
-// One Animated.Value drives both translateY and translateX (via interpolate),
-// so wind-blown rain is still a single native animation per group.
+// One speed band of the rain (lib/weather/rainField): a static SVG of drops,
+// `period` taller than the canvas, translated down and sideways by one period
+// per loop. One Animated.Value drives both axes, so a band is a single native
+// animation however many drops it holds.
 
 interface RainLayerProps {
-    xOffsets: readonly number[];
-    duration: number;
-    startDelay: number;
+    tile: RainTile;
     fill: string;
-    opacity: number;
-    streakHeight: number;
     width: number;
-    height: number;
     rainAngle: number;
     animate: boolean;
 }
 
-function RainLayer({
-    xOffsets, duration, startDelay, fill, opacity, streakHeight, width, height, rainAngle, animate,
-}: RainLayerProps) {
+function RainLayer({ tile, fill, width, rainAngle, animate }: RainLayerProps) {
     const progress = useRef(new Animated.Value(0)).current;
-    // The rain SVG's viewBox is the layer in points, so STREAK_WIDTH/HEIGHT and
-    // everything derived here are already in the units they render at — no
-    // scale factor between what's written and what lands on screen.
-    const segmentH = height / DROPS_PER_GROUP;
+    const { period, loopMs, height, drops } = tile;
 
     useEffect(() => {
-        if (!animate) {
-            progress.setValue(0);
-            return;
-        }
         progress.setValue(0);
+        if (!animate) return;
         // Linear, so the fall holds a constant velocity: an ease-in-out cycle
-        // accelerates then decelerates once per segment, which reads as a
+        // accelerates then decelerates once per period, which reads as a
         // stutter rather than as rain.
-        const loop = nativeLoop(progress, duration);
-        const timer = setTimeout(() => loop.start(), startDelay);
-        return () => {
-            clearTimeout(timer);
-            loop.stop();
-        };
-    }, [animate, progress, duration, startDelay]);
+        const loop = nativeLoop(progress, loopMs);
+        loop.start();
+        return () => loop.stop();
+    }, [animate, progress, loopMs]);
 
-    // The SVG itself stays in place; we translate the Animated.View wrapper.
-    // Y travels one segment (drops slot back to start), X travels rainAngle * segment.
-    //
     // Memoised for the same reason as Bolt's `opacity` just above: AnimatedProps
     // is keyed on animated-node identity, so returning fresh interpolation nodes
     // each render rebuilt this layer's native node chain every time the parent
     // re-rendered.
     const translateY = useMemo(
-        () =>
-            progress.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0, segmentH],
-            }),
-        [progress, segmentH],
+        () => progress.interpolate({ inputRange: [0, 1], outputRange: [0, period] }),
+        [progress, period],
     );
     const translateX = useMemo(
-        () =>
-            progress.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0, rainAngle * segmentH],
-            }),
-        [progress, rainAngle, segmentH],
+        () => progress.interpolate({ inputRange: [0, 1], outputRange: [0, rainAngle * period] }),
+        [progress, rainAngle, period],
     );
 
-    // Pre-stack DROPS_PER_GROUP+1 streaks per column, starting one segment ABOVE
-    // the viewBox. After translating one segment downward and snapping back, the
-    // visual pattern is identical (the extra top streak replaces the one that
-    // moved out of frame), so the loop is seamless.
-    const streaks = useMemo(() => {
-        const result: { x: number; y: number; key: string }[] = [];
-        xOffsets.forEach((xf, ci) => {
-            const cx = xf * width;
-            for (let i = -1; i < DROPS_PER_GROUP; i++) {
-                result.push({
-                    x: cx - STREAK_WIDTH / 2,
-                    y: i * segmentH,
-                    key: `${ci}-${i}`,
-                });
-            }
-        });
-        return result;
-    }, [xOffsets, width, segmentH]);
+    const tilt = streakTiltDeg(rainAngle);
 
     return (
         <Animated.View
-            style={[StyleSheet.absoluteFill, { transform: [{ translateY }, { translateX }] }]}
+            style={{
+                position: 'absolute',
+                left: 0,
+                top: -period,
+                width,
+                height,
+                transform: [{ translateY }, { translateX }],
+            }}
             pointerEvents="none"
-            // The streak SVG never changes — only this wrapper's transform moves.
+            // The drop SVG never changes — only this wrapper's transform moves.
             // Caching the layer as a GPU texture lets scroll/animation frames just
             // re-position a bitmap instead of re-rasterizing the full-screen SVG,
             // which is what was dropping frames while scrolling over the backdrop.
@@ -236,16 +199,17 @@ function RainLayer({
             renderToHardwareTextureAndroid
         >
             <Svg viewBox={`0 0 ${width} ${height}`} width={width} height={height}>
-                {streaks.map((s) => (
+                {drops.map((d, i) => (
                     <Rect
-                        key={s.key}
-                        x={s.x}
-                        y={s.y}
-                        width={STREAK_WIDTH}
-                        height={streakHeight}
-                        rx={STREAK_WIDTH / 2}
+                        key={i}
+                        x={d.x}
+                        y={d.y}
+                        width={d.w}
+                        height={d.len}
+                        rx={d.w / 2}
                         fill={fill}
-                        opacity={opacity}
+                        opacity={d.opacity}
+                        transform={tilt ? `rotate(${tilt} ${d.x + d.w / 2} ${d.y + d.len / 2})` : undefined}
                     />
                 ))}
             </Svg>
@@ -334,12 +298,11 @@ interface StormIconLightningProps {
     /** 0–0.3 wind-drift fraction (translateX / translateY per rain segment). */
     rainAngle?: number;
     /**
-     * 'storm' is the dense, fast rain used behind thunderstorms. 'light' is
-     * fewer streaks falling much slower and fainter, for plain rain. 'drizzle'
-     * is dense but short, faint, quick-falling droplets. 'sleet' is short,
-     * quick and a little brighter — WeatherHUD layers ice pellets (FlakeFall)
-     * over it. Pair everything but 'storm' with showBolts={false}
-     * showFlash={false}. Default 'storm'. Values: lib/weather/backdropSpec.
+     * 'storm' is the dense, fast, long-streaked rain behind thunderstorms.
+     * 'light' is plain rain. 'drizzle' is many short, faint droplets. 'sleet'
+     * is short quick streaks with round ice pellets among them. Pair
+     * everything but 'storm' with showBolts={false} showFlash={false}.
+     * Default 'storm'. Values: RAIN_VARIANTS in lib/weather/backdropSpec.
      */
     rainVariant?: RainVariant;
     decorative?: boolean;
@@ -371,9 +334,15 @@ export default function StormIconLightning({
     const width  = fullWidth  ? screenWidth  : size;
     const height = fullHeight ? screenHeight : size;
 
+    const rain = useMemo(
+        () => (showRain ? rainTiles(rainVariant, width, height, rainAngle) : []),
+        [showRain, rainVariant, width, height, rainAngle],
+    );
+
     return (
         <View
-            style={{ width, height }}
+            // The rain tiles reach above and beside the canvas; keep them in it.
+            style={{ width, height, overflow: showRain ? 'hidden' : 'visible' }}
             accessibilityLabel="Storm"
             accessibilityElementsHidden={decorative}
             importantForAccessibility={decorative ? 'no' : 'auto'}
@@ -406,22 +375,14 @@ export default function StormIconLightning({
                 />
             ))}
 
-            {/* Rain — parallax groups, each native-driver translateY+translateX.
-                'light' swaps in fewer, much slower, fainter columns for plain
-                rain. 'drizzle' keeps storm-like density and speed but with
-                short, faint droplets instead of long streaks. 'sleet' is short
-                and quick. See RAIN_VARIANTS. */}
-            {showRain && RAIN_VARIANTS[rainVariant].groups.map((g) => (
+            {/* Rain — one native-driver layer per speed band; the bands'
+                different speeds give the fall its depth. */}
+            {showRain && rain.map((tile, i) => (
                 <RainLayer
-                    key={g.id}
-                    xOffsets={g.xOffsets}
-                    duration={g.duration}
-                    startDelay={g.startDelay}
+                    key={`${rainVariant}-${i}`}
+                    tile={tile}
                     fill={color}
-                    opacity={RAIN_VARIANTS[rainVariant].opacity}
-                    streakHeight={RAIN_VARIANTS[rainVariant].streakHeight}
                     width={width}
-                    height={height}
                     rainAngle={rainAngle}
                     animate={animateOn}
                 />

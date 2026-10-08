@@ -65,7 +65,7 @@ const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 import { gradientFor, footerBgFor } from './weatherPalette';
 import { accentFromGradient } from '../../lib/weather/accentColor';
 import { backdropLayersFor, NO_LAYERS } from '../../lib/weather/backdropLayers';
-import { SLEET_PELLET_GROUPS, SNOW_GROUPS } from '../../lib/weather/backdropSpec';
+import { SNOW_GROUPS } from '../../lib/weather/backdropSpec';
 import { devCondition, devIsDay } from '../../lib/debug/devWeatherOverride';
 import FlakeFall from './FlakeFall';
 import FogDrift from './FogDrift';
@@ -749,7 +749,8 @@ const WeatherHUD = ({
     // Full-screen star backdrop for clear nights; storm backdrop for thunder;
     // light-rain backdrop for plain rain; drizzle backdrop for drizzle. All
     // derive from the shared classifier so they track the icon/gradient.
-    // Snow, sleet and fog get flat particle layers too (FlakeFall, FogDrift).
+    // Snow and fog get flat particle layers too (FlakeFall, FogDrift); sleet
+    // is a rain variant with ice pellets.
     // lib/weather/backdropLayers is the single decision — the story-loop
     // renderer runs it too, so shared stories match what's on screen.
     const layers = weather ? backdropLayersFor(bgCondition, bgIsDay) : NO_LAYERS;
@@ -945,8 +946,8 @@ const WeatherHUD = ({
                 />
             </BackdropLayer>
 
-            {/* Full-screen plain-rain backdrop — gentler, much slower falling
-                rain, no bolts or sheet flash. Mutually exclusive with the storm
+            {/* Full-screen plain-rain backdrop — lighter rain than the storm,
+                no bolts or sheet flash. Mutually exclusive with the storm
                 backdrop above and the drizzle one below: isThunderstorm, isRain
                 and isDrizzle come from disjoint classifier kinds. */}
             <BackdropLayer
@@ -969,8 +970,7 @@ const WeatherHUD = ({
             </BackdropLayer>
 
             {/* Full-screen drizzle backdrop — same falling-rain mechanism, but
-                short, faint, quick-falling droplets instead of the long slow
-                streaks used for plain rain. */}
+                many short, faint droplets instead of rain streaks. */}
             <BackdropLayer
                 visible={isDrizzleBg && perf.backdrop}
                 scrollY={scrollY}
@@ -1002,8 +1002,9 @@ const WeatherHUD = ({
                 <FlakeFall groups={SNOW_GROUPS} animate={backdropAnimate} />
             </BackdropLayer>
 
-            {/* Full-screen sleet — short quick streaks with ice pellets among
-                them, both taking the wind slant. */}
+            {/* Full-screen sleet — short quick streaks with round ice pellets
+                among them (both part of the 'sleet' rain variant), taking the
+                wind slant. */}
             <BackdropLayer
                 visible={isSleetBg && perf.backdrop}
                 scrollY={scrollY}
@@ -1021,7 +1022,6 @@ const WeatherHUD = ({
                     rainVariant="sleet"
                     animate={backdropAnimate}
                 />
-                <FlakeFall groups={SLEET_PELLET_GROUPS} slant={rainAngle} animate={backdropAnimate} />
             </BackdropLayer>
 
             {/* Full-screen fog — soft banks drifting sideways. Shallow depth:

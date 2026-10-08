@@ -8,12 +8,12 @@ app's gradientFor() and backdropLayersFor() and copying out
 src/lib/weather/backdropSpec.ts. The drawing rules mirror the components they
 came from, one function each:
 
-    draw_rain     StormIconLightning — RainLayer (streak columns)
+    draw_rain     StormIconLightning — RainLayer (rainField's drop tiles)
     flash_alpha   StormIconLightning — SheetFlash
     StarField     ClearNightIconMoon — StarField (sparkles, six twinkle phases)
     draw_shooting_star  ShootingStar     — one streak, at a fixed time per loop
     SunGlare      SunGlare           — corner glow and lens-flare ghosts
-    draw_flakes   FlakeFall          — snow and ice pellets
+    draw_flakes   FlakeFall          — snow
     FogField      FogDrift           — drifting fog banks
 
 If one of those components changes how it draws, change the matching function.
@@ -79,23 +79,32 @@ def vertical_gradient(colors: list[str]) -> np.ndarray:
 # ── Rain (StormIconLightning / RainLayer) ────────────────────────────────────
 
 def draw_rain(pen: ImageDraw.ImageDraw, cv: Canvas, lib: dict, variant: str, t_ms: float) -> None:
+    """Each band's tile, slid down by one period per loop, its drops tilted to the slant."""
     rain = lib["spec"]["rain"]
-    v = rain["variants"][variant]
+    angle = rain["angle"]
     k = cv.scale * SS
-    seg = cv.h / rain["dropsPerGroup"]
-    sw = rain["streakWidth"]
-    fill = (*cv.particle, round(255 * v["opacity"]))
-    for g in v["groups"]:
-        p = phase(t_ms, g["startDelay"], g["duration"])
-        ty, tx = seg * p, rain["angle"] * seg * p
-        for xf in g["xOffsets"]:
-            x = xf * cv.w - sw / 2 + tx
-            for i in range(-1, rain["dropsPerGroup"]):
-                y = i * seg + ty
-                pen.rounded_rectangle(
-                    (x * k, y * k, (x + sw) * k, (y + v["streakHeight"]) * k),
-                    radius=sw / 2 * k, fill=fill,
-                )
+    # A streak tilted to its fall: unit vector along it.
+    norm = math.hypot(angle, 1.0)
+    ux, uy = angle / norm, 1.0 / norm
+    for tile in rain["tiles"][variant]:
+        p = phase(t_ms, 0, tile["loopMs"])
+        ty = tile["period"] * p - tile["period"]  # the tile's top starts one period above the canvas
+        tx = angle * tile["period"] * p
+        for d in tile["drops"]:
+            w, ln = d["w"], d["len"]
+            cx, cy = d["x"] + w / 2 + tx, d["y"] + ln / 2 + ty
+            if cy + ln < 0 or cy - ln > cv.h:
+                continue
+            fill = (*cv.particle, round(255 * d["opacity"]))
+            # A rounded streak = a line between the two cap centres, with round caps.
+            half = max(0.0, ln - w) / 2
+            x0, y0 = (cx - ux * half) * k, (cy - uy * half) * k
+            x1, y1 = (cx + ux * half) * k, (cy + uy * half) * k
+            r = w / 2 * k
+            if half > 0:
+                pen.line((x0, y0, x1, y1), fill=fill, width=max(1, round(w * k)))
+            pen.ellipse((x0 - r, y0 - r, x0 + r, y0 + r), fill=fill)
+            pen.ellipse((x1 - r, y1 - r, x1 + r, y1 + r), fill=fill)
 
 
 def flash_alpha(lib: dict, t_ms: float) -> float:
@@ -108,7 +117,7 @@ def flash_alpha(lib: dict, t_ms: float) -> float:
     return 0.0
 
 
-# ── Snow and ice pellets (FlakeFall) ─────────────────────────────────────────
+# ── Snow (FlakeFall) ─────────────────────────────────────────────────────────
 
 SWAY_STEPS = 12
 
@@ -336,7 +345,6 @@ class LookRenderer:
         self.stars = StarField(self.cv, lib) if self.layers["stars"] else None
         self.fog = FogField(self.cv, lib) if self.layers["fog"] else None
         self.glare = SunGlare(self.cv, lib) if self.layers.get("glare") else None
-        self.angle = lib["spec"]["rain"]["angle"]
 
     def frame(self, f: int) -> Image.Image:
         return to_rgb_image(self.frame_rgb(f))
@@ -361,8 +369,6 @@ class LookRenderer:
                 draw_rain(pen, self.cv, self.lib, self.layers["rain"], t)
             if self.layers["flakes"] == "snow":
                 draw_flakes(pen, self.cv, self.lib, "snow", 0.0, t)
-            elif self.layers["flakes"] == "pellets":
-                draw_flakes(pen, self.cv, self.lib, "pellets", self.angle, t)
             p = np.asarray(particles.resize((OUT_W, OUT_H), Image.BOX), np.float32)
             a = p[..., 3:4] / 255
             out = out * (1 - a) + p[..., :3] * a

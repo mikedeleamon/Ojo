@@ -12,50 +12,92 @@
  * of the canvas; durations are milliseconds.
  */
 
-// ─── Rain group configurations ──────────────────────────────────────────────
-// Each group is one Animated.View loop translating an SVG of stacked streaks.
-// Within a group, streaks are pre-offset vertically so the falling stream looks
-// continuous as the group translates by one segment. Different durations
-// across groups give a parallax / depth feel.
+// ─── Rain ───────────────────────────────────────────────────────────────────
+// Ported from the rain in the Instagram promo video, which read far better than
+// the old fixed grid of streak columns: every streak gets its own seeded-random
+// position, length and opacity, and the field falls ~6× faster than the grid
+// did. lib/weather/rainField lays the drops out; StormIconLightning draws them.
+//
+// A variant is one or more fields (sleet adds a field of round ice pellets to
+// its streaks). A field's drops are split across speed bands. Each band is one
+// native loop, translating a static SVG, so a band costs one animated view
+// however many drops it holds — see the perf notes in StormIconLightning.
 
-export const RAIN_GROUPS = [
-    { id: 'A', xOffsets: [0.07, 0.22, 0.38, 0.55, 0.71, 0.88], duration: 820,  startDelay: 0   },
-    { id: 'B', xOffsets: [0.13, 0.29, 0.45, 0.61, 0.78, 0.94], duration: 950,  startDelay: 210 },
-    { id: 'C', xOffsets: [0.04, 0.19, 0.34, 0.50, 0.66, 0.83], duration: 1100, startDelay: 420 },
-] as const;
+/** Widths and lengths are written in px of a 1080-px-wide frame, the promo video's, and scaled by canvas width / 1080. */
+export const RAIN_REF_WIDTH = 1080;
 
-// Plain-rain variant: fewer columns and a slower fall than the storm rain
-// above, so ordinary rain/drizzle reads as gentler without touching the
-// thunderstorm backdrop's look. No sheet flash or bolts accompany this one —
-// callers pass showFlash={false} showBolts={false}.
-export const RAIN_GROUPS_LIGHT = [
-    { id: 'A', xOffsets: [0.10, 0.35, 0.60, 0.85], duration: 1300, startDelay: 0   },
-    { id: 'B', xOffsets: [0.22, 0.48, 0.73],       duration: 1550, startDelay: 260 },
-] as const;
+export interface RainBand {
+    /**
+     * The band's drops repeat every `periodF` of the canvas height. Each band
+     * gets a different period, so the combined field never repeats on screen.
+     */
+    periodF: number;
+    /**
+     * Milliseconds to fall one period. Every value divides 8000, so the 8 s
+     * story loops are seamless; a drop crosses the canvas in loopMs / periodF.
+     */
+    loopMs: number;
+}
 
-// Drizzle variant: NOT the slow fall above — fine droplets fall quickly, just
-// short and faint. Denser columns than the light-rain variant (closer to the
-// storm count) since drizzle reads as a mist of many tiny drops rather than a
-// few long streaks.
-export const RAIN_GROUPS_DRIZZLE = [
-    { id: 'A', xOffsets: [0.08, 0.24, 0.40, 0.56, 0.72, 0.88], duration: 620, startDelay: 0   },
-    { id: 'B', xOffsets: [0.16, 0.32, 0.48, 0.64, 0.80, 0.96], duration: 700, startDelay: 140 },
-] as const;
+export interface RainField {
+    /** Drops on a still-air 9:16 canvas. Scaled up for taller canvases and for the wind slant. */
+    count: number;
+    /** Streak width and length range, in RAIN_REF_WIDTH px. Length = width draws a round pellet. */
+    width: number;
+    length: readonly [number, number];
+    opacity: readonly [number, number];
+    bands: readonly RainBand[];
+}
 
-export const STREAK_OPACITY_STORM = 0.55;
-export const STREAK_OPACITY_LIGHT = 0.32;
-export const STREAK_OPACITY_DRIZZLE = 0.30;
+export type RainVariant = 'storm' | 'light' | 'drizzle' | 'sleet';
 
-export const DROPS_PER_GROUP = 6;
+export const RAIN_VARIANTS: Readonly<Record<RainVariant, readonly RainField[]>> = {
+    // Plain rain: the promo video's rain, as written. Crosses the screen in 1.0–1.3 s.
+    light: [{
+        count: 70, width: 3, length: [36, 76], opacity: [0.2, 0.4],
+        bands: [
+            { periodF: 0.55, loopMs: 8000 / 11 },
+            { periodF: 0.5, loopMs: 8000 / 14 },
+            { periodF: 0.45, loopMs: 8000 / 18 },
+        ],
+    }],
+    // Thunderstorm: denser, longer, brighter and faster (0.7–1.0 s).
+    storm: [{
+        count: 110, width: 3, length: [56, 110], opacity: [0.25, 0.5],
+        bands: [
+            { periodF: 0.55, loopMs: 8000 / 15 },
+            { periodF: 0.5, loopMs: 8000 / 19 },
+            { periodF: 0.45, loopMs: 8000 / 25 },
+        ],
+    }],
+    // Drizzle: many short, thin, faint drops, slower than rain (1.6–2.1 s), as
+    // fine droplets are.
+    drizzle: [{
+        count: 110, width: 2.5, length: [14, 30], opacity: [0.16, 0.32],
+        bands: [
+            { periodF: 0.55, loopMs: 8000 / 7 },
+            { periodF: 0.5, loopMs: 8000 / 9 },
+            { periodF: 0.45, loopMs: 8000 / 11 },
+        ],
+    }],
+    // Sleet: short quick streaks (0.95–1.05 s), plus round ice pellets among them.
+    sleet: [
+        {
+            count: 60, width: 3, length: [22, 44], opacity: [0.28, 0.46],
+            bands: [
+                { periodF: 0.55, loopMs: 8000 / 14 },
+                { periodF: 0.5, loopMs: 8000 / 17 },
+            ],
+        },
+        {
+            count: 40, width: 7, length: [7, 7], opacity: [0.5, 0.75],
+            bands: [{ periodF: 0.45, loopMs: 8000 / 15 }],
+        },
+    ],
+};
 
-// Streak dimensions in POINTS. The rain SVG is given a viewBox in points (see
-// RainLayer) rather than the component's 1280-unit artwork space, which the
-// full-screen canvas scaled by ~0.14: a 3-unit-wide streak came out 0.42 pt
-// across — a sub-pixel hairline that aliases and shimmers as it translates,
-// which is its own source of visible chop independent of frame rate.
-export const STREAK_WIDTH = 1.5;
-export const STREAK_HEIGHT_STORM = 14;
-export const STREAK_HEIGHT_DRIZZLE = 6;
+/** Default wind drift for falling particles: translateX per unit of fall. WeatherHUD passes the live value (lib/weather/windSlant). */
+export const DEFAULT_RAIN_ANGLE = 0.12;
 
 // ─── Sheet lightning ─────────────────────────────────────────────────────────
 
@@ -70,39 +112,6 @@ export const FLASH_CURVE = {
     inputRange: [0, 50 / FLASH_MS, 110 / FLASH_MS, 180 / FLASH_MS, 1],
     outputRange: [0, 0.35, 0.05, 0.3, 0],
 };
-
-// Sleet variant (the `ice` kind): shorter than rain, quick, and a little
-// brighter, with ice pellets falling alongside (SLEET_PELLET_GROUPS below).
-export const RAIN_GROUPS_SLEET = [
-    { id: 'A', xOffsets: [0.06, 0.21, 0.37, 0.53, 0.69, 0.85], duration: 560, startDelay: 0   },
-    { id: 'B', xOffsets: [0.14, 0.30, 0.46, 0.62, 0.78, 0.94], duration: 640, startDelay: 180 },
-] as const;
-export const STREAK_OPACITY_SLEET = 0.42;
-export const STREAK_HEIGHT_SLEET = 9;
-
-export interface RainGroup {
-    id: string;
-    xOffsets: readonly number[];
-    duration: number;
-    startDelay: number;
-}
-
-export type RainVariant = 'storm' | 'light' | 'drizzle' | 'sleet';
-
-/** Everything a rain variant varies, in one place. */
-export const RAIN_VARIANTS: Readonly<Record<RainVariant, {
-    groups: readonly RainGroup[];
-    opacity: number;
-    streakHeight: number;
-}>> = {
-    storm:   { groups: RAIN_GROUPS,         opacity: STREAK_OPACITY_STORM,   streakHeight: STREAK_HEIGHT_STORM },
-    light:   { groups: RAIN_GROUPS_LIGHT,   opacity: STREAK_OPACITY_LIGHT,   streakHeight: STREAK_HEIGHT_STORM },
-    drizzle: { groups: RAIN_GROUPS_DRIZZLE, opacity: STREAK_OPACITY_DRIZZLE, streakHeight: STREAK_HEIGHT_DRIZZLE },
-    sleet:   { groups: RAIN_GROUPS_SLEET,   opacity: STREAK_OPACITY_SLEET,   streakHeight: STREAK_HEIGHT_SLEET },
-};
-
-/** Default wind drift for falling particles: translateX per unit of fall. WeatherHUD passes the live value (lib/weather/windSlant). */
-export const DEFAULT_RAIN_ANGLE = 0.12;
 
 /** Gap between sheet-lightning strikes: FLASH_GAP_MIN_MS plus up to FLASH_GAP_SPREAD_MS, randomized per strike. */
 export const FLASH_GAP_MIN_MS = 4500;
@@ -378,10 +387,10 @@ export const SUN_GLARE = {
     ] as readonly GlareGhost[],
 } as const;
 
-// ─── Snow and ice pellets ───────────────────────────────────────────────────
-// Same mechanism as the rain: each group is one Animated.View translating an
-// SVG of stacked particles down by one segment and snapping back, so a group
-// costs one native loop however many flakes it holds. Two things differ:
+// ─── Snow ────────────────────────────────────────────────────────────────────
+// Each group is one Animated.View translating an SVG of stacked particles down
+// by one segment and snapping back, so a group costs one native loop however
+// many flakes it holds. Two details make it read as snow:
 //   - columns carry their own vertical phase, so flakes don't fall in rows;
 //   - the same progress value also drives a sideways sway (one full swing per
 //     segment), which is what makes snow read as snow rather than slow rain.
@@ -423,16 +432,6 @@ export const SNOW_GROUPS: readonly FlakeGroup[] = [
         xOffsets: [0.11, 0.35, 0.59, 0.83],
         phases:   [0.30, 0.80, 0.05, 0.50],
         duration: 4200, startDelay: 300, sway: 10, size: 9, shape: 'flake', opacity: 0.85,
-    },
-];
-
-/** Ice pellets that fall with the sleet streaks: small, quick, no sway (they take the wind slant instead). */
-export const SLEET_PELLET_GROUPS: readonly FlakeGroup[] = [
-    {
-        id: 'pellets',
-        xOffsets: [0.09, 0.26, 0.43, 0.60, 0.77, 0.94],
-        phases:   [0.15, 0.60, 0.35, 0.85, 0.05, 0.50],
-        duration: 900, startDelay: 90, sway: 0, size: 2.5, shape: 'dot', opacity: 0.65,
     },
 ];
 

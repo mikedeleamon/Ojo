@@ -9,14 +9,15 @@ lives in `src/lib/visualLibrary/`.
 **Nothing is generated or imitated.** The loops are the app's own backdrop,
 rendered offline:
 - `export_data.ts` runs the app's own `gradientFor()` and `backdropLayersFor()`
-  for every look in `src/lib/visualLibrary/looks.ts`, and copies every particle
-  number out of `src/lib/weather/backdropSpec.ts`;
+  for every look in `src/lib/visualLibrary/looks.ts`, copies every particle
+  number out of `src/lib/weather/backdropSpec.ts`, and lays out the rain drops
+  with the app's `src/lib/weather/rainField.ts`;
 - `render_loops.py` draws them with the same rules as the components:
-  - rain and lightning, from `StormIconLightning`;
+  - rain (including sleet's ice pellets) and lightning, from `StormIconLightning`;
   - stars, from `ClearNightIconMoon`;
   - the shooting star, from `ShootingStar` (one per loop, at a fixed time);
   - sun glare, from `SunGlare`;
-  - snow and ice pellets, from `FlakeFall`;
+  - snow, from `FlakeFall`;
   - fog, from `FogDrift`.
 
 If you change how a backdrop looks in the app, re-run the pipeline and
