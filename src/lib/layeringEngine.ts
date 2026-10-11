@@ -152,6 +152,7 @@ const buildTimeline = (
   high:         number,
   low:          number,
   feelsOffset:  number,
+  generic       = false,
 ): { time: string; action: string; hour: number }[] | undefined => {
   if ((!mid && !outer) || forecasts.length === 0) return undefined;
 
@@ -162,8 +163,15 @@ const buildTimeline = (
   if (!hasTempSwing && precipTransitions.length === 0) return undefined;
 
   const primaryLayer = outer ?? mid;
-  const primaryName  = articleDisplayName(primaryLayer!.article);
-  const outerName    = outer ? articleDisplayName(outer.article) : undefined;
+  // Generic advice names the layer, not a garment — the "garment" is a stand-in
+  // for what a typical wardrobe holds, not something the user owns.
+  const primaryName  = generic
+    ? (outer ? 'the outer layer' : 'the mid layer')
+    : articleDisplayName(primaryLayer!.article);
+  const outerName    = outer
+    ? (generic ? 'the outer layer' : articleDisplayName(outer.article))
+    : undefined;
+  const yourPrimary  = generic ? primaryName : `your ${primaryName}`;
 
   const steps: { time: string; action: string; hour: number }[] = [];
 
@@ -202,7 +210,7 @@ const buildTimeline = (
     const firstTemp = forecasts[0] ? forecasts[0].Temperature.Value + feelsOffset : null;
     if (firstTemp !== null && firstTemp < TEMP_COLD_THRESHOLD) {
       const firstHour = new Date(forecasts[0].DateTime).getHours();
-      steps.push({ time: hourLabel(firstHour), action: `Keep your ${primaryName} on`, hour: firstHour });
+      steps.push({ time: hourLabel(firstHour), action: `Keep ${yourPrimary} on`, hour: firstHour });
     }
 
     if (shedStep) steps.push(shedStep);
@@ -247,24 +255,56 @@ interface RecommendationInput {
   missingOuter:      boolean;            // weather needs outer, outfit doesn't have one
   raining:           boolean;
   snowing:           boolean;
+  /** Precipitation is falling right now, not only somewhere in the forecast. */
+  precipNow:         boolean;
   midHardToRemove:   boolean;
   outerHardToRemove: boolean;
+  /** Advice for a user with no closet: name layers, not garments, and don't claim ownership. */
+  generic?:          boolean;
 }
 
+/**
+ * Turns closet-voiced copy ("Your mid layer…") into advice that doesn't claim
+ * the user owns anything ("A mid layer…"). Only used on generic recommendations,
+ * whose layer names are role words rather than garment names.
+ */
+const depersonalise = (text: string): string =>
+  text
+    .replace(/\b(Your|your) (?=(base|mid|outer) layer)/g, (_, w: string) => (w === 'Your' ? 'A ' : 'a '))
+    // "Layer a mid layer…" reads as a typo once the garment name is gone.
+    .replace(/\bLayer (?=an? (base|mid|outer) layer)/g, 'Wear ')
+    // Stacking sentences introduce each layer ("a mid layer over a base layer,
+    // with an outer layer on top"); "the" is kept only for back-references.
+    .replace(/\b(over|with|add) the (?=(base|mid|outer) layer)/g, '$1 a ')
+    .replace(/\b(A|a) (?=outer layer)/g, '$1n ')
+    .replace(/ for full coverage\./, ', for full coverage.')
+    .replace(/\byour layers\b/g, 'layers');
+
 const buildRecommendation = (ctx: RecommendationInput): string => {
+  const text = buildRecommendationText(ctx);
+  return ctx.generic ? depersonalise(text) : text;
+};
+
+const buildRecommendationText = (ctx: RecommendationInput): string => {
   const {
     base, activeMid, activeOuter, extraMid, extraOuter,
     currentTemp, windSpeed, hasTimeline,
-    missingMid, missingOuter, raining, snowing,
-    midHardToRemove, outerHardToRemove,
+    missingMid, missingOuter, raining, snowing, precipNow,
+    generic,
   } = ctx;
+  // Carry caveats and closet-gap notes are about specific owned garments, so
+  // generic advice drops them (the card's CTA already covers "add your clothes").
+  const midHardToRemove   = !generic && ctx.midHardToRemove;
+  const outerHardToRemove = !generic && ctx.outerHardToRemove;
 
   // ── Name helpers ──────────────────────────────────────────────────────────
-  const baseName       = base       ? articleDisplayName(base.article)       : 'base layer';
-  const midName        = activeMid  ? articleDisplayName(activeMid.article)  : undefined;
-  const outerName      = activeOuter ? articleDisplayName(activeOuter.article) : undefined;
-  const extraMidName   = extraMid   ? articleDisplayName(extraMid.article)   : undefined;
-  const extraOuterName = extraOuter ? articleDisplayName(extraOuter.article) : undefined;
+  const nameOf = (slot: OutfitSlot, role: string) =>
+    generic ? `${role} layer` : articleDisplayName(slot.article);
+  const baseName       = base       ? nameOf(base, 'base')        : 'base layer';
+  const midName        = activeMid  ? nameOf(activeMid, 'mid')    : undefined;
+  const outerName      = activeOuter ? nameOf(activeOuter, 'outer') : undefined;
+  const extraMidName   = extraMid   ? nameOf(extraMid, 'mid')     : undefined;
+  const extraOuterName = extraOuter ? nameOf(extraOuter, 'outer') : undefined;
 
   const isFullBody = base?.role === 'fullBody';
   const overWord   = isFullBody ? 'paired with' : 'over';  // "Hoodie over T-Shirt" vs "Hoodie paired with Dress"
@@ -384,7 +424,7 @@ const buildRecommendation = (ctx: RecommendationInput): string => {
     const precipNote = hasPrecip
       ? (snowing ? ` ${precipWord[0].toUpperCase() + precipWord.slice(1)} is expected — keep the ${outerName} on.` : ` Rain is expected — keep the ${outerName} on.`)
       : '';
-    const gapNote = missingMid
+    const gapNote = missingMid && !generic
       ? ` A mid layer underneath would round things out if you add one to your closet.`
       : '';
 
@@ -401,7 +441,14 @@ const buildRecommendation = (ctx: RecommendationInput): string => {
     if (hasTimeline) {
       return outerHardToRemove
         ? `The ${outerName} is the right call today, but it's heavy to stow — you may want to commit to it all day.${precipNote}${gapNote}${windNote}`
-        : `The ${outerName} will be welcome this morning — feel free to shed it once temperatures climb.${precipNote}${gapNote}${windNote}`;
+        // "Shed it as it warms up" and "keep it on for the rain" can't both
+        // stand. Falling now, the rain decides when the layer comes off; only
+        // forecast, it may arrive after the warm-up, so shed first and re-layer.
+        : hasPrecip && precipNow
+          ? `The ${outerName} is the right call this morning. ${snowing ? 'Snow' : 'Rain'} is falling, so keep it on until that clears — then shed it as temperatures climb.${gapNote}${windNote}`
+          : hasPrecip
+            ? `The ${outerName} will be welcome this morning — feel free to shed it once temperatures climb. ${snowing ? 'Snow' : 'Rain'} is in the forecast, so have it back on when that arrives.${gapNote}${windNote}`
+            : `The ${outerName} will be welcome this morning — feel free to shed it once temperatures climb.${gapNote}${windNote}`;
     }
 
     // E3: Steady day
@@ -415,7 +462,7 @@ const buildRecommendation = (ctx: RecommendationInput): string => {
     const precipWarning = hasPrecip
       ? ` ${snowing ? 'Snow' : 'Rain'} is in the forecast though — consider grabbing a water-resistant layer too.`
       : '';
-    const gapNote = missingOuter
+    const gapNote = missingOuter && !generic
       ? ` Adding outerwear to your closet would help on days like this.`
       : '';
 
@@ -535,9 +582,12 @@ export const buildLayeringContext = ({
 export const generateLayeringRecommendation = ({
   context,
   slots,
+  generic = false,
 }: {
   context: LayeringContext;
   slots:   OutfitSlot[];
+  /** Phrase the advice by layer role instead of garment names (no-closet users). */
+  generic?: boolean;
 }): LayeringResult => {
   const {
     forecasts,
@@ -571,7 +621,7 @@ export const generateLayeringRecommendation = ({
   const extraMid   = mid   && !needsMid;
   const extraOuter = outer && !needsOuter;
 
-  const timeline = buildTimeline(forecasts, activeMid, activeOuter, high, low, offset);
+  const timeline = buildTimeline(forecasts, activeMid, activeOuter, high, low, offset, generic);
 
   const removabilityPenalty =
     (midHardToRemove   && tempDelta > 10 ? 0.08 : 0) +
@@ -590,8 +640,10 @@ export const generateLayeringRecommendation = ({
       hasTimeline: !!timeline,
       missingMid, missingOuter,
       raining: rainContext, snowing,
+      precipNow: raining,
       midHardToRemove:   !!midHardToRemove,
       outerHardToRemove: !!outerHardToRemove,
+      generic,
     }),
     timeline,
     confidence:     Math.max(0, computeConfidence(currentTemp, tempDelta, windSpeed, !!activeMid, !!activeOuter) - removabilityPenalty),

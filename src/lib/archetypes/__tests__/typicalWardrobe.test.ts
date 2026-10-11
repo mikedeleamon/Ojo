@@ -15,6 +15,7 @@ import { CLIMATE_BANDS, climateBandFor, type ClimateBand } from '../../climate';
 import { typicalWardrobe, invariantFailures, WEATHER_BUCKETS } from '../typicalWardrobe';
 import { archetypeToArticle, buildGenericOutfit } from '../genericOutfit';
 import type { GarmentArchetype } from '../types';
+import { ARCHETYPE_CATALOG } from '../catalog';
 
 const HI = 85;
 const LO = 50;
@@ -228,5 +229,122 @@ describe('buildGenericOutfit — the entry point the app calls', () => {
     const prose = `${out!.headline} ${out!.recommendation}`;
     expect(prose.toLowerCase()).not.toContain('skirt');
     expect(prose.toLowerCase()).not.toContain('dress');
+  });
+});
+
+/** Hourly forecast rows as [local hour, °F, IconPhrase] on a fixed day. */
+const hourlyForecast = (rows: [number, number, string][]) =>
+  rows.map(([h, t, phrase]) => ({
+    IconPhrase: phrase,
+    Temperature: { Value: t, Unit: 'F' },
+    DateTime: new Date(2026, 9, 12, h).toISOString(),
+    IsDaylight: h < 19,
+  }));
+
+describe('buildGenericOutfit — copy never claims ownership', () => {
+  // "jacket" is deliberately absent: "a jacket would make a real difference" is
+  // generic advice, not a stand-in garment.
+  const GARMENT_WORDS = /t-?shirt|tee\b|hoodie|sweater|coat|jeans|cotton|wool|fleece|denim|\byour\b|closet/i;
+
+  it('talks about layers, not garments, in every bucket × rain state', () => {
+    for (const bucket of WEATHER_BUCKETS) {
+      for (const wet of [false, true]) {
+        const out = buildGenericOutfit({
+          weather: weatherFor(bucket, { HasPrecipitation: wet }),
+          settings: settingsFor('All'),
+          coords: { lat: 40.71, lon: -74.01 },
+        });
+        expect(out).not.toBeNull();
+        const prose = [out!.recommendation, ...(out!.timeline ?? []).map(t => t.action)].join(' ');
+        expect(`${bucket}/${wet}: ${prose.match(GARMENT_WORDS)?.[0] ?? ''}`).toBe(`${bucket}/${wet}: `);
+      }
+    }
+  });
+
+  it('timeline steps stay garment-free on a variable, rainy day', () => {
+    // 41°F morning → 66°F afternoon → 45°F evening, with rain mid-morning and
+    // clearing after noon: exercises the morning-keep, shed, re-layer and both
+    // precipitation steps.
+    const forecasts = hourlyForecast([
+      [7, 41, 'Clear'], [9, 44, 'Rain'], [11, 52, 'Rain'], [13, 62, 'Clear'], [15, 70, 'Clear'],
+      [17, 60, 'Clear'], [19, 52, 'Clear'], [21, 45, 'Clear'],
+    ]);
+
+    const out = buildGenericOutfit({
+      weather: weatherFor('cool', { HasPrecipitation: true }),
+      settings: settingsFor('All'),
+      forecasts,
+      coords: { lat: 40.71, lon: -74.01 },
+    });
+    expect(out).not.toBeNull();
+    expect(out!.timeline?.length).toBeGreaterThan(1);
+
+    const actions = out!.timeline!.map(t => t.action);
+    const prose = [out!.recommendation, ...actions].join(' ');
+    expect(prose.match(GARMENT_WORDS)?.[0]).toBeUndefined();
+    // The steps that matter on this day all fired.
+    expect(actions.some(a => /^Rain starts/.test(a))).toBe(true);
+    expect(actions.some(a => /^Rain clears/.test(a))).toBe(true);
+    expect(actions.some(a => /^Remove the outer layer/.test(a))).toBe(true);
+    // Rain decides when the layer comes off — the summary must not tell the
+    // user both to shed it as it warms and to keep it on for the rain.
+    expect(out!.recommendation).not.toMatch(/feel free to shed/i);
+    expect(out!.recommendation).toMatch(/until that clears/i);
+  });
+
+  it('does not hold the layer for rain that only arrives in the evening', () => {
+    // Dry now, warm afternoon, rain after sunset. "Keep it on until the rain
+    // clears" would contradict the timeline's afternoon shed step.
+    const forecasts = hourlyForecast([
+      [7, 44, 'Clear'], [10, 52, 'Clear'], [13, 64, 'Clear'], [15, 70, 'Clear'],
+      [17, 62, 'Clear'], [19, 52, 'Rain'], [21, 48, 'Rain'],
+    ]);
+    const out = buildGenericOutfit({
+      weather: weatherFor('cool', { RealFeelTemperature: { Imperial: { Value: 46, Unit: 'F' }, Metric: { Value: 0, Unit: 'C' } } }),
+      settings: settingsFor('All'),
+      forecasts,
+      coords: { lat: 40.71, lon: -74.01 },
+    });
+    expect(out).not.toBeNull();
+    expect(out!.recommendation).not.toMatch(/until that clears/i);
+    expect(out!.recommendation).toMatch(/feel free to shed it once temperatures climb/i);
+    expect(out!.recommendation).toMatch(/have it back on when that arrives/i);
+  });
+
+  it('notes never name a stand-in, mention a closet, or grade the outfit', () => {
+    const names = ARCHETYPE_CATALOG.map(a => a.displayName);
+    const places = [
+      { lat: 40.71, lon: -74.01 },  // temperate
+      { lat: 59.91, lon: 10.75 },   // continental — wool and dry-clean territory
+      { lat: 1.35,  lon: 103.82 },  // tropical — linen, rain-fragile fabrics
+    ];
+    const conditions: Partial<CurrentWeather>[] = [
+      {},
+      { HasPrecipitation: true },
+      { PollenCategory: 'High' },
+    ];
+    const allergic = { ...settingsFor('All'), sensitivities: { allergies: true } } as Settings;
+
+    for (const coords of places) {
+      for (const bucket of ['warm', 'cool', 'freezing'] as WeatherBucket[]) {
+        for (const over of conditions) {
+          const out = buildGenericOutfit({ weather: weatherFor(bucket, over), settings: allergic, coords });
+          expect(out).not.toBeNull();
+          for (const note of out!.notes) {
+            const leaked = names.find(n => note.includes(n)) ?? note.match(/\bcloset\b|\/100\b/)?.[0];
+            expect(`${note} → ${leaked ?? ''}`).toBe(`${note} → `);
+          }
+        }
+      }
+    }
+  });
+
+  it('keeps pollen advice for allergy sufferers, without the garment', () => {
+    const out = buildGenericOutfit({
+      weather: weatherFor('warm', { PollenCategory: 'High' }),
+      settings: { ...settingsFor('All'), sensitivities: { allergies: true } } as Settings,
+      coords: { lat: 40.71, lon: -74.01 },
+    });
+    expect(out!.notes).toContain('High pollen today — shower and change clothes after spending time outdoors.');
   });
 });

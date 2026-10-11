@@ -12,7 +12,8 @@
     "dev": "concurrently --names \"server,expo\" --prefix-colors \"cyan,magenta\" \"npm run dev --prefix server\" \"expo start\"",
     "test": "jest",
     "typecheck": "tsc --noEmit",
-    "typecheck:test": "tsc -p tsconfig.test.json --noEmit"
+    "typecheck:test": "tsc -p tsconfig.test.json --noEmit",
+    "update": "node scripts/eas-update.js"
   },
   "jest": {
     "preset": "ts-jest",
@@ -73,6 +74,7 @@
     "expo-splash-screen": "~31.0.13",
     "expo-status-bar": "~3.0.9",
     "expo-store-review": "~9.0.9",
+    "expo-updates": "~29.0.20",
     "pako": "^2.1.0",
     "react": "19.1.0",
     "react-dom": "^19.1.0",

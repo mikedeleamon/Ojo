@@ -15,14 +15,18 @@
  *      all-or-nothing by design, so nobody ever sees an assumed garment mixed
  *      into suggestions from clothes they actually own.
  *
- *   2. **Zero engine changes.** An archetype resolves to a `ClothingArticle`
- *      (docs/zero-catalog-first-value.md §1), so `generateOutfits` and
- *      `generateLayeringRecommendation` run untouched. That is also why the
- *      advice is as good as the real thing: it is produced by the same engine.
+ *   2. **No change to outfit selection.** An archetype resolves to a `ClothingArticle`
+ *      (docs/zero-catalog-first-value.md §1), so `generateOutfits` picks and
+ *      scores the stand-ins exactly as it would real clothes. That is also why
+ *      the advice is as good as the real thing: it is produced by the same
+ *      engine. Only the copy differs — layering prose is re-run in generic mode
+ *      and notes are filtered (see genericNotes), so nothing names a stand-in.
  */
 
-import type { ClothingArticle, CurrentWeather, Forecast, Settings } from '../../types';
+import { articleDisplayName, type ClothingArticle, type CurrentWeather, type Forecast, type Settings } from '../../types';
 import { generateOutfits } from '../outfitEngine';
+import type { OutfitSlot } from '../outfit/types';
+import { buildLayeringContext, generateLayeringRecommendation } from '../layeringEngine';
 import { climateBandFor, type ClimateBand } from '../climate';
 import { typicalWardrobe } from './typicalWardrobe';
 import { ARCHETYPE_ID_PREFIX, type GarmentArchetype } from './types';
@@ -59,6 +63,31 @@ export interface GenericOutfit {
   band: ClimateBand;
 }
 
+/** The pollen note's garment-free variant, for when the engine's names a stand-in. */
+const POLLEN_GENERIC_NOTE = 'High pollen today — shower and change clothes after spending time outdoors.';
+
+/**
+ * The engine's notes are written for a real closet: some name a garment ("Dry-
+ * clean recommended for: Wool sweater"), some talk about "your closet", and the
+ * score notes grade an outfit nobody is wearing. Keep only the weather notes.
+ * The allergy pollen note names a garment but carries real advice, so it is
+ * swapped for the engine's own garment-free wording rather than lost.
+ */
+const genericNotes = (notes: string[], slots: OutfitSlot[]): string[] => {
+  const names = slots.map(s => articleDisplayName(s.article));
+  const out: string[] = [];
+  for (const note of notes) {
+    const namesGarment = names.some(n => note.includes(n));
+    if (namesGarment && note.startsWith('High pollen today')) {
+      if (!out.includes(POLLEN_GENERIC_NOTE)) out.push(POLLEN_GENERIC_NOTE);
+      continue;
+    }
+    if (namesGarment || /\bcloset\b|\/100\b/.test(note)) continue;
+    out.push(note);
+  }
+  return out;
+};
+
 export interface GenericOutfitInput {
   weather: CurrentWeather;
   settings: Settings;
@@ -92,11 +121,20 @@ export function buildGenericOutfit(input: GenericOutfitInput): GenericOutfit | n
   const top = results[0];
   if (!top || top.slots.length === 0) return null;
 
+  // The engine's own layering prose names the stand-in garments and says "your".
+  // Re-run it over the same slots in generic mode so the copy talks about
+  // layers, not a Cotton T-shirt the user never said they own.
+  const layering = generateLayeringRecommendation({
+    context: buildLayeringContext({ weather, forecasts, settings }),
+    slots:   top.slots,
+    generic: true,
+  });
+
   return {
     headline:       top.headline,
-    recommendation: top.layering?.recommendation ?? '',
-    timeline:       top.layering?.timeline,
-    notes:          top.notes,
+    recommendation: layering.recommendation,
+    timeline:       layering.timeline,
+    notes:          genericNotes(top.notes, top.slots),
     band,
   };
 }

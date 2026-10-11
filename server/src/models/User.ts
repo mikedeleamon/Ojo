@@ -1,7 +1,10 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
 export interface ISettings {
+  // Legacy single style. Kept in sync with clothingStyles[0] by PUT /settings so
+  // older clients still read a sane value.
   clothingStyle: string;
+  clothingStyles?: string[];
   location: string;
   // Coordinates of `location`, resolved client-side via expo-location and
   // pushed up so the notification cron jobs can call WeatherKit directly
@@ -138,6 +141,7 @@ const savedLocationSchema = new Schema<ISavedLocation>({
 
 const settingsSchema = new Schema<ISettings>({
   clothingStyle:      { type: String, default: '' },
+  clothingStyles:     { type: [String], default: undefined },
   location:           { type: String, default: '' },
   lat:                { type: Number },
   lon:                { type: Number },
