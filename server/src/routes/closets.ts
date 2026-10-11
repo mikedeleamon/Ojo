@@ -86,7 +86,10 @@ router.post('/', async (req: AuthRequest, res: Response): Promise<void> => {
       Closet.countDocuments({ userId: req.userId }));
     if (!withinCap) return;
 
-    const closet = await Closet.create({ name, userId: req.userId });
+    // A user's first closet becomes preferred, so Home has an outfit to show
+    // straight after onboarding instead of the "pick a preferred closet" picker.
+    const hasPreferred = await Closet.exists({ userId: req.userId, isPreferred: true });
+    const closet = await Closet.create({ name, userId: req.userId, isPreferred: !hasPreferred });
     res.status(201).json(closet);
   } catch (err) {
     console.error('[closets] create error:', err);
@@ -115,6 +118,13 @@ router.delete('/:id', async (req: AuthRequest, res: Response): Promise<void> => 
     // URLs are still available here — the same R2 cleanup the single-article
     // delete does, applied to every article the closet held.
     const closet = await Closet.findOneAndDelete({ _id: req.params.id, userId: req.userId });
+
+    // Deleting the preferred closet promotes the oldest remaining one. This runs
+    // before the response so the client's refetch already sees the new star.
+    if (closet?.isPreferred) {
+      const oldest = await Closet.findOne({ userId: req.userId }).sort({ createdAt: 1 });
+      if (oldest) await Closet.updateOne({ _id: oldest._id }, { isPreferred: true });
+    }
     res.sendStatus(204);
 
     if (closet) {
@@ -133,14 +143,16 @@ router.put('/:id/preferred', async (req: AuthRequest, res: Response): Promise<vo
     const target = await Closet.findOne({ _id: req.params.id, userId: req.userId });
     if (!target) { res.status(404).json({ error: 'Closet not found' }); return; }
 
-    // Toggle: tapping "preferred" on the already-preferred closet clears it so
-    // the user can have no preferred closet; otherwise this becomes the sole
-    // preferred one. Either way every other closet is cleared first.
-    const makePreferred = !target.isPreferred;
-    await Closet.updateMany({ userId: req.userId }, { isPreferred: false });
+    // Set-only: this closet becomes the sole preferred one. It used to toggle,
+    // which let a tap on the only closet's star drop the user back into the
+    // Home picker. Builds that still offer "Remove preferred" now get a no-op.
+    await Closet.updateMany(
+      { userId: req.userId, _id: { $ne: target._id } },
+      { isPreferred: false },
+    );
     const closet = await Closet.findByIdAndUpdate(
       target._id,
-      { isPreferred: makePreferred },
+      { isPreferred: true },
       { new: true },
     );
     res.json(closet);

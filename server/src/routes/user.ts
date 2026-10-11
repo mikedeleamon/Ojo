@@ -9,6 +9,7 @@ import { signToken } from '../lib/jwt';
 import { deleteManyFromR2 } from '../lib/r2';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 import { coarsenSettingsField } from '../lib/coarseLocation';
+import { SETTINGS_EDITABLE_FIELDS, sanitizeClothingStyles } from '../lib/settingsFields';
 
 const router = Router();
 router.use(requireAuth);
@@ -197,21 +198,6 @@ router.get('/settings', async (req: AuthRequest, res: Response): Promise<void> =
   }
 });
 
-const SETTINGS_EDITABLE_FIELDS = [
-  'clothingStyle',
-  'location',
-  'lat',
-  'lon',
-  'temperatureScale',
-  'hiTempThreshold',
-  'lowTempThreshold',
-  'humidityPreference',
-  'gender',
-  'savedLocations',
-  'tripModeEnabled',
-  'tripModeRadiusMi',
-] as const;
-
 router.put('/settings', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     // Merge individual fields rather than replacing the whole sub-document.
@@ -222,6 +208,18 @@ router.put('/settings', async (req: AuthRequest, res: Response): Promise<void> =
     for (const field of SETTINGS_EDITABLE_FIELDS) {
       if (Object.prototype.hasOwnProperty.call(req.body, field)) {
         updateFields[`settings.${field}`] = coarsenSettingsField(field, req.body[field]);
+      }
+    }
+    // clothingStyles must be a list of short strings. Anything else is dropped
+    // rather than stored. A non-empty list also rewrites the legacy singular
+    // field, overriding whatever stale value the client sent alongside it.
+    if ('settings.clothingStyles' in updateFields) {
+      const styles = sanitizeClothingStyles(updateFields['settings.clothingStyles']);
+      if (styles) {
+        updateFields['settings.clothingStyles'] = styles;
+        if (styles.length > 0) updateFields['settings.clothingStyle'] = styles[0];
+      } else {
+        delete updateFields['settings.clothingStyles'];
       }
     }
     if (Object.keys(updateFields).length === 0) {

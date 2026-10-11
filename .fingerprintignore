@@ -1,0 +1,4 @@
+# Files the runtime fingerprint ignores. eas.json only feeds EXPO_PUBLIC_* values
+# and EAS build settings into the JS bundle, never native code, so editing it
+# must not cut later OTA updates off from builds already in the store.
+eas.json

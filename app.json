@@ -8,6 +8,14 @@
     "icon": "./assets/ojo_app_icon@1x.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/117165ec-1076-4eba-84f5-3c2a1676e965",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.ojostudio.ojo",
