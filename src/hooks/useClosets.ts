@@ -2,6 +2,7 @@ import { useSyncExternalStore, useEffect, useCallback } from 'react';
 import axios from '../api/client';
 import { Closet } from '../types';
 import { auth, getToken } from '../lib/auth';
+import { withoutCloset } from '../lib/preferredCloset';
 import { ArticleFormData } from '../types';
 
 interface UseClosetsResult {
@@ -179,7 +180,9 @@ export const useClosets = (): UseClosetsResult => {
 
   const deleteCloset = useCallback(async (id: string) => {
     await axios.delete(`/api/closets/${id}`, auth());
-    updateCache((prev) => prev.filter((c) => c._id !== id));
+    // The server promotes the oldest remaining closet when the preferred one
+    // goes; apply the same rule here rather than wait for a refetch.
+    updateCache((prev) => withoutCloset(prev, id));
   }, []);
 
   const addArticle = useCallback(async (closetId: string, formData: ArticleFormData) => {
@@ -198,8 +201,8 @@ export const useClosets = (): UseClosetsResult => {
   }, [patch]);
 
   const setPreferred = useCallback(async (id: string) => {
-    // The endpoint toggles, so the returned closet may now be un-preferred.
-    // Apply its actual isPreferred and clear every other closet.
+    // Set-only: the returned closet is now the sole preferred one, so clear
+    // every other closet.
     const { data } = await axios.put<Closet>(`/api/closets/${id}/preferred`, {}, auth());
     updateCache((prev) => prev.map((c) => c._id === data._id ? data : { ...c, isPreferred: false }));
   }, []);

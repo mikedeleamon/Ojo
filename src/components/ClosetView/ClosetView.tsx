@@ -280,10 +280,12 @@ const ClosetView = ({
 
     const openTabMenu = (c: Closet) => {
         Alert.alert(c.name, undefined, [
-            {
-                text: c.isPreferred ? '★  Remove preferred' : '☆  Set as preferred',
-                onPress: () => onSetPreferred(c._id),
-            },
+            // Preferred is set-only on the server: there is always one, so the
+            // starred closet has nothing to offer here. Moving the star means
+            // setting another closet as preferred.
+            ...(c.isPreferred
+                ? []
+                : [{ text: '☆  Set as preferred', onPress: () => onSetPreferred(c._id) }]),
             {
                 text: 'Rename',
                 onPress: () => {
