@@ -2,3 +2,14 @@
 # and EAS build settings into the JS bundle, never native code, so editing it
 # must not cut later OTA updates off from builds already in the store.
 eas.json
+
+# Local-only files under ios/ that the fingerprint would otherwise hash. EAS
+# recomputes the fingerprint on its builder and fails the build when it differs
+# from the one computed here (build 37's first attempt failed exactly this way).
+#   - sentry.properties holds an auth token, so .easignore keeps it off EAS.
+#   - Podfile.lock is .easignored; EAS's pod install writes its own. Pod
+#     versions are already pinned by the Podfile and the hashed podspecs.
+#   - xcuserdata is Xcode's per-user UI state and changes whenever Xcode opens.
+ios/sentry.properties
+ios/Podfile.lock
+**/xcuserdata/**
