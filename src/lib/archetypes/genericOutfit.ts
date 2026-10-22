@@ -24,9 +24,9 @@
  */
 
 import { articleDisplayName, type ClothingArticle, type CurrentWeather, type Forecast, type Settings } from '../../types';
-import { generateOutfits } from '../outfitEngine';
+import { buildOutfitLayeringContext, generateOutfits } from '../outfitEngine';
 import type { OutfitSlot } from '../outfit/types';
-import { buildLayeringContext, generateLayeringRecommendation } from '../layeringEngine';
+import { generateLayeringRecommendation } from '../layeringEngine';
 import { climateBandFor, type ClimateBand } from '../climate';
 import { typicalWardrobe } from './typicalWardrobe';
 import { ARCHETYPE_ID_PREFIX, type GarmentArchetype } from './types';
@@ -123,9 +123,11 @@ export function buildGenericOutfit(input: GenericOutfitInput): GenericOutfit | n
 
   // The engine's own layering prose names the stand-in garments and says "your".
   // Re-run it over the same slots in generic mode so the copy talks about
-  // layers, not a Cotton T-shirt the user never said they own.
+  // layers, not a Cotton T-shirt the user never said they own. Same context the
+  // engine picked the slots with, so the prose agrees with them. Gaps are left
+  // behind: generic advice never records them.
   const layering = generateLayeringRecommendation({
-    context: buildLayeringContext({ weather, forecasts, settings }),
+    context: buildOutfitLayeringContext(weather, settings, forecasts),
     slots:   top.slots,
     generic: true,
   });

@@ -52,10 +52,10 @@ import { addHistoryEntry, recentlyWornWithAge, loadHistory } from '../../lib/out
 import { recordSuccessfulOutfit, maybeRequestReview } from '../../services/reviewManager';
 import { derivePreferenceProfile } from '../../lib/userPreferences';
 import {
-    recordGapsFromNotes,
+    recordGaps,
     getGapSuggestions,
     GapSuggestion,
-    GapType,
+    GAP_SEARCH_TERMS,
 } from '../../lib/wardrobeGaps';
 import {
     ClothingArticle,
@@ -234,15 +234,6 @@ const ScoreBadge = ({
 };
 
 // ─── Gap card ────────────────────────────────────────────────────────────────
-
-const GAP_SEARCH_TERMS: Record<GapType, string> = {
-    missing_coat: 'winter coat',
-    missing_jacket: 'light jacket',
-    missing_boots: 'boots',
-    missing_mid_layer: 'hoodie sweater',
-    missing_rain_layer: 'waterproof jacket',
-    missing_footwear: 'shoes',
-};
 
 const GapCard = ({
     suggestion,
@@ -496,13 +487,17 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
         // occasion chip), since both flags are already true by then.
         if (!wornReady || !historyReady) return;
         setGenerating(true);
+        // One pick per selected style plus the engine's wild card, and never
+        // fewer than the usual three. Capped at 5: each style re-scores every
+        // candidate.
+        const topK = Math.max(3, Math.min(5, (effectiveSettings.clothingStyles?.length ?? 0) + 1));
         const task = InteractionManager.runAfterInteractions(() => {
             const { results, status } = generateOutfits(
                 preferred.articles,
                 weather,
                 effectiveSettings,
                 worn,
-                3,
+                topK,
                 profile,
                 forecasts,
             );
@@ -739,8 +734,8 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
     });
 
     useEffect(() => {
-        if (!activeOutfit || activeOutfit.notes.length === 0) return;
-        recordGapsFromNotes(activeOutfit.notes)
+        if (!activeOutfit?.gaps?.length) return;
+        recordGaps(activeOutfit.gaps)
             .then(() => getGapSuggestions())
             .then((suggestions) => setGapSuggestion(suggestions[0] ?? null))
             .catch(() => {});

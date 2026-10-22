@@ -23,6 +23,7 @@ import { hapticSelection, hapticSuccess } from '../../lib/haptics';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing, fonts, fontSizes } from '../../theme/tokens';
 import { loadHistory } from '../../lib/outfitHistory';
+import { GAP_SEARCH_TERMS, type GapType } from '../../lib/wardrobeGaps';
 import {
   computeInsights,
   InsightsData,
@@ -64,10 +65,8 @@ const DONATION_PREVIEW = 4;
 const articleLabel = (insight: ArticleInsight): string =>
   articleDisplayName(insight.article);
 
-const shopUrl = (message: string): string => {
-  const query = encodeURIComponent(message.split('—')[0].trim());
-  return `https://www.google.com/search?tbm=shop&q=${query}`;
-};
+const shopUrl = (gapType: GapType): string =>
+  `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(GAP_SEARCH_TERMS[gapType])}`;
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -832,7 +831,7 @@ export default function InsightsPage() {
                   <Text style={styles.gapMsg}>{gap.message}</Text>
                   <Pressable
                     style={styles.gapShopBtn}
-                    onPress={() => Linking.openURL(shopUrl(gap.message))}
+                    onPress={() => Linking.openURL(shopUrl(gap.type))}
                     accessibilityRole="button"
                     accessibilityLabel={`Shop for ${gap.type.replace(/_/g, ' ')}`}
                   >

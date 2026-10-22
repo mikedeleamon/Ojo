@@ -16,6 +16,15 @@ export type PrecipIntensity = 'none' | 'light' | 'moderate' | 'heavy';
 
 export type OutfitStatus = 'ok' | 'empty_closet' | 'insufficient';
 
+/** A piece the closet lacks for the day's weather (see buildGaps in outfitEngine). */
+export type GapType =
+  | 'missing_coat'
+  | 'missing_jacket'
+  | 'missing_boots'
+  | 'missing_mid_layer'
+  | 'missing_rain_layer'
+  | 'missing_footwear';
+
 export interface OutfitSlot {
   role: OutfitRole;
   article: ClothingArticle;
@@ -51,6 +60,8 @@ export interface OutfitResult {
   isPersonalized?: boolean;
   /** When mood-based generation is active, labels the style this outfit was optimized for. */
   moodLabel?:      string;
+  /** What the closet lacks for this weather. Optional: outfits saved by older builds (trips) predate it. */
+  gaps?:           GapType[];
 }
 
 /** Accepts either legacy Set<string> or Map<string, number> (id→daysSinceWorn). */

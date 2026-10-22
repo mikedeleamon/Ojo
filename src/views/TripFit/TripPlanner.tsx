@@ -33,7 +33,7 @@ import type { ColorTokens } from '../../theme/tokens';
 import { useReduceMotion } from '../../hooks/useReduceMotion';
 import { usePurchases } from '../../context/PurchasesContext';
 import { generateOutfits } from '../../lib/outfitEngine';
-import { recordGapsFromNotes } from '../../lib/wardrobeGaps';
+import { recordGaps } from '../../lib/wardrobeGaps';
 import { gradientFor } from '../../components/WeatherHUD/weatherPalette';
 import { humanizeCondition } from '../../lib/weather/humanizeCondition';
 import api from '../../api/client';
@@ -806,7 +806,7 @@ export default function TripPlanner({
 
             for (const p of newPlans) {
                 const top = p.candidates[0];
-                if (top?.notes.length) recordGapsFromNotes(top.notes).catch(() => {});
+                if (top?.gaps?.length) recordGaps(top.gaps).catch(() => {});
             }
 
             fetchedAtRef.current = new Date().toISOString();

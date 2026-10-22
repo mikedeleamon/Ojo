@@ -1,5 +1,6 @@
 import type { ClothingArticle, CurrentWeather } from '../../types';
 import type { WeatherBucket, PrecipIntensity } from './types';
+import { OUTER_LAYER_OFFSET_F } from '../layering/thresholds';
 
 /**
  * Buckets a feels-like temperature using the user's high/low thresholds.
@@ -16,7 +17,7 @@ export const getWeatherBucket = (
 ): WeatherBucket => {
   if (feelsLikeF >= hiThreshold) return 'hot';
   if (feelsLikeF >= loThreshold) return 'warm';
-  if (feelsLikeF >= loThreshold - 15) return 'cool';
+  if (feelsLikeF >= loThreshold - OUTER_LAYER_OFFSET_F) return 'cool';
   if (feelsLikeF >= 32) return 'cold';
   return 'freezing';
 };
