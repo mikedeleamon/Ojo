@@ -22,6 +22,7 @@ import { ClothingArticle, CurrentWeather, Forecast, Settings, articleDisplayName
 import type { OutfitSlot } from './outfit/types';
 import { extractLayers } from './layering/extractLayers';
 import { deriveDayRange } from './layering/dayRange';
+import { layerThresholds } from './layering/thresholds';
 import type { LayeringResult, LayeringContext } from './layering/types';
 
 export type { LayeringResult, LayeringContext };
@@ -380,9 +381,19 @@ const buildRecommendationText = (ctx: RecommendationInput): string => {
       return `Keep everything on today — it's dangerously cold at ${currentTemp}°F. Your ${midName} ${overWord} the ${baseName} with the ${outerName} on top is essential.${precipSuffix}${windNote}`;
     }
 
-    // B2: Variable day (timeline)
+    // B2: Variable day (timeline). Same rule as E2: rain falling now decides
+    // when the outer layer comes off; rain only in the forecast means shed it
+    // as it warms and put it back on when the rain arrives.
     if (hasTimeline) {
-      return `Start with your ${midName} ${overWord} the ${baseName}, then add the ${outerName} for cooler moments. You can drop the ${outerName} as the day warms up.${precipSuffix}${outerCaveat}${midCaveat}${windNote}`;
+      const lead = `Start with your ${midName} ${overWord} the ${baseName}`;
+      const Precip = snowing ? 'Snow' : 'Rain';
+      if (hasPrecip && precipNow) {
+        return `${lead}, with the ${outerName} on top. ${Precip} is falling, so keep the ${outerName} on until that clears — then shed it as temperatures climb.${outerCaveat}${midCaveat}${windNote}`;
+      }
+      if (hasPrecip) {
+        return `${lead}, with the ${outerName} on top — feel free to shed it once temperatures climb. ${Precip} is in the forecast, so have it back on when that arrives.${outerCaveat}${midCaveat}${windNote}`;
+      }
+      return `${lead}, then add the ${outerName} for cooler moments. You can drop the ${outerName} as the day warms up.${outerCaveat}${midCaveat}${windNote}`;
     }
 
     // B3: Steady day
@@ -519,16 +530,24 @@ const computeConfidence = (
  *
  * Layer thresholds are derived from user settings so someone who runs warm
  * (lowTempThreshold = 70°F) gets layering advice calibrated to their preference.
- * The 15°F offset for outerThreshold mirrors getWeatherBucket's cool→cold boundary.
+ * They come from layering/thresholds, which getWeatherBucket also reads.
  */
 export const buildLayeringContext = ({
   weather,
   forecasts,
   settings,
+  dressingTemp,
 }: {
   weather:   CurrentWeather;
   forecasts: Forecast[];
   settings:  Settings;
+  /**
+   * The feels-like temperature the outfit was chosen for. Before noon the
+   * outfit engine blends the current reading toward the day's low; passing
+   * that blend here means a layer its weather bucket calls for is never
+   * described as optional.
+   */
+  dressingTemp?: number;
 }): LayeringContext => {
   const currentTemp    = weather.RealFeelTemperature.Imperial.Value;
   const currentAirTemp = weather.Temperature.Imperial.Value;
@@ -549,11 +568,11 @@ export const buildLayeringContext = ({
   const { high, low, offset } = deriveDayRange(forecasts, currentAirTemp, currentTemp);
   const tempDelta = high - low;
 
-  const midThreshold   = settings.lowTempThreshold;       // below "warm" → mid layer
-  const outerThreshold = settings.lowTempThreshold - 15;  // below "cool" → outer layer
+  const { midBelow, outerBelow } = layerThresholds(settings);
+  const dressingBelow = (threshold: number) => dressingTemp !== undefined && dressingTemp < threshold;
 
-  let needsMid   = layerNeedsMid(currentTemp, tempDelta, windSpeed, midThreshold);
-  let needsOuter = layerNeedsOuter(currentTemp, windSpeed, outerThreshold) || raining || rainForecast;
+  let needsMid   = layerNeedsMid(currentTemp, tempDelta, windSpeed, midBelow) || dressingBelow(midBelow);
+  let needsOuter = layerNeedsOuter(currentTemp, windSpeed, outerBelow) || raining || rainForecast || dressingBelow(outerBelow);
 
   // ── Hot-weather safety net ──────────────────────────────────────────────
   // When the effective temperature exceeds the user's hot threshold, no amount

@@ -2,7 +2,7 @@
  * wardrobeGaps.ts
  * ---------------
  * Tracks recurring wardrobe gap signals from outfit generation.
- * When a missing-layer note (e.g. "No coat in your closet") fires repeatedly
+ * When the engine reports the same gap (e.g. no coat on a cold day) repeatedly
  * over a rolling window, the system surfaces a persistent shopping suggestion.
  *
  * Architecture:
@@ -12,6 +12,9 @@
  */
 
 import { storage, storageGetJSON } from './storage';
+import type { GapType } from './outfit/types';
+
+export type { GapType };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -19,14 +22,6 @@ export interface GapEvent {
   type: GapType;
   date: string;  // ISO date string
 }
-
-export type GapType =
-  | 'missing_coat'
-  | 'missing_jacket'
-  | 'missing_boots'
-  | 'missing_mid_layer'
-  | 'missing_rain_layer'
-  | 'missing_footwear';
 
 export interface GapSuggestion {
   type: GapType;
@@ -36,7 +31,11 @@ export interface GapSuggestion {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const STORAGE_KEY = 'ojo_wardrobe_gaps';
+// v2: events under the old key came from substring-matching note copy, which
+// logged a rain-layer gap on every rainy day even for raincoat owners. They're
+// dropped rather than migrated; real gaps rebuild within a few days.
+const STORAGE_KEY = 'ojo_wardrobe_gaps_v2';
+const LEGACY_STORAGE_KEY = 'ojo_wardrobe_gaps';
 const WINDOW_DAYS = 30;
 const SUGGESTION_THRESHOLD = 4;  // Fire suggestion after 4 occurrences in 30 days
 
@@ -47,6 +46,16 @@ const GAP_MESSAGES: Record<GapType, string> = {
   missing_mid_layer:  "A mid layer (hoodie or sweater) keeps coming up — consider adding one.",
   missing_rain_layer: "Rain-resistant outerwear has been needed often — a waterproof jacket would be a smart addition.",
   missing_footwear:   "You don't have footwear in your closet yet — any pair would improve your recommendations.",
+};
+
+/** Shopping-search query for each gap's "Shop" button. */
+export const GAP_SEARCH_TERMS: Record<GapType, string> = {
+  missing_coat:       'winter coat',
+  missing_jacket:     'light jacket',
+  missing_boots:      'boots',
+  missing_mid_layer:  'hoodie sweater',
+  missing_rain_layer: 'waterproof jacket',
+  missing_footwear:   'shoes',
 };
 
 // ─── Storage ──────────────────────────────────────────────────────────────────
@@ -66,23 +75,10 @@ const pruneOld = (events: GapEvent[]): GapEvent[] => {
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
- * Record one or more gap events from the current outfit generation.
- * Call this after generating outfits, passing the notes array.
+ * Record the gaps from the current outfit generation.
+ * Call this after generating outfits, passing the outfit's `gaps`.
  */
-export const recordGapsFromNotes = async (notes: string[]): Promise<void> => {
-  const gaps: GapType[] = [];
-
-  for (const note of notes) {
-    const lower = note.toLowerCase();
-    if (lower.includes('no coat'))                gaps.push('missing_coat');
-    if (lower.includes('light jacket'))           gaps.push('missing_jacket');
-    if (lower.includes('boots would'))            gaps.push('missing_boots');
-    if (lower.includes('mid layer'))              gaps.push('missing_mid_layer');
-    if (lower.includes('waterproof') || lower.includes('water-resistant'))
-                                                  gaps.push('missing_rain_layer');
-    if (lower.includes('no footwear'))            gaps.push('missing_footwear');
-  }
-
+export const recordGaps = async (gaps: GapType[]): Promise<void> => {
   if (gaps.length === 0) return;
 
   const existing = await loadEvents();
@@ -140,4 +136,5 @@ export const getGapSuggestions = async (): Promise<GapSuggestion[]> => {
 /** Clear all gap data (for settings reset). */
 export const clearGapHistory = async (): Promise<void> => {
   await storage.removeItem(STORAGE_KEY);
+  await storage.removeItem(LEGACY_STORAGE_KEY);
 };

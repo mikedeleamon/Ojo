@@ -209,6 +209,19 @@ describe('buildGenericOutfit — the entry point the app calls', () => {
     }
   });
 
+  it('never carries wardrobe gaps: generic advice must not record any', () => {
+    for (const bucket of WEATHER_BUCKETS) {
+      for (const wet of [false, true]) {
+        const out = buildGenericOutfit({
+          weather: weatherFor(bucket, { HasPrecipitation: wet }),
+          settings: settingsFor('All'),
+          coords: { lat: 40.71, lon: -74.01 },
+        });
+        expect(out).not.toHaveProperty('gaps');
+      }
+    }
+  });
+
   it('falls back to temperate rather than failing when coordinates are unknown', () => {
     const out = buildGenericOutfit({
       weather: weatherFor('cool'),

@@ -19,8 +19,9 @@ import {
   articlePreferenceScore, colorPairingBonus, UserPreferenceProfile,
   PERSONALIZATION_THRESHOLD, LEARNING_THRESHOLD,
 } from './userPreferences';
-import { buildLayeringContext, generateLayeringRecommendation } from './layeringEngine';
+import { buildLayeringContext, generateLayeringRecommendation, type LayeringContext } from './layeringEngine';
 import type {
+  GapType,
   OutfitRole,
   WeatherBucket,
   OutfitSlot,
@@ -478,6 +479,11 @@ interface ScoredCombo {
   slots:     OutfitSlot[];
   score:     number;           // 0–100
   breakdown: ScoreBreakdown;
+  // Unrounded parts, so mood selection can swap in another style's score
+  // without re-scoring the whole combo (see restyle).
+  raw:         number;         // pre-clamp composite
+  styleRaw:    number;
+  styleWeight: number;
 }
 
 const scoreCombo = (
@@ -491,13 +497,10 @@ const scoreCombo = (
   settings:       Settings,
   recentlyWorn:   RecentlyWorn,
   profile:        UserPreferenceProfile,
-  styleOverride?: string,
 ): ScoredCombo => {
   const fabric     = outfitFabricScore(slots, bucket, feelsLikeF, precipIntensity, humidity, settings.humidityPreference, windMph, isSnowing);
   const color      = outfitColorScore(slots, profile);
-  const style      = styleOverride
-    ? outfitStyleScore(slots, styleOverride)
-    : Math.max(...(settings.clothingStyles?.length ? settings.clothingStyles : [settings.clothingStyle ?? 'Casual']).map(s => outfitStyleScore(slots, s)));
+  const style      = Math.max(...(settings.clothingStyles?.length ? settings.clothingStyles : [settings.clothingStyle ?? 'Casual']).map(s => outfitStyleScore(slots, s)));
   const simplicity = simplicityScore(slots);
   const preference = outfitPreferenceScore(slots, profile);
   const occasion   = occasionScore(slots, settings.occasion ?? 'everyday');
@@ -535,6 +538,23 @@ const scoreCombo = (
       simplicity: Math.round(simplicity * 100),
       preference: Math.round(preference * 100),
     },
+    raw,
+    styleRaw:    style,
+    styleWeight: weights.style,
+  };
+};
+
+/** The combo scored for one style instead of the best of the user's styles.
+ *  Style is the only term that depends on it, so only that term is swapped. */
+const restyle = (combo: ScoredCombo, styleName: string): ScoredCombo => {
+  const style = outfitStyleScore(combo.slots, styleName);
+  const raw   = combo.raw + (style - combo.styleRaw) * combo.styleWeight;
+  return {
+    ...combo,
+    score:     Math.round(Math.max(0, Math.min(1, raw)) * 100),
+    breakdown: { ...combo.breakdown, style: Math.round(style * 100) },
+    raw,
+    styleRaw:  style,
   };
 };
 
@@ -591,6 +611,16 @@ interface NotesContext {
   settings:         Settings;
   aqiHigh?:         boolean;
   pollenHigh?:      boolean;
+  /** The layering engine's verdict, which also decided the mid/outer slots. */
+  needsMid:         boolean;
+  needsOuter:       boolean;
+  /** Whether the closet (weather- and gender-filtered) has each kind of piece. */
+  closetHas: {
+    outerwear: boolean;
+    midLayer:  boolean;
+    footwear:  boolean;
+    boots:     boolean;
+  };
 }
 
 const buildNotes = (
@@ -601,15 +631,17 @@ const buildNotes = (
   const notes: string[] = [];
 
   // ── Wardrobe gap notes ────────────────────────────────────────────────
-  const needsOuter = ctx.bucket === 'cool' || ctx.bucket === 'cold' || ctx.bucket === 'freezing';
-  if (needsOuter && !slots.some(s => s.role === 'outerwear')) {
+  // Closet-level: a needed outer layer is always in the outfit when the closet
+  // has one, so these only fire when there's nothing to wear.
+  const coldBucket = ctx.bucket === 'cool' || ctx.bucket === 'cold' || ctx.bucket === 'freezing';
+  if (coldBucket && ctx.needsOuter && !ctx.closetHas.outerwear) {
     notes.push(
       ctx.bucket === 'freezing' || ctx.bucket === 'cold'
         ? 'No coat in your closet — add one for cold days.'
         : 'A light jacket would work well today.',
     );
   }
-  if (!slots.some(s => s.role === 'footwear')) {
+  if (!ctx.closetHas.footwear) {
     notes.push('No footwear in your closet yet.');
   }
 
@@ -730,11 +762,30 @@ const buildAccessoryAlerts = (slots: OutfitSlot[], ctx: NotesContext): Accessory
   uvIndexText:  ctx.uvIndexText,
 });
 
+// ─── Wardrobe gaps ─────────────────────────────────────────────────────────────
+// What the closet is missing for today's weather, as structured signals for
+// wardrobeGaps (the "consider adding one" cards). Closet-level, so they're the
+// same for every outfit in a generation, and someone who owns a raincoat is
+// never told to buy one because it rained.
+
+const buildGaps = (ctx: NotesContext): GapType[] => {
+  const gaps: GapType[] = [];
+  if (ctx.needsOuter && !ctx.closetHas.outerwear) {
+    if (ctx.bucket === 'cold' || ctx.bucket === 'freezing') gaps.push('missing_coat');
+    else if (ctx.bucket === 'cool')                         gaps.push('missing_jacket');
+    if (ctx.precipIntensity === 'moderate' || ctx.precipIntensity === 'heavy') gaps.push('missing_rain_layer');
+  }
+  if (ctx.needsMid && !ctx.closetHas.midLayer) gaps.push('missing_mid_layer');
+  if (ctx.isSnowing && !ctx.closetHas.boots)   gaps.push('missing_boots');
+  if (!ctx.closetHas.footwear)                 gaps.push('missing_footwear');
+  return gaps;
+};
+
 // ─── Main: generate top-K ranked outfits ──────────────────────────────────────
 
 /** Bumped whenever scoring weights/logic change meaningfully, so training data
  *  can distinguish which engine produced a logged score. */
-export const ENGINE_VERSION = 1;
+export const ENGINE_VERSION = 2;
 
 interface DerivedWeatherContext {
   feelsLikeF:         number;
@@ -779,6 +830,18 @@ const deriveWeatherContext = (
 
   return { feelsLikeF, precipIntensity, humidity, windMph, uvIndexText, isSnowing, uvHigh, effectiveFeelsLike, bucket };
 };
+
+/** The layering context generateOutfits judges layers by, for callers that
+ *  re-phrase its advice (genericOutfit) and must agree with its slots. */
+export const buildOutfitLayeringContext = (
+  weather:   CurrentWeather,
+  settings:  Settings,
+  forecasts: Forecast[] = [],
+): LayeringContext =>
+  buildLayeringContext({
+    weather, forecasts, settings,
+    dressingTemp: deriveWeatherContext(weather, settings, forecasts).effectiveFeelsLike,
+  });
 
 /** The weather/settings snapshot to stamp on a wear-log entry, derived exactly
  *  as generateOutfits derives its own scoring context (same bucket, same
@@ -867,15 +930,22 @@ export const generateOutfits = (
 
   // ── Phase 2: Build candidate lists for optional/conditional roles ─────────
 
-  // Mid layer (Hoodie, Sweater): excluded in hot; required in cold/freezing if
-  // available; optional (try with and without) in cool and warm.
+  // The layering engine decides which layers today needs, judged at the same
+  // temperature as the bucket. Mid and outer slots follow it, so the card never
+  // omits a layer the layering sentence calls for, or forces one it calls
+  // optional.
+  const layeringCtx = buildLayeringContext({ weather, forecasts, settings, dressingTemp: effectiveFeelsLike });
+
+  // Mid layer (Hoodie, Sweater): excluded in hot; required when needed and
+  // available; otherwise optional (try with and without). The layering text
+  // calls an unneeded mid layer a nice-to-have, which matches.
   // Capped at 4 to avoid combinatorial explosion with large wardrobes.
   const midOptions: (ClothingArticle | null)[] =
     bucket === 'hot' || midLayers.length === 0
       ? [null]
-      : bucket === 'cold' || bucket === 'freezing'
+      : layeringCtx.needsMid
         ? midLayers.slice(0, 4)
-        : [...midLayers.slice(0, 4), null];  // cool/warm: optional
+        : [...midLayers.slice(0, 4), null];
 
   // Outerwear and footwear are *multiplied* dimensions in the enumeration below,
   // so they dominate the combinatorial cost on large closets (all outerwear × all
@@ -885,16 +955,12 @@ export const generateOutfits = (
   const outerEnum = outerwears.slice(0, OPTIONAL_ENUM_CAP);
   const shoeEnum  = footwears.slice(0, OPTIONAL_ENUM_CAP);
 
-  // Outerwear: required in cool/cold/freezing; required if moderate+ rain;
-  // optional if light rain; skip otherwise
+  // Outerwear: required when needed (below the outer threshold, wind chill,
+  // rain now or forecast) and available; skipped otherwise. Not optional: a
+  // jacket on the card that the layering sentence says "you likely won't need"
+  // is the contradiction this rule exists to prevent.
   const outerOptions: (ClothingArticle | null)[] =
-    bucket === 'cool' || bucket === 'cold' || bucket === 'freezing'
-      ? outerEnum.length > 0 ? outerEnum : [null]     // null → "missing" note
-      : (precipIntensity === 'heavy' || precipIntensity === 'moderate') && outerEnum.length > 0
-        ? outerEnum                                    // moderate+ rain → require
-        : precipIntensity === 'light' && outerEnum.length > 0
-          ? [...outerEnum, null]                       // light rain → optional
-          : [null];                                    // no rain → skip
+    layeringCtx.needsOuter && outerEnum.length > 0 ? outerEnum : [null];
 
   const shoeOptions: (ClothingArticle | null)[] =
     shoeEnum.length > 0 ? shoeEnum : [null];
@@ -1032,7 +1098,7 @@ export const generateOutfits = (
     for (const styleName of styleList) {
       if (topList.length >= moodSlots) break;
       const reScored = scored.map(c => ({
-        ...scoreCombo(c.slots, bucket, effectiveFeelsLike, precipIntensity, humidity, windMph, isSnowing, settings, recentlyWorn, profile, styleName),
+        ...restyle(c, styleName),
         moodLabel: `${styleName} pick` as string,
       }));
       reScored.sort((a, b) => b.score - a.score);
@@ -1077,9 +1143,18 @@ export const generateOutfits = (
     bucket, precipIntensity, windMph, uvHigh, uvIndexText, isSnowing, settings,
     aqiHigh:    weather.AirQualityText  ? AQI_HIGH_LABELS.has(weather.AirQualityText)  : undefined,
     pollenHigh: weather.PollenCategory  ? POLLEN_HIGH_LABELS.has(weather.PollenCategory) : undefined,
+    needsMid:   layeringCtx.needsMid,
+    needsOuter: layeringCtx.needsOuter,
+    // From byRole, before capping: what the closet can offer today, not what
+    // the chosen outfit happens to contain.
+    closetHas: {
+      outerwear: (byRole.get('outerwear') ?? []).length > 0,
+      midLayer:  (byRole.get('midLayer')  ?? []).length > 0,
+      footwear:  (byRole.get('footwear')  ?? []).length > 0,
+      boots:     (byRole.get('footwear')  ?? []).some(a => a.clothingType === 'Boots'),
+    },
   };
-
-  const layeringCtx = buildLayeringContext({ weather, forecasts, settings });
+  const gaps = buildGaps(notesCtx);
 
   const isPersonalized = profile.totalOutfits >= PERSONALIZATION_THRESHOLD;
 
@@ -1100,6 +1175,7 @@ export const generateOutfits = (
       accessoryAlerts: buildAccessoryAlerts(combo.slots, notesCtx),
       isPersonalized,
       moodLabel:       combo.moodLabel,
+      gaps,
     };
   });
 
