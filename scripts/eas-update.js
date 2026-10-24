@@ -136,8 +136,12 @@ const main = () => {
   run('npx', updateArgs, env);
 
   // Reads SENTRY_ORG/PROJECT/URL from the profile env and SENTRY_AUTH_TOKEN
-  // from .env (it loads dotenv itself).
-  run('npx', ['sentry-expo-upload-sourcemaps', 'dist'], env);
+  // from .env or .env.local, which it loads through @expo/env. That loader
+  // honours EXPO_NO_DOTENV, so drop it here: the bundle is already built, and
+  // with it set the token never loads.
+  const sentryEnv = { ...env };
+  delete sentryEnv.EXPO_NO_DOTENV;
+  run('npx', ['sentry-expo-upload-sourcemaps', 'dist'], sentryEnv);
 };
 
 main();
