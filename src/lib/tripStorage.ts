@@ -2,12 +2,25 @@ import { SavedTripFitPlan } from '../types';
 import { storage, storageGetJSON } from './storage';
 import api from '../api/client';
 import { authHeaders, getUserId } from './auth';
+import { createOutboxStore, type Outbox } from './syncOutbox';
 
 const MAX_PLANS = 100;
 
 // Storage key scoped to the authenticated user so plans never bleed between accounts.
-const plansKey    = () => `ojo_tripfit_plans_${getUserId() ?? 'anon'}`;
-const migratedKey = () => `ojo_tripfit_migrated_v1_${getUserId() ?? 'anon'}`;
+const plansKey = () => `ojo_tripfit_plans_${getUserId() ?? 'anon'}`;
+// Changes the server hasn't confirmed (see syncOutbox), versioned per edit.
+// Replaces the one-time `ojo_tripfit_migrated_v1_*` latch; leftover keys from
+// it are harmless.
+const outbox = createOutboxStore(() => `ojo_tripfit_outbox_v1_${getUserId() ?? 'anon'}`);
+
+// `updatedAt` alone can repeat within a millisecond, and then an older edit's
+// upload would confirm a newer one.
+let edits = 0;
+const editVersion = (plan: SavedTripFitPlan) => `${plan.updatedAt}#${++edits}`;
+
+const ms = (iso: string) => new Date(iso).getTime();
+const byStartDate = (a: SavedTripFitPlan, b: SavedTripFitPlan) =>
+  a.startDate.localeCompare(b.startDate);
 
 // ─── Id generation ──────────────────────────────────────────────────────────────
 
@@ -22,65 +35,123 @@ export const loadLocalPlans = async (): Promise<SavedTripFitPlan[]> =>
 const saveLocalPlans = async (plans: SavedTripFitPlan[]): Promise<void> =>
   storage.setItem(plansKey(), JSON.stringify(plans.slice(0, MAX_PLANS)));
 
-// ─── Server sync helpers (fire-and-forget, swallow errors) ──────────────────────
+// ─── Server sync helpers (swallow errors) ───────────────────────────────────────
 
-// Resolves true when the post landed, false when it didn't. Fire-and-forget
-// callers can keep ignoring the result; the one-time migration below needs it,
-// because it must not latch its "done" flag on a batch that silently failed.
+// Each resolves true when the request landed, false when it didn't. A change
+// leaves the outbox only on true; otherwise it's sent again after the next load.
 const syncPost = (plan: SavedTripFitPlan): Promise<boolean> =>
   api.post('/api/tripfit', plan, authHeaders()).then(() => true).catch(() => false);
 
-const syncDelete = (id: string) =>
-  api.delete(`/api/tripfit/${id}`, authHeaders()).catch(() => {});
+const syncDelete = (id: string): Promise<boolean> =>
+  api.delete(`/api/tripfit/${id}`, authHeaders()).then(() => true).catch(() => false);
 
-const syncClear = () =>
-  api.delete('/api/tripfit?confirm=true', authHeaders()).catch(() => {});
+const syncClear = (): Promise<boolean> =>
+  api.delete('/api/tripfit?confirm=true', authHeaders()).then(() => true).catch(() => false);
 
-// ─── One-time migration: push local plans the server doesn't have yet ────────────
+const pushPlan = async (plan: SavedTripFitPlan, version: string) => {
+  if (await syncPost(plan)) await outbox.confirmPush(plan.id, version);
+};
 
-const migrateLocalToServer = async (serverIds: Set<string>, local: SavedTripFitPlan[]) => {
-  const alreadyMigrated = await storage.getItem(migratedKey());
-  if (alreadyMigrated) return;
-  const unsynced = local.filter(p => !serverIds.has(p.id));
-  const results = await Promise.all(unsynced.map(syncPost));
-  // Only latch the flag once every plan actually landed — syncPost swallows its
-  // own failures, so Promise.all resolved even when all of them failed, latching
-  // the flag and stranding those plans on the device forever. Empty batch is a
-  // success: [].every() is true.
-  if (results.every(Boolean)) await storage.setItem(migratedKey(), '1');
+const pushDelete = async (id: string) => {
+  if (await syncDelete(id)) await outbox.confirmDelete(id);
+};
+
+const pushClear = async (at: string): Promise<boolean> => {
+  if (!(await syncClear())) return false;
+  await outbox.confirmClear(at);
+  return true;
+};
+
+// One replay at a time; anything queued meanwhile goes out after the next load.
+let replaying: Promise<void> | null = null;
+
+/** Sends everything still queued: a pending clear first, then deletes and saves. */
+const replay = (box: Outbox, pending: SavedTripFitPlan[]): Promise<void> => {
+  if (replaying) return replaying;
+  replaying = (async () => {
+    // Plans saved after a clear must not reach the server before it, or the
+    // clear would wipe them.
+    if (box.clearAt && !(await pushClear(box.clearAt))) return;
+    await Promise.all([
+      ...box.del.map(pushDelete),
+      ...pending.map(p => pushPlan(p, box.push[p.id])),
+    ]);
+  })().finally(() => { replaying = null; });
+  return replaying;
 };
 
 // ─── Public API ─────────────────────────────────────────────────────────────────
 
 /**
  * Load plans: server first, merged with local, falling back to local-only when
- * offline. The newer `updatedAt` wins for plans that exist in both places so an
- * edit made offline isn't clobbered by a stale server copy.
+ * offline.
+ *
+ * A plan saved or edited here whose upload the server hasn't confirmed is
+ * queued in the outbox; its local copy wins and is sent again. Every other
+ * plan comes from the server, and a local plan the server lacks that isn't
+ * queued was deleted on another device, so it's dropped.
  */
 export const loadPlans = async (): Promise<SavedTripFitPlan[]> => {
-  const local = await loadLocalPlans();
-
+  let server: SavedTripFitPlan[];
+  const mark = outbox.mark();
   try {
     const res = await api.get<SavedTripFitPlan[]>('/api/tripfit', authHeaders());
-    const server: SavedTripFitPlan[] = res.data ?? [];
-    const serverIds = new Set(server.map(p => p.id));
-
-    migrateLocalToServer(serverIds, local).catch(() => {});
-
-    const localById = new Map(local.map(p => [p.id, p]));
-    const merged: SavedTripFitPlan[] = server.map(s => {
-      const l = localById.get(s.id);
-      return l && new Date(l.updatedAt).getTime() > new Date(s.updatedAt).getTime() ? l : s;
-    });
-    // Append local-only plans (not yet synced)
-    for (const l of local) if (!serverIds.has(l.id)) merged.push(l);
-
-    merged.sort((a, b) => a.startDate.localeCompare(b.startDate));
-    await saveLocalPlans(merged);
-    return merged;
+    server = res.data ?? [];
   } catch {
-    return [...local].sort((a, b) => a.startDate.localeCompare(b.startDate));
+    return [...(await loadLocalPlans())].sort(byStartDate);
   }
+
+  const { merged, box, pending } = await outbox.locked(async () => {
+    // Read after the request, not before it: a plan saved while it was in
+    // flight is only in local storage, and the save below must keep it.
+    const local = await loadLocalPlans();
+    const box = await outbox.read();
+    const serverById = new Map(server.map(p => [p.id, p]));
+
+    // First load since the outbox shipped: queue plans the old one-time
+    // migration left stranded here, and offline edits that never went up (the
+    // local copy is newer than the server's).
+    if (!box.seeded) {
+      for (const l of local) {
+        const s = serverById.get(l.id);
+        if (!s || ms(l.updatedAt) > ms(s.updatedAt)) box.push[l.id] = l.updatedAt;
+      }
+      box.seeded = true;
+    }
+
+    const settled = outbox.settledSince(mark);
+
+    // Only a successful upload confirms a queued plan: the server may hold an
+    // older version of it. The local copy also wins when its upload landed
+    // after this list was read.
+    const kept = local.filter(l => l.id in box.push || settled.pushed.has(l.id));
+    const keptIds = new Set(kept.map(l => l.id));
+    const pending = kept.filter(l => l.id in box.push);
+    // Queued ids with no local plan left have nothing to upload.
+    box.push = Object.fromEntries(pending.map(l => [l.id, box.push[l.id]]));
+
+    // Hide what a delete or clear made here removed: queued ones the server
+    // hasn't applied, and ones that landed after this list was read.
+    const deletedHere = new Set([...box.del, ...settled.deleted]);
+    const clearedHere = Math.max(box.clearAt ? ms(box.clearAt) : -Infinity, settled.clearedAt ?? -Infinity);
+    // A delete the server already reflects needs no request.
+    box.del = box.del.filter(id => serverById.has(id));
+
+    const merged = [
+      ...server.filter(s =>
+        !keptIds.has(s.id) &&
+        !deletedHere.has(s.id) &&
+        ms(s.updatedAt) >= clearedHere),
+      ...kept,
+    ].sort(byStartDate);
+
+    await saveLocalPlans(merged);
+    await outbox.write(box);
+    return { merged, box, pending };
+  });
+
+  replay(box, pending).catch(() => {});
+  return merged;
 };
 
 /** The fields that decide whether two records describe the same trip. */
@@ -121,38 +192,60 @@ export const findTwinPlan = <T extends TripIdentity>(
  * same trip: adopt the record that already exists rather than adding to it.
  */
 export const upsertPlan = async (plan: SavedTripFitPlan): Promise<SavedTripFitPlan> => {
-  const existing = await loadLocalPlans();
+  const { stamped, version } = await outbox.locked(async () => {
+    const existing = await loadLocalPlans();
 
-  // Only when the incoming id is unknown — an edit to a plan already saved
-  // under its own id is never a duplicate of anything, even if the user has
-  // just retyped its dates to match another trip's.
-  const twin = existing.some(p => p.id === plan.id)
-    ? undefined
-    : findTwinPlan(existing, plan);
+    // Only when the incoming id is unknown — an edit to a plan already saved
+    // under its own id is never a duplicate of anything, even if the user has
+    // just retyped its dates to match another trip's.
+    const twin = existing.some(p => p.id === plan.id)
+      ? undefined
+      : findTwinPlan(existing, plan);
 
-  const stamped: SavedTripFitPlan = {
-    ...plan,
-    id:        twin?.id ?? plan.id,
-    createdAt: twin?.createdAt ?? plan.createdAt,
-    updatedAt: new Date().toISOString(),
-  };
+    const stamped: SavedTripFitPlan = {
+      ...plan,
+      id:        twin?.id ?? plan.id,
+      createdAt: twin?.createdAt ?? plan.createdAt,
+      updatedAt: new Date().toISOString(),
+    };
 
-  const idx = existing.findIndex(p => p.id === stamped.id);
-  const next = idx >= 0
-    ? existing.map(p => (p.id === stamped.id ? stamped : p))
-    : [stamped, ...existing];
-  await saveLocalPlans(next);
-  syncPost(stamped);
+    const idx = existing.findIndex(p => p.id === stamped.id);
+    const next = idx >= 0
+      ? existing.map(p => (p.id === stamped.id ? stamped : p))
+      : [stamped, ...existing];
+    await saveLocalPlans(next);
+    // Queued at this version: an upload of an older edit that lands later
+    // doesn't confirm this one.
+    const version = editVersion(stamped);
+    const box = await outbox.read();
+    box.push[stamped.id] = version;
+    await outbox.write(box);
+    return { stamped, version };
+  });
+  pushPlan(stamped, version).catch(() => {});
   return stamped;
 };
 
 export const deletePlan = async (id: string): Promise<void> => {
-  const next = (await loadLocalPlans()).filter(p => p.id !== id);
-  await saveLocalPlans(next);
-  syncDelete(id);
+  await outbox.locked(async () => {
+    const next = (await loadLocalPlans()).filter(p => p.id !== id);
+    await saveLocalPlans(next);
+    const box = await outbox.read();
+    delete box.push[id];
+    // Queued even if its upload never landed: the upload may have succeeded
+    // without this device hearing back. The server ignores unknown ids.
+    if (!box.del.includes(id)) box.del.push(id);
+    await outbox.write(box);
+  });
+  pushDelete(id).catch(() => {});
 };
 
 export const clearPlans = async (): Promise<void> => {
-  await storage.removeItem(plansKey());
-  syncClear();
+  const at = new Date().toISOString();
+  await outbox.locked(async () => {
+    await storage.removeItem(plansKey());
+    // Everything this device had is gone, uploaded or not.
+    await outbox.write({ push: {}, del: [], clearAt: at, seeded: true });
+  });
+  pushClear(at).catch(() => {});
 };
