@@ -8,16 +8,21 @@
  * credentials are remembered, or who signs in via the login screen, never
  * re-sees the first-run flow.
  *
- * - `pending`  — global flag set at sign-up, cleared on completion. AuthGate
- *                routes to /(auth)/onboarding while it is set.
- * - `done`     — keyed by userId so multiple accounts on one device don't share
- *                state. Acts as a guard so onboarding is never shown twice.
+ * - `pending`  — set at sign-up, cleared on completion. AuthGate routes to
+ *                /(auth)/onboarding while it is set.
+ * - `done`     — a guard so onboarding is never shown twice.
+ *
+ * Both are keyed by userId so multiple accounts on one device don't share
+ * state. A shared `pending` flag sent the next account signed in on the device
+ * through onboarding when the previous one quit it unfinished. The old global
+ * `ojo_onboarding_pending` key is simply no longer read.
  */
 
 import { storage } from './storage';
 import { getUserId } from './auth';
 
-const PENDING_KEY = 'ojo_onboarding_pending';
+const pendingKey = (): string =>
+  `ojo_onboarding_pending_${getUserId() ?? 'anon'}`;
 
 const onboardKey = (): string =>
   `ojo_onboarding_done_${getUserId() ?? 'anon'}`;
@@ -27,8 +32,8 @@ const onboardKey = (): string =>
 // AsyncStorage each time added a bridge round-trip per route change. The first
 // read warms the cache; the mutators below keep it in sync, so subsequent reads
 // resolve without touching storage. resetOnboardingCache() clears it on logout
-// (the userId — and thus the "done" key — changes with the next account).
-let pendingCache: boolean | null = null;
+// (the userId — and thus both keys — changes with the next account).
+const pendingCache = new Map<string, boolean>();
 const doneCache = new Map<string, boolean>();
 
 export const isOnboardingComplete = async (): Promise<boolean> => {
@@ -43,25 +48,32 @@ export const isOnboardingComplete = async (): Promise<boolean> => {
 export const markOnboardingComplete = async (): Promise<void> => {
   const key = onboardKey();
   await storage.setItem(key, 'true');
-  await storage.removeItem(PENDING_KEY);
+  await storage.removeItem(pendingKey());
   doneCache.set(key, true);
-  pendingCache = false;
+  pendingCache.set(pendingKey(), false);
 };
 
-/** Set by SignupPage once the sign-up form succeeds, so AuthGate runs onboarding. */
+/**
+ * Set by SignupPage once the sign-up form succeeds, so AuthGate runs onboarding.
+ * Both callers run after saveAuth, so the new account's id is already known.
+ */
 export const markOnboardingPending = async (): Promise<void> => {
-  await storage.setItem(PENDING_KEY, 'true');
-  pendingCache = true;
+  const key = pendingKey();
+  await storage.setItem(key, 'true');
+  pendingCache.set(key, true);
 };
 
 export const isOnboardingPending = async (): Promise<boolean> => {
-  if (pendingCache !== null) return pendingCache;
-  pendingCache = (await storage.getItem(PENDING_KEY)) === 'true';
-  return pendingCache;
+  const key = pendingKey();
+  const cached = pendingCache.get(key);
+  if (cached !== undefined) return cached;
+  const val = (await storage.getItem(key)) === 'true';
+  pendingCache.set(key, val);
+  return val;
 };
 
 /** Drop the in-memory mirror — call on logout so the next account reads fresh. */
 export const resetOnboardingCache = (): void => {
-  pendingCache = null;
+  pendingCache.clear();
   doneCache.clear();
 };

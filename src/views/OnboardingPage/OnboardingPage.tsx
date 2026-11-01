@@ -14,7 +14,9 @@ import CityAutocomplete from '../../features/settings/components/CityAutocomplet
 import { getCurrentLocation } from '../../lib/location';
 import { coarsen } from '../../lib/coarseLocation';
 import { reverseGeocode } from '../../lib/geocoding';
-import { requestPermission, registerPushToken, NOTIF_DEFAULTS } from '../../lib/notifications';
+import {
+  requestPermission, registerPushToken, NOTIF_DEFAULTS, localHourToUTC, deviceTimeZone,
+} from '../../lib/notifications';
 import { hapticSuccess } from '../../lib/haptics';
 import { auth } from '../../lib/auth';
 import axios from '../../api/client';
@@ -27,6 +29,8 @@ import { GENDERS } from '../../lib/colors/palettes';
 
 const STYLES_LIST = ['Casual', 'Business Casual', 'Formal', 'Athletic', 'Streetwear', 'Minimalist'];
 const TEMP_UNITS  = ['Imperial', 'Metric'] as const;
+/** Morning Brief hour turned on by onboarding, in the user's own time zone. */
+const BRIEF_HOUR_LOCAL = 7;
 /**
  * Six steps: Welcome → Location → Closet → Preferences → Notifications → Done.
  *
@@ -158,7 +162,7 @@ export default function OnboardingPage({ onComplete }: Props) {
   const [coldTemp, setColdTemp] = useState(
     isMetric ? Math.round(fToC(settings.lowTempThreshold ?? 55)) : (settings.lowTempThreshold ?? 55),
   );
-  const [humidity, setHumidity] = useState(settings.humidityPreference ?? 50);
+  const [humidity, setHumidity] = useState(settings.humidityPreference ?? 60);
 
   const [notifLoading, setNotifLoading] = useState(false);
 
@@ -275,13 +279,20 @@ export default function OnboardingPage({ onComplete }: Props) {
         // actually produces notifications. Without this the toggle is a no-op
         // and the user hears nothing until they dig into Settings. They can
         // still fine-tune or disable any of these there.
+        //
+        // The brief hour goes up as a local hour plus time zone, the same shape
+        // the Notifications screen saves. NOTIF_DEFAULTS alone carries only 12
+        // UTC, which lands at 4am in Los Angeles and 9pm in Tokyo.
         await axios.put(
           '/api/notifications/settings',
           {
             ...NOTIF_DEFAULTS,
-            morningBriefEnabled:  true,
-            weatherChangeEnabled: true,
-            tempSwingEnabled:     true,
+            morningBriefEnabled:   true,
+            morningBriefHourLocal: BRIEF_HOUR_LOCAL,
+            morningBriefHourUTC:   localHourToUTC(BRIEF_HOUR_LOCAL),
+            timeZone:              deviceTimeZone(),
+            weatherChangeEnabled:  true,
+            tempSwingEnabled:      true,
           },
           auth(),
         );

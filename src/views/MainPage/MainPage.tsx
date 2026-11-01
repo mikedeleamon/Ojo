@@ -4,7 +4,7 @@ import { View } from '../../components/primitives';
 import WeatherHUD from '../../components/WeatherHUD/WeatherHUD';
 import { useSettings } from '../../hooks/useSettings';
 import { useActiveLocation } from '../../context/ActiveLocationContext';
-import { getCurrentLocation, formatCoords } from '../../lib/location';
+import { getCurrentLocation, formatCoords, hasLocationPermission } from '../../lib/location';
 import { getToken } from '../../lib/auth';
 import { CURRENT_LOCATION_ID } from '../../lib/savedLocations';
 import { getAllSnapshots, setSnapshot } from '../../lib/weatherCache';
@@ -24,6 +24,9 @@ export default function MainPage() {
   const nav = useAppNavigation();
 
   const [gpsLocation, setGpsLocation] = useState('');
+  // The last GPS attempt came back empty because location access is off, not
+  // because the fix was slow.
+  const [gpsDenied,   setGpsDenied]   = useState(false);
   const [refreshKey,  setRefreshKey]  = useState(0);
   // In-memory mirror of the per-city snapshot cache, so the seed for the active
   // city is available synchronously when switching (no async flash).
@@ -70,10 +73,24 @@ export default function MainPage() {
     // OnboardingPage step 2). Spending it here first, on a stranger looking at
     // a password field, is the worst possible moment and cannot be retried.
     if (!getToken()) return;
-    getCurrentLocation(8000).then(coords => {
+    setGpsDenied(false);
+    getCurrentLocation(8000).then(async coords => {
+      setGpsDenied(!coords && !(await hasLocationPermission()));
       setGpsLocation(coords ? formatCoords(coords.lat, coords.lng) : settings.location);
     });
   }, [settingsReady, settings.location, activeId]);
+
+  // With location access off and no default city, My Location can only show
+  // an error. A saved city can show weather, so switch to it — including one
+  // just added from that error's "Add a city". A slow fix doesn't count: the
+  // switch is persisted, so making it on a timeout would strand the user on
+  // the saved city after GPS recovers.
+  const firstSavedId = savedLocations[0]?.id;
+  useEffect(() => {
+    if (activeId === CURRENT_LOCATION_ID && gpsDenied && !settings.location && firstSavedId) {
+      setActiveId(firstSavedId);
+    }
+  }, [activeId, gpsDenied, settings.location, firstSavedId, setActiveId]);
 
   // For saved cities, pass stored coordinates as a "lat,lng" string so
   // geocodeCity skips the CLGeocoder network call entirely (parseLatLng fast
@@ -98,7 +115,8 @@ export default function MainPage() {
   // synchronously, so they bump immediately.
   const handleRefresh = useCallback(() => {
     if (activeId === CURRENT_LOCATION_ID) {
-      getCurrentLocation(8000).then(coords => {
+      getCurrentLocation(8000).then(async coords => {
+        setGpsDenied(!coords && !(await hasLocationPermission()));
         setGpsLocation(coords ? formatCoords(coords.lat, coords.lng) : settings.location);
         setRefreshKey(k => k + 1);
       });

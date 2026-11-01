@@ -36,6 +36,20 @@ export const getCurrentLocation = async (timeoutMs = 8000): Promise<Coords | nul
 };
 
 /**
+ * Whether the app may read the device's location, checked without prompting.
+ * Tells a refused fix apart from a slow one, since getCurrentLocation returns
+ * null for both.
+ */
+export const hasLocationPermission = async (): Promise<boolean> => {
+  try {
+    const { status } = await Location.getForegroundPermissionsAsync();
+    return status === 'granted';
+  } catch {
+    return false;
+  }
+};
+
+/**
  * A fix as the "lat,lng" location string the weather screens send to the server
  * — rounded to ~1 km, since this is how a device fix leaves the phone.
  */
