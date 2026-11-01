@@ -78,15 +78,11 @@ export default function AccountLayout() {
             />
             <Stack.Screen
                 name='location'
-                options={{ ...subScreen, title: 'Location' }}
+                options={{ ...subScreen, title: 'Default City' }}
             />
             <Stack.Screen
                 name='locations'
                 options={{ ...subScreen, title: 'Locations' }}
-            />
-            <Stack.Screen
-                name='units'
-                options={{ ...subScreen, title: 'Units' }}
             />
             <Stack.Screen
                 name='price-backfill'
