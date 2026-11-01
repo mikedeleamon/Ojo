@@ -309,7 +309,7 @@ const WeatherHUD = ({
     useEffect(() => {
         if (!location) {
             setError(
-                'Location unavailable. Set a default city in Settings → Preferences.',
+                "We can't find your location. Allow location access, or add a city to see its weather.",
             );
             setLoading(false);
             setRefreshing(false);
@@ -826,6 +826,39 @@ const WeatherHUD = ({
     }, [weather?.WeatherText, weather?.IsDayTime]);
 
     // ── Error state (#9: retry + check settings) ──────────────────────────────
+    // With no location at all (GPS denied, no default city), retrying alone
+    // can't help: offer a city, or the system settings to allow location.
+    if (error && !weather && !location)
+        return (
+            <View style={st.center}>
+                <Text style={st.errorText}>{error}</Text>
+                {onOpenLocations && (
+                    <Pressable
+                        style={st.retryBtn}
+                        onPress={onOpenLocations}
+                        accessibilityRole='button'
+                        accessibilityLabel='Add a city'
+                    >
+                        <Text style={st.retryBtnText}>Add a city</Text>
+                    </Pressable>
+                )}
+                <Pressable
+                    onPress={() => { Linking.openSettings().catch(() => {}); }}
+                    accessibilityRole='button'
+                    accessibilityLabel='Open Settings'
+                >
+                    <Text style={st.settingsLink}>Open Settings</Text>
+                </Pressable>
+                <Pressable
+                    onPress={() => onRefresh?.()}
+                    accessibilityRole='button'
+                    accessibilityLabel='Try again'
+                >
+                    <Text style={st.settingsLink}>Try again</Text>
+                </Pressable>
+            </View>
+        );
+
     if (error && !weather)
         return (
             <View style={st.center}>

@@ -38,6 +38,8 @@ export const SETTINGS_CONFIG: SettingsSectionConfig[] = [
     title: 'Preferences',
     items: [
       { key: 'outfit-prefs', label: 'Style preference', sublabelKey: 'clothingStyle', action: { type: 'navigate', to: '/account/preferences' } },
+      // Weather falls back to this city when there's no GPS fix.
+      { key: 'location',     label: 'Default city',     sublabelKey: 'location',      action: { type: 'navigate', to: '/account/location' } },
     ],
   },
   {

@@ -20,7 +20,7 @@ export const defaults: Settings = {
     temperatureScale: 'Imperial',
     hiTempThreshold: 85,
     lowTempThreshold: 50,
-    humidityPreference: 70,
+    humidityPreference: 60, // the server's schema default, so both agree
     tripModeEnabled: true,
     tripModeRadiusMi: 30,
 };
