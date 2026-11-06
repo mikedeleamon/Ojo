@@ -1,0 +1,65 @@
+diff --git a/node_modules/react-native-screens/ios/bottom-tabs/RNSTabBarAppearanceCoordinator.mm b/node_modules/react-native-screens/ios/bottom-tabs/RNSTabBarAppearanceCoordinator.mm
+index dff5cbf..9a94f89 100644
+--- a/node_modules/react-native-screens/ios/bottom-tabs/RNSTabBarAppearanceCoordinator.mm
++++ b/node_modules/react-native-screens/ios/bottom-tabs/RNSTabBarAppearanceCoordinator.mm
+@@ -63,13 +63,20 @@ - (void)setIconsForTabBarItem:(UITabBarItem *)tabBarItem
+   } else if (imageLoader != nil) {
+     bool isTemplate = screenView.iconType == RNSBottomTabsIconTypeTemplate;
+ 
++    // Backport of react-native-screens #4111 (4.26.0). Weak-capture to avoid
++    // updating a tab bar item whose internal view hierarchy has been torn
++    // down (iOS 26 UIKit regression: unowned refs inside
++    // UITabBarItem._updateViewAndPositionItems:).
++    __weak UITabBarItem *weakTabBarItem = tabBarItem;
++    __weak RNSBottomTabsScreenComponentView *weakScreenView = screenView;
++
+     // Normal icon
+     if (screenView.iconImageSource != nil) {
+       [self loadImageFrom:screenView.iconImageSource
+           withImageLoader:imageLoader
+                asTemplate:isTemplate
+           completionBlock:^(UIImage *image) {
+-            tabBarItem.image = image;
++            [self updateTabBarItem:weakTabBarItem withImage:image isSelected:NO forScreenView:weakScreenView];
+           }];
+     } else {
+       tabBarItem.image = nil;
+@@ -81,7 +88,7 @@ - (void)setIconsForTabBarItem:(UITabBarItem *)tabBarItem
+           withImageLoader:imageLoader
+                asTemplate:isTemplate
+           completionBlock:^(UIImage *image) {
+-            tabBarItem.selectedImage = image;
++            [self updateTabBarItem:weakTabBarItem withImage:image isSelected:YES forScreenView:weakScreenView];
+           }];
+     } else {
+       tabBarItem.selectedImage = nil;
+@@ -91,6 +98,29 @@ - (void)setIconsForTabBarItem:(UITabBarItem *)tabBarItem
+   }
+ }
+ 
++- (void)updateTabBarItem:(nullable UITabBarItem *)tabBarItem
++               withImage:(nullable UIImage *)image
++              isSelected:(BOOL)isSelected
++           forScreenView:(nullable RNSBottomTabsScreenComponentView *)screenView
++{
++  // Called from an asynchronous context. On iOS 26+ the tab bar item can
++  // already be gone, or the screen's controller detached from the
++  // UITabBarController, by the time the image arrives.
++  if (tabBarItem == nil || screenView == nil) {
++    return;
++  }
++
++  if (screenView.controller.parentViewController == nil) {
++    return;
++  }
++
++  if (isSelected) {
++    tabBarItem.selectedImage = image;
++  } else {
++    tabBarItem.image = image;
++  }
++}
++
+ - (void)loadImageFrom:(nonnull RCTImageSource *)imageSource
+       withImageLoader:(nonnull RCTImageLoader *)imageLoader
+            asTemplate:(bool)isTemplate
