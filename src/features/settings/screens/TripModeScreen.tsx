@@ -74,7 +74,7 @@ export default function TripModeScreen() {
   };
 
   return (
-    <SafeAreaView style={st.root} edges={['bottom']}>
+    <SafeAreaView style={st.root} edges={['bottom', 'right']}>
       <ScrollView contentContainerStyle={st.content}>
         <View style={st.section}>
           <Text style={s.sectionLabel}>Trip Mode</Text>

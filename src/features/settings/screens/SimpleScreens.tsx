@@ -27,7 +27,7 @@ const Root = ({ children }: { children: React.ReactNode }) => {
   const { colors } = useTheme();
   const st = useMemo(() => makeLocalStyles(colors), [colors]);
   return (
-    <SafeAreaView style={st.root} edges={['bottom']}>
+    <SafeAreaView style={st.root} edges={['bottom', 'right']}>
       <ScrollView contentContainerStyle={st.content}>{children}</ScrollView>
     </SafeAreaView>
   );

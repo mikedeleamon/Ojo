@@ -468,7 +468,7 @@ export default function NotificationsScreen() {
     return (
         <SafeAreaView
             style={st.root}
-            edges={['bottom']}
+            edges={['bottom', 'right']}
         >
             <ScrollView contentContainerStyle={st.content}>
                 {/* Before iOS has asked, this button opens the system prompt, so it

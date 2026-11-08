@@ -694,7 +694,9 @@ export default function PreferencesScreen() {
     return (
         <SafeAreaView
             style={styles.root}
-            edges={[]}
+            // Bottom is handled by tabPad in the scroll content; 'right' keeps
+            // the cards clear of the iPhone Duo's side column.
+            edges={['right']}
         >
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
