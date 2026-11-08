@@ -26,7 +26,7 @@ const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     borderRadius: radius.sm, borderWidth: 1, borderColor: colors.glassBorder,
     padding: spacing.sm, gap: 4,
   },
-  statLabel: { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  statLabel: { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textLabel, textTransform: 'uppercase', letterSpacing: 0.5 },
   statValue: { fontFamily: fonts.body, fontSize: fontSizes.base, color: colors.textPrimary, fontWeight: fontWeights.medium },
   pillRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   pill: {
@@ -51,13 +51,13 @@ interface StatsProps {
  * two-pane Home shows these in the weather pane, apart from the outfit.
  */
 export const WeatherStats = memo(({ weather, settings, showAll = false }: StatsProps) => {
-  const { colors } = useTheme();
+  const { colors, innerGlassTint } = useTheme();
   const st = useMemo(() => makeStyles(colors), [colors]);
   const [expanded, setExpanded] = useState(false);
   const isMetric = settings.temperatureScale === 'Metric';
 
   const Stat = ({ label, value }: { label: string; value: string }) => (
-    <GlassCard style={st.stat}>
+    <GlassCard style={st.stat} glassTint={innerGlassTint}>
       <Text style={st.statLabel}>{label}</Text>
       <Text style={st.statValue}>{value}</Text>
     </GlassCard>
@@ -69,9 +69,9 @@ export const WeatherStats = memo(({ weather, settings, showAll = false }: StatsP
 
   const pillColor = (value?: string) => {
     if (!value) return { border: colors.glassBorder, text: colors.textMuted };
-    if (BAD_LABELS.has(value)) return { border: 'rgba(239,68,68,0.40)', text: 'rgba(252,165,165,0.9)' };
-    if (MID_LABELS.has(value)) return { border: 'rgba(251,191,36,0.40)', text: 'rgba(251,191,36,0.9)' };
-    return { border: 'rgba(52,211,153,0.35)', text: 'rgba(52,211,153,0.9)' };
+    if (BAD_LABELS.has(value)) return { border: 'rgba(239,68,68,0.40)', text: colors.ratingPoor };
+    if (MID_LABELS.has(value)) return { border: 'rgba(251,191,36,0.40)', text: colors.ratingMid };
+    return { border: 'rgba(52,211,153,0.35)', text: colors.ratingHigh };
   };
 
   const ConditionPill = ({ label, value }: { label: string; value?: string }) => {

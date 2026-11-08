@@ -3,6 +3,7 @@ import { StyleSheet, Animated } from 'react-native';
 import { View, Text } from '../primitives';
 import { ColorTokens, fonts, fontSizes } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
+import { LIGHT_SKY_TEXT } from '../../lib/weather/skyContrast';
 import { useSpinAnimation } from '../../hooks/useSpinAnimation';
 import { getMoonPhase } from '../../lib/moonPhase';
 import ClearNightIcon from '../WeatherIcons/ClearNightIcon';
@@ -50,6 +51,10 @@ interface Props {
      *  Defaults to `size === 'large'` so existing callers are unchanged. The
      *  sticky mini header opts in explicitly with `animate` to mirror the hero. */
     animate?: boolean;
+    /** The sky behind is pale: give the temperature text a dark halo. */
+    onLightSky?: boolean;
+    /** Icon colour. White by default; dark on a light surface (the Now tile). */
+    color?: string;
 }
 
 const makeStyles = (colors: ColorTokens) =>
@@ -91,6 +96,8 @@ const WeatherIconDisplay = ({
     feelsLike,
     latitude,
     animate = size !== 'small',
+    onLightSky = false,
+    color,
 }: Props) => {
     const { colors } = useTheme();
     const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -135,7 +142,7 @@ const WeatherIconDisplay = ({
                 isHero ? (
                     // Hero: moon phase disc only — stars are in the full-screen backdrop.
                     <ClearNightIconMoon
-                        size={iconSize}
+                        size={iconSize} color={color}
                         showStars={false}
                         moonPhase={moonPhase}
                         mirrorDisc={southernHemisphere}
@@ -145,7 +152,7 @@ const WeatherIconDisplay = ({
                     // animate=true on the sticky mini enables twinkling; the
                     // forecast strip gets animate=false (cheap, no per-frame cost).
                     <ClearNightIcon
-                        size={iconSize}
+                        size={iconSize} color={color}
                         starCount={10}
                         animate={animate}
                         moonPhase={moonPhase}
@@ -153,37 +160,37 @@ const WeatherIconDisplay = ({
                     />
                 )
             ) : isRainy ? (
-                <RainyIcon size={iconSize} animate={animate} />
+                <RainyIcon size={iconSize} color={color} animate={animate} />
             ) : isStorm ? (
                 animate ? (
-                    <StormIconLightning size={iconSize} />
+                    <StormIconLightning size={iconSize} color={color} />
                 ) : (
-                    <StormIcon size={iconSize} />
+                    <StormIcon size={iconSize} color={color} />
                 )
             ) : isPartlyCloudyNight ? (
-                <PartlyCloudyNightIcon size={iconSize} />
+                <PartlyCloudyNightIcon size={iconSize} color={color} />
             ) : isPartlyCloudy ? (
-                <PartlyCloudyIcon size={iconSize} animate={animate} />
+                <PartlyCloudyIcon size={iconSize} color={color} animate={animate} />
             ) : isCloudy ? (
-                <CloudyIcon size={iconSize} />
+                <CloudyIcon size={iconSize} color={color} />
             ) : isSunny ? (
                 animate ? (
                     <Animated.View
                         style={[iconStyle, { transform: [{ rotate }] }]}
                     >
-                        <SunnyIcon size={iconSize} />
+                        <SunnyIcon size={iconSize} color={color} />
                     </Animated.View>
                 ) : (
-                    <SunnyIcon size={iconSize} />
+                    <SunnyIcon size={iconSize} color={color} />
                 )
             ) : isSnow ? (
-                <SnowIcon size={iconSize} />
+                <SnowIcon size={iconSize} color={color} />
             ) : null}
             {isLarge && temperature !== undefined && (
                 <View style={styles.temps}>
-                    <Text style={styles.temp}>{temperature}°</Text>
+                    <Text style={[styles.temp, onLightSky && LIGHT_SKY_TEXT]}>{temperature}°</Text>
                     {feelsLike !== undefined && (
-                        <Text style={styles.feelsLike}>
+                        <Text style={[styles.feelsLike, onLightSky && LIGHT_SKY_TEXT]}>
                             Feels like: {feelsLike}°
                         </Text>
                     )}

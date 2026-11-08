@@ -1,5 +1,6 @@
 import { StyleSheet } from 'react-native';
 import { ColorTokens, fonts, fontSizes, spacing } from '../../theme/tokens';
+import { LIGHT_SKY_SCRIM } from '../../lib/weather/skyContrast';
 
 export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     root: { flex: 1 },
@@ -83,10 +84,12 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         fontSize: fontSizes.lg,
         color: 'rgba(255,255,255,0.75)',
     },
+    // 60%, not 35%: at 35% it measured 3.2:1 even on the clear-night sky, and
+    // this style also sets the WeatherKit attribution, which must stay legible.
     lastUpdated: {
         fontFamily: fonts.body,
         fontSize: fontSizes.sm,
-        color: 'rgba(255,255,255,0.35)',
+        color: 'rgba(255,255,255,0.6)',
         marginTop: 2,
     },
     retryBtn: {
@@ -181,6 +184,13 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         fontSize: fontSizes.sm,
         color: colors.textSecondary,
     },
+    // On a pale sky the pill sits on the near-white horizon: give it a navy
+    // surface and full-strength text.
+    shareForecastBtnLight: {
+        backgroundColor: LIGHT_SKY_SCRIM,
+        borderColor: 'rgba(255,255,255,0.18)',
+    },
+    shareForecastBtnTextLight: { color: colors.textPrimary },
 
     hiLo: {
         fontFamily: fonts.body,

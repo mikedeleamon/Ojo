@@ -14,10 +14,10 @@ const ConfidencePip = ({ value }: { value: number }) => {
     const pct = Math.round(value * 100);
     const col =
         pct >= 80
-            ? 'rgba(52,211,153,0.85)'
+            ? colors.ratingHigh
             : pct >= 60
-              ? 'rgba(251,191,36,0.85)'
-              : 'rgba(148,163,184,0.75)';
+              ? colors.ratingMid
+              : colors.ratingLow;
     return (
         <View style={[layerStyles.confidencePip, { borderColor: col }]}>
             <Text style={[layerStyles.confidenceText, { color: col }]}>
@@ -57,7 +57,7 @@ const LayerRow = ({
 };
 
 export const LayeringSection = ({ layering }: { layering: LayeringResult }) => {
-    const { colors } = useTheme();
+    const { colors, innerGlassTint } = useTheme();
     const perf = usePerfFlags();
     const layerStyles = useMemo(() => makeLayerStyles(colors), [colors]);
     const hasLayers =
@@ -78,6 +78,7 @@ export const LayeringSection = ({ layering }: { layering: LayeringResult }) => {
                 <GlassCard
                     style={layerStyles.layerStack}
                     disableGlass={!perf.outfitInnerGlass}
+                    glassTint={innerGlassTint}
                 >
                     {LAYER_TIERS.map(({ key, label }) => (
                         <LayerRow

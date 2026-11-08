@@ -9,6 +9,7 @@ import {
     AppState,
     Animated as RNAnimated,
     Easing as RNEasing,
+    StyleSheet,
 } from 'react-native';
 import Animated, {
     useSharedValue,
@@ -57,7 +58,7 @@ import {
 } from '../../types';
 import { geocodeCity } from '../../lib/geocoding';
 import { spacing } from '../../theme/tokens';
-import { useTheme } from '../../theme/ThemeContext';
+import { useTheme, ThemeOverride } from '../../theme/ThemeContext';
 import { blendHsl, flattenHsl, hslToHex, lerpHslFlat } from './colorMath';
 
 // LinearGradient driven by a UI-thread worklet via useAnimatedProps. The
@@ -80,6 +81,17 @@ import BackdropLayer, { SCROLL_RANGE } from './BackdropLayer';
 import PerfPanel from '../debug/PerfPanel';
 import { usePerfFlags } from '../../lib/debug/perfFlags';
 import LastUpdated from './LastUpdated';
+import {
+    HAZY_BACKDROP_LIFT,
+    isLightSky,
+    lightSkyFade,
+    LIGHT_SKY_CARD_TEXT,
+    LIGHT_SKY_CARD_TINT,
+    LIGHT_SKY_INNER_TINT,
+    LIGHT_SKY_SCRIM,
+    LIGHT_SKY_TEXT,
+    PARTICLE_BACKDROP_LIFT,
+} from '../../lib/weather/skyContrast';
 import { fToC } from '../../lib/units';
 import { humanizeCondition } from '../../lib/weather/humanizeCondition';
 import { makeStyles } from './WeatherHUD.styles';
@@ -538,6 +550,10 @@ const WeatherHUD = ({
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [gradientKey],
     );
+    // Pale skies (snow, sunny days, sunrise and sunset, hot, fog, haze) need
+    // darker tiles and haloed text to stay readable; see lib/weather/skyContrast.
+    const lightSky = useMemo(() => isLightSky(targetGradient), [targetGradient]);
+    const skyText = lightSky ? LIGHT_SKY_TEXT : null;
 
     // Publish the tab-bar accent off the same memoised gradient. Deliberately
     // *not* driven from the animated gradient above: `tintColor` is a native
@@ -787,6 +803,18 @@ const WeatherHUD = ({
     const isSleetBg = layers.rain === 'sleet';
     const isFogBg = layers.fog;
     const isGlareBg = layers.glare;
+    // Glare and fog drift lighten the sky behind the header more than falling
+    // snow or rain does, so the fade allows for more of it under them.
+    const skyFade = useMemo(
+        () =>
+            lightSky
+                ? lightSkyFade(
+                      targetGradient,
+                      isGlareBg || isFogBg ? HAZY_BACKDROP_LIFT : PARTICLE_BACKDROP_LIFT,
+                  )
+                : null,
+        [lightSky, targetGradient, isGlareBg, isFogBg],
+    );
 
     // ── Backdrop animation gate ──────────────────────────────────────────────
     //
@@ -913,14 +941,14 @@ const WeatherHUD = ({
         <>
                         {forecasts.length > 0 && (
                             <Pressable
-                                style={st.shareForecastBtn}
+                                style={[st.shareForecastBtn, lightSky && st.shareForecastBtnLight]}
                                 onPress={() => setShowShareSheet(true)}
                                 accessibilityRole='button'
                                 accessibilityLabel='Share forecast to Instagram'
                             >
                                 <View style={st.shareForecastBtnRow}>
-                                    <CameraIcon size={15} color={colors.textSecondary} decorative />
-                                    <Text style={st.shareForecastBtnText}>
+                                    <CameraIcon size={15} color={lightSky ? colors.textPrimary : colors.textSecondary} decorative />
+                                    <Text style={[st.shareForecastBtnText, lightSky && st.shareForecastBtnTextLight]}>
                                         Share forecast
                                     </Text>
                                 </View>
@@ -939,7 +967,7 @@ const WeatherHUD = ({
                                 accessibilityRole='link'
                                 accessibilityLabel='Weather data provided by Apple Weather'
                             >
-                                <Text style={st.lastUpdated}>
+                                <Text style={[st.lastUpdated, skyText]}>
                                     {' '}
                                     Weather data provided by Apple Weather
                                 </Text>
@@ -1133,6 +1161,18 @@ const WeatherHUD = ({
                 <FogDrift animate={backdropAnimate} />
             </BackdropLayer>
 
+            {/* Light skies only: a fade behind the header, sized to the sky
+                and in its own hue, over the sky and its particles, under the
+                content. See lightSkyFade in lib/weather/skyContrast. */}
+            {skyFade && (
+                <LinearGradient
+                    pointerEvents='none'
+                    colors={skyFade.colors}
+                    locations={skyFade.locations}
+                    style={StyleSheet.absoluteFill}
+                />
+            )}
+
             {/* Transparent loading spinner — sits over the animating gradient.
                 Suppressed when a parent owns the loading gate (showInlineLoader). */}
             {showInlineLoader && loaderMounted && (
@@ -1204,20 +1244,20 @@ const WeatherHUD = ({
                                 }}
                             >
                                 <Text
-                                    style={st.city}
+                                    style={[st.city, skyText]}
                                     numberOfLines={1}
                                     adjustsFontSizeToFit
                                     minimumFontScale={0.6}
                                 >
                                     {place?.name}
                                 </Text>
-                                <Text style={st.condition} numberOfLines={1}>
+                                <Text style={[st.condition, skyText]} numberOfLines={1}>
                                     {humanizeCondition(weather.WeatherText)}
                                 </Text>
                                 {lastUpdated && (
                                     <LastUpdated
                                         date={lastUpdated}
-                                        style={st.lastUpdated}
+                                        style={[st.lastUpdated, skyText]}
                                     />
                                 )}
                                 <View style={st.paneTempRow}>
@@ -1228,8 +1268,8 @@ const WeatherHUD = ({
                                         latitude={place?.lat}
                                     />
                                     <View style={st.paneTemps}>
-                                        <Text style={st.paneTemp}>{tempVal}°</Text>
-                                        <Text style={st.coverFeels}>
+                                        <Text style={[st.paneTemp, skyText]}>{tempVal}°</Text>
+                                        <Text style={[st.coverFeels, skyText]}>
                                             Feels like {feelsVal}°
                                             {hiTemp !== null && loTemp !== null
                                                 ? ` · H:${hiTemp}° L:${loTemp}°`
@@ -1251,20 +1291,20 @@ const WeatherHUD = ({
                             >
                                 <View style={st.coverHeroPlace}>
                                     <Text
-                                        style={st.city}
+                                        style={[st.city, skyText]}
                                         numberOfLines={1}
                                         adjustsFontSizeToFit
                                         minimumFontScale={0.6}
                                     >
                                         {place?.name}
                                     </Text>
-                                    <Text style={st.condition} numberOfLines={1}>
+                                    <Text style={[st.condition, skyText]} numberOfLines={1}>
                                         {humanizeCondition(weather.WeatherText)}
                                     </Text>
                                     {lastUpdated && (
                                         <LastUpdated
                                             date={lastUpdated}
-                                            style={st.lastUpdated}
+                                            style={[st.lastUpdated, skyText]}
                                         />
                                     )}
                                 </View>
@@ -1276,11 +1316,11 @@ const WeatherHUD = ({
                                             animate
                                             latitude={place?.lat}
                                         />
-                                        <Text style={st.coverTemp}>{tempVal}°</Text>
+                                        <Text style={[st.coverTemp, skyText]}>{tempVal}°</Text>
                                     </View>
-                                    <Text style={st.coverFeels}>Feels like: {feelsVal}°</Text>
+                                    <Text style={[st.coverFeels, skyText]}>Feels like: {feelsVal}°</Text>
                                     {hiTemp !== null && loTemp !== null && (
-                                        <Text style={st.coverHiLo}>
+                                        <Text style={[st.coverHiLo, skyText]}>
                                             H:{hiTemp}° L:{loTemp}°
                                         </Text>
                                     )}
@@ -1294,14 +1334,14 @@ const WeatherHUD = ({
                                     { paddingTop: spacing.lg + topInset },
                                 ]}
                             >
-                                <Text style={st.city}>{place?.name}</Text>
-                                <Text style={st.condition}>
+                                <Text style={[st.city, skyText]}>{place?.name}</Text>
+                                <Text style={[st.condition, skyText]}>
                                     {humanizeCondition(weather.WeatherText)}
                                 </Text>
                                 {lastUpdated && (
                                     <LastUpdated
                                         date={lastUpdated}
-                                        style={st.lastUpdated}
+                                        style={[st.lastUpdated, skyText]}
                                     />
                                 )}
                             </View>
@@ -1319,12 +1359,13 @@ const WeatherHUD = ({
                                     condition={weather.WeatherText}
                                     isDay={weather.IsDayTime}
                                     size='large'
+                                    onLightSky={lightSky}
                                     temperature={tempVal}
                                     feelsLike={feelsVal}
                                     latitude={place?.lat}
                                 />
                                 {hiTemp !== null && loTemp !== null && (
-                                    <Text style={st.hiLo}>
+                                    <Text style={[st.hiLo, skyText]}>
                                         H:{hiTemp}° L:{loTemp}°
                                     </Text>
                                 )}
@@ -1387,6 +1428,7 @@ const WeatherHUD = ({
                                                     ) === hourBucket
                                                 }
                                                 disableGlass={!perf.glass}
+                                                onLightSky={lightSky}
                                             />
                                         ) : (
                                             <SunEventTile
@@ -1395,6 +1437,7 @@ const WeatherHUD = ({
                                                 temperature={item.temp}
                                                 tempUnit={isMetric ? 'C' : 'F'}
                                                 disableGlass={!perf.glass}
+                                                onLightSky={lightSky}
                                             />
                                         ),
                                     )}
@@ -1403,8 +1446,17 @@ const WeatherHUD = ({
                         )}
 
                         {twoPane && (
-                            <GlassCard style={st.details} disableGlass={!perf.outfitCardGlass}>
-                                <WeatherStats weather={weather} settings={settings} showAll />
+                            <GlassCard
+                                style={st.details}
+                                disableGlass={!perf.outfitCardGlass}
+                                glassTint={lightSky ? LIGHT_SKY_CARD_TINT : undefined}
+                            >
+                                <ThemeOverride
+                                    colors={lightSky ? LIGHT_SKY_CARD_TEXT : undefined}
+                                    innerGlassTint={lightSky ? LIGHT_SKY_INNER_TINT : undefined}
+                                >
+                                    <WeatherStats weather={weather} settings={settings} showAll />
+                                </ThemeOverride>
                             </GlassCard>
                         )}
                         {twoPane && shareAndAttribution}
@@ -1447,16 +1499,26 @@ const WeatherHUD = ({
                                     : null,
                             ]}
                             disableGlass={!perf.outfitCardGlass}
+                            // Light skies: the card's glass darkens, the glass
+                            // inside it a little less, and its grey text lifts to
+                            // near-white, so every line on it clears 4.5:1. See
+                            // LIGHT_SKY_CARD_TINT.
+                            glassTint={lightSky ? LIGHT_SKY_CARD_TINT : undefined}
                         >
-                            <WeatherDetails
-                                weather={weather}
-                                settings={settings}
-                                forecasts={forecasts}
-                                daily={daily}
-                                city={place?.name}
-                                coords={place ?? undefined}
-                                showStats={!twoPane}
-                            />
+                            <ThemeOverride
+                                colors={lightSky ? LIGHT_SKY_CARD_TEXT : undefined}
+                                innerGlassTint={lightSky ? LIGHT_SKY_INNER_TINT : undefined}
+                            >
+                                <WeatherDetails
+                                    weather={weather}
+                                    settings={settings}
+                                    forecasts={forecasts}
+                                    daily={daily}
+                                    city={place?.name}
+                                    coords={place ?? undefined}
+                                    showStats={!twoPane}
+                                />
+                            </ThemeOverride>
                         </GlassCard>
                         </View>
 
@@ -1483,6 +1545,9 @@ const WeatherHUD = ({
                             <GlassCard
                                 glassStyle='clear'
                                 style={st.locationsBtn}
+                                // Light skies: the buttons take the tiles' scrim,
+                                // or their white glyphs drop under 3:1.
+                                tintColor={lightSky ? LIGHT_SKY_SCRIM : undefined}
                                 disableGlass={!perf.glass}
                             >
                                 <Pressable
@@ -1538,6 +1603,7 @@ const WeatherHUD = ({
                         <GlassCard
                             glassStyle='clear'
                             style={st.gearBtn}
+                            tintColor={lightSky ? LIGHT_SKY_SCRIM : undefined}
                             disableGlass={!perf.glass}
                         >
                             <Pressable

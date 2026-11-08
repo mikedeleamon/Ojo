@@ -10,6 +10,7 @@ import {
     spacing,
 } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
+import { LIGHT_SKY_SCRIM } from '../../lib/weather/skyContrast';
 
 interface Props {
     time: string; // ISO timestamp of the sunrise / sunset moment
@@ -18,6 +19,8 @@ interface Props {
     /** Forwarded from the dev perf panel so the strip participates in the
      *  glass on/off bisection along with the rest of the HUD. */
     disableGlass?: boolean;
+    /** The sky behind is pale: darken the tile like the hourly ones. */
+    onLightSky?: boolean;
 }
 
 const formatExactTime = (iso: string) =>
@@ -51,9 +54,10 @@ const makeStyles = (colors: ColorTokens) =>
             fontSize: fontSizes.xs,
             color: colors.textPrimary,
         },
+        cardLight: { backgroundColor: LIGHT_SKY_SCRIM },
     });
 
-const SunEventTile = ({ time, temperature, tempUnit, disableGlass }: Props) => {
+const SunEventTile = ({ time, temperature, tempUnit, disableGlass, onLightSky = false }: Props) => {
     const { colors } = useTheme();
     const styles = useMemo(() => makeStyles(colors), [colors]);
     return (
@@ -61,7 +65,8 @@ const SunEventTile = ({ time, temperature, tempUnit, disableGlass }: Props) => {
         // sits between — see MinimizedWeatherDisplay.
         <GlassCard
             glassStyle='clear'
-            style={styles.card}
+            style={[styles.card, onLightSky && styles.cardLight]}
+            tintColor={onLightSky ? LIGHT_SKY_SCRIM : undefined}
             disableGlass={disableGlass}
         >
             <Text style={styles.time}>{formatExactTime(time)}</Text>

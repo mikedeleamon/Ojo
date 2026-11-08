@@ -129,7 +129,7 @@ const ArticleThumb = ({
     role: OutfitRole;
     onRemove?: () => void;
 }) => {
-    const { colors } = useTheme();
+    const { colors, innerGlassTint } = useTheme();
     const perf = usePerfFlags();
     const styles = useMemo(() => makeStyles(colors), [colors]);
     return (
@@ -140,6 +140,8 @@ const ArticleThumb = ({
         <GlassCard
             style={styles.articleCard}
             disableGlass={!perf.outfitInnerGlass}
+            // Light skies: darkened with the card around it (see ThemeOverride).
+            glassTint={innerGlassTint}
         >
             <View style={styles.articleImg}>
                 {article.imageUrl ? (
@@ -214,10 +216,10 @@ const ScoreBadge = ({
     const styles = useMemo(() => makeStyles(colors), [colors]);
     const color =
         score >= 80
-            ? 'rgba(52,211,153,0.9)'
+            ? colors.ratingHigh
             : score >= 60
-              ? 'rgba(251,191,36,0.9)'
-              : 'rgba(148,163,184,0.9)';
+              ? colors.ratingMid
+              : colors.ratingLow;
     const label = isPersonalized ? 'Your Score' : 'Outfit Score';
     return (
         <View style={[styles.scoreBadge, { borderColor: color }]}>

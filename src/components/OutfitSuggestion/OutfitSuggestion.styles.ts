@@ -210,7 +210,7 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     roleLabel: {
         fontFamily: fonts.body,
         fontSize: 10,
-        color: colors.textMuted,
+        color: colors.textLabel,
         textTransform: 'uppercase',
         letterSpacing: 0.5,
     },
@@ -223,7 +223,7 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     articleMeta: {
         fontFamily: fonts.body,
         fontSize: 10,
-        color: colors.textMuted,
+        color: colors.textLabel,
     },
     breakdownToggle: { paddingVertical: 6, alignSelf: 'flex-start' },
     breakdownToggleText: {
@@ -518,7 +518,7 @@ export const makeLayerStyles = (colors: ColorTokens) => StyleSheet.create({
     layerTierLabel: {
         fontFamily: fonts.body,
         fontSize: 10,
-        color: colors.textMuted,
+        color: colors.textLabel,
         textTransform: 'uppercase',
         letterSpacing: 0.5,
         width: 36,
@@ -544,7 +544,7 @@ export const makeLayerStyles = (colors: ColorTokens) => StyleSheet.create({
     layerFabric: {
         fontFamily: fonts.body,
         fontSize: 10,
-        color: colors.textMuted,
+        color: colors.textLabel,
     },
     recommendation: {
         fontFamily: fonts.body,
@@ -557,7 +557,7 @@ export const makeLayerStyles = (colors: ColorTokens) => StyleSheet.create({
     timelineTime: {
         fontFamily: fonts.body,
         fontSize: 10,
-        color: colors.textMuted,
+        color: colors.textLabel,
         width: 68,
         textTransform: 'uppercase',
         letterSpacing: 0.5,
