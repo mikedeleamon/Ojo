@@ -99,3 +99,34 @@ export function computeFoldLayout(
     gutter: 0,
   };
 }
+
+/**
+ * Home only. The Duo's inner screen turned upright (669×951) fails the two-pane
+ * rule on aspect, so it reports 'compact', yet the fold runs across the middle of
+ * the window. Home then puts the weather above the fold and the outfit below it.
+ *
+ * Separate from isTwoPane on purpose: Closet, Login, Onboarding, Auth and Settings
+ * test mode === 'two-pane' without checking the axis, so changing that rule would
+ * flip them too. iOS only: Android has no hinge data here yet, and a Galaxy Z
+ * Fold's inner screen is this shape with its fold running the other way.
+ */
+export const STACKED_HOME_MIN_WIDTH = 600;
+export const STACKED_HOME_MIN_HEIGHT = 840;
+
+export type StackedHome = {
+  /** Height of the weather half, ending short of the fold. */
+  weatherHeight: number;
+  /** Where the outfit half starts, past the fold. */
+  outfitTop: number;
+};
+
+export function stackedHomeSplit(os: string, layout: FoldLayout): StackedHome | null {
+  if (os !== 'ios' || layout.mode !== 'compact') return null;
+  const { width, height } = layout.window;
+  if (width < STACKED_HOME_MIN_WIDTH || height < STACKED_HOME_MIN_HEIGHT) return null;
+  const keepClear = FOLD_GUTTER / 2;
+  return {
+    weatherHeight: Math.round(height / 2 - keepClear),
+    outfitTop: Math.round(height / 2 + keepClear),
+  };
+}

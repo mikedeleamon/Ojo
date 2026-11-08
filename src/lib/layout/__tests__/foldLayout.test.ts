@@ -1,4 +1,4 @@
-import { computeFoldLayout, FOLD_GUTTER, type Hinge } from '../foldLayout';
+import { computeFoldLayout, FOLD_GUTTER, stackedHomeSplit, type Hinge } from '../foldLayout';
 
 const verticalFold = (x: number, height: number, overrides: Partial<Hinge> = {}): Hinge => ({
   bounds: { x, y: 0, width: 0, height },
@@ -108,5 +108,28 @@ describe('computeFoldLayout', () => {
       expect(half.mode).toBe(flat.mode);
       expect(half.panes).toEqual(flat.panes);
     });
+  });
+});
+
+describe('stackedHomeSplit', () => {
+  const split = (width: number, height: number, os = 'ios') =>
+    stackedHomeSplit(os, computeFoldLayout({ width, height }));
+
+  it('splits the iPhone Duo inner screen, turned upright, at the fold', () => {
+    expect(split(669, 951)).toEqual({ weatherHeight: 464, outfitTop: 488 });
+  });
+
+  it.each([
+    ['Duo inner screen, usual pose', 951, 669],
+    ['Duo cover', 466, 678],
+    ['iPhone 17 Pro Max', 440, 956],
+    ['iPhone SE', 375, 667],
+    ['wide enough but short', 669, 700],
+  ])('leaves %s alone', (_name, width, height) => {
+    expect(split(width, height)).toBeNull();
+  });
+
+  it('stays off Android, where the fold can run the other way', () => {
+    expect(split(669, 951, 'android')).toBeNull();
   });
 });

@@ -18,6 +18,7 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     loadingIcon: { width: 80, height: 80 },
     scroll: { flexGrow: 1, paddingBottom: spacing.xl },
     scrollRow: { flexDirection: 'row', alignItems: 'flex-start' },
+    scrollStacked: { paddingTop: spacing.xsPlus },
     center: {
         flex: 1,
         alignItems: 'center',
@@ -49,6 +50,7 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     locationsBtn: { borderRadius: 999, overflow: 'hidden' },
     locationsBtnInner: { padding: 8 },
     locationsBtnPlaceholder: { width: 44, height: 44 },
+    barBtnInnerStacked: { padding: 11 },
     miniWrap: {
         maxWidth: '60%',
     },
@@ -127,20 +129,46 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         alignItems: 'flex-start',
         gap: 4,
         paddingHorizontal: 20,
-        paddingBottom: spacing.md,
+        paddingBottom: spacing.sm,
     },
     paneTempRow: {
+        alignSelf: 'center',
         flexDirection: 'row',
         alignItems: 'center',
         gap: spacing.md,
-        marginTop: spacing.sm,
+        marginTop: 10,
     },
-    paneTemps: { gap: 2 },
+    // Tucked into the empty bottom of the icon's box, so the hours below stay put.
+    paneFeels: { alignSelf: 'center', marginTop: -10 },
     paneTemp: {
         fontFamily: fonts.hero,
         fontSize: 80,
         lineHeight: 88,
         color: colors.textPrimary,
+    },
+    // Duo inner screen turned upright: the half above the fold.
+    stackedHero: { alignItems: 'center', paddingHorizontal: 20 },
+    // Same height as the buttons either side; the padding keeps a long city name
+    // clear of them.
+    stackedCityRow: { height: 44, alignSelf: 'stretch', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 64 },
+    stackedCity: { fontFamily: fonts.hero, fontSize: 34, color: colors.textPrimary },
+    stackedStatus: { flexDirection: 'row', marginTop: 2 },
+    stackedStatusText: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.base,
+        lineHeight: 18,
+        color: 'rgba(255,255,255,0.85)',
+    },
+    stackedTempRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.smPlus, marginTop: 6 },
+    stackedTemp: { fontFamily: fonts.hero, fontSize: 100, lineHeight: 110, color: colors.textPrimary },
+    stackedFeels: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.base,
+        lineHeight: 20,
+        color: 'rgba(255,255,255,0.9)',
+        // The temperature's line box is taller than its digits.
+        marginTop: -4,
+        marginBottom: spacing.smPlus,
     },
     coverHeroPlace: { flex: 1, gap: 4 },
     coverHeroTemps: { alignItems: 'flex-end' },
@@ -209,6 +237,7 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         paddingHorizontal: spacing.md,
         paddingBottom: spacing.md,
     },
+    forecastStripStacked: { paddingBottom: 14 },
     details: {
         marginHorizontal: spacing.md,
         backgroundColor: colors.glassBg,

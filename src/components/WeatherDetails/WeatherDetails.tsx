@@ -1,5 +1,5 @@
 import { useState, useMemo, memo } from 'react';
-import { ActivityIndicator, StyleSheet, Pressable } from 'react-native';
+import { ActivityIndicator, StyleSheet, Pressable, type StyleProp, type TextStyle } from 'react-native';
 import { Svg, Path } from 'react-native-svg';
 import { View, Text, GlassCard, GlassGroup } from '../primitives';
 import OutfitSuggestion from '../OutfitSuggestion/OutfitSuggestion';
@@ -36,7 +36,24 @@ const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   },
   pillLabel: { fontFamily: fonts.body, fontSize: fontSizes.xs, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
   pillValue: { fontFamily: fonts.body, fontSize: fontSizes.xs, fontWeight: fontWeights.semibold },
+  line:      { flexDirection: 'row', paddingHorizontal: spacing.md },
+  lineCell:  { flex: 1, alignItems: 'center' },
+  lineCellDivided: { borderLeftWidth: StyleSheet.hairlineWidth * 2, borderLeftColor: 'rgba(255,255,255,0.22)' },
+  lineLabel: { fontFamily: fonts.body, fontSize: fontSizes.xs, lineHeight: 14, letterSpacing: 1.4, textTransform: 'uppercase', color: 'rgba(255,255,255,0.85)' },
+  lineValue: { fontFamily: fonts.body, fontSize: 17, lineHeight: 22, color: colors.textPrimary, fontWeight: fontWeights.medium },
 });
+
+const windText = (weather: CurrentWeather, isMetric: boolean) =>
+  isMetric
+    ? `${weather.Wind.Speed.Metric.Value} km/h`
+    : `${weather.Wind.Speed.Imperial.Value} mph`;
+
+const visibilityText = (weather: CurrentWeather, isMetric: boolean) =>
+  weather.Visibility
+    ? isMetric
+      ? `${Math.round(weather.Visibility.Metric.Value)} km`
+      : `${Math.round(weather.Visibility.Imperial.Value)} mi`
+    : null;
 
 interface StatsProps {
   weather: CurrentWeather;
@@ -86,19 +103,13 @@ export const WeatherStats = memo(({ weather, settings, showAll = false }: StatsP
   };
 
   const hasConditionData = weather.AirQualityText || weather.PollenCategory;
-  const visibility = weather.Visibility
-    ? isMetric
-      ? `${Math.round(weather.Visibility.Metric.Value)} km`
-      : `${Math.round(weather.Visibility.Imperial.Value)} mi`
-    : null;
+  const visibility = visibilityText(weather, isMetric);
 
   return (
     <View style={st.root}>
       {/* Always-visible wind + humidity */}
       <GlassGroup spacing={spacing.sm} style={st.grid}>
-        <Stat label="Wind"     value={isMetric
-          ? `${weather.Wind.Speed.Metric.Value} km/h`
-          : `${weather.Wind.Speed.Imperial.Value} mph`} />
+        <Stat label="Wind"     value={windText(weather, isMetric)} />
         <Stat label="Humidity" value={`${weather.RelativeHumidity}%`} />
       </GlassGroup>
 
@@ -142,6 +153,48 @@ export const WeatherStats = memo(({ weather, settings, showAll = false }: StatsP
   );
 });
 WeatherStats.displayName = 'WeatherStats';
+
+interface StatsLineProps {
+  weather: CurrentWeather;
+  settings: Settings;
+  /** Merged onto the text, for a pale sky behind it. */
+  textStyle?: StyleProp<TextStyle>;
+}
+
+/**
+ * The four stats as one line straight on the sky, with hairlines and no boxes.
+ * For Home above the fold on the rotated Duo, where the hourly chips already sit
+ * right above it and four more boxes would crowd them.
+ */
+export const WeatherStatsLine = memo(({ weather, settings, textStyle }: StatsLineProps) => {
+  const { colors } = useTheme();
+  const st = useMemo(() => makeStyles(colors), [colors]);
+  const isMetric = settings.temperatureScale === 'Metric';
+  const visibility = visibilityText(weather, isMetric);
+  const stats = [
+    { label: 'Wind', value: windText(weather, isMetric) },
+    { label: 'Humidity', value: `${weather.RelativeHumidity}%` },
+    { label: 'UV Index', value: weather.UVIndexText },
+    ...(visibility ? [{ label: 'Visibility', value: visibility }] : []),
+  ];
+
+  return (
+    <View style={st.line}>
+      {stats.map(({ label, value }, i) => (
+        <View
+          key={label}
+          style={[st.lineCell, i > 0 && st.lineCellDivided]}
+          accessible
+          accessibilityLabel={`${label}: ${value}`}
+        >
+          <Text style={[st.lineLabel, textStyle]} numberOfLines={1}>{label}</Text>
+          <Text style={[st.lineValue, textStyle]} numberOfLines={1}>{value}</Text>
+        </View>
+      ))}
+    </View>
+  );
+});
+WeatherStatsLine.displayName = 'WeatherStatsLine';
 
 const WeatherDetails = ({ weather, settings, forecasts, daily, city, coords, showStats = true }: Props) => {
   const { colors } = useTheme();
