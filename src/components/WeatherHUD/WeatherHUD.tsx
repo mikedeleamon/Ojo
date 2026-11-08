@@ -39,9 +39,10 @@ import WeatherIconDisplay from '../WeatherIconDisplay/WeatherIconDisplay';
 import ClearNightIconMoon from '../WeatherIcons/ClearNightIconMoon';
 import StormIconLightning from '../WeatherIcons/StormIconLightning';
 import SunnyIcon from '../WeatherIcons/SunnyIcon';
-import WeatherDetails, { WeatherStats } from '../WeatherDetails/WeatherDetails';
+import WeatherDetails, { WeatherStats, WeatherStatsLine } from '../WeatherDetails/WeatherDetails';
 import { useFoldLayout } from '../../context/FoldLayoutContext';
 import { useSideRail } from '../../hooks/useSideRail';
+import { useStackedHome } from '../../hooks/useStackedHome';
 import MinimizedWeatherDisplay from '../MinimizedWeatherDisplay/MinimizedWeatherDisplay';
 import SunEventTile from '../SunEventTile/SunEventTile';
 import ShareToInstagramSheet from '../ShareCard/ShareToInstagramSheet';
@@ -86,6 +87,7 @@ import {
     HAZY_BACKDROP_LIFT,
     isLightSky,
     lightSkyFade,
+    STACKED_HOME_TEXT_BAND,
     LIGHT_SKY_CARD_TEXT,
     LIGHT_SKY_CARD_TINT,
     LIGHT_SKY_INNER_TINT,
@@ -96,6 +98,14 @@ import {
 import { fToC } from '../../lib/units';
 import { humanizeCondition } from '../../lib/weather/humanizeCondition';
 import { makeStyles } from './WeatherHUD.styles';
+
+/**
+ * Rotated Duo: the row under the status bar that holds Location, the city and
+ * Settings, measured down from the top inset. These are the HUD's own buttons,
+ * not native bar items as on the Duo's other poses: iOS would put those level
+ * with the clock, beside it rather than under it.
+ */
+const STACKED_NAV_ROW_TOP = 3;
 
 // ─── Sun-event helpers ────────────────────────────────────────────────────────
 // WeatherKit's daily forecast embeds `sunrise` / `sunset` ISO timestamps per
@@ -244,6 +254,9 @@ const WeatherHUD = ({
     // iPhone Duo: Location and Settings are nav-bar items in the side column
     // (MainPage), so the sticky bar drops its own buttons and the hero moves up.
     const sideRail = useSideRail();
+    // Duo inner screen turned upright: weather above the fold, outfit below it.
+    const stacked = useStackedHome();
+    const isStacked = stacked !== null;
     const twoPane = fold.mode === 'two-pane' && fold.axis === 'row' && fold.panes !== null;
     const paneHeight = fold.window.height;
     const weatherPaneStyle = twoPane && fold.panes
@@ -815,9 +828,10 @@ const WeatherHUD = ({
                 ? lightSkyFade(
                       targetGradient,
                       isGlareBg || isFogBg ? HAZY_BACKDROP_LIFT : PARTICLE_BACKDROP_LIFT,
+                      isStacked ? STACKED_HOME_TEXT_BAND : undefined,
                   )
                 : null,
-        [lightSky, targetGradient, isGlareBg, isFogBg],
+        [lightSky, targetGradient, isGlareBg, isFogBg, isStacked],
     );
 
     // ── Backdrop animation gate ──────────────────────────────────────────────
@@ -979,6 +993,314 @@ const WeatherHUD = ({
                         </View>
         </>
     );
+
+    // A const so it can sit in either place. Stacked, it lives outside the scroll
+    // view so the outfit can clip at the fold; otherwise it rides the scroll view
+    // (see pinnedPaneStyle). Only this pane moves, so a rotation doesn't remount
+    // OutfitSuggestion and lose the selected outfit.
+    const weatherPane = weather ? (
+        <ScrollView
+            // Stacked: only large text outgrows the half, and it scrolls in
+            // place instead of running across the fold.
+            scrollEnabled={twoPane || isStacked}
+            alwaysBounceVertical={!isStacked}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={twoPane ? { paddingBottom: tabPad } : undefined}
+        >
+        {/* Header — only city/condition/lastUpdated live in the
+            scroll surface now. The Locations/Gear buttons + a
+            scroll-driven mini summary moved to the sticky bar
+            below. */}
+        {stacked ? (
+            // The city sits in the row with Location and Settings (the sticky
+            // bar below), then one big temperature.
+            <View
+                style={[st.stackedHero, { paddingTop: topInset + STACKED_NAV_ROW_TOP }]}
+                onLayout={(e) => {
+                    const { y, height } = e.nativeEvent.layout;
+                    setHeroBottomY(y + height);
+                }}
+            >
+                <View style={st.stackedCityRow}>
+                    <Text
+                        style={[st.stackedCity, skyText]}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.6}
+                    >
+                        {place?.name}
+                    </Text>
+                </View>
+                <View style={st.stackedStatus}>
+                    <Text style={[st.stackedStatusText, skyText]} numberOfLines={1}>
+                        {humanizeCondition(weather.WeatherText)}
+                        {lastUpdated ? ' · ' : ''}
+                    </Text>
+                    {lastUpdated && (
+                        <LastUpdated
+                            date={lastUpdated}
+                            style={[st.stackedStatusText, skyText]}
+                        />
+                    )}
+                </View>
+                <View style={st.stackedTempRow}>
+                    <WeatherIconDisplay
+                        condition={weather.WeatherText}
+                        isDay={weather.IsDayTime}
+                        size='medium'
+                        latitude={place?.lat}
+                    />
+                    {/* Already display-sized. Growing with Dynamic Type only pushes
+                        the hours out of the half. */}
+                    <Text style={[st.stackedTemp, skyText]} maxFontSizeMultiplier={1}>
+                        {tempVal}°
+                    </Text>
+                </View>
+                <Text style={[st.stackedFeels, skyText]} numberOfLines={1}>
+                    Feels like {feelsVal}°
+                    {hiTemp !== null && loTemp !== null
+                        ? ` · H:${hiTemp}° L:${loTemp}°`
+                        : ''}
+                </Text>
+            </View>
+        ) : twoPane ? (
+            // Weather pane: the place reads first, then the icon
+            // beside the temperature, centred over the hours and
+            // stats, so they fit the pane instead of sitting under
+            // a tall hero.
+            // On the Duo the buttons live in the side column, so
+            // the place starts 40 pt down, level with the outfit
+            // pane's first row; otherwise 64 clears the sticky buttons.
+            <View
+                style={[st.paneHero, { paddingTop: (sideRail ? 40 : 64) + topInset }]}
+                onLayout={(e) => {
+                    const { y, height } = e.nativeEvent.layout;
+                    setHeroBottomY(y + height);
+                }}
+            >
+                <Text
+                    style={[st.city, skyText]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.6}
+                >
+                    {place?.name}
+                </Text>
+                <Text style={[st.condition, skyText]} numberOfLines={1}>
+                    {humanizeCondition(weather.WeatherText)}
+                </Text>
+                {lastUpdated && (
+                    <LastUpdated
+                        date={lastUpdated}
+                        style={[st.lastUpdated, skyText]}
+                    />
+                )}
+                <View style={st.paneTempRow}>
+                    <WeatherIconDisplay
+                        condition={weather.WeatherText}
+                        isDay={weather.IsDayTime}
+                        size='medium'
+                        latitude={place?.lat}
+                    />
+                    <Text style={[st.paneTemp, skyText]}>{tempVal}°</Text>
+                </View>
+                <Text style={[st.coverFeels, st.paneFeels, skyText]}>
+                    Feels like {feelsVal}°
+                    {hiTemp !== null && loTemp !== null
+                        ? ` · H:${hiTemp}° L:${loTemp}°`
+                        : ''}
+                </Text>
+            </View>
+        ) : fold.mode === 'compact-short' ? (
+            // The Duo cover is short, so the place and the
+            // temperature share one row and the outfit starts
+            // higher up. With the buttons in the side column
+            // (Duo) 40 pt keeps it off the edge; otherwise 60
+            // clears the sticky buttons.
+            <View
+                style={[st.coverHero, { paddingTop: (sideRail ? 40 : 60) + topInset }]}
+                onLayout={(e) => {
+                    const { y, height } = e.nativeEvent.layout;
+                    setHeroBottomY(y + height);
+                }}
+            >
+                <View style={st.coverHeroPlace}>
+                    <Text
+                        style={[st.city, skyText]}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.6}
+                    >
+                        {place?.name}
+                    </Text>
+                    <Text style={[st.condition, skyText]} numberOfLines={1}>
+                        {humanizeCondition(weather.WeatherText)}
+                    </Text>
+                    {lastUpdated && (
+                        <LastUpdated
+                            date={lastUpdated}
+                            style={[st.lastUpdated, skyText]}
+                        />
+                    )}
+                </View>
+                <View style={st.coverHeroTemps}>
+                    <View style={st.coverTempRow}>
+                        <WeatherIconDisplay
+                            condition={weather.WeatherText}
+                            isDay={weather.IsDayTime}
+                            animate
+                            latitude={place?.lat}
+                        />
+                        <Text style={[st.coverTemp, skyText]}>{tempVal}°</Text>
+                    </View>
+                    <Text style={[st.coverFeels, skyText]}>Feels like: {feelsVal}°</Text>
+                    {hiTemp !== null && loTemp !== null && (
+                        <Text style={[st.coverHiLo, skyText]}>
+                            H:{hiTemp}° L:{loTemp}°
+                        </Text>
+                    )}
+                </View>
+            </View>
+        ) : (
+            <>
+            <View
+                style={[
+                    st.header,
+                    { paddingTop: spacing.lg + topInset },
+                ]}
+            >
+                <Text style={[st.city, skyText]}>{place?.name}</Text>
+                <Text style={[st.condition, skyText]}>
+                    {humanizeCondition(weather.WeatherText)}
+                </Text>
+                {lastUpdated && (
+                    <LastUpdated
+                        date={lastUpdated}
+                        style={[st.lastUpdated, skyText]}
+                    />
+                )}
+            </View>
+
+            {/* Hero icon + temperature. onLayout reports the bottom
+                edge so the sticky mini knows when to fade in. */}
+            <View
+                style={st.hero}
+                onLayout={(e) => {
+                    const { y, height } = e.nativeEvent.layout;
+                    setHeroBottomY(y + height);
+                }}
+            >
+                <WeatherIconDisplay
+                    condition={weather.WeatherText}
+                    isDay={weather.IsDayTime}
+                    size='large'
+                    onLightSky={lightSky}
+                    temperature={tempVal}
+                    feelsLike={feelsVal}
+                    latitude={place?.lat}
+                />
+                {hiTemp !== null && loTemp !== null && (
+                    <Text style={[st.hiLo, skyText]}>
+                        H:{hiTemp}° L:{loTemp}°
+                    </Text>
+                )}
+            </View>
+            </>
+        )}
+
+        {/* Hourly forecast strip — interleaves sunrise/sunset tiles.
+            Each tile is an individual GlassCard so it picks up
+            colorScheme="dark" from ForceDarkPalette on MainPage,
+            keeping tiles consistent between light and dark mode.
+            (GlassGroup/GlassContainer has no colorScheme prop and
+            always follows UIWindow, which breaks consistency.)
+
+            These were briefly consolidated into one card spanning
+            the strip, on the theory that surface COUNT was the
+            cost. Measured worse on an iPhone 16: the ScrollView
+            clips offscreen tiles so only ~5 ever blur anything,
+            and the gaps between them aren't blurred either, so
+            one contiguous full-width surface covers more animated
+            sky than the tiles it replaced. */}
+        {stripItems.length > 0 && (
+            <View>
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={[st.forecastStrip, stacked && st.forecastStripStacked]}
+                >
+                    {stripItems.map((item) =>
+                        item.kind === 'forecast' ? (
+                            <MinimizedWeatherDisplay
+                                key={`f-${item.time}`}
+                                weather={item.data.IconPhrase}
+                                temperature={
+                                    isMetric
+                                        ? fToC(
+                                              item.data
+                                                  .Temperature
+                                                  .Value,
+                                          )
+                                        : item.data.Temperature
+                                              .Value
+                                }
+                                time={item.data.DateTime}
+                                tempUnit={
+                                    isMetric
+                                        ? 'C'
+                                        : item.data.Temperature
+                                              .Unit
+                                }
+                                isDay={item.data.IsDaylight}
+                                // Derived from the clock, not
+                                // from position: index 0 is only
+                                // "now" while the data is fresh,
+                                // and mislabelling a past hour
+                                // "Now" is what hid the staleness.
+                                isNow={
+                                    hourBucketOf(
+                                        item.data.DateTime,
+                                    ) === hourBucket
+                                }
+                                disableGlass={!perf.glass}
+                                onLightSky={lightSky}
+                            />
+                        ) : (
+                            <SunEventTile
+                                key={`s-${item.sun.kind}-${item.time}`}
+                                time={item.time}
+                                temperature={item.temp}
+                                tempUnit={isMetric ? 'C' : 'F'}
+                                disableGlass={!perf.glass}
+                                onLightSky={lightSky}
+                            />
+                        ),
+                    )}
+                </ScrollView>
+            </View>
+        )}
+
+        {stacked && (
+            <WeatherStatsLine weather={weather} settings={settings} textStyle={skyText} />
+        )}
+
+        {twoPane && (
+            <GlassCard
+                style={st.details}
+                disableGlass={!perf.outfitCardGlass}
+                glassTint={lightSky ? LIGHT_SKY_CARD_TINT : undefined}
+            >
+                <ThemeOverride
+                    colors={lightSky ? LIGHT_SKY_CARD_TEXT : undefined}
+                    innerGlassTint={lightSky ? LIGHT_SKY_INNER_TINT : undefined}
+                >
+                    <WeatherStats weather={weather} settings={settings} showAll />
+                </ThemeOverride>
+            </GlassCard>
+        )}
+        {twoPane && shareAndAttribution}
+        </ScrollView>
+    ) : null;
 
     return (
         <AnimatedLinearGradient
@@ -1203,12 +1525,15 @@ const WeatherHUD = ({
                     style={st.contentLayer}
                     pointerEvents={loading ? 'none' : 'auto'}
                 >
+                    {stacked && <View style={{ height: stacked.weatherHeight }}>{weatherPane}</View>}
                     <Animated.ScrollView
                         ref={scrollRef}
+                        style={stacked ? { marginTop: stacked.outfitTop - stacked.weatherHeight } : undefined}
                         contentContainerStyle={[
                             st.scroll,
                             { paddingBottom: tabPad, paddingRight: twoPane ? 0 : rightInset },
                             twoPane && st.scrollRow,
+                            stacked && st.scrollStacked,
                         ]}
                         showsVerticalScrollIndicator={false}
                         onScroll={scrollHandler}
@@ -1225,251 +1550,11 @@ const WeatherHUD = ({
                             />
                         }
                     >
-                        <Animated.View style={[weatherPaneStyle, pinnedPaneStyle]}>
-                        <ScrollView
-                            scrollEnabled={twoPane}
-                            showsVerticalScrollIndicator={false}
-                            contentContainerStyle={twoPane ? { paddingBottom: tabPad } : undefined}
-                        >
-                        {/* Header — only city/condition/lastUpdated live in the
-                            scroll surface now. The Locations/Gear buttons + a
-                            scroll-driven mini summary moved to the sticky bar
-                            below. */}
-                        {twoPane ? (
-                            // Weather pane: the place reads first, then the icon
-                            // beside the temperature, so the hours and every stat
-                            // fit the pane instead of sitting under a tall hero.
-                            // On the Duo the buttons live in the side column, so
-                            // the place starts 40 pt down, level with the outfit
-                            // pane's first row; otherwise 64 clears the sticky buttons.
-                            <View
-                                style={[st.paneHero, { paddingTop: (sideRail ? 40 : 64) + topInset }]}
-                                onLayout={(e) => {
-                                    const { y, height } = e.nativeEvent.layout;
-                                    setHeroBottomY(y + height);
-                                }}
-                            >
-                                <Text
-                                    style={[st.city, skyText]}
-                                    numberOfLines={1}
-                                    adjustsFontSizeToFit
-                                    minimumFontScale={0.6}
-                                >
-                                    {place?.name}
-                                </Text>
-                                <Text style={[st.condition, skyText]} numberOfLines={1}>
-                                    {humanizeCondition(weather.WeatherText)}
-                                </Text>
-                                {lastUpdated && (
-                                    <LastUpdated
-                                        date={lastUpdated}
-                                        style={[st.lastUpdated, skyText]}
-                                    />
-                                )}
-                                <View style={st.paneTempRow}>
-                                    <WeatherIconDisplay
-                                        condition={weather.WeatherText}
-                                        isDay={weather.IsDayTime}
-                                        size='medium'
-                                        latitude={place?.lat}
-                                    />
-                                    <View style={st.paneTemps}>
-                                        <Text style={[st.paneTemp, skyText]}>{tempVal}°</Text>
-                                        <Text style={[st.coverFeels, skyText]}>
-                                            Feels like {feelsVal}°
-                                            {hiTemp !== null && loTemp !== null
-                                                ? ` · H:${hiTemp}° L:${loTemp}°`
-                                                : ''}
-                                        </Text>
-                                    </View>
-                                </View>
-                            </View>
-                        ) : fold.mode === 'compact-short' ? (
-                            // The Duo cover is short, so the place and the
-                            // temperature share one row and the outfit starts
-                            // higher up. With the buttons in the side column
-                            // (Duo) 40 pt keeps it off the edge; otherwise 60
-                            // clears the sticky buttons.
-                            <View
-                                style={[st.coverHero, { paddingTop: (sideRail ? 40 : 60) + topInset }]}
-                                onLayout={(e) => {
-                                    const { y, height } = e.nativeEvent.layout;
-                                    setHeroBottomY(y + height);
-                                }}
-                            >
-                                <View style={st.coverHeroPlace}>
-                                    <Text
-                                        style={[st.city, skyText]}
-                                        numberOfLines={1}
-                                        adjustsFontSizeToFit
-                                        minimumFontScale={0.6}
-                                    >
-                                        {place?.name}
-                                    </Text>
-                                    <Text style={[st.condition, skyText]} numberOfLines={1}>
-                                        {humanizeCondition(weather.WeatherText)}
-                                    </Text>
-                                    {lastUpdated && (
-                                        <LastUpdated
-                                            date={lastUpdated}
-                                            style={[st.lastUpdated, skyText]}
-                                        />
-                                    )}
-                                </View>
-                                <View style={st.coverHeroTemps}>
-                                    <View style={st.coverTempRow}>
-                                        <WeatherIconDisplay
-                                            condition={weather.WeatherText}
-                                            isDay={weather.IsDayTime}
-                                            animate
-                                            latitude={place?.lat}
-                                        />
-                                        <Text style={[st.coverTemp, skyText]}>{tempVal}°</Text>
-                                    </View>
-                                    <Text style={[st.coverFeels, skyText]}>Feels like: {feelsVal}°</Text>
-                                    {hiTemp !== null && loTemp !== null && (
-                                        <Text style={[st.coverHiLo, skyText]}>
-                                            H:{hiTemp}° L:{loTemp}°
-                                        </Text>
-                                    )}
-                                </View>
-                            </View>
-                        ) : (
-                            <>
-                            <View
-                                style={[
-                                    st.header,
-                                    { paddingTop: spacing.lg + topInset },
-                                ]}
-                            >
-                                <Text style={[st.city, skyText]}>{place?.name}</Text>
-                                <Text style={[st.condition, skyText]}>
-                                    {humanizeCondition(weather.WeatherText)}
-                                </Text>
-                                {lastUpdated && (
-                                    <LastUpdated
-                                        date={lastUpdated}
-                                        style={[st.lastUpdated, skyText]}
-                                    />
-                                )}
-                            </View>
-
-                            {/* Hero icon + temperature. onLayout reports the bottom
-                                edge so the sticky mini knows when to fade in. */}
-                            <View
-                                style={st.hero}
-                                onLayout={(e) => {
-                                    const { y, height } = e.nativeEvent.layout;
-                                    setHeroBottomY(y + height);
-                                }}
-                            >
-                                <WeatherIconDisplay
-                                    condition={weather.WeatherText}
-                                    isDay={weather.IsDayTime}
-                                    size='large'
-                                    onLightSky={lightSky}
-                                    temperature={tempVal}
-                                    feelsLike={feelsVal}
-                                    latitude={place?.lat}
-                                />
-                                {hiTemp !== null && loTemp !== null && (
-                                    <Text style={[st.hiLo, skyText]}>
-                                        H:{hiTemp}° L:{loTemp}°
-                                    </Text>
-                                )}
-                            </View>
-                            </>
+                        {!stacked && (
+                            <Animated.View style={[weatherPaneStyle, pinnedPaneStyle]}>
+                                {weatherPane}
+                            </Animated.View>
                         )}
-
-                        {/* Hourly forecast strip — interleaves sunrise/sunset tiles.
-                            Each tile is an individual GlassCard so it picks up
-                            colorScheme="dark" from ForceDarkPalette on MainPage,
-                            keeping tiles consistent between light and dark mode.
-                            (GlassGroup/GlassContainer has no colorScheme prop and
-                            always follows UIWindow, which breaks consistency.)
-
-                            These were briefly consolidated into one card spanning
-                            the strip, on the theory that surface COUNT was the
-                            cost. Measured worse on an iPhone 16: the ScrollView
-                            clips offscreen tiles so only ~5 ever blur anything,
-                            and the gaps between them aren't blurred either, so
-                            one contiguous full-width surface covers more animated
-                            sky than the tiles it replaced. */}
-                        {stripItems.length > 0 && (
-                            <View>
-                                <ScrollView
-                                    horizontal
-                                    showsHorizontalScrollIndicator={false}
-                                    contentContainerStyle={st.forecastStrip}
-                                >
-                                    {stripItems.map((item) =>
-                                        item.kind === 'forecast' ? (
-                                            <MinimizedWeatherDisplay
-                                                key={`f-${item.time}`}
-                                                weather={item.data.IconPhrase}
-                                                temperature={
-                                                    isMetric
-                                                        ? fToC(
-                                                              item.data
-                                                                  .Temperature
-                                                                  .Value,
-                                                          )
-                                                        : item.data.Temperature
-                                                              .Value
-                                                }
-                                                time={item.data.DateTime}
-                                                tempUnit={
-                                                    isMetric
-                                                        ? 'C'
-                                                        : item.data.Temperature
-                                                              .Unit
-                                                }
-                                                isDay={item.data.IsDaylight}
-                                                // Derived from the clock, not
-                                                // from position: index 0 is only
-                                                // "now" while the data is fresh,
-                                                // and mislabelling a past hour
-                                                // "Now" is what hid the staleness.
-                                                isNow={
-                                                    hourBucketOf(
-                                                        item.data.DateTime,
-                                                    ) === hourBucket
-                                                }
-                                                disableGlass={!perf.glass}
-                                                onLightSky={lightSky}
-                                            />
-                                        ) : (
-                                            <SunEventTile
-                                                key={`s-${item.sun.kind}-${item.time}`}
-                                                time={item.time}
-                                                temperature={item.temp}
-                                                tempUnit={isMetric ? 'C' : 'F'}
-                                                disableGlass={!perf.glass}
-                                                onLightSky={lightSky}
-                                            />
-                                        ),
-                                    )}
-                                </ScrollView>
-                            </View>
-                        )}
-
-                        {twoPane && (
-                            <GlassCard
-                                style={st.details}
-                                disableGlass={!perf.outfitCardGlass}
-                                glassTint={lightSky ? LIGHT_SKY_CARD_TINT : undefined}
-                            >
-                                <ThemeOverride
-                                    colors={lightSky ? LIGHT_SKY_CARD_TEXT : undefined}
-                                    innerGlassTint={lightSky ? LIGHT_SKY_INNER_TINT : undefined}
-                                >
-                                    <WeatherStats weather={weather} settings={settings} showAll />
-                                </ThemeOverride>
-                            </GlassCard>
-                        )}
-                        {twoPane && shareAndAttribution}
-                        </ScrollView>
-                        </Animated.View>
 
                         <View style={outfitPaneStyle}>
                         {/* Details + outfit.
@@ -1524,7 +1609,7 @@ const WeatherHUD = ({
                                     daily={daily}
                                     city={place?.name}
                                     coords={place ?? undefined}
-                                    showStats={!twoPane}
+                                    showStats={!twoPane && !stacked}
                                 />
                             </ThemeOverride>
                         </GlassCard>
@@ -1537,13 +1622,13 @@ const WeatherHUD = ({
                         summary. Sits as a sibling of (and above) the scroll
                         view. pointerEvents="box-none" lets pulls/scrolls fall
                         through everywhere except the button hit areas.
-                        On the Duo (side rail) Location and Settings are native
+                        On the Duo Location and Settings are native
                         nav-bar items declared in MainPage, so only the mini
                         summary renders here, centred between placeholders. */}
                     <View
                         style={[
                             st.stickyBar,
-                            { top: topInset + 8 },
+                            { top: topInset + (stacked ? STACKED_NAV_ROW_TOP : 8) },
                             {
                                 right: twoPane && fold.panes
                                     ? fold.panes.secondary.width + fold.gutter / 2
@@ -1567,6 +1652,7 @@ const WeatherHUD = ({
                                     accessibilityRole='button'
                                     style={({ pressed }) => [
                                         st.locationsBtnInner,
+                                        stacked && st.barBtnInnerStacked,
                                         { opacity: pressed ? 0.6 : 1 },
                                     ]}
                                 >
@@ -1576,7 +1662,7 @@ const WeatherHUD = ({
                         ) : (
                             <View style={st.locationsBtnPlaceholder} />
                         )}
-                        {miniVisible && !twoPane && (
+                        {miniVisible && !twoPane && !stacked && (
                             <Animated.View
                                 entering={FadeIn.duration(200)}
                                 style={st.miniWrap}
@@ -1626,6 +1712,7 @@ const WeatherHUD = ({
                                     accessibilityRole='button'
                                     style={({ pressed }) => [
                                         st.gearBtnInner,
+                                        stacked && st.barBtnInnerStacked,
                                         { opacity: pressed ? 0.6 : 1 },
                                     ]}
                                 >

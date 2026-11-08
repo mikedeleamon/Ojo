@@ -9,6 +9,8 @@ import {
     LIGHT_SKY_SCRIM,
     PARTICLE_BACKDROP_LIFT,
     relativeLuminance,
+    STACKED_HOME_TEXT_BAND,
+    type TextBand,
 } from '../skyContrast';
 import { darkColors, weatherGradients } from '../../../theme/tokens';
 
@@ -91,8 +93,15 @@ describe('lightSkyFade', () => {
     };
     // Independent of the module's own model: sample the drawn fade and the sky
     // (lifted toward white for the backdrop) every 1% of the height.
-    const worstLabelContrast = (gradient: readonly string[], from: number, to: number, lift: number) => {
-        const fade = lightSkyFade(gradient, lift);
+    const worstLabelContrast = (
+        gradient: readonly string[],
+        from: number,
+        to: number,
+        lift: number,
+        band?: TextBand,
+    ) => {
+        const fade = lightSkyFade(gradient, lift, band);
+        const midAt = band?.to ?? 0.45;
         const stops = gradient.map(hex);
         let worst = Infinity;
         for (let y = from; y <= to + 1e-9; y += 0.01) {
@@ -105,7 +114,7 @@ describe('lightSkyFade', () => {
             let bg = sky;
             if (fade) {
                 const [top, mid] = fade.colors.map(parseRgba);
-                const a = y <= 0.45 ? top.a + (mid.a - top.a) * (y / 0.45) : mid.a * Math.max(0, 1 - (y - 0.45) / 0.19);
+                const a = y <= midAt ? top.a + (mid.a - top.a) * (y / midAt) : mid.a * Math.max(0, 1 - (y - midAt) / (0.64 - midAt));
                 bg = sky.map((c, k) => c * (1 - a) + top.rgb[k] * a);
             }
             const label = [255, 255, 255]; // LIGHT_SKY_TEXT is full white
@@ -125,6 +134,11 @@ describe('lightSkyFade', () => {
 
     it.each(CASES)('keeps the place name on %s (%s) at 3:1 or better', (name, _backdrop, lift) => {
         expect(worstLabelContrast(weatherGradients[name], 0, 0.15, lift)).toBeGreaterThanOrEqual(3);
+    });
+
+    it.each(CASES)('keeps the rotated Duo Home text on %s (%s) at 4.5:1 or better', (name, _backdrop, lift) => {
+        const band = STACKED_HOME_TEXT_BAND;
+        expect(worstLabelContrast(weatherGradients[name], band.from, band.to, lift, band)).toBeGreaterThanOrEqual(4.5);
     });
 
     it('fades a particle sky less than the same sky under glare or fog', () => {

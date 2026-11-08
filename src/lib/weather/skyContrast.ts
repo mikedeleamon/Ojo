@@ -118,8 +118,21 @@ export const LIGHT_SKY_TEXT = {
  */
 const FADE_MID = 0.45;
 const FADE_END = 0.64;
+
 const SMALL_TEXT_FROM = 0.15;
 const LARGE_TEXT_AT = 0.05;
+
+/** Where a layout's small text sits on the sky, as fractions of the screen's height. */
+export interface TextBand {
+    from: number;
+    to: number;
+}
+const DEFAULT_TEXT_BAND: TextBand = { from: SMALL_TEXT_FROM, to: FADE_MID };
+/**
+ * Duo inner screen turned upright: the condition line sits a little higher than
+ * on other Home layouts, and the four stats lower, just above the fold.
+ */
+export const STACKED_HOME_TEXT_BAND: TextBand = { from: 0.135, to: 0.475 };
 /**
  * WCAG AA is 4.5:1 for body text and 3:1 for large text. These sit a hair above
  * it on purpose: every bit of headroom darkens the palest skies. The backdrop
@@ -186,29 +199,30 @@ function alphaFor(bg: Rgb, fade: Rgb, target: number): number {
  * The fade for a light sky, or null when its header already reads without one.
  * `backdropLift` is HAZY_BACKDROP_LIFT when sun glare or fog drift is drawn,
  * PARTICLE_BACKDROP_LIFT otherwise.
- * Full strength `top` at the top of the screen, `mid` at FADE_MID, gone by
+ * Full strength `top` at the top of the screen, `mid` at `band.to`, gone by
  * FADE_END. `mid` covers the lowest small text; `top` is the least that keeps
  * the large text at the top and every small-text line in between passing.
  */
 export function lightSkyFade(
     gradient: readonly string[],
     backdropLift: number = HAZY_BACKDROP_LIFT,
+    band: TextBand = DEFAULT_TEXT_BAND,
 ): SkyFade | null {
     const stops = gradient.map(parseHex);
     if (stops.length < 2 || stops.some((s) => s === null)) return null;
     const sky = stops as Rgb[];
     const fade = sky[0].map((c) => Math.round(c * FADE_DEPTH)) as unknown as Rgb;
 
-    const mid = alphaFor(skyAt(sky, FADE_MID, backdropLift), fade, SMALL_TEXT_TARGET);
+    const mid = alphaFor(skyAt(sky, band.to, backdropLift), fade, SMALL_TEXT_TARGET);
     let top = alphaFor(skyAt(sky, LARGE_TEXT_AT, backdropLift), fade, LARGE_TEXT_TARGET);
-    // Between the top and FADE_MID the opacity is a straight line from `top`
+    // Between the top and `band.to` the opacity is a straight line from `top`
     // to `mid`; raise `top` until every small-text height clears.
-    // Whole steps, so float drift can't land a sample a hair under FADE_MID,
+    // Whole steps, so float drift can't land a sample a hair under `band.to`,
     // where 1 - w is ~0 and the division below blows up.
-    const steps = Math.round((FADE_MID - SMALL_TEXT_FROM) / 0.05);
+    const steps = Math.round((band.to - band.from) / 0.05);
     for (let i = 0; i < steps; i++) {
-        const y = SMALL_TEXT_FROM + i * 0.05;
-        const w = y / FADE_MID;
+        const y = band.from + i * 0.05;
+        const w = y / band.to;
         const need = alphaFor(skyAt(sky, y, backdropLift), fade, SMALL_TEXT_TARGET);
         top = Math.max(top, (need - mid * w) / (1 - w));
     }
@@ -220,6 +234,6 @@ export function lightSkyFade(
     const rgba = (a: number) => `rgba(${fade[0]}, ${fade[1]}, ${fade[2]}, ${Math.ceil(a * 100) / 100})`;
     return {
         colors: [rgba(top), rgba(mid), rgba(0)],
-        locations: [0, FADE_MID, FADE_END],
+        locations: [0, band.to, FADE_END],
     };
 }
