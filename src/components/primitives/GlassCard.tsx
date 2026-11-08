@@ -17,6 +17,7 @@ import { View, ViewProps, StyleSheet, StyleProp, ViewStyle } from 'react-native'
 import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
 import { useTheme } from '../../theme/ThemeContext';
 import { darkColors } from '../../theme/tokens';
+import type { ViewRef } from '../../types/nativeRefs';
 
 const LIQUID_GLASS = isGlassEffectAPIAvailable();
 
@@ -28,6 +29,13 @@ interface GlassCardProps extends ViewProps {
    *  as the background colour (fallback path). Use for cases where the default
    *  glass bg is too subtle, e.g. on a light-coloured page. */
   tintColor?:  string;
+  /**
+   * Tint the native glass material itself, so it keeps its depth, edge
+   * highlights and refraction. `tintColor` above instead lays a flat colour over
+   * the glass, which reads as paint once it's strong. Fallback path: used as the
+   * background colour.
+   */
+  glassTint?:  string;
   /**
    * Render the translucent fallback surface even where the native glass
    * material is available.
@@ -47,8 +55,8 @@ interface GlassCardProps extends ViewProps {
   children?:   React.ReactNode;
 }
 
-const GlassCard = forwardRef<View, GlassCardProps>(
-  ({ style, glassStyle = 'regular', tintColor, disableGlass = false, children, ...rest }, ref) => {
+const GlassCard = forwardRef<ViewRef, GlassCardProps>(
+  ({ style, glassStyle = 'regular', tintColor, glassTint, disableGlass = false, children, ...rest }, ref) => {
     const { colors, isDark } = useTheme();
 
     if (LIQUID_GLASS && !disableGlass) {
@@ -69,6 +77,7 @@ const GlassCard = forwardRef<View, GlassCardProps>(
         <GlassView
           ref={ref}
           glassEffectStyle={glassStyle}
+          tintColor={glassTint}
           // Drive the material's appearance from our React context's isDark
           // rather than the native UIWindow style. This lets ForceDarkPalette
           // (used by MainPage) flip nested glass to dark even when the user's
@@ -93,7 +102,7 @@ const GlassCard = forwardRef<View, GlassCardProps>(
         style={[
           styles.base,
           {
-            backgroundColor: tintColor ?? colors.glassBg,
+            backgroundColor: tintColor ?? glassTint ?? colors.glassBg,
             borderWidth: 1,
             borderColor: tintColor ? darkColors.glassBorder : colors.glassBorder,
           },

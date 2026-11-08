@@ -27,6 +27,10 @@ export const darkColors = {
   textPrimary:   'rgba(255, 255, 255, 0.97)',
   textSecondary: 'rgba(255, 255, 255, 0.65)',
   textMuted:     'rgba(255, 255, 255, 0.55)',
+  // Small labels on cards (uppercase tags, fabric, stat names). Brighter than
+  // textMuted because most sit on the lighter glass tiles inside a card, where
+  // 55% white measured 3.2–3.6:1 at night; 85% keeps them above 5:1.
+  textLabel:     'rgba(255, 255, 255, 0.85)',
 
   // Semantic — danger
   dangerBg:      'rgba(239, 68, 68, 0.10)',
@@ -38,6 +42,12 @@ export const darkColors = {
   successBg:     'rgba(52, 211, 153, 0.12)',
   successBorder: 'rgba(52, 211, 153, 0.30)',
   successText:   'rgba(110, 231, 183, 1.00)',
+
+  // Outfit score, layering confidence and UV/air pills: good / fair / low / poor
+  ratingHigh:    'rgba(52, 211, 153, 0.9)',
+  ratingMid:     'rgba(251, 191, 36, 0.9)',
+  ratingLow:     'rgba(148, 163, 184, 0.9)',
+  ratingPoor:    'rgba(252, 165, 165, 0.9)',
 
   // Semantic — error (form messages)
   errorBg:       'rgba(239, 68, 68, 0.12)',
@@ -60,6 +70,7 @@ export const lightColors = {
   textPrimary:    '#111113',
   textSecondary:  '#404045',
   textMuted:      '#5C5C63',
+  textLabel:      '#5C5C63',
   dangerBg:       'rgba(220, 38, 38, 0.08)',
   dangerBorder:   'rgba(220, 38, 38, 0.30)',
   dangerText:     '#B91C1C',
@@ -67,6 +78,10 @@ export const lightColors = {
   successBg:      'rgba(5, 150, 105, 0.10)',
   successBorder:  'rgba(5, 150, 105, 0.32)',
   successText:    '#047857',
+  ratingHigh:     'rgba(52, 211, 153, 0.9)',
+  ratingMid:      'rgba(251, 191, 36, 0.9)',
+  ratingLow:      'rgba(148, 163, 184, 0.9)',
+  ratingPoor:     'rgba(252, 165, 165, 0.9)',
   errorBg:        'rgba(220, 38, 38, 0.08)',
   errorBorder:    'rgba(220, 38, 38, 0.30)',
   errorText:      '#B91C1C',

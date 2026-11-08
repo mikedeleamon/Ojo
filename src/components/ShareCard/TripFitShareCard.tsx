@@ -7,6 +7,7 @@ import { phraseEmoji, fmtDate } from '../../views/TripFit/shared';
 import ShareCardFrame from './ShareCardFrame';
 import { contentWidth, type ShareCardVariant } from './ShareCardFrame.styles';
 import cs from './shareCardCommon.styles';
+import type { ViewRef } from '../../types/nativeRefs';
 
 interface TripFitShareCardProps {
   destination: string;
@@ -27,7 +28,7 @@ function tileSize(count: number, variant: ShareCardVariant) {
   return { width, height: width * 1.15 };
 }
 
-const TripFitShareCard = forwardRef<View, TripFitShareCardProps>(
+const TripFitShareCard = forwardRef<ViewRef, TripFitShareCardProps>(
   ({ destination, day, slots, dayLabel, variant = 'poster' }, ref) => {
     const photos = slots.slice(0, 4);
     const { width, height } = tileSize(photos.length, variant);

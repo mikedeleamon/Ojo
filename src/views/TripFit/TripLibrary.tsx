@@ -8,7 +8,9 @@ import {
     ActivityIndicator,
     Animated,
 } from 'react-native';
-import { Swipeable } from 'react-native-gesture-handler';
+import Swipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
+import type { SharedValue } from 'react-native-reanimated';
+import { SwipeActionReveal } from '../../components/primitives/SwipeActionReveal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { View, Text, GlassCard } from '../../components/primitives';
@@ -65,6 +67,8 @@ interface TripLibraryProps {
     onPlanFromAirline: (prefill: PlannerPrefill) => void;
     /** Omitted when the library is a root tab — there is nothing to go back to. */
     onBack?: () => void;
+    /** The trip open in the detail pane beside the library (two panes only). */
+    selectedId?: string;
 }
 
 // ─── TripCard ────────────────────────────────────────────────────────────────────
@@ -78,10 +82,12 @@ const TripCard = ({
     onOpen,
     onDelete,
     st,
+    selected = false,
 }: {
     plan: SavedTripFitPlan;
     onOpen: () => void;
     onDelete: () => void;
+    selected?: boolean;
     st: ReturnType<typeof makeStyles>;
 }) => {
     const status = tripFitStatus(plan);
@@ -115,17 +121,12 @@ const TripCard = ({
               : 'Planned';
 
     const renderRightActions = (
-        _progress: ReturnType<Animated.Value['interpolate']>,
-        dragX: ReturnType<Animated.Value['interpolate']>,
-        swipeable: Swipeable,
+        _progress: SharedValue<number>,
+        translation: SharedValue<number>,
+        swipeable: SwipeableMethods,
     ) => {
-        const translateX = dragX.interpolate({
-            inputRange: [-110, 0],
-            outputRange: [0, 110],
-            extrapolate: 'clamp',
-        });
         return (
-            <Animated.View style={[st.deleteActionWrap, { transform: [{ translateX }] }]}>
+            <SwipeActionReveal translation={translation} width={110} style={st.deleteActionWrap}>
                 <Pressable
                     style={st.deleteAction}
                     onPress={() => {
@@ -137,7 +138,7 @@ const TripCard = ({
                 >
                     <Text style={st.deleteText}>Delete trip</Text>
                 </Pressable>
-            </Animated.View>
+            </SwipeActionReveal>
         );
     };
 
@@ -152,6 +153,7 @@ const TripCard = ({
                     onPress={onOpen}
                     accessibilityRole='button'
                     accessibilityLabel={`Open trip to ${plan.destination}`}
+                    accessibilityState={{ selected }}
                     style={[status === 'completed' && st.cardCompleted]}
                 >
                     <RNView style={st.cardWrap}>
@@ -197,6 +199,7 @@ const TripCard = ({
                                 </Text>
                             )}
                         </GlassCard>
+                        {selected && <RNView pointerEvents='none' style={st.cardSelected} />}
                     </RNView>
                 </Pressable>
             </ForceDarkPalette>
@@ -214,6 +217,7 @@ export default function TripLibrary({
     onDelete,
     onPlanFromAirline,
     onBack,
+    selectedId,
 }: TripLibraryProps) {
     const { colors } = useTheme();
     const st = useMemo(() => makeStyles(colors), [colors]);
@@ -398,6 +402,7 @@ export default function TripLibrary({
                                 key={p.id}
                                 plan={p}
                                 st={st}
+                                selected={p.id === selectedId}
                                 onOpen={() => onOpen(p)}
                                 onDelete={() => confirmDelete(p, onDelete)}
                             />
@@ -414,6 +419,7 @@ export default function TripLibrary({
                                 key={p.id}
                                 plan={p}
                                 st={st}
+                                selected={p.id === selectedId}
                                 onOpen={() => onOpen(p)}
                                 onDelete={() => confirmDelete(p, onDelete)}
                             />
@@ -479,6 +485,14 @@ function makeStyles(colors: ReturnType<typeof useTheme>['colors']) {
         overlapTitle: { fontFamily: fonts.bodySemiBold, fontSize: fontSizes.sm },
         overlapSub: { fontFamily: fonts.body, fontSize: fontSizes.xs },
         cardWrap: { borderRadius: radius.lg, overflow: 'hidden' },
+        // The trip in the detail pane: a ring over the card, since the glass
+        // surface drops borders.
+        cardSelected: {
+            ...StyleSheet.absoluteFill,
+            borderRadius: radius.lg,
+            borderWidth: 1.5,
+            borderColor: darkColors.successText,
+        },
         cardCompleted: { opacity: 0.6 },
         card: { padding: spacing.md, gap: 4, minHeight: 130 },
         cardTopRow: {

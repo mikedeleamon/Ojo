@@ -42,7 +42,7 @@ export default StyleSheet.create({
     backgroundColor: '#0F172A',
   },
   gradient: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   safeArea: {
     flex: 1,

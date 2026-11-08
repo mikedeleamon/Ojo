@@ -92,7 +92,7 @@ export default function ShootingStar({ animate, color = '#fefefe' }: ShootingSta
 
     const boxW = S.travel + S.tail;
     const translateX = progress.interpolate({ inputRange: [0, 1], outputRange: [0, S.travel] });
-    const opacity = progress.interpolate(S.fade as unknown as Animated.InterpolationConfigType);
+    const opacity = progress.interpolate(S.fade as unknown as Animated.InterpolationConfig<number>);
 
     return (
         <View

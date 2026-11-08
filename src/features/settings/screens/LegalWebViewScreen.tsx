@@ -53,7 +53,7 @@ export default function LegalWebViewScreen({ doc, onClose }: Props) {
   const useWebView = shouldUseIframe(doc.url);
 
   return (
-    <SafeAreaView style={styles.root} edges={['bottom']}>
+    <SafeAreaView style={styles.root} edges={['bottom', 'right']}>
       <View style={styles.header}>
         <View style={styles.headerText}>
           <Text style={styles.headerTitle}>{doc.title}</Text>

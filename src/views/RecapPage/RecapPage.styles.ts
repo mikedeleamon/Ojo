@@ -68,7 +68,7 @@ export default StyleSheet.create({
     overflow: 'hidden',
     gap: 8,
   },
-  cardGradient: { ...StyleSheet.absoluteFillObject },
+  cardGradient: { ...StyleSheet.absoluteFill },
 
   // ── Type roles ───────────────────────────────────────────────────────────
   eyebrow: {

@@ -9,7 +9,7 @@ const SCALED_H = CARD_HEIGHT * PREVIEW_SCALE;
 
 export default StyleSheet.create({
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.72)',
   },
   sheet: {

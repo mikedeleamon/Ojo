@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useFocusEffect } from 'expo-router';
-import { useIsFocused } from '@react-navigation/native';
+import { useIsFocused } from 'expo-router';
 import {
     ScrollView,
     RefreshControl,
@@ -9,6 +9,7 @@ import {
     AppState,
     Animated as RNAnimated,
     Easing as RNEasing,
+    StyleSheet,
 } from 'react-native';
 import Animated, {
     useSharedValue,
@@ -16,6 +17,7 @@ import Animated, {
     useAnimatedScrollHandler,
     useAnimatedReaction,
     useAnimatedRef,
+    useAnimatedStyle,
     runOnJS,
     FadeIn,
     withTiming,
@@ -37,7 +39,8 @@ import WeatherIconDisplay from '../WeatherIconDisplay/WeatherIconDisplay';
 import ClearNightIconMoon from '../WeatherIcons/ClearNightIconMoon';
 import StormIconLightning from '../WeatherIcons/StormIconLightning';
 import SunnyIcon from '../WeatherIcons/SunnyIcon';
-import WeatherDetails from '../WeatherDetails/WeatherDetails';
+import WeatherDetails, { WeatherStats } from '../WeatherDetails/WeatherDetails';
+import { useFoldLayout } from '../../context/FoldLayoutContext';
 import MinimizedWeatherDisplay from '../MinimizedWeatherDisplay/MinimizedWeatherDisplay';
 import SunEventTile from '../SunEventTile/SunEventTile';
 import ShareToInstagramSheet from '../ShareCard/ShareToInstagramSheet';
@@ -55,7 +58,7 @@ import {
 } from '../../types';
 import { geocodeCity } from '../../lib/geocoding';
 import { spacing } from '../../theme/tokens';
-import { useTheme } from '../../theme/ThemeContext';
+import { useTheme, ThemeOverride } from '../../theme/ThemeContext';
 import { blendHsl, flattenHsl, hslToHex, lerpHslFlat } from './colorMath';
 
 // LinearGradient driven by a UI-thread worklet via useAnimatedProps. The
@@ -78,6 +81,17 @@ import BackdropLayer, { SCROLL_RANGE } from './BackdropLayer';
 import PerfPanel from '../debug/PerfPanel';
 import { usePerfFlags } from '../../lib/debug/perfFlags';
 import LastUpdated from './LastUpdated';
+import {
+    HAZY_BACKDROP_LIFT,
+    isLightSky,
+    lightSkyFade,
+    LIGHT_SKY_CARD_TEXT,
+    LIGHT_SKY_CARD_TINT,
+    LIGHT_SKY_INNER_TINT,
+    LIGHT_SKY_SCRIM,
+    LIGHT_SKY_TEXT,
+    PARTICLE_BACKDROP_LIFT,
+} from '../../lib/weather/skyContrast';
 import { fToC } from '../../lib/units';
 import { humanizeCondition } from '../../lib/weather/humanizeCondition';
 import { makeStyles } from './WeatherHUD.styles';
@@ -223,8 +237,21 @@ const WeatherHUD = ({
     // this reads as the current behaviour everywhere but the perf panel.
     const perf = usePerfFlags();
     const { setFooterBg, setAccent } = useWeatherTheme();
-    const { top: topInset } = useSafeAreaInsets();
+    const { top: topInset, right: rightInset } = useSafeAreaInsets();
     const tabPad = useTabBarPadding();
+    const fold = useFoldLayout();
+    const twoPane = fold.mode === 'two-pane' && fold.axis === 'row' && fold.panes !== null;
+    const paneHeight = fold.window.height;
+    const weatherPaneStyle = twoPane && fold.panes
+        ? { width: fold.panes.primary.width, height: paneHeight, paddingRight: fold.gutter / 2 }
+        : null;
+    const outfitPaneStyle = twoPane && fold.panes
+        ? {
+              width: fold.panes.secondary.width - rightInset,
+              paddingLeft: fold.gutter / 2,
+              paddingTop: spacing.md,
+          }
+        : null;
     const nav = useAppNavigation();
     // Seed the resolved place (coords + city name) from the cached snapshot so
     // the city label paints immediately on a warm load, in lockstep with the
@@ -523,6 +550,10 @@ const WeatherHUD = ({
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [gradientKey],
     );
+    // Pale skies (snow, sunny days, sunrise and sunset, hot, fog, haze) need
+    // darker tiles and haloed text to stay readable; see lib/weather/skyContrast.
+    const lightSky = useMemo(() => isLightSky(targetGradient), [targetGradient]);
+    const skyText = lightSky ? LIGHT_SKY_TEXT : null;
 
     // Publish the tab-bar accent off the same memoised gradient. Deliberately
     // *not* driven from the animated gradient above: `tintColor` is a native
@@ -635,6 +666,16 @@ const WeatherHUD = ({
 
 
     const scrollRef = useAnimatedRef<Animated.ScrollView>();
+    // In two panes the outfit scrolls and the weather stays put, without a
+    // second tree: the weather pane rides the same scroll view, pinned by
+    // cancelling the offset. Folding therefore can't remount OutfitSuggestion
+    // and lose the selected outfit. Clamped so pull-to-refresh still shows.
+    const pinnedPaneStyle = useAnimatedStyle(
+        () => ({
+            transform: [{ translateY: twoPane ? Math.max(0, scrollY.value) : 0 }],
+        }),
+        [twoPane],
+    );
 
     const scrollToTop = useCallback(() => {
         scrollRef.current?.scrollTo({ x: 0, y: 0, animated: true });
@@ -762,6 +803,18 @@ const WeatherHUD = ({
     const isSleetBg = layers.rain === 'sleet';
     const isFogBg = layers.fog;
     const isGlareBg = layers.glare;
+    // Glare and fog drift lighten the sky behind the header more than falling
+    // snow or rain does, so the fade allows for more of it under them.
+    const skyFade = useMemo(
+        () =>
+            lightSky
+                ? lightSkyFade(
+                      targetGradient,
+                      isGlareBg || isFogBg ? HAZY_BACKDROP_LIFT : PARTICLE_BACKDROP_LIFT,
+                  )
+                : null,
+        [lightSky, targetGradient, isGlareBg, isFogBg],
+    );
 
     // ── Backdrop animation gate ──────────────────────────────────────────────
     //
@@ -882,6 +935,46 @@ const WeatherHUD = ({
                 </Pressable>
             </View>
         );
+
+    // Below the outfit in one column, at the foot of the weather pane in two.
+    const shareAndAttribution = (
+        <>
+                        {forecasts.length > 0 && (
+                            <Pressable
+                                style={[st.shareForecastBtn, lightSky && st.shareForecastBtnLight]}
+                                onPress={() => setShowShareSheet(true)}
+                                accessibilityRole='button'
+                                accessibilityLabel='Share forecast to Instagram'
+                            >
+                                <View style={st.shareForecastBtnRow}>
+                                    <CameraIcon size={15} color={lightSky ? colors.textPrimary : colors.textSecondary} decorative />
+                                    <Text style={[st.shareForecastBtnText, lightSky && st.shareForecastBtnTextLight]}>
+                                        Share forecast
+                                    </Text>
+                                </View>
+                            </Pressable>
+                        )}
+
+                        {/* WeatherKit attribution — required by Apple. */}
+                        <View style={st.weatherAttribution}>
+                            <Pressable
+                                onPress={() =>
+                                    Linking.openURL(
+                                        'https://weatherkit.apple.com/legal-attribution.html',
+                                    ).catch(() => {})
+                                }
+                                hitSlop={6}
+                                accessibilityRole='link'
+                                accessibilityLabel='Weather data provided by Apple Weather'
+                            >
+                                <Text style={[st.lastUpdated, skyText]}>
+                                    {' '}
+                                    Weather data provided by Apple Weather
+                                </Text>
+                            </Pressable>
+                        </View>
+        </>
+    );
 
     return (
         <AnimatedLinearGradient
@@ -1068,6 +1161,18 @@ const WeatherHUD = ({
                 <FogDrift animate={backdropAnimate} />
             </BackdropLayer>
 
+            {/* Light skies only: a fade behind the header, sized to the sky
+                and in its own hue, over the sky and its particles, under the
+                content. See lightSkyFade in lib/weather/skyContrast. */}
+            {skyFade && (
+                <LinearGradient
+                    pointerEvents='none'
+                    colors={skyFade.colors}
+                    locations={skyFade.locations}
+                    style={StyleSheet.absoluteFill}
+                />
+            )}
+
             {/* Transparent loading spinner — sits over the animating gradient.
                 Suppressed when a parent owns the loading gate (showInlineLoader). */}
             {showInlineLoader && loaderMounted && (
@@ -1098,7 +1203,8 @@ const WeatherHUD = ({
                         ref={scrollRef}
                         contentContainerStyle={[
                             st.scroll,
-                            { paddingBottom: tabPad },
+                            { paddingBottom: tabPad, paddingRight: twoPane ? 0 : rightInset },
+                            twoPane && st.scrollRow,
                         ]}
                         showsVerticalScrollIndicator={false}
                         onScroll={scrollHandler}
@@ -1115,51 +1221,157 @@ const WeatherHUD = ({
                             />
                         }
                     >
+                        <Animated.View style={[weatherPaneStyle, pinnedPaneStyle]}>
+                        <ScrollView
+                            scrollEnabled={twoPane}
+                            showsVerticalScrollIndicator={false}
+                            contentContainerStyle={twoPane ? { paddingBottom: tabPad } : undefined}
+                        >
                         {/* Header — only city/condition/lastUpdated live in the
                             scroll surface now. The Locations/Gear buttons + a
                             scroll-driven mini summary moved to the sticky bar
                             below. */}
-                        <View
-                            style={[
-                                st.header,
-                                { paddingTop: spacing.lg + topInset },
-                            ]}
-                        >
-                            <Text style={st.city}>{place?.name}</Text>
-                            <Text style={st.condition}>
-                                {humanizeCondition(weather.WeatherText)}
-                            </Text>
-                            {lastUpdated && (
-                                <LastUpdated
-                                    date={lastUpdated}
-                                    style={st.lastUpdated}
-                                />
-                            )}
-                        </View>
-
-                        {/* Hero icon + temperature. onLayout reports the bottom
-                            edge so the sticky mini knows when to fade in. */}
-                        <View
-                            style={st.hero}
-                            onLayout={(e) => {
-                                const { y, height } = e.nativeEvent.layout;
-                                setHeroBottomY(y + height);
-                            }}
-                        >
-                            <WeatherIconDisplay
-                                condition={weather.WeatherText}
-                                isDay={weather.IsDayTime}
-                                size='large'
-                                temperature={tempVal}
-                                feelsLike={feelsVal}
-                                latitude={place?.lat}
-                            />
-                            {hiTemp !== null && loTemp !== null && (
-                                <Text style={st.hiLo}>
-                                    H:{hiTemp}° L:{loTemp}°
+                        {twoPane ? (
+                            // Weather pane: the place reads first, then the icon
+                            // beside the temperature, so the hours and every stat
+                            // fit the pane instead of sitting under a tall hero.
+                            // paddingTop clears the sticky buttons.
+                            <View
+                                style={[st.paneHero, { paddingTop: 64 + topInset }]}
+                                onLayout={(e) => {
+                                    const { y, height } = e.nativeEvent.layout;
+                                    setHeroBottomY(y + height);
+                                }}
+                            >
+                                <Text
+                                    style={[st.city, skyText]}
+                                    numberOfLines={1}
+                                    adjustsFontSizeToFit
+                                    minimumFontScale={0.6}
+                                >
+                                    {place?.name}
                                 </Text>
-                            )}
-                        </View>
+                                <Text style={[st.condition, skyText]} numberOfLines={1}>
+                                    {humanizeCondition(weather.WeatherText)}
+                                </Text>
+                                {lastUpdated && (
+                                    <LastUpdated
+                                        date={lastUpdated}
+                                        style={[st.lastUpdated, skyText]}
+                                    />
+                                )}
+                                <View style={st.paneTempRow}>
+                                    <WeatherIconDisplay
+                                        condition={weather.WeatherText}
+                                        isDay={weather.IsDayTime}
+                                        size='medium'
+                                        latitude={place?.lat}
+                                    />
+                                    <View style={st.paneTemps}>
+                                        <Text style={[st.paneTemp, skyText]}>{tempVal}°</Text>
+                                        <Text style={[st.coverFeels, skyText]}>
+                                            Feels like {feelsVal}°
+                                            {hiTemp !== null && loTemp !== null
+                                                ? ` · H:${hiTemp}° L:${loTemp}°`
+                                                : ''}
+                                        </Text>
+                                    </View>
+                                </View>
+                            </View>
+                        ) : fold.mode === 'compact-short' ? (
+                            // The Duo cover is short, so the place and the
+                            // temperature share one row and the outfit starts
+                            // higher up. paddingTop clears the sticky buttons.
+                            <View
+                                style={[st.coverHero, { paddingTop: 60 + topInset }]}
+                                onLayout={(e) => {
+                                    const { y, height } = e.nativeEvent.layout;
+                                    setHeroBottomY(y + height);
+                                }}
+                            >
+                                <View style={st.coverHeroPlace}>
+                                    <Text
+                                        style={[st.city, skyText]}
+                                        numberOfLines={1}
+                                        adjustsFontSizeToFit
+                                        minimumFontScale={0.6}
+                                    >
+                                        {place?.name}
+                                    </Text>
+                                    <Text style={[st.condition, skyText]} numberOfLines={1}>
+                                        {humanizeCondition(weather.WeatherText)}
+                                    </Text>
+                                    {lastUpdated && (
+                                        <LastUpdated
+                                            date={lastUpdated}
+                                            style={[st.lastUpdated, skyText]}
+                                        />
+                                    )}
+                                </View>
+                                <View style={st.coverHeroTemps}>
+                                    <View style={st.coverTempRow}>
+                                        <WeatherIconDisplay
+                                            condition={weather.WeatherText}
+                                            isDay={weather.IsDayTime}
+                                            animate
+                                            latitude={place?.lat}
+                                        />
+                                        <Text style={[st.coverTemp, skyText]}>{tempVal}°</Text>
+                                    </View>
+                                    <Text style={[st.coverFeels, skyText]}>Feels like: {feelsVal}°</Text>
+                                    {hiTemp !== null && loTemp !== null && (
+                                        <Text style={[st.coverHiLo, skyText]}>
+                                            H:{hiTemp}° L:{loTemp}°
+                                        </Text>
+                                    )}
+                                </View>
+                            </View>
+                        ) : (
+                            <>
+                            <View
+                                style={[
+                                    st.header,
+                                    { paddingTop: spacing.lg + topInset },
+                                ]}
+                            >
+                                <Text style={[st.city, skyText]}>{place?.name}</Text>
+                                <Text style={[st.condition, skyText]}>
+                                    {humanizeCondition(weather.WeatherText)}
+                                </Text>
+                                {lastUpdated && (
+                                    <LastUpdated
+                                        date={lastUpdated}
+                                        style={[st.lastUpdated, skyText]}
+                                    />
+                                )}
+                            </View>
+
+                            {/* Hero icon + temperature. onLayout reports the bottom
+                                edge so the sticky mini knows when to fade in. */}
+                            <View
+                                style={st.hero}
+                                onLayout={(e) => {
+                                    const { y, height } = e.nativeEvent.layout;
+                                    setHeroBottomY(y + height);
+                                }}
+                            >
+                                <WeatherIconDisplay
+                                    condition={weather.WeatherText}
+                                    isDay={weather.IsDayTime}
+                                    size='large'
+                                    onLightSky={lightSky}
+                                    temperature={tempVal}
+                                    feelsLike={feelsVal}
+                                    latitude={place?.lat}
+                                />
+                                {hiTemp !== null && loTemp !== null && (
+                                    <Text style={[st.hiLo, skyText]}>
+                                        H:{hiTemp}° L:{loTemp}°
+                                    </Text>
+                                )}
+                            </View>
+                            </>
+                        )}
 
                         {/* Hourly forecast strip — interleaves sunrise/sunset tiles.
                             Each tile is an individual GlassCard so it picks up
@@ -1216,6 +1428,7 @@ const WeatherHUD = ({
                                                     ) === hourBucket
                                                 }
                                                 disableGlass={!perf.glass}
+                                                onLightSky={lightSky}
                                             />
                                         ) : (
                                             <SunEventTile
@@ -1224,6 +1437,7 @@ const WeatherHUD = ({
                                                 temperature={item.temp}
                                                 tempUnit={isMetric ? 'C' : 'F'}
                                                 disableGlass={!perf.glass}
+                                                onLightSky={lightSky}
                                             />
                                         ),
                                     )}
@@ -1231,6 +1445,25 @@ const WeatherHUD = ({
                             </View>
                         )}
 
+                        {twoPane && (
+                            <GlassCard
+                                style={st.details}
+                                disableGlass={!perf.outfitCardGlass}
+                                glassTint={lightSky ? LIGHT_SKY_CARD_TINT : undefined}
+                            >
+                                <ThemeOverride
+                                    colors={lightSky ? LIGHT_SKY_CARD_TEXT : undefined}
+                                    innerGlassTint={lightSky ? LIGHT_SKY_INNER_TINT : undefined}
+                                >
+                                    <WeatherStats weather={weather} settings={settings} showAll />
+                                </ThemeOverride>
+                            </GlassCard>
+                        )}
+                        {twoPane && shareAndAttribution}
+                        </ScrollView>
+                        </Animated.View>
+
+                        <View style={outfitPaneStyle}>
                         {/* Details + outfit.
                             NOT a glass surface, deliberately. This is the
                             tallest element on the screen, so as glass it blurred
@@ -1266,51 +1499,30 @@ const WeatherHUD = ({
                                     : null,
                             ]}
                             disableGlass={!perf.outfitCardGlass}
+                            // Light skies: the card's glass darkens, the glass
+                            // inside it a little less, and its grey text lifts to
+                            // near-white, so every line on it clears 4.5:1. See
+                            // LIGHT_SKY_CARD_TINT.
+                            glassTint={lightSky ? LIGHT_SKY_CARD_TINT : undefined}
                         >
-                            <WeatherDetails
-                                weather={weather}
-                                settings={settings}
-                                forecasts={forecasts}
-                                daily={daily}
-                                city={place?.name}
-                                coords={place ?? undefined}
-                            />
+                            <ThemeOverride
+                                colors={lightSky ? LIGHT_SKY_CARD_TEXT : undefined}
+                                innerGlassTint={lightSky ? LIGHT_SKY_INNER_TINT : undefined}
+                            >
+                                <WeatherDetails
+                                    weather={weather}
+                                    settings={settings}
+                                    forecasts={forecasts}
+                                    daily={daily}
+                                    city={place?.name}
+                                    coords={place ?? undefined}
+                                    showStats={!twoPane}
+                                />
+                            </ThemeOverride>
                         </GlassCard>
-
-                        {forecasts.length > 0 && (
-                            <Pressable
-                                style={st.shareForecastBtn}
-                                onPress={() => setShowShareSheet(true)}
-                                accessibilityRole='button'
-                                accessibilityLabel='Share forecast to Instagram'
-                            >
-                                <View style={st.shareForecastBtnRow}>
-                                    <CameraIcon size={15} color={colors.textSecondary} decorative />
-                                    <Text style={st.shareForecastBtnText}>
-                                        Share forecast
-                                    </Text>
-                                </View>
-                            </Pressable>
-                        )}
-
-                        {/* WeatherKit attribution — required by Apple. */}
-                        <View style={st.weatherAttribution}>
-                            <Pressable
-                                onPress={() =>
-                                    Linking.openURL(
-                                        'https://weatherkit.apple.com/legal-attribution.html',
-                                    ).catch(() => {})
-                                }
-                                hitSlop={6}
-                                accessibilityRole='link'
-                                accessibilityLabel='Weather data provided by Apple Weather'
-                            >
-                                <Text style={st.lastUpdated}>
-                                    {' '}
-                                    Weather data provided by Apple Weather
-                                </Text>
-                            </Pressable>
                         </View>
+
+                        {!twoPane && shareAndAttribution}
                     </Animated.ScrollView>
 
                     {/* Sticky top bar — pinned buttons + scroll-driven mini
@@ -1318,13 +1530,24 @@ const WeatherHUD = ({
                         view. pointerEvents="box-none" lets pulls/scrolls fall
                         through everywhere except the button hit areas. */}
                     <View
-                        style={[st.stickyBar, { top: topInset + 8 }]}
+                        style={[
+                            st.stickyBar,
+                            { top: topInset + 8 },
+                            {
+                                right: twoPane && fold.panes
+                                    ? fold.panes.secondary.width + fold.gutter / 2
+                                    : rightInset,
+                            },
+                        ]}
                         pointerEvents='box-none'
                     >
                         {onOpenLocations ? (
                             <GlassCard
                                 glassStyle='clear'
                                 style={st.locationsBtn}
+                                // Light skies: the buttons take the tiles' scrim,
+                                // or their white glyphs drop under 3:1.
+                                tintColor={lightSky ? LIGHT_SKY_SCRIM : undefined}
                                 disableGlass={!perf.glass}
                             >
                                 <Pressable
@@ -1342,7 +1565,7 @@ const WeatherHUD = ({
                         ) : (
                             <View style={st.locationsBtnPlaceholder} />
                         )}
-                        {miniVisible && (
+                        {miniVisible && !twoPane && (
                             <Animated.View
                                 entering={FadeIn.duration(200)}
                                 style={st.miniWrap}
@@ -1380,6 +1603,7 @@ const WeatherHUD = ({
                         <GlassCard
                             glassStyle='clear'
                             style={st.gearBtn}
+                            tintColor={lightSky ? LIGHT_SKY_SCRIM : undefined}
                             disableGlass={!perf.glass}
                         >
                             <Pressable

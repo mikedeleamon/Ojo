@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { StyleSheet, Modal, ScrollView, ActivityIndicator, AccessibilityInfo, findNodeHandle, View as RNView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { View, Text, Pressable, GlassCard, GlassGroup } from '../../components/primitives';
 import { SETTINGS_CONFIG, SettingsAction } from './config';
 import SettingsSection from './components/SettingsSection';
@@ -12,12 +12,20 @@ import { useDeferredMount } from '../../hooks/useDeferredMount';
 import { clearAuth } from '../../lib/auth';
 import { spacing, radius, fonts, fontSizes, fontWeights } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
+import type { ViewRef } from '../../types/nativeRefs';
+import { usePaneOverlay } from '../../hooks/usePaneOverlay';
 
 interface Props {
     onLogout?: () => void;
+    /** Shown beside the account stack in two panes, rather than as a route. */
+    embedded?: boolean;
+    /** The account route open beside the list, so its row can be marked. */
+    activeRoute?: string;
 }
 
-export default function SettingsScreen({ onLogout }: Props) {
+export default function SettingsScreen({ onLogout, embedded = false, activeRoute }: Props) {
+    const router = useRouter();
+    const overlay = usePaneOverlay(24);
     const { colors } = useTheme();
     const { isPro, isReady, isConfigured } = usePurchases();
     const styles = useMemo(() => StyleSheet.create({
@@ -60,7 +68,7 @@ export default function SettingsScreen({ onLogout }: Props) {
             color: colors.dangerText,
         },
         backdrop: {
-            ...StyleSheet.absoluteFillObject,
+            ...StyleSheet.absoluteFill,
             backgroundColor: 'rgba(0,0,0,0.55)',
         },
         modalCard: {
@@ -128,7 +136,7 @@ export default function SettingsScreen({ onLogout }: Props) {
     // instant instead of stalling on the synchronous glass mount.
     const showBody = useDeferredMount();
 
-    const logoutModalTitleRef = useRef<RNView>(null);
+    const logoutModalTitleRef = useRef<ViewRef>(null);
     useEffect(() => {
         if (!showLogout) return;
         const id = setTimeout(() => {
@@ -147,6 +155,16 @@ export default function SettingsScreen({ onLogout }: Props) {
     );
 
     const dispatch = (action: SettingsAction) => {
+        if (embedded) {
+            // Beside the list, a row swaps the open page instead of stacking up
+            // pages with nothing on screen to go back through.
+            if (action.type === 'navigate') {
+                router.replace(action.to as Href);
+            } else if (action.type === 'legal') {
+                router.replace({ pathname: '/account/legal', params: { docType: action.doc } });
+            }
+            return;
+        }
         if (action.type === 'navigate') {
             nav.push(action.to);
         } else if (action.type === 'legal') {
@@ -185,10 +203,13 @@ export default function SettingsScreen({ onLogout }: Props) {
     );
 
     return (
-        <SafeAreaView style={styles.root}>
+        <SafeAreaView
+            style={styles.root}
+            edges={embedded ? ['top', 'left', 'bottom'] : undefined}
+        >
             <View style={styles.header}>
                 <Pressable
-                    onPress={() => nav.goBack()}
+                    onPress={() => (embedded ? router.navigate('/(tabs)') : nav.goBack())}
                     style={styles.backBtn}
                     accessibilityLabel='Go to Home'
                     accessibilityRole="button"
@@ -207,6 +228,7 @@ export default function SettingsScreen({ onLogout }: Props) {
                                 section={section}
                                 settings={settings}
                                 onAction={dispatch}
+                                activeRoute={embedded ? activeRoute : undefined}
                             />
                         ))}
                     </View>
@@ -238,7 +260,7 @@ export default function SettingsScreen({ onLogout }: Props) {
                     accessibilityLabel="Dismiss"
                     accessibilityRole="button"
                 />
-                <GlassCard style={styles.modalCard}>
+                <GlassCard style={[styles.modalCard, overlay]}>
                     <RNView ref={logoutModalTitleRef} accessible={true} accessibilityLabel="Log out?">
                         <Text style={styles.modalTitle}>Log out?</Text>
                     </RNView>

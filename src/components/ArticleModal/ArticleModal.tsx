@@ -116,6 +116,7 @@ import {
     METALLIC_END,
 } from '../../lib/colors/metallicGradients';
 import { makeSt } from './ArticleModal.styles';
+import type { ViewRef } from '../../types/nativeRefs';
 
 // ─── Default state + edit hydration ───────────────────────────────────────────
 
@@ -415,6 +416,8 @@ const ColorField = ({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 interface Props {
+    /** Render in place (the two-pane Closet) rather than as a sheet. */
+    inline?: boolean;
     closetId: string;
     onClose: () => void;
     onSubmit: (data: ArticleFormData) => Promise<void>;
@@ -430,6 +433,7 @@ interface Props {
 }
 
 const ArticleModal = ({
+    inline = false,
     closetId,
     onClose,
     onSubmit,
@@ -457,7 +461,7 @@ const ArticleModal = ({
     const [topLabelText, setTopLabelText] = useState<string>('');
     const uploadIgnoredRef = useRef(false);
 
-    const headerRef = useRef<RNView>(null);
+    const headerRef = useRef<ViewRef>(null);
     useEffect(() => {
         const id = setTimeout(() => {
             if (headerRef.current) {
@@ -748,16 +752,13 @@ const ArticleModal = ({
     // toggle and Top/Bottom chips are hidden. Only 'Other' (or no type yet) needs them.
     const typeIsAmbiguous = !KNOWN_TYPES.has(form.clothingType);
 
-    return (
-        <Modal
-            visible
-            animationType='slide'
-            presentationStyle='pageSheet'
-            onRequestClose={onClose}
-        >
+    const content = (
             <SafeAreaView
                 style={st.root}
-                edges={['top', 'bottom']}
+                // As a sheet, 'right' clears the iPhone Duo's camera and status
+                // strip, which a page sheet spans on the cover (0 on other
+                // iPhones). Inline, the pane around it already stops at the rail.
+                edges={inline ? ['top', 'bottom'] : ['top', 'bottom', 'right']}
             >
                 {/* Header */}
                 <View style={st.header}>
@@ -1236,6 +1237,19 @@ const ArticleModal = ({
                     </Pressable>
                 </View>
             </SafeAreaView>
+    );
+
+    // In two panes this sits in the right pane instead of a sheet across the fold.
+    if (inline) return <RNView style={{ flex: 1 }}>{content}</RNView>;
+
+    return (
+        <Modal
+            visible
+            animationType='slide'
+            presentationStyle='pageSheet'
+            onRequestClose={onClose}
+        >
+            {content}
         </Modal>
     );
 };

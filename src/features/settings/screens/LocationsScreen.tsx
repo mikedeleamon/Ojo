@@ -7,7 +7,9 @@ import {
   ActivityIndicator,
   Animated,
 } from 'react-native';
-import { Swipeable } from 'react-native-gesture-handler';
+import Swipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
+import type { SharedValue } from 'react-native-reanimated';
+import { SwipeActionReveal } from '../../../components/primitives/SwipeActionReveal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -50,17 +52,16 @@ function SwipeableLocationRow({
   onDelete: () => void;
 }) {
   const renderRightActions = (
-    _progress: ReturnType<Animated.Value['interpolate']>,
-    dragX: ReturnType<Animated.Value['interpolate']>,
-    swipeable: Swipeable,
+    _progress: SharedValue<number>,
+    translation: SharedValue<number>,
+    swipeable: SwipeableMethods,
   ) => {
-    const translateX = dragX.interpolate({
-      inputRange: [-SWIPE_ACTION_WIDTH, 0],
-      outputRange: [0, SWIPE_ACTION_WIDTH],
-      extrapolate: 'clamp',
-    });
     return (
-      <Animated.View style={{ width: SWIPE_ACTION_WIDTH, alignSelf: 'stretch', transform: [{ translateX }] }}>
+      <SwipeActionReveal
+        translation={translation}
+        width={SWIPE_ACTION_WIDTH}
+        style={{ width: SWIPE_ACTION_WIDTH, alignSelf: 'stretch' }}
+      >
         <Pressable
           style={{
             flex: 1,
@@ -86,7 +87,7 @@ function SwipeableLocationRow({
             Delete
           </Text>
         </Pressable>
-      </Animated.View>
+      </SwipeActionReveal>
     );
   };
 

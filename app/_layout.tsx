@@ -15,6 +15,7 @@ import { WeatherProvider } from '../src/context/WeatherContext';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import { PurchasesProvider } from '../src/context/PurchasesContext';
 import { ConfirmProvider } from '../src/components/ConfirmDialog';
+import { FoldLayoutProvider } from '../src/context/FoldLayoutContext';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { isOnboardingComplete, isOnboardingPending } from '../src/lib/onboarding';
 import { recordAppOpen } from '../src/services/reviewManager';
@@ -224,6 +225,7 @@ export default Sentry.wrap(function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <ThemeProvider>
           <SafeAreaProvider>
+            <FoldLayoutProvider>
             <AuthProvider>
               <PurchasesProvider>
               <SettingsProvider>
@@ -253,6 +255,7 @@ export default Sentry.wrap(function RootLayout() {
               </SettingsProvider>
               </PurchasesProvider>
             </AuthProvider>
+            </FoldLayoutProvider>
           </SafeAreaProvider>
         </ThemeProvider>
       </GestureHandlerRootView>

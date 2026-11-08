@@ -23,7 +23,6 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { InteractionManager } from 'react-native';
 import api from '../api/client';
 import { authHeaders, getToken } from '../lib/auth';
 import { useActiveLocation } from '../context/ActiveLocationContext';
@@ -45,6 +44,7 @@ import type {
   NotificationSettings,
   Settings,
 } from '../types';
+import { runAfterInteractions } from '../lib/runAfterInteractions';
 
 /** Local calendar date as "YYYY-MM-DD" — must match DailyForecast.date. */
 const localISODate = (d: Date): string => {
@@ -122,7 +122,7 @@ export function useMorningBriefScheduler({
 
     // Generating up to 7 outfits is far too much to put on the render path — the
     // single tomorrow run was already deferred for this reason.
-    const task = InteractionManager.runAfterInteractions(async () => {
+    const task = runAfterInteractions(async () => {
       try {
         if (!notifSettings.current) {
           const { data } = await api.get<NotificationSettings>(

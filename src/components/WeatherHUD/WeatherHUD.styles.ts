@@ -1,11 +1,12 @@
 import { StyleSheet } from 'react-native';
 import { ColorTokens, fonts, fontSizes, spacing } from '../../theme/tokens';
+import { LIGHT_SKY_SCRIM } from '../../lib/weather/skyContrast';
 
 export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     root: { flex: 1 },
     contentLayer: { flex: 1 },
     loadingOverlay: {
-        ...StyleSheet.absoluteFillObject,
+        ...StyleSheet.absoluteFill,
         zIndex: 10,
         alignItems: 'center',
         justifyContent: 'center',
@@ -16,6 +17,7 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     },
     loadingIcon: { width: 80, height: 80 },
     scroll: { flexGrow: 1, paddingBottom: spacing.xl },
+    scrollRow: { flexDirection: 'row', alignItems: 'flex-start' },
     center: {
         flex: 1,
         alignItems: 'center',
@@ -82,10 +84,12 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         fontSize: fontSizes.lg,
         color: 'rgba(255,255,255,0.75)',
     },
+    // 60%, not 35%: at 35% it measured 3.2:1 even on the clear-night sky, and
+    // this style also sets the WeatherKit attribution, which must stay legible.
     lastUpdated: {
         fontFamily: fonts.body,
         fontSize: fontSizes.sm,
-        color: 'rgba(255,255,255,0.35)',
+        color: 'rgba(255,255,255,0.6)',
         marginTop: 2,
     },
     retryBtn: {
@@ -108,6 +112,57 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         textDecorationLine: 'underline',
     },
     hero: { alignItems: 'center', paddingVertical: spacing.lg },
+    // Duo cover: place on the left, temperature on the right, one row.
+    coverHero: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        justifyContent: 'space-between',
+        gap: spacing.md,
+        paddingHorizontal: 20,
+        paddingBottom: spacing.lg,
+    },
+    // Two-pane weather pane: the place on top, left-aligned, then the icon
+    // beside the temperature.
+    paneHero: {
+        alignItems: 'flex-start',
+        gap: 4,
+        paddingHorizontal: 20,
+        paddingBottom: spacing.md,
+    },
+    paneTempRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.md,
+        marginTop: spacing.sm,
+    },
+    paneTemps: { gap: 2 },
+    paneTemp: {
+        fontFamily: fonts.hero,
+        fontSize: 80,
+        lineHeight: 88,
+        color: colors.textPrimary,
+    },
+    coverHeroPlace: { flex: 1, gap: 4 },
+    coverHeroTemps: { alignItems: 'flex-end' },
+    coverTempRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    coverTemp: {
+        fontFamily: fonts.hero,
+        fontSize: 56,
+        lineHeight: 62,
+        color: colors.textPrimary,
+    },
+    coverFeels: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.sm,
+        color: colors.textSecondary,
+    },
+    coverHiLo: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.sm,
+        color: 'rgba(255,255,255,0.55)',
+        marginTop: 2,
+        letterSpacing: 0.5,
+    },
     weatherAttribution: { alignItems: 'center', paddingVertical: spacing.sm },
     shareForecastBtn: {
         alignSelf: 'center',
@@ -129,6 +184,13 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         fontSize: fontSizes.sm,
         color: colors.textSecondary,
     },
+    // On a pale sky the pill sits on the near-white horizon: give it a navy
+    // surface and full-strength text.
+    shareForecastBtnLight: {
+        backgroundColor: LIGHT_SKY_SCRIM,
+        borderColor: 'rgba(255,255,255,0.18)',
+    },
+    shareForecastBtnTextLight: { color: colors.textPrimary },
 
     hiLo: {
         fontFamily: fonts.body,

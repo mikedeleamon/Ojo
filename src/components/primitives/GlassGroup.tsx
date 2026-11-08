@@ -13,6 +13,7 @@
 import { forwardRef } from 'react';
 import { View, ViewProps, StyleProp, ViewStyle } from 'react-native';
 import { GlassContainer, isGlassEffectAPIAvailable } from 'expo-glass-effect';
+import type { ViewRef } from '../../types/nativeRefs';
 
 const LIQUID_GLASS = isGlassEffectAPIAvailable();
 
@@ -23,7 +24,7 @@ interface GlassGroupProps extends ViewProps {
   children?: React.ReactNode;
 }
 
-const GlassGroup = forwardRef<View, GlassGroupProps>(
+const GlassGroup = forwardRef<ViewRef, GlassGroupProps>(
   ({ style, spacing, children, ...rest }, ref) => {
     if (LIQUID_GLASS) {
       return (

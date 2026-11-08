@@ -6,6 +6,7 @@ import { articleDisplayName } from '../../types';
 import ShareCardFrame from './ShareCardFrame';
 import { CARD_WIDTH } from './ShareCardFrame.styles';
 import cs from './shareCardCommon.styles';
+import type { ViewRef } from '../../types/nativeRefs';
 
 interface DonationListShareCardProps {
   items: ArticleInsight[];
@@ -23,7 +24,7 @@ function tileSize(count: number) {
 const articleLabel = (insight: ArticleInsight): string =>
   articleDisplayName(insight.article);
 
-const DonationListShareCard = forwardRef<View, DonationListShareCardProps>(
+const DonationListShareCard = forwardRef<ViewRef, DonationListShareCardProps>(
   ({ items }, ref) => {
     const photos = items.slice(0, 4);
     const { width, height } = tileSize(photos.length);

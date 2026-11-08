@@ -1,6 +1,9 @@
-import { Pressable } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { Svg, Path } from 'react-native-svg';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
+import SettingsScreen from '../../src/features/settings/SettingsScreen';
+import { useFoldLayout } from '../../src/context/FoldLayoutContext';
+import { useAuth } from '../../src/context/AuthContext';
 import { useTheme } from '../../src/theme/ThemeContext';
 
 function AccountBackButton({ color }: { color: string }) {
@@ -31,8 +34,19 @@ function AccountBackButton({ color }: { color: string }) {
     );
 }
 
+// These run full screen in every layout, and lay themselves out in two panes.
+const FULL_SCREEN_ROUTES = new Set(['recap', 'upgrade']);
+
 export default function AccountLayout() {
     const { colors } = useTheme();
+    const fold = useFoldLayout();
+    const { logout } = useAuth();
+    const segments = useSegments() as string[];
+    const route = segments[segments.length - 1];
+    // Two panes: the settings list stays on the left and the stack runs on the
+    // right, so a row opens beside the list. The stack keeps its place in the
+    // tree (by key), which means folding can't remount it and lose a form.
+    const showList = fold.mode === 'two-pane' && fold.axis === 'row' && !FULL_SCREEN_ROUTES.has(route);
 
     const subScreen = {
         headerShown: true,
@@ -45,11 +59,20 @@ export default function AccountLayout() {
         // of this navigator's own history and hides the native back button. This
         // renders unconditionally and falls back to /account when there's nothing
         // to pop.
-        headerLeft: () => <AccountBackButton color={colors.textPrimary} />,
+        // Beside the list there's nothing to go back to.
+        headerLeft: showList ? undefined : () => <AccountBackButton color={colors.textPrimary} />,
+        headerBackVisible: showList ? false : undefined,
     };
 
     return (
-        <Stack screenOptions={{ headerShown: false }}>
+        <View style={{ flex: 1, flexDirection: showList ? 'row' : 'column', backgroundColor: colors.bgDefault }}>
+        {showList && (
+            <View key='list' style={{ width: fold.panes?.primary.width }}>
+                <SettingsScreen onLogout={logout} embedded activeRoute={route} />
+            </View>
+        )}
+        <View key='stack' style={{ flex: 1 }}>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bgDefault } }}>
             <Stack.Screen name='index' />
             <Stack.Screen
                 name='profile'
@@ -109,5 +132,7 @@ export default function AccountLayout() {
                 options={{ ...subScreen, title: 'Legal' }}
             />
         </Stack>
+        </View>
+        </View>
     );
 }

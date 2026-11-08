@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { InteractionManager } from 'react-native';
+import { runAfterInteractions } from '../lib/runAfterInteractions';
 
 /**
  * Returns false on first render, then flips to true once the current
@@ -23,7 +23,7 @@ export const useDeferredMount = (maxDelayMs = 600): boolean => {
         setReady(true);
       }
     };
-    const task = InteractionManager.runAfterInteractions(finish);
+    const task = runAfterInteractions(finish);
     // Hard cap so a long-running interaction handle can't defer indefinitely.
     const timer = setTimeout(finish, maxDelayMs);
     return () => {

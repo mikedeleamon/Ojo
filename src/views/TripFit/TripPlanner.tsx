@@ -73,6 +73,9 @@ import TripFitShareCard from '../../components/ShareCard/TripFitShareCard';
 import { lookFor } from '../../lib/visualLibrary/looks';
 import PackingListShareCard from '../../components/ShareCard/PackingListShareCard';
 import { tripShareLink } from '../../lib/share/deepLinks';
+import type { ScrollViewRef } from '../../types/nativeRefs';
+import { useFoldLayout } from '../../context/FoldLayoutContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ─── Local date helper ──────────────────────────────────────────────────────────
 // Build a yyyy-mm-dd string from a Date using LOCAL components, so a calendar
@@ -568,6 +571,12 @@ interface TripPlannerProps {
     onBack: () => void;
     onPersist: (plan: SavedTripFitPlan) => Promise<SavedTripFitPlan>;
     onDeleted: (id: string) => void;
+    /**
+     * False when the trip is only previewed (the two-pane detail pane showing
+     * the next trip unasked): a pending trip then waits for a tap before it
+     * spends a forecast fetch and a save. Defaults to true.
+     */
+    autoGenerate?: boolean;
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -582,10 +591,18 @@ export default function TripPlanner({
     onBack,
     onPersist,
     onDeleted,
+    autoGenerate = true,
 }: TripPlannerProps) {
     const { colors } = useTheme();
     const reduceMotion = useReduceMotion();
     const { width: windowWidth } = useWindowDimensions();
+    const fold = useFoldLayout();
+    const { right: rightInset } = useSafeAreaInsets();
+    const besideLibrary = fold.mode === 'two-pane' && fold.axis === 'row';
+    // In two panes the planner only gets the right-hand pane.
+    const contentWidth = besideLibrary && fold.panes
+        ? fold.panes.secondary.width - rightInset
+        : windowWidth - rightInset;
     const router = useRouter();
     const { isPro, isReady, isConfigured } = usePurchases();
 
@@ -595,7 +612,7 @@ export default function TripPlanner({
     // padding (spacing.md a side); we measure it via onLayout and only fall back
     // to that derivation before the first layout lands.
     const [pagerWidth, setPagerWidth] = useState(0);
-    const cardWidth = pagerWidth || windowWidth - spacing.md * 2;
+    const cardWidth = pagerWidth || contentWidth - spacing.md * 2;
 
     // ── Form state ──
     const [destination, setDestination] = useState(
@@ -636,7 +653,7 @@ export default function TripPlanner({
     );
 
     // ── Refs (avoid stale closures when persisting after a state update) ──
-    const pagerRef = useRef<ScrollView>(null);
+    const pagerRef = useRef<ScrollViewRef>(null);
     const forecastDaysRef = useRef<DailyForecast[]>([]);
     const animValues = useRef<Animated.Value[]>([]).current;
     const planIdRef = useRef<string>(existingPlan?.id ?? newPlanId());
@@ -827,6 +844,7 @@ export default function TripPlanner({
     // Auto-generate when opening a pending trip that has entered the forecast window.
     useEffect(() => {
         if (
+            autoGenerate &&
             existingPlan &&
             tripFitStatus(existingPlan) === 'pending' &&
             isInForecastWindow(existingPlan.startDate)
@@ -1016,7 +1034,7 @@ export default function TripPlanner({
 
     const st = useMemo(() => makeStyles(colors), [colors]);
     const tabPad = useTabBarPadding();
-    const calContainerWidth = windowWidth - spacing.md * 2;
+    const calContainerWidth = contentWidth - spacing.md * 2;
     const showForm = !isSaved;
 
     return (
@@ -1025,14 +1043,18 @@ export default function TripPlanner({
         <SafeAreaView style={st.root} edges={['top']}>
             {/* Header */}
             <View style={st.header}>
-                <Pressable
-                    onPress={onBack}
-                    style={st.backBtn}
-                    accessibilityLabel='Back to trips'
-                    accessibilityRole='button'
-                >
-                    <Text style={[st.backArrow, { color: colors.textPrimary }]}>‹</Text>
-                </Pressable>
+                {/* Beside the library a saved trip has nowhere to go back to: the
+                    trips are already on the left. A new trip keeps it as Cancel. */}
+                {!(besideLibrary && isSaved) && (
+                    <Pressable
+                        onPress={onBack}
+                        style={st.backBtn}
+                        accessibilityLabel='Back to trips'
+                        accessibilityRole='button'
+                    >
+                        <Text style={[st.backArrow, { color: colors.textPrimary }]}>‹</Text>
+                    </Pressable>
+                )}
                 <Text style={st.title}>{isSaved ? 'Your Trip' : 'New Trip'}</Text>
             </View>
 

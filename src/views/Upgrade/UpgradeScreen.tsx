@@ -72,6 +72,9 @@ import {
     fontSizes,
     darkColors,
 } from '../../theme/tokens';
+import type { ScrollViewRef } from '../../types/nativeRefs';
+import { useFoldColumns } from '../../hooks/useFoldColumns';
+import { useFoldLayout } from '../../context/FoldLayoutContext';
 
 // The app icon's own diagonal mint→leaf gradient (see OjoLogoIcon's j-gradient
 // and the widget's brand ramp) — the fixed "Ojo Pro" brand moment, independent
@@ -449,8 +452,14 @@ function purchaseFailure(error: unknown): Feedback | null {
 
 function OjoProPaywall({ onClose }: { onClose: () => void }) {
     const insets = useSafeAreaInsets();
+    // Two panes: the pitch on the left. The plans, CTA, Restore and legal copy all
+    // stay together on the right, because App Review expects them in one place.
+    const columns = useFoldColumns(20);
+    const { twoPane } = columns;
+    // The Duo cover is short: benefits shrink to titles so plans and CTA fit.
+    const titlesOnly = useFoldLayout().mode === 'compact-short';
     const nav = useAppNavigation();
-    const scrollRef = useRef<ScrollView>(null);
+    const scrollRef = useRef<ScrollViewRef>(null);
 
     // Purchases and restores can outlive this screen — the "still waiting"
     // note tells people to close it — and a result that lands after that must
@@ -728,12 +737,15 @@ function OjoProPaywall({ onClose }: { onClose: () => void }) {
                     contentContainerStyle={[
                         styles.content,
                         {
-                            paddingTop: insets.top,
+                            paddingTop: twoPane ? insets.top + 12 : insets.top,
                             paddingBottom: insets.bottom + 24,
+                            paddingRight: 20 + insets.right,
                         },
+                        columns.row,
                     ]}
                     showsVerticalScrollIndicator={false}
                 >
+                    <View style={[styles.column, columns.left]}>
                     <View style={styles.headerRow}>
                         <IconButton
                             icon={
@@ -764,31 +776,38 @@ function OjoProPaywall({ onClose }: { onClose: () => void }) {
                         </Text>
                     </View>
 
-                    <View style={styles.features}>
+                    <View style={[styles.features, titlesOnly && styles.featuresGrid]}>
                         {/* Ordered by how often each gate is actually met, so
                             the first row is the reason most people are here. */}
                         <FeatureRow
+                            titleOnly={titlesOnly}
                             icon={<HangerIcon size={23} color='#ffffff' decorative />}
                             title='Unlimited items'
                             body={`Free covers ${FREE_ITEM_LIMIT} items — enough for a full year of weather. Pro removes the cap.`}
                         />
                         <FeatureRow
+                            titleOnly={titlesOnly}
                             icon={<GridIcon size={22} color='#ffffff' />}
                             title='Unlimited closets'
                             body='Free includes one closet. Pro adds a travel closet, a seasonal one, as many as you like.'
                         />
                         <FeatureRow
+                            titleOnly={titlesOnly}
                             icon={<TripFitIcon size={24} />}
                             title='Unlimited saved trips'
                             body="Free keeps 1 trip at a time. Pro keeps every trip you're planning."
                         />
                         <FeatureRow
+                            titleOnly={titlesOnly}
                             icon={<StyleDnaGlyph size={21} />}
                             title='Your Style DNA'
                             body='Top colors, fabrics and pairings, learned from what you actually wear.'
                         />
                     </View>
 
+                    </View>
+
+                    <View style={[styles.column, columns.right, twoPane && styles.planPane]}>
                     {offering.status === 'loading' ? (
                         <GlassCard style={styles.planPlaceholder}>
                             <ActivityIndicator color='#ffffff' />
@@ -964,6 +983,7 @@ function OjoProPaywall({ onClose }: { onClose: () => void }) {
                                 </Text>
                             </Pressable>
                         </View>
+                    </View>
                     </View>
                 </ScrollView>
             </View>
@@ -1170,11 +1190,21 @@ function FeatureRow({
     icon,
     title,
     body,
+    titleOnly = false,
 }: {
     icon: ReactNode;
     title: string;
     body: string;
+    titleOnly?: boolean;
 }) {
+    if (titleOnly) {
+        return (
+            <GlassCard style={styles.featureTile}>
+                <View style={styles.featureTileIcon}>{icon}</View>
+                <Text style={styles.featureTileTitle} numberOfLines={2}>{title}</Text>
+            </GlassCard>
+        );
+    }
     return (
         <GlassCard style={styles.featureRow}>
             <View style={styles.featureIconWrap}>{icon}</View>
@@ -1280,6 +1310,8 @@ const styles = StyleSheet.create({
     },
     scroll: { flex: 1 },
     content: { paddingHorizontal: 20, gap: 14 },
+    column: { gap: 14 },
+    planPane: { paddingTop: 44 },
 
     headerRow: { flexDirection: 'row', justifyContent: 'flex-end' },
     // 44×44 is the HIG minimum touch target; the glyph itself stays 16.
@@ -1319,6 +1351,30 @@ const styles = StyleSheet.create({
     },
 
     features: { gap: 10 },
+    featuresGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    featureTile: {
+        flexBasis: '47%',
+        flexGrow: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        borderRadius: radius.md,
+        padding: 8,
+    },
+    featureTileIcon: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(159,232,112,0.13)',
+    },
+    featureTileTitle: {
+        flex: 1,
+        fontFamily: fonts.bodySemiBold,
+        fontSize: fontSizes.sm,
+        color: '#ffffff',
+    },
     featureRow: {
         flexDirection: 'row',
         alignItems: 'flex-start',

@@ -9,6 +9,7 @@ import type { ShareCardVariant } from './ShareCardFrame.styles';
 import cs from './shareCardCommon.styles';
 import { fonts, fontSizes } from '../../theme/tokens';
 import { StyleSheet } from 'react-native';
+import type { ViewRef } from '../../types/nativeRefs';
 
 interface WeatherForecastShareCardProps {
   place: string;
@@ -62,7 +63,7 @@ const hourLabel = (iso: string) =>
     .toLocaleTimeString('en-US', { hour: 'numeric' })
     .replace(/\s+/g, '');
 
-const WeatherForecastShareCard = forwardRef<View, WeatherForecastShareCardProps>(
+const WeatherForecastShareCard = forwardRef<ViewRef, WeatherForecastShareCardProps>(
   ({ place, weather, hourly, isMetric = false, variant = 'poster' }, ref) => {
     // Hourly forecast temps are always Fahrenheit; convert per the unit setting.
     const currentTemp = Math.round(

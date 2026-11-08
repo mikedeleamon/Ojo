@@ -289,7 +289,7 @@ function makeStyles(cellSize: number) {
             position: 'relative',
         },
         rangeFill: {
-            ...StyleSheet.absoluteFillObject,
+            ...StyleSheet.absoluteFill,
             borderRadius: 0,
         },
         selectedDot: {

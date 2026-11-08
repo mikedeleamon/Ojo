@@ -6,7 +6,6 @@ import {
     Pressable,
     Linking,
     ActivityIndicator,
-    InteractionManager,
     useWindowDimensions,
     Animated as RNAnimated,
     Easing as RNEasing,
@@ -94,6 +93,8 @@ import {
 } from '../../lib/archetypes/genericOutfit';
 import { LayeringSection } from './LayeringSection';
 import { makeStyles } from './OutfitSuggestion.styles';
+import type { ScrollViewRef } from '../../types/nativeRefs';
+import { runAfterInteractions } from '../../lib/runAfterInteractions';
 
 /** Value equality for generic advice — see the guard in the effect below. */
 const sameGenericOutfit = (
@@ -128,7 +129,7 @@ const ArticleThumb = ({
     role: OutfitRole;
     onRemove?: () => void;
 }) => {
-    const { colors } = useTheme();
+    const { colors, innerGlassTint } = useTheme();
     const perf = usePerfFlags();
     const styles = useMemo(() => makeStyles(colors), [colors]);
     return (
@@ -139,6 +140,8 @@ const ArticleThumb = ({
         <GlassCard
             style={styles.articleCard}
             disableGlass={!perf.outfitInnerGlass}
+            // Light skies: darkened with the card around it (see ThemeOverride).
+            glassTint={innerGlassTint}
         >
             <View style={styles.articleImg}>
                 {article.imageUrl ? (
@@ -213,10 +216,10 @@ const ScoreBadge = ({
     const styles = useMemo(() => makeStyles(colors), [colors]);
     const color =
         score >= 80
-            ? 'rgba(52,211,153,0.9)'
+            ? colors.ratingHigh
             : score >= 60
-              ? 'rgba(251,191,36,0.9)'
-              : 'rgba(148,163,184,0.9)';
+              ? colors.ratingMid
+              : colors.ratingLow;
     const label = isPersonalized ? 'Your Score' : 'Outfit Score';
     return (
         <View style={[styles.scoreBadge, { borderColor: color }]}>
@@ -422,7 +425,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
     const { width: windowWidth } = useWindowDimensions();
     const [pagerWidth, setPagerWidth] = useState(0);
     const cardWidth = pagerWidth || windowWidth - spacing.md * 4.1;
-    const pagerRef = useRef<ScrollView>(null);
+    const pagerRef = useRef<ScrollViewRef>(null);
 
     useEffect(() => {
         recentlyWornWithAge(7)
@@ -491,7 +494,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
         // fewer than the usual three. Capped at 5: each style re-scores every
         // candidate.
         const topK = Math.max(3, Math.min(5, (effectiveSettings.clothingStyles?.length ?? 0) + 1));
-        const task = InteractionManager.runAfterInteractions(() => {
+        const task = runAfterInteractions(() => {
             const { results, status } = generateOutfits(
                 preferred.articles,
                 weather,
@@ -546,7 +549,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
         }
         // Same treatment as real generation: off the render path, so an empty
         // closet's advice never blocks a tap or a tab switch.
-        const task = InteractionManager.runAfterInteractions(() => {
+        const task = runAfterInteractions(() => {
             const next = buildGenericOutfit({
                 weather,
                 settings: effectiveSettings,
@@ -571,7 +574,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
     // have actually been viewed. Starts with just the active index — the
     // first paint mounts exactly one card's worth of thumbs. Neighbors are
     // pre-warmed two ways: (1) idle, via runAfterInteractions, once the active
-    // card settles — the common case, since InteractionManager tasks usually
+    // card settles — the common case, since idle tasks usually
     // run within tens of ms and land well before any swipe; (2) synchronously
     // on onScrollBeginDrag, as a safety net — without it, a swipe that starts
     // before the idle warm has fired showed a blank neighbor card once the
@@ -597,7 +600,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
         });
     }, [safeIdx, outfits.length]);
     useEffect(() => {
-        const task = InteractionManager.runAfterInteractions(warmNeighbors);
+        const task = runAfterInteractions(warmNeighbors);
         return () => task.cancel();
     }, [warmNeighbors]);
 
@@ -634,7 +637,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
         const day = tomorrowDailyFor(daily);
         if (!day) { setTomorrowForWidget(null); return; }
         if (!preferred) { setTomorrowForWidget({ day, outfit: null }); return; }
-        const task = InteractionManager.runAfterInteractions(() => {
+        const task = runAfterInteractions(() => {
             const { results } = generateOutfits(
                 preferred.articles,
                 buildTripWeather(day),

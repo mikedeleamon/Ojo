@@ -37,6 +37,7 @@ import { buildRecap, isoWeekKey, RecapCard, RecapWeekMeta, RecapSection } from '
 import { loadShownBeforeWeek, recordShownTemplates } from '../../lib/recapStorage';
 import { recapShareLink } from '../../lib/share/deepLinks';
 import { DEMO_RECAP } from './recapDemo';
+import { useFoldColumns } from '../../hooks/useFoldColumns';
 
 // ─── Shop CTA (unchanged from the prior recap) ─────────────────────────────────
 
@@ -76,6 +77,9 @@ const ShareIcon = () => (
 );
 
 // ─── Section renderers ────────────────────────────────────────────────────────
+
+const HERO_TEMPLATES = new Set(['hero_week', 'hero_light', 'empty_week']);
+const isHeroCard = (card: RecapCard) => HERO_TEMPLATES.has(card.templateId);
 
 const HeroCard = ({ card, meta }: { card: RecapCard; meta: RecapWeekMeta }) => (
   <View style={sx.hero}>
@@ -223,6 +227,8 @@ export default function RecapPage() {
   const isDemo = __DEV__ && params.demo === '1';
   const { closets, loading: closetsLoading } = useClosets();
   const gradient = useRecapGradientCycle();
+  const columns = useFoldColumns(18, { railPadded: true });
+  const { twoPane } = columns;
 
   const [data, setData] = useState<Data | null>(isDemo ? DEMO_RECAP : null);
   const [showShare, setShowShare] = useState(false);
@@ -280,11 +286,32 @@ export default function RecapPage() {
 
   const { cards, meta } = data;
 
+  const renderCard = (card: (typeof cards)[number]) => {
+      switch (card.templateId) {
+        case 'hero_week':
+        case 'hero_light':
+        case 'empty_week':
+          return <HeroCard key={card.templateId} card={card} meta={meta} />;
+        case 'color_story':
+          return <ColorStoryCard key={card.templateId} card={card} meta={meta} />;
+        case 'mvp_item':
+          return <MvpCard key={card.templateId} card={card} />;
+        case 'milestone':
+          return <AllTimeCard key={card.templateId} card={card} meta={meta} />;
+        case 'trip_week':
+          return <TravelCard key={card.templateId} card={card} />;
+        case 'share_cta':
+          return <WrappedCard key={card.templateId} card={card} onShare={handleShare} />;
+        default:
+          return <GenericCard key={card.templateId} card={card} onShop={handleShop} />;
+      }
+  };
+
   return (
     <View style={st.root}>
       <StatusBar style='light' />
       <RecapGradientBackground {...gradient} />
-      <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
+      <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom', 'right']}>
         {/* Nav row */}
         <View style={st.navRow}>
           <Pressable style={st.navBtn} onPress={handleBack} accessibilityLabel='Back' accessibilityRole='button'>
@@ -309,26 +336,12 @@ export default function RecapPage() {
           </View>
           <View style={st.hairline} />
 
-          {cards.map(card => {
-            switch (card.templateId) {
-              case 'hero_week':
-              case 'hero_light':
-              case 'empty_week':
-                return <HeroCard key={card.templateId} card={card} meta={meta} />;
-              case 'color_story':
-                return <ColorStoryCard key={card.templateId} card={card} meta={meta} />;
-              case 'mvp_item':
-                return <MvpCard key={card.templateId} card={card} />;
-              case 'milestone':
-                return <AllTimeCard key={card.templateId} card={card} meta={meta} />;
-              case 'trip_week':
-                return <TravelCard key={card.templateId} card={card} />;
-              case 'share_cta':
-                return <WrappedCard key={card.templateId} card={card} onShare={handleShare} />;
-              default:
-                return <GenericCard key={card.templateId} card={card} onShop={handleShop} />;
-            }
-          })}
+          {twoPane ? (
+            <View style={[columns.row, { paddingRight: 0 }]}>
+              <View style={[sx.pane, columns.left]}>{cards.filter(isHeroCard).map(renderCard)}</View>
+              <View style={[sx.pane, columns.right]}>{cards.filter(c => !isHeroCard(c)).map(renderCard)}</View>
+            </View>
+          ) : cards.map(renderCard)}
 
           <Text style={[st.stamp, { textAlign: 'center', marginTop: 6 }]}>{meta.weekStamp}</Text>
         </ScrollView>
@@ -359,6 +372,7 @@ export default function RecapPage() {
 const sx = StyleSheet.create({
   loading: { alignItems: 'center', justifyContent: 'center' },
   navSpacer: { width: 38, height: 38 },
+  pane: { gap: 14 },
   hero: { paddingHorizontal: 2, paddingTop: 6, gap: 2 },
   shareBtn: {
     alignSelf: 'flex-start',
