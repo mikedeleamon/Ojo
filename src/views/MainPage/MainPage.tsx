@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { StyleSheet } from 'react-native';
+import { Stack } from 'expo-router';
 import { View } from '../../components/primitives';
 import WeatherHUD from '../../components/WeatherHUD/WeatherHUD';
 import { useSettings } from '../../hooks/useSettings';
@@ -12,7 +13,14 @@ import { refreshClosets } from '../../hooks/useClosets';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { ForceDarkPalette } from '../../theme/ThemeContext';
 import { darkColors } from '../../theme/tokens';
+import { useSideRail } from '../../hooks/useSideRail';
 import type { WeatherSnapshot } from '../../types';
+
+// The HUD's own LocationsIcon and GearIcon, as template PNGs for native bar items
+// (scripts/render-header-icons.py). Same stroke colour as the SVG components.
+const LOCATION_GLYPH = require('../../../assets/images/ojo_header_location.png');
+const SETTINGS_GLYPH = require('../../../assets/images/ojo_header_settings.png');
+const GLYPH_TINT = 'rgba(255,255,255,0.85)';
 
 export default function MainPage() {
   const st = useMemo(() => StyleSheet.create({
@@ -133,15 +141,53 @@ export default function MainPage() {
   }, [activeId]);
 
   const openLocations = useCallback(() => nav.push('/account/locations'), [nav]);
+  const openSettings = useCallback(() => nav.push('/account'), [nav]);
+
+  // iPhone Duo: Location and Settings become native nav-bar items, which iOS
+  // places in the side column above the tab rail (Duo HIG: the toolbar, nav
+  // buttons included, moves to the side; don't override that placement). They
+  // keep the app's own pin and gear as template images. On a regular iPhone no
+  // toolbar is declared, the Stack header stays hidden, and WeatherHUD draws its
+  // own buttons exactly as before (it checks the same useSideRail()).
+  // Memoized so a Home re-render doesn't hand Stack.Toolbar new children, which
+  // would re-apply the header options and rebuild the native bar items.
+  const sideRail = useSideRail();
+  const navBarButtons = useMemo(() => sideRail ? (
+    <>
+      <Stack.Toolbar placement='left'>
+        <Stack.Toolbar.Button
+          icon={LOCATION_GLYPH}
+          iconRenderingMode='template'
+          tintColor={GLYPH_TINT}
+          accessibilityLabel='Switch location'
+          onPress={openLocations}
+        >
+          Location
+        </Stack.Toolbar.Button>
+      </Stack.Toolbar>
+      <Stack.Toolbar placement='right'>
+        <Stack.Toolbar.Button
+          icon={SETTINGS_GLYPH}
+          iconRenderingMode='template'
+          tintColor={GLYPH_TINT}
+          accessibilityLabel='Account settings'
+          onPress={openSettings}
+        >
+          Settings
+        </Stack.Toolbar.Button>
+      </Stack.Toolbar>
+    </>
+  ) : null, [sideRail, openLocations, openSettings]);
 
   // WeatherHUD owns its loading state via showInlineLoader (default true):
   // a spinning sun sits on the dark gradient while GPS + weather fetch,
   // then fades out (400 ms) as the gradient transitions to the weather colour.
   // The settings gate is kept so WeatherHUD never mounts without a location.
-  if (!settingsReady) return <ForceDarkPalette><View style={st.root} /></ForceDarkPalette>;
+  if (!settingsReady) return <ForceDarkPalette>{navBarButtons}<View style={st.root} /></ForceDarkPalette>;
 
   return (
     <ForceDarkPalette>
+      {navBarButtons}
       <View style={st.root}>
         {/* key={activeId} remounts on city switch so each city paints from its
             own synchronous seed (and uncached cities cold-load cleanly). */}

@@ -26,7 +26,8 @@ export default function TabLayout() {
   return (
     <View style={{ flex: 1 }}>
       <NativeTabs tintColor={accent}>
-        <NativeTabs.Trigger name="index">
+        {/* (home) is a folder with its own Stack; see app/(tabs)/(home)/_layout.tsx */}
+        <NativeTabs.Trigger name="(home)">
           <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
           <NativeTabs.Trigger.Icon src={require('../../assets/images/ojo_home_tab_icon.png')} renderingMode='template' />
         </NativeTabs.Trigger>
