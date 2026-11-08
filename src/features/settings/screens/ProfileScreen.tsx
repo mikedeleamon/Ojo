@@ -277,7 +277,7 @@ export default function ProfileScreen({ onLogout }: Props) {
     return (
         <SafeAreaView
             style={styles.root}
-            edges={['bottom']}
+            edges={['bottom', 'right']}
         >
             <KeyboardAvoidingView
                 style={{ flex: 1 }}

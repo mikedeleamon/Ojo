@@ -40,7 +40,7 @@ export default function LocationScreen() {
   });
 
   return (
-    <SafeAreaView style={st.root} edges={['bottom']}>
+    <SafeAreaView style={st.root} edges={['bottom', 'right']}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
           <View style={st.section}>

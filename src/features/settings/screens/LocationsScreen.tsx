@@ -354,8 +354,11 @@ export default function LocationsScreen() {
     );
   };
 
+  // 'right' keeps the list and its intro clear of the iPhone Duo's side column
+  // (clock, Wi-Fi, camera), on the cover and beside the settings list unfolded.
+  // The right inset is 0 on a regular iPhone, so nothing moves there.
   return (
-    <SafeAreaView style={st.root} edges={['bottom']}>
+    <SafeAreaView style={st.root} edges={['bottom', 'right']}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

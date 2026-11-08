@@ -18,6 +18,7 @@
 
 import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { hasSideRail } from '../lib/layout/sideRail';
 
 // Tab bar visible height above the safe-area inset.
 // iOS standard:   49pt
@@ -33,6 +34,6 @@ export const useTabBarPadding = (): number => {
   const insets = useSafeAreaInsets();
   // A reserved right edge on iOS means the iPhone Duo, on either screen, where
   // the system moves the tab bar into a rail. Nothing sits along the bottom then.
-  if (Platform.OS === 'ios' && insets.right > 0) return insets.bottom + 16;
+  if (hasSideRail(Platform.OS, insets)) return insets.bottom + 16;
   return insets.bottom + TAB_BAR_HEIGHT;
 };

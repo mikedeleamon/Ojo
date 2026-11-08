@@ -89,7 +89,7 @@ export default function PriceBackfillScreen() {
   if (loading) return <Loading />;
 
   return (
-    <SafeAreaView style={st.root} edges={['bottom']}>
+    <SafeAreaView style={st.root} edges={['bottom', 'right']}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

@@ -41,6 +41,7 @@ import StormIconLightning from '../WeatherIcons/StormIconLightning';
 import SunnyIcon from '../WeatherIcons/SunnyIcon';
 import WeatherDetails, { WeatherStats } from '../WeatherDetails/WeatherDetails';
 import { useFoldLayout } from '../../context/FoldLayoutContext';
+import { useSideRail } from '../../hooks/useSideRail';
 import MinimizedWeatherDisplay from '../MinimizedWeatherDisplay/MinimizedWeatherDisplay';
 import SunEventTile from '../SunEventTile/SunEventTile';
 import ShareToInstagramSheet from '../ShareCard/ShareToInstagramSheet';
@@ -240,6 +241,9 @@ const WeatherHUD = ({
     const { top: topInset, right: rightInset } = useSafeAreaInsets();
     const tabPad = useTabBarPadding();
     const fold = useFoldLayout();
+    // iPhone Duo: Location and Settings are nav-bar items in the side column
+    // (MainPage), so the sticky bar drops its own buttons and the hero moves up.
+    const sideRail = useSideRail();
     const twoPane = fold.mode === 'two-pane' && fold.axis === 'row' && fold.panes !== null;
     const paneHeight = fold.window.height;
     const weatherPaneStyle = twoPane && fold.panes
@@ -1235,9 +1239,11 @@ const WeatherHUD = ({
                             // Weather pane: the place reads first, then the icon
                             // beside the temperature, so the hours and every stat
                             // fit the pane instead of sitting under a tall hero.
-                            // paddingTop clears the sticky buttons.
+                            // On the Duo the buttons live in the side column, so
+                            // the place starts 40 pt down, level with the outfit
+                            // pane's first row; otherwise 64 clears the sticky buttons.
                             <View
-                                style={[st.paneHero, { paddingTop: 64 + topInset }]}
+                                style={[st.paneHero, { paddingTop: (sideRail ? 40 : 64) + topInset }]}
                                 onLayout={(e) => {
                                     const { y, height } = e.nativeEvent.layout;
                                     setHeroBottomY(y + height);
@@ -1281,9 +1287,11 @@ const WeatherHUD = ({
                         ) : fold.mode === 'compact-short' ? (
                             // The Duo cover is short, so the place and the
                             // temperature share one row and the outfit starts
-                            // higher up. paddingTop clears the sticky buttons.
+                            // higher up. With the buttons in the side column
+                            // (Duo) 40 pt keeps it off the edge; otherwise 60
+                            // clears the sticky buttons.
                             <View
-                                style={[st.coverHero, { paddingTop: 60 + topInset }]}
+                                style={[st.coverHero, { paddingTop: (sideRail ? 40 : 60) + topInset }]}
                                 onLayout={(e) => {
                                     const { y, height } = e.nativeEvent.layout;
                                     setHeroBottomY(y + height);
@@ -1528,7 +1536,10 @@ const WeatherHUD = ({
                     {/* Sticky top bar — pinned buttons + scroll-driven mini
                         summary. Sits as a sibling of (and above) the scroll
                         view. pointerEvents="box-none" lets pulls/scrolls fall
-                        through everywhere except the button hit areas. */}
+                        through everywhere except the button hit areas.
+                        On the Duo (side rail) Location and Settings are native
+                        nav-bar items declared in MainPage, so only the mini
+                        summary renders here, centred between placeholders. */}
                     <View
                         style={[
                             st.stickyBar,
@@ -1541,7 +1552,7 @@ const WeatherHUD = ({
                         ]}
                         pointerEvents='box-none'
                     >
-                        {onOpenLocations ? (
+                        {onOpenLocations && !sideRail ? (
                             <GlassCard
                                 glassStyle='clear'
                                 style={st.locationsBtn}
@@ -1600,24 +1611,28 @@ const WeatherHUD = ({
                                 </Pressable>
                             </Animated.View>
                         )}
-                        <GlassCard
-                            glassStyle='clear'
-                            style={st.gearBtn}
-                            tintColor={lightSky ? LIGHT_SKY_SCRIM : undefined}
-                            disableGlass={!perf.glass}
-                        >
-                            <Pressable
-                                onPress={() => nav.push('/account')}
-                                accessibilityLabel='Account settings'
-                                accessibilityRole='button'
-                                style={({ pressed }) => [
-                                    st.gearBtnInner,
-                                    { opacity: pressed ? 0.6 : 1 },
-                                ]}
+                        {sideRail ? (
+                            <View style={st.locationsBtnPlaceholder} />
+                        ) : (
+                            <GlassCard
+                                glassStyle='clear'
+                                style={st.gearBtn}
+                                tintColor={lightSky ? LIGHT_SKY_SCRIM : undefined}
+                                disableGlass={!perf.glass}
                             >
-                                <GearIcon decorative />
-                            </Pressable>
-                        </GlassCard>
+                                <Pressable
+                                    onPress={() => nav.push('/account')}
+                                    accessibilityLabel='Account settings'
+                                    accessibilityRole='button'
+                                    style={({ pressed }) => [
+                                        st.gearBtnInner,
+                                        { opacity: pressed ? 0.6 : 1 },
+                                    ]}
+                                >
+                                    <GearIcon decorative />
+                                </Pressable>
+                            </GlassCard>
+                        )}
                     </View>
 
                     {/* Dev-only bisection switches. Inside the content layer so
