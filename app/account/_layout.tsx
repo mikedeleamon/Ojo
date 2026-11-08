@@ -35,7 +35,7 @@ function AccountBackButton({ color }: { color: string }) {
 }
 
 // These run full screen in every layout, and lay themselves out in two panes.
-const FULL_SCREEN_ROUTES = new Set(['recap', 'upgrade']);
+const FULL_SCREEN_ROUTES = new Set(['recap', 'upgrade', 'locations']);
 
 export default function AccountLayout() {
     const { colors } = useTheme();

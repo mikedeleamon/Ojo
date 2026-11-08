@@ -98,6 +98,7 @@ import {
 import { fToC } from '../../lib/units';
 import { humanizeCondition } from '../../lib/weather/humanizeCondition';
 import { makeStyles } from './WeatherHUD.styles';
+import type { ScrollViewRef } from '../../types/nativeRefs';
 
 /**
  * Rotated Duo: the row under the status bar that holds Location, the city and
@@ -106,6 +107,19 @@ import { makeStyles } from './WeatherHUD.styles';
  * with the clock, beside it rather than under it.
  */
 const STACKED_NAV_ROW_TOP = 3;
+
+/**
+ * Two panes: the clear space above the capitals of the 36 pt city name. The
+ * outfit card's top edge sits this far below the hero's top, so it lines up with
+ * the letters rather than with the line box around them.
+ */
+const CITY_CAP_OFFSET = 10;
+
+/** Long enough for the loading overlay to fade before the scroll bar shows. */
+const CARD_SCROLL_BAR_FLASH_DELAY_MS = 500;
+
+/** Keeps the card's scroll bar clear of its rounded corners. */
+const CARD_SCROLL_BAR_INSETS = { top: 10, bottom: 10 };
 
 // ─── Sun-event helpers ────────────────────────────────────────────────────────
 // WeatherKit's daily forecast embeds `sunrise` / `sunset` ISO timestamps per
@@ -259,6 +273,11 @@ const WeatherHUD = ({
     const isStacked = stacked !== null;
     const twoPane = fold.mode === 'two-pane' && fold.axis === 'row' && fold.panes !== null;
     const paneHeight = fold.window.height;
+    const paneHeroTop = (sideRail ? 40 : 64) + topInset;
+    const outfitCardTop = paneHeroTop + CITY_CAP_OFFSET;
+    // Two panes: the card stops at the bottom margin the page keeps anyway, and
+    // anything taller scrolls inside it.
+    const outfitCardMaxHeight = paneHeight - outfitCardTop - tabPad;
     const weatherPaneStyle = twoPane && fold.panes
         ? { width: fold.panes.primary.width, height: paneHeight, paddingRight: fold.gutter / 2 }
         : null;
@@ -266,7 +285,7 @@ const WeatherHUD = ({
         ? {
               width: fold.panes.secondary.width - rightInset,
               paddingLeft: fold.gutter / 2,
-              paddingTop: spacing.md,
+              paddingTop: outfitCardTop,
           }
         : null;
     const nav = useAppNavigation();
@@ -683,16 +702,35 @@ const WeatherHUD = ({
 
 
     const scrollRef = useAnimatedRef<Animated.ScrollView>();
-    // In two panes the outfit scrolls and the weather stays put, without a
-    // second tree: the weather pane rides the same scroll view, pinned by
-    // cancelling the offset. Folding therefore can't remount OutfitSuggestion
-    // and lose the selected outfit. Clamped so pull-to-refresh still shows.
-    const pinnedPaneStyle = useAnimatedStyle(
-        () => ({
-            transform: [{ translateY: twoPane ? Math.max(0, scrollY.value) : 0 }],
-        }),
-        [twoPane],
-    );
+    const cardScrollRef = useRef<ScrollViewRef>(null);
+
+    // In two panes the page holds still and the outfit scrolls inside its card;
+    // on every other pose the page scrolls and the card's scroll view is switched
+    // off. Folding changes which one moves, so neither may keep an offset that
+    // the other layout has no room for.
+    useEffect(() => {
+        scrollY.value = 0;
+        scrollRef.current?.scrollTo({ x: 0, y: 0, animated: false });
+        cardScrollRef.current?.scrollTo({ x: 0, y: 0, animated: false });
+    }, [twoPane, scrollRef, scrollY]);
+
+    // The card's edge doesn't show that there's more below it, so the scroll bar
+    // appears once when the card is first on screen.
+    const cardOnScreen = twoPane && !loading;
+    useEffect(() => {
+        if (!cardOnScreen) return;
+        const timer = setTimeout(
+            () => cardScrollRef.current?.flashScrollIndicators(),
+            CARD_SCROLL_BAR_FLASH_DELAY_MS,
+        );
+        return () => clearTimeout(timer);
+    }, [cardOnScreen]);
+
+    const handlePullToRefresh = () => {
+        isRefreshRef.current = true;
+        setRefreshing(true);
+        onRefresh?.();
+    };
 
     const scrollToTop = useCallback(() => {
         scrollRef.current?.scrollTo({ x: 0, y: 0, animated: true });
@@ -706,6 +744,7 @@ const WeatherHUD = ({
     useFocusEffect(useCallback(() => {
         scrollY.value = 0;
         scrollRef.current?.scrollTo({ x: 0, y: 0, animated: false });
+        cardScrollRef.current?.scrollTo({ x: 0, y: 0, animated: false });
     }, [scrollRef, scrollY]));
 
 
@@ -995,9 +1034,9 @@ const WeatherHUD = ({
     );
 
     // A const so it can sit in either place. Stacked, it lives outside the scroll
-    // view so the outfit can clip at the fold; otherwise it rides the scroll view
-    // (see pinnedPaneStyle). Only this pane moves, so a rotation doesn't remount
-    // OutfitSuggestion and lose the selected outfit.
+    // view so the outfit can clip at the fold; otherwise it sits inside it. Only
+    // this pane moves, so a rotation doesn't remount OutfitSuggestion and lose the
+    // selected outfit.
     const weatherPane = weather ? (
         <ScrollView
             // Stacked: only large text outgrows the half, and it scrolls in
@@ -1006,6 +1045,17 @@ const WeatherHUD = ({
             alwaysBounceVertical={!isStacked}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={twoPane ? { paddingBottom: tabPad } : undefined}
+            // Two panes: the page holds still, so pull to refresh lives here.
+            // Swapping it on a fold can only remount this pane, never the outfit.
+            refreshControl={
+                twoPane ? (
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={handlePullToRefresh}
+                        tintColor={colors.textPrimary as string}
+                    />
+                ) : undefined
+            }
         >
         {/* Header — only city/condition/lastUpdated live in the
             scroll surface now. The Locations/Gear buttons + a
@@ -1072,7 +1122,7 @@ const WeatherHUD = ({
             // the place starts 40 pt down, level with the outfit
             // pane's first row; otherwise 64 clears the sticky buttons.
             <View
-                style={[st.paneHero, { paddingTop: (sideRail ? 40 : 64) + topInset }]}
+                style={[st.paneHero, { paddingTop: paneHeroTop }]}
                 onLayout={(e) => {
                     const { y, height } = e.nativeEvent.layout;
                     setHeroBottomY(y + height);
@@ -1535,25 +1585,23 @@ const WeatherHUD = ({
                             twoPane && st.scrollRow,
                             stacked && st.scrollStacked,
                         ]}
+                        scrollEnabled={!twoPane}
                         showsVerticalScrollIndicator={false}
                         onScroll={scrollHandler}
                         scrollEventThrottle={16}
                         refreshControl={
                             <RefreshControl
-                                refreshing={refreshing}
-                                onRefresh={() => {
-                                    isRefreshRef.current = true;
-                                    setRefreshing(true);
-                                    onRefresh?.();
-                                }}
+                                refreshing={refreshing && !twoPane}
+                                enabled={!twoPane}
+                                onRefresh={handlePullToRefresh}
                                 tintColor={colors.textPrimary as string}
                             />
                         }
                     >
                         {!stacked && (
-                            <Animated.View style={[weatherPaneStyle, pinnedPaneStyle]}>
+                            <View style={weatherPaneStyle}>
                                 {weatherPane}
-                            </Animated.View>
+                            </View>
                         )}
 
                         <View style={outfitPaneStyle}>
@@ -1576,6 +1624,7 @@ const WeatherHUD = ({
                         <GlassCard
                             style={[
                                 st.details,
+                                twoPane && st.detailsCapped,
                                 // Last in the array on purpose: GlassCard's
                                 // fallback applies `style` after its own
                                 // background, so overriding here (rather than
@@ -1598,20 +1647,34 @@ const WeatherHUD = ({
                             // LIGHT_SKY_CARD_TINT.
                             glassTint={lightSky ? LIGHT_SKY_CARD_TINT : undefined}
                         >
-                            <ThemeOverride
-                                colors={lightSky ? LIGHT_SKY_CARD_TEXT : undefined}
-                                innerGlassTint={lightSky ? LIGHT_SKY_INNER_TINT : undefined}
+                            {/* Mounted on every pose and only scrolls in two
+                                panes. Adding it just for two panes would remount
+                                OutfitSuggestion on a fold and lose the selected
+                                outfit. */}
+                            <ScrollView
+                                ref={cardScrollRef}
+                                scrollEnabled={twoPane}
+                                style={twoPane ? { maxHeight: outfitCardMaxHeight } : st.detailsScrollOff}
+                                contentContainerStyle={twoPane ? st.detailsCappedContent : undefined}
+                                alwaysBounceVertical={false}
+                                showsVerticalScrollIndicator={twoPane}
+                                scrollIndicatorInsets={CARD_SCROLL_BAR_INSETS}
                             >
-                                <WeatherDetails
-                                    weather={weather}
-                                    settings={settings}
-                                    forecasts={forecasts}
-                                    daily={daily}
-                                    city={place?.name}
-                                    coords={place ?? undefined}
-                                    showStats={!twoPane && !stacked}
-                                />
-                            </ThemeOverride>
+                                <ThemeOverride
+                                    colors={lightSky ? LIGHT_SKY_CARD_TEXT : undefined}
+                                    innerGlassTint={lightSky ? LIGHT_SKY_INNER_TINT : undefined}
+                                >
+                                    <WeatherDetails
+                                        weather={weather}
+                                        settings={settings}
+                                        forecasts={forecasts}
+                                        daily={daily}
+                                        city={place?.name}
+                                        coords={place ?? undefined}
+                                        showStats={!twoPane && !stacked}
+                                    />
+                                </ThemeOverride>
+                            </ScrollView>
                         </GlassCard>
                         </View>
 

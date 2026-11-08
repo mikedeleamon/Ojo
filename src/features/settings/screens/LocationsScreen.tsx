@@ -22,6 +22,7 @@ import { useSettings } from '../../../hooks/useSettings';
 import { useActiveLocation } from '../../../context/ActiveLocationContext';
 import { useAppNavigation } from '../../../hooks/useAppNavigation';
 import { useDeferredMount } from '../../../hooks/useDeferredMount';
+import { useFoldColumns } from '../../../hooks/useFoldColumns';
 import {
   spacing,
   radius,
@@ -135,6 +136,13 @@ export default function LocationsScreen() {
       StyleSheet.create({
         root: { flex: 1, backgroundColor: colors.bgDefault },
         content: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xl },
+        // Two panes: each side keeps its own top and bottom space, so the list
+        // scrolls edge to edge. First child on the right, so the places sit on
+        // the right here and first on every other layout.
+        contentColumns: { paddingTop: 0, paddingBottom: 0, flexDirection: 'row-reverse' },
+        addColumn: { paddingTop: spacing.md },
+        listColumn: { paddingTop: spacing.md, paddingBottom: spacing.xl },
+        listScrollOff: { overflow: 'visible' },
         section: { gap: spacing.sm },
         sectionLabel: {
           fontFamily: fonts.body,
@@ -217,6 +225,8 @@ export default function LocationsScreen() {
   const showRows = useDeferredMount();
 
   const scrollViewRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
+  const columns = useFoldColumns(spacing.md, { railPadded: true });
+  const [paneHeight, setPaneHeight] = useState(0);
 
   const [snapshots, setSnapshots] = useState<Record<string, WeatherSnapshot>>({});
   const [selectedCity, setSelectedCity] = useState<CitySuggestion | null>(null);
@@ -365,10 +375,24 @@ export default function LocationsScreen() {
       >
         <ScrollView
           ref={scrollViewRef}
-          contentContainerStyle={st.content}
+          contentContainerStyle={[st.content, columns.row, columns.twoPane && st.contentColumns]}
+          // Two panes: the page only has anywhere to go when the city results run
+          // past the keyboard, so it mustn't bounce the rest of the time.
+          alwaysBounceVertical={!columns.twoPane}
+          onLayout={e => setPaneHeight(e.nativeEvent.layout.height)}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
         >
+          {/* Mounted on every layout and only scrolls in two panes, where a long
+              list mustn't carry the add form away with it. Adding it just for two
+              panes would remount the form on a fold and lose a half-typed city. */}
+          <ScrollView
+            style={[columns.right, columns.twoPane ? { height: paneHeight } : st.listScrollOff]}
+            contentContainerStyle={columns.twoPane ? st.listColumn : undefined}
+            scrollEnabled={columns.twoPane}
+            showsVerticalScrollIndicator={columns.twoPane}
+            keyboardShouldPersistTaps="handled"
+          >
           <View style={st.section}>
             <Text style={st.sectionLabel}>Destinations</Text>
             <Text style={st.hint}>
@@ -386,8 +410,9 @@ export default function LocationsScreen() {
               </View>
             )}
           </View>
+          </ScrollView>
 
-          <View style={st.section}>
+          <View style={[st.section, columns.left, columns.twoPane && st.addColumn]}>
             <Text style={st.sectionLabel}>Add a city</Text>
             <Text style={st.hint}>
               Start typing and pick a city from the list.
@@ -397,7 +422,9 @@ export default function LocationsScreen() {
               resetSignal={resetSignal}
               placeholder="Search for a city (e.g. London)"
               accessibilityLabel="City to add"
-              onInputFocus={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+              // The form is at the top of its pane in two panes; only the stacked
+              // layout has to bring it up above the keyboard.
+              onInputFocus={columns.twoPane ? undefined : () => scrollViewRef.current?.scrollToEnd({ animated: true })}
             />
             <StatusMessage status={status} />
             <Pressable

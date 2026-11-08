@@ -247,4 +247,10 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         padding: spacing.md,
         gap: spacing.md,
     },
+    // Two panes: the padding moves onto the scrolling content, so the outfit
+    // clips at the card's own edge instead of 20 pt inside it.
+    detailsCapped: { padding: 0 },
+    detailsCappedContent: { padding: spacing.md },
+    // Every other pose: the card's scroll view is switched off and must not clip.
+    detailsScrollOff: { overflow: 'visible' },
 });
