@@ -4,6 +4,7 @@ Regenerate the Home nav-bar button glyphs used on the iPhone Duo:
 
     assets/images/ojo_header_location{,@2x,@3x}.png  <- LocationsIcon (map pin)
     assets/images/ojo_header_settings{,@2x,@3x}.png  <- GearIcon
+    assets/images/ojo_header_close{,@2x,@3x}.png     <- CloseIcon (paywall)
 
 On the Duo, Home's Location and Settings buttons are native nav-bar items
 (Stack.Toolbar), which iOS places in the side column next to the tab rail. Native
@@ -33,6 +34,9 @@ OUT_DIR = os.path.join(REPO, "assets", "images")
 
 # Transcribed from the components. Each icon: list of ("path", d) / ("circle", cx, cy, r).
 ICONS = {
+    "ojo_header_close": [
+        ("path", "M18 6L6 18M6 6l12 12"),
+    ],
     "ojo_header_location": [
         ("path", "M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"),
         ("circle", 12, 10, 3),

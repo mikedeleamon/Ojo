@@ -13,6 +13,7 @@ import {
     AppState,
     Platform,
     StyleSheet,
+    useWindowDimensions,
 } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -75,6 +76,26 @@ import {
 import type { ScrollViewRef } from '../../types/nativeRefs';
 import { useFoldColumns } from '../../hooks/useFoldColumns';
 import { useFoldLayout } from '../../context/FoldLayoutContext';
+import { useSideRail } from '../../hooks/useSideRail';
+
+// On the Duo, folded or unfolded, Close is a native nav-bar item, which iOS places
+// in the side column as it does Home's Location and Settings. Unfolded, that also
+// keeps it clear of the fold. The app's own X as a template image
+// (render-header-icons.py).
+const CLOSE_GLYPH = require('../../../assets/images/ojo_header_close.png');
+const CLOSE_GLYPH_TINT = 'rgba(255,255,255,0.85)';
+// The header exists only to carry that item. The account stack's shared header
+// options are undone here so nothing else of it shows.
+const SIDE_COLUMN_HEADER = {
+    headerShown: true,
+    headerTransparent: true,
+    headerShadowVisible: false,
+    headerStyle: { backgroundColor: 'transparent' },
+    headerLeft: undefined,
+    headerBackVisible: false,
+    title: '',
+};
+const NO_HEADER = { headerShown: false };
 
 // The app icon's own diagonal mint→leaf gradient (see OjoLogoIcon's j-gradient
 // and the widget's brand ramp) — the fixed "Ojo Pro" brand moment, independent
@@ -456,6 +477,21 @@ function OjoProPaywall({ onClose }: { onClose: () => void }) {
     // stay together on the right, because App Review expects them in one place.
     const columns = useFoldColumns(20);
     const { twoPane } = columns;
+    const closeInSideColumn = useSideRail();
+    // Memoized so a re-render doesn't rebuild the native bar item.
+    const sideColumnClose = useMemo(() => closeInSideColumn ? (
+        <Stack.Toolbar placement='left'>
+            <Stack.Toolbar.Button
+                icon={CLOSE_GLYPH}
+                iconRenderingMode='template'
+                tintColor={CLOSE_GLYPH_TINT}
+                accessibilityLabel='Close'
+                onPress={onClose}
+            >
+                Close
+            </Stack.Toolbar.Button>
+        </Stack.Toolbar>
+    ) : null, [closeInSideColumn, onClose]);
     // The Duo cover is short: benefits shrink to titles so plans and CTA fit.
     const titlesOnly = useFoldLayout().mode === 'compact-short';
     const nav = useAppNavigation();
@@ -727,7 +763,8 @@ function OjoProPaywall({ onClose }: { onClose: () => void }) {
             <View style={styles.root}>
                 {/* This screen is a full-bleed brand moment (like Recap) rather than a
           titled sub-page, so it opts out of the account stack's shared header. */}
-                <Stack.Screen options={{ headerShown: false }} />
+                <Stack.Screen options={closeInSideColumn ? SIDE_COLUMN_HEADER : NO_HEADER} />
+                {sideColumnClose}
                 <StatusBar style='light' />
                 <BrandField />
 
@@ -747,18 +784,20 @@ function OjoProPaywall({ onClose }: { onClose: () => void }) {
                 >
                     <View style={[styles.column, columns.left]}>
                     <View style={styles.headerRow}>
-                        <IconButton
-                            icon={
-                                <CloseIcon
-                                    size={16}
-                                    color='#ffffff'
-                                    decorative
-                                />
-                            }
-                            onPress={onClose}
-                            accessibilityLabel='Close'
-                            style={styles.closeBtn}
-                        />
+                        {!closeInSideColumn && (
+                            <IconButton
+                                icon={
+                                    <CloseIcon
+                                        size={16}
+                                        color='#ffffff'
+                                        decorative
+                                    />
+                                }
+                                onPress={onClose}
+                                accessibilityLabel='Close'
+                                style={styles.closeBtn}
+                            />
+                        )}
                     </View>
 
                     <View style={styles.hero}>
@@ -1076,8 +1115,12 @@ function BrandField() {
 /** One static mint bloom, sized in percentages of the screen-sized box it
  *  fills. Nothing here moves — BrandField animates between two of them. */
 function Bloom({ id, spec }: { id: string; spec: BloomSpec }) {
+    // The Svg keeps its drawing at the old size when a fold resizes its box, which
+    // left a hard edge at the folded width. Keyed so a new size draws it afresh.
+    const { width, height } = useWindowDimensions();
     return (
         <Svg
+            key={`${width}x${height}`}
             style={StyleSheet.absoluteFill}
             width='100%'
             height='100%'
@@ -1311,9 +1354,11 @@ const styles = StyleSheet.create({
     scroll: { flex: 1 },
     content: { paddingHorizontal: 20, gap: 14 },
     column: { gap: 14 },
-    planPane: { paddingTop: 44 },
+    // Two panes: the plans are far shorter than the benefits beside them.
+    planPane: { alignSelf: 'center' },
 
-    headerRow: { flexDirection: 'row', justifyContent: 'flex-end' },
+    // Fixed height so the hero stays put when Close moves to the side column.
+    headerRow: { flexDirection: 'row', justifyContent: 'flex-end', height: 44 },
     // 44×44 is the HIG minimum touch target; the glyph itself stays 16.
     closeBtn: {
         width: 44,

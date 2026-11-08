@@ -253,4 +253,7 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     detailsCappedContent: { padding: spacing.md },
     // Every other pose: the card's scroll view is switched off and must not clip.
     detailsScrollOff: { overflow: 'visible' },
+    // Rotated Duo: a pull carries the weather down toward the fold, and the outfit
+    // half moves out of its way, so its bottom edge has nothing to clip against.
+    weatherHalfScroll: { overflow: 'visible' },
 });

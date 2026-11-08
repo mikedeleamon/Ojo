@@ -272,6 +272,8 @@ const WeatherHUD = ({
     const stacked = useStackedHome();
     const isStacked = stacked !== null;
     const twoPane = fold.mode === 'two-pane' && fold.axis === 'row' && fold.panes !== null;
+    // Where the weather has its own pane, pull to refresh starts from it.
+    const refreshFromWeather = twoPane || isStacked;
     const paneHeight = fold.window.height;
     const paneHeroTop = (sideRail ? 40 : 64) + topInset;
     const outfitCardTop = paneHeroTop + CITY_CAP_OFFSET;
@@ -704,6 +706,23 @@ const WeatherHUD = ({
     const scrollRef = useAnimatedRef<Animated.ScrollView>();
     const cardScrollRef = useRef<ScrollViewRef>(null);
 
+    // Rotated Duo: the weather and the outfit are separate scroll views, so a pull
+    // only moves the one being dragged. The outfit half follows the weather by the
+    // same distance, so the whole screen comes down together. Only a transform, so
+    // nothing remounts and the outfit keeps its own scrolling and fold clip.
+    const weatherPull = useSharedValue(0);
+    const weatherPullHandler = useAnimatedScrollHandler({
+        onScroll: (e) => {
+            weatherPull.value = Math.max(0, -e.contentOffset.y);
+        },
+    });
+    const followWeatherPullStyle = useAnimatedStyle(() => ({
+        transform: [{ translateY: weatherPull.value }],
+    }));
+    useEffect(() => {
+        weatherPull.value = 0;
+    }, [isStacked, weatherPull]);
+
     // In two panes the page holds still and the outfit scrolls inside its card;
     // on every other pose the page scrolls and the card's scroll view is switched
     // off. Folding changes which one moves, so neither may keep an offset that
@@ -1038,17 +1057,18 @@ const WeatherHUD = ({
     // this pane moves, so a rotation doesn't remount OutfitSuggestion and lose the
     // selected outfit.
     const weatherPane = weather ? (
-        <ScrollView
+        <Animated.ScrollView
             // Stacked: only large text outgrows the half, and it scrolls in
             // place instead of running across the fold.
-            scrollEnabled={twoPane || isStacked}
-            alwaysBounceVertical={!isStacked}
+            scrollEnabled={refreshFromWeather}
+            style={stacked ? st.weatherHalfScroll : undefined}
+            onScroll={stacked ? weatherPullHandler : undefined}
+            scrollEventThrottle={16}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={twoPane ? { paddingBottom: tabPad } : undefined}
-            // Two panes: the page holds still, so pull to refresh lives here.
-            // Swapping it on a fold can only remount this pane, never the outfit.
+            // Swapping this on a fold can only remount this pane, never the outfit.
             refreshControl={
-                twoPane ? (
+                refreshFromWeather ? (
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={handlePullToRefresh}
@@ -1349,7 +1369,7 @@ const WeatherHUD = ({
             </GlassCard>
         )}
         {twoPane && shareAndAttribution}
-        </ScrollView>
+        </Animated.ScrollView>
     ) : null;
 
     return (
@@ -1578,7 +1598,11 @@ const WeatherHUD = ({
                     {stacked && <View style={{ height: stacked.weatherHeight }}>{weatherPane}</View>}
                     <Animated.ScrollView
                         ref={scrollRef}
-                        style={stacked ? { marginTop: stacked.outfitTop - stacked.weatherHeight } : undefined}
+                        style={
+                            stacked
+                                ? [{ marginTop: stacked.outfitTop - stacked.weatherHeight }, followWeatherPullStyle]
+                                : undefined
+                        }
                         contentContainerStyle={[
                             st.scroll,
                             { paddingBottom: tabPad, paddingRight: twoPane ? 0 : rightInset },
@@ -1589,13 +1613,18 @@ const WeatherHUD = ({
                         showsVerticalScrollIndicator={false}
                         onScroll={scrollHandler}
                         scrollEventThrottle={16}
+                        // Empty on the rotated Duo, not undefined: ScrollView puts a
+                        // control ahead of its content, so removing it would shift
+                        // the content and remount the outfit, losing the selection.
                         refreshControl={
-                            <RefreshControl
-                                refreshing={refreshing && !twoPane}
-                                enabled={!twoPane}
-                                onRefresh={handlePullToRefresh}
-                                tintColor={colors.textPrimary as string}
-                            />
+                            isStacked ? <></> : (
+                                <RefreshControl
+                                    refreshing={refreshing && !twoPane}
+                                    enabled={!twoPane}
+                                    onRefresh={handlePullToRefresh}
+                                    tintColor={colors.textPrimary as string}
+                                />
+                            )
                         }
                     >
                         {!stacked && (
