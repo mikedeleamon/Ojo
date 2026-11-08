@@ -2,7 +2,7 @@ import { useMemo, useCallback } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
 import { View, Text } from '../../components/primitives';
 import ClosetView from '../../components/ClosetView/ClosetView';
 import Loading from '../../components/Loading/Loading';
@@ -14,6 +14,7 @@ import { UPGRADE_ROUTE } from '../../config/limits';
 import { useTabBarPadding } from '../../hooks/useTabBarPadding';
 import { fonts, fontSizes, spacing, radius } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
+import { useFoldLayout } from '../../context/FoldLayoutContext';
 
 // Retained for backward import compatibility — adding new articles now flows
 // through the /camera modal route, not URL params.
@@ -25,6 +26,7 @@ export type QuickAddData = {
 };
 
 export default function ClosetPage() {
+  const twoPane = useFoldLayout().mode === 'two-pane';
   const { colors } = useTheme();
   const { push } = useAppNavigation();
   const tabPad = useTabBarPadding();
@@ -59,7 +61,7 @@ export default function ClosetPage() {
   if (loading) return <Loading />;
 
   return (
-    <SafeAreaView style={st.root} edges={['top']}>
+    <SafeAreaView style={st.root} edges={twoPane ? ['top'] : ['top', 'right']}>
       {error ? (
         <Pressable
           style={st.errorBanner}

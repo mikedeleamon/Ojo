@@ -2,6 +2,7 @@ import { useRef, useState, useCallback } from 'react';
 import { View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import { CARD_WIDTH, CARD_HEIGHT } from '../components/ShareCard/ShareCardFrame.styles';
+import type { ViewRef } from '../types/nativeRefs';
 
 // Every share card renders inside the CARD_WIDTH×CARD_HEIGHT (9:16) frame. We
 // capture at a fixed 3× so the output is always exactly 1080×1920 — Instagram
@@ -16,7 +17,7 @@ export const EXPORT_SCALE = 3;
  * captured at its own size. PNG keeps transparency outside rounded corners.
  */
 export function useShareCapture() {
-  const ref = useRef<View>(null);
+  const ref = useRef<ViewRef>(null);
   const [capturing, setCapturing] = useState(false);
 
   const capture = useCallback(async (size?: { width: number; height: number }): Promise<string> => {

@@ -29,6 +29,7 @@ import { View, Text, Pressable, GlassCard } from './primitives';
 import { useTheme } from '../theme/ThemeContext';
 import { ColorTokens, spacing, radius, fonts, fontSizes, fontWeights } from '../theme/tokens';
 import { hapticWarning } from '../lib/haptics';
+import { usePaneOverlay } from '../hooks/usePaneOverlay';
 
 export interface ConfirmOptions {
   title: string;
@@ -46,6 +47,7 @@ const ConfirmContext = createContext<ConfirmFn>(async () => false);
 export const useConfirm = (): ConfirmFn => useContext(ConfirmContext);
 
 export const ConfirmProvider = ({ children }: { children: React.ReactNode }) => {
+  const overlay = usePaneOverlay(24);
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [opts, setOpts] = useState<ConfirmOptions | null>(null);
@@ -81,7 +83,7 @@ export const ConfirmProvider = ({ children }: { children: React.ReactNode }) => 
           accessibilityRole="button"
         />
         {opts && (
-          <GlassCard style={styles.card}>
+          <GlassCard style={[styles.card, overlay]}>
             <Text style={styles.title}>{opts.title}</Text>
             {opts.message ? <Text style={styles.body}>{opts.message}</Text> : null}
             <View style={styles.actions}>
@@ -116,7 +118,7 @@ export const ConfirmProvider = ({ children }: { children: React.ReactNode }) => 
 const makeStyles = (colors: ColorTokens) =>
   StyleSheet.create({
     backdrop: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       backgroundColor: 'rgba(0,0,0,0.55)',
     },
     card: {

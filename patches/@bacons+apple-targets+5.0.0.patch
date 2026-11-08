@@ -1,0 +1,30 @@
+diff --git a/node_modules/@bacons/apple-targets/build/with-xcode-changes.js b/node_modules/@bacons/apple-targets/build/with-xcode-changes.js
+index 96ded68..ee4c113 100644
+--- a/node_modules/@bacons/apple-targets/build/with-xcode-changes.js
++++ b/node_modules/@bacons/apple-targets/build/with-xcode-changes.js
+@@ -219,19 +219,17 @@ async function applyXcodeChanges(config, project, props) {
+     }
+     if (targetToUpdate) {
+         // Remove existing build phases
+-        targetToUpdate.props.buildConfigurationList.props.buildConfigurations.forEach((config) => {
++        // Saved first: removing the list's referrers clears this property on the
++        // target itself, so reading it afterwards throws.
++        const existingConfigList = targetToUpdate.props.buildConfigurationList;
++        existingConfigList.props.buildConfigurations.forEach((config) => {
+             config.getReferrers().forEach((ref) => {
+                 ref.removeReference(config.uuid);
+             });
+             config.removeFromProject();
+         });
+-        // Remove existing build configuration list
+-        targetToUpdate.props.buildConfigurationList
+-            .getReferrers()
+-            .forEach((ref) => {
+-            ref.removeReference(targetToUpdate.props.buildConfigurationList.uuid);
+-        });
+-        targetToUpdate.props.buildConfigurationList.removeFromProject();
++        // Remove existing build configuration list (this also drops its referrers)
++        existingConfigList.removeFromProject();
+         // Create new build phases
+         targetToUpdate.props.buildConfigurationList =
+             (0, configuration_list_1.createConfigurationListForType)(project, props);

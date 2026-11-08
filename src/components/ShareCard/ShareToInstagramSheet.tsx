@@ -34,19 +34,21 @@ import { ensureLocal } from '../../lib/visualLibrary/cache';
 import { loopFor } from '../../lib/visualLibrary/manifest';
 import type { LoopKey } from '../../lib/visualLibrary/looks';
 import styles from './ShareToInstagramSheet.styles';
+import type { ViewRef } from '../../types/nativeRefs';
+import { usePaneOverlay } from '../../hooks/usePaneOverlay';
 
 interface ShareToInstagramSheetProps {
   visible: boolean;
   onClose: () => void;
   /** The card template to render + capture, given the ref it must forward. */
-  renderCard: (ref: React.RefObject<RNView | null>) => React.ReactNode;
+  renderCard: (ref: React.RefObject<ViewRef | null>) => React.ReactNode;
   attributionURL?: string | null;
   backgroundTopColor?: string;
   backgroundBottomColor?: string;
   /** The weather look (or 'recap') behind this card. With renderSticker, enables video mode. */
   look?: LoopKey;
   /** The same card as a sticker (variant='sticker'), given the ref it must forward. */
-  renderSticker?: (ref: React.RefObject<RNView | null>) => React.ReactNode;
+  renderSticker?: (ref: React.RefObject<ViewRef | null>) => React.ReactNode;
 }
 
 /**
@@ -75,6 +77,7 @@ const ShareToInstagramSheet = ({
   look,
   renderSticker,
 }: ShareToInstagramSheetProps) => {
+  const overlay = usePaneOverlay();
   const { ref, capture, capturing } = useShareCapture();
   const sticker = useShareCapture();
   const [error, setError] = useState<string | null>(null);
@@ -179,7 +182,7 @@ const ShareToInstagramSheet = ({
         accessibilityRole='button'
         accessibilityLabel='Dismiss'
       />
-      <View style={styles.sheet}>
+      <View style={[styles.sheet, overlay]}>
         {/* Grabber + scaled preview of the story card */}
         <View style={styles.grabber} />
         <View style={styles.previewWrap} pointerEvents='none'>

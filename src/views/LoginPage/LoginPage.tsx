@@ -9,6 +9,7 @@ import {
     AuthButton,
     makeAuthStyles,
 } from '../../components/auth';
+import { useFoldLayout } from '../../context/FoldLayoutContext';
 import OjoLogoIcon from '../../components/icons/OjoLogoIcon';
 import axios from '../../api/client';
 import { AuthState, Settings } from '../../types';
@@ -28,6 +29,7 @@ interface Props {
 
 export default function LoginPage({ onLogin }: Props) {
     const { colors, isDark } = useTheme();
+    const twoPane = useFoldLayout().mode === 'two-pane';
     const styles = useMemo(() => makeAuthStyles(colors), [colors]);
     const local = useMemo(
         () =>
@@ -123,11 +125,62 @@ export default function LoginPage({ onLogin }: Props) {
         }
     };
 
+    const socialButtons = (onDark: boolean) => (
+        <>
+                {appleAvailable && (
+                    <AppleAuthentication.AppleAuthenticationButton
+                        buttonType={
+                            AppleAuthentication.AppleAuthenticationButtonType
+                                .SIGN_IN
+                        }
+                        buttonStyle={
+                            onDark
+                                ? AppleAuthentication
+                                      .AppleAuthenticationButtonStyle.WHITE
+                                : AppleAuthentication
+                                      .AppleAuthenticationButtonStyle.BLACK
+                        }
+                        cornerRadius={radius.sm}
+                        style={[
+                            styles.appleBtn,
+                            appleLoading && { opacity: 0.5 },
+                        ]}
+                        onPress={handleApple}
+                    />
+                )}
+
+                {googleAvailable && (
+                    <Pressable
+                        onPress={handleGoogle}
+                        accessibilityRole="button"
+                        accessibilityLabel="Sign in with Google"
+                        style={[
+                            styles.googleBtn,
+                            { backgroundColor: onDark ? '#FFFFFF' : '#000000' },
+                            googleLoading && { opacity: 0.5 },
+                        ]}
+                    >
+                        <GoogleGlyph size={20} />
+                        <Text style={[styles.googleBtnText, { color: onDark ? '#000000' : '#FFFFFF' }]}>
+                            Sign in with Google
+                        </Text>
+                    </Pressable>
+                )}
+        </>
+    );
+
     return (
-        <AuthScaffold centered>
+        <AuthScaffold
+            centered
+            brandExtra={twoPane && (appleAvailable || googleAvailable) ? socialButtons(true) : null}
+        >
             <GlassCard style={[styles.card, styles.cardCentered]}>
-                <OjoLogoIcon width={local.logo.width} height={local.logo.height} />
-                <Text style={local.tagline}>Dress for the weather.</Text>
+                {!twoPane && (
+                    <>
+                        <OjoLogoIcon width={local.logo.width} height={local.logo.height} />
+                        <Text style={local.tagline}>Dress for the weather.</Text>
+                    </>
+                )}
 
                 {error ? <AuthStatus message={error} /> : null}
 
@@ -169,7 +222,7 @@ export default function LoginPage({ onLogin }: Props) {
                     onPress={handleSubmit}
                 />
 
-                {(appleAvailable || googleAvailable) && (
+                {!twoPane && (appleAvailable || googleAvailable) && (
                     <View style={styles.dividerRow}>
                         <View style={styles.dividerLine} />
                         <Text style={styles.dividerText}>or</Text>
@@ -177,45 +230,7 @@ export default function LoginPage({ onLogin }: Props) {
                     </View>
                 )}
 
-                {appleAvailable && (
-                    <AppleAuthentication.AppleAuthenticationButton
-                        buttonType={
-                            AppleAuthentication.AppleAuthenticationButtonType
-                                .SIGN_IN
-                        }
-                        buttonStyle={
-                            isDark
-                                ? AppleAuthentication
-                                      .AppleAuthenticationButtonStyle.WHITE
-                                : AppleAuthentication
-                                      .AppleAuthenticationButtonStyle.BLACK
-                        }
-                        cornerRadius={radius.sm}
-                        style={[
-                            styles.appleBtn,
-                            appleLoading && { opacity: 0.5 },
-                        ]}
-                        onPress={handleApple}
-                    />
-                )}
-
-                {googleAvailable && (
-                    <Pressable
-                        onPress={handleGoogle}
-                        accessibilityRole="button"
-                        accessibilityLabel="Sign in with Google"
-                        style={[
-                            styles.googleBtn,
-                            { backgroundColor: isDark ? '#FFFFFF' : '#000000' },
-                            googleLoading && { opacity: 0.5 },
-                        ]}
-                    >
-                        <GoogleGlyph size={20} />
-                        <Text style={[styles.googleBtnText, { color: isDark ? '#000000' : '#FFFFFF' }]}>
-                            Sign in with Google
-                        </Text>
-                    </Pressable>
-                )}
+                {!twoPane && socialButtons(isDark)}
 
                 <View style={styles.footer}>
                     <Text style={styles.footerText}>Don't have an account? </Text>

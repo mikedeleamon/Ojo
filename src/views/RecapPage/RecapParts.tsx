@@ -114,7 +114,7 @@ export const MvpCard = ({ card }: { card: RecapCard }) => {
         colors={P.cream}
         start={{ x: 0.15, y: 0 }}
         end={{ x: 0.85, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
+        style={StyleSheet.absoluteFill}
       />
       <View style={mv.headerRow}>
         <Text style={mv.eyebrow}>THE MVP</Text>

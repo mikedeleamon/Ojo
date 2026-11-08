@@ -8,6 +8,7 @@ import SuitcaseIcon from '../icons/SuitcaseIcon';
 import ShareCardFrame from './ShareCardFrame';
 import cs from './shareCardCommon.styles';
 import { fonts, fontSizes } from '../../theme/tokens';
+import type { ViewRef } from '../../types/nativeRefs';
 
 interface PackingListShareCardProps {
   destination: string;
@@ -41,7 +42,7 @@ const styles = StyleSheet.create({
 
 const itemLabel = (a: ClothingArticle): string => articleDisplayName(a);
 
-const PackingListShareCard = forwardRef<View, PackingListShareCardProps>(
+const PackingListShareCard = forwardRef<ViewRef, PackingListShareCardProps>(
   ({ destination, packingList, dateRangeLabel }, ref) => {
     const groups = PACKING_GROUPS.map((g) => ({
       ...g,

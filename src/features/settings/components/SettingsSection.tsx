@@ -10,6 +10,8 @@ interface Props {
   section:  SettingsSectionConfig;
   settings: Settings;
   onAction: (action: SettingsAction) => void;
+  /** The account route open beside the list in two panes. */
+  activeRoute?: string;
 }
 
 const getSublabel = (
@@ -28,7 +30,13 @@ const getSublabel = (
   return typeof v === 'string' && v.trim() ? v : '';
 };
 
-const SettingsSection = ({ section, settings, onAction }: Props) => {
+const isActive = (action: SettingsAction, route?: string) => {
+  if (!route) return false;
+  if (action.type === 'navigate') return action.to === `/account/${route}`;
+  return action.type === 'legal' && route === 'legal';
+};
+
+const SettingsSection = ({ section, settings, onAction, activeRoute }: Props) => {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
@@ -36,13 +44,14 @@ const SettingsSection = ({ section, settings, onAction }: Props) => {
       <Text style={styles.title}>{section.title}</Text>
       <GlassCard style={styles.group}>
         {section.items.map((item, i) => (
+          <View key={item.key} style={isActive(item.action, activeRoute) ? { backgroundColor: colors.glassBg } : undefined}>
           <SettingsItem
-            key={item.key}
             label={item.label}
             sublabel={item.sublabel ?? (item.sublabelKey ? getSublabel(item.sublabelKey, settings) : undefined)}
             onPress={() => onAction(item.action)}
             isFirst={i === 0}
           />
+          </View>
         ))}
       </GlassCard>
     </View>

@@ -44,6 +44,9 @@ import {
 import { CATEGORIES, COLORS, FABRICS, ARTICLE_GENDERS } from '../../lib/colors/palettes';
 import { articleCategories } from '../../types';
 import { SwipeableArticleCard, TileArticleCard } from './ArticleCard';
+import { useFoldLayout } from '../../context/FoldLayoutContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { PanePlaceholder } from '../layout/PanePlaceholder';
 
 type SortMode = 'default' | 'type' | 'color' | 'wornRecent' | 'wornStale';
 
@@ -108,8 +111,12 @@ const ClosetView = ({
     const confirm = useConfirm();
     const styles = useMemo(() => makeStyles(colors), [colors]);
     const { width: windowWidth } = useWindowDimensions();
+    const fold = useFoldLayout();
+    const { right: rightInset } = useSafeAreaInsets();
+    const twoPane = fold.mode === 'two-pane' && fold.axis === 'row' && fold.panes !== null;
+    const listWidth = twoPane && fold.panes ? fold.panes.primary.width : windowWidth - rightInset;
     const tileWidth = Math.floor(
-        (windowWidth - spacing.md * 2 - spacing.sm) / 2,
+        (listWidth - spacing.md * 2 - spacing.sm) / 2,
     );
 
     const [viewMode, setViewMode] = useState<'list' | 'tile'>('list');
@@ -216,6 +223,12 @@ const ClosetView = ({
             arr.sort((a, b) => (wornAgeMap.get(b._id) ?? 999) - (wornAgeMap.get(a._id) ?? 999));
         return arr;
     }, [filteredArticles, sortBy, wornAgeMap]);
+
+    // The piece in the detail pane. Two panes always show one, the tapped piece
+    // or else the first, like a split view opening on its first row. Derived, not
+    // stored, so folding to one column never pops the first piece up as a sheet.
+    const detailArticle =
+        editingArticle ?? (twoPane ? sortedArticles[0] ?? null : null);
 
     // Stable per-render handlers so the memoized article cards don't re-render
     // on every ClosetView update (filter/sort/edit-modal toggles). The article
@@ -371,8 +384,13 @@ const ClosetView = ({
     };
 
     return (
-        <View style={styles.root}>
-            {/* ── Closet tab bar ── */}
+        <View style={[styles.root, twoPane && { flexDirection: 'row' }]}>
+            <View style={twoPane ? { width: listWidth } : { flex: 1 }}>
+            {/* ── Closet tab bar ──
+                Clipped to its own bounds: the inactive tabs are native glass,
+                which otherwise draws past the scroll view's edge, across the
+                fold or under the iPhone Duo's camera strip. */}
+            <View style={styles.clipRow}>
             <GlassGroup spacing={8}>
             <ScrollView
                 horizontal
@@ -384,6 +402,8 @@ const ClosetView = ({
                     const onPress = () => {
                         setSelectedId(c._id);
                         setEditingId(null);
+                        // The detail pane belongs to the closet it came from.
+                        if (c._id !== selectedId) setEditingArticle(null);
                         clearFilters();
                     };
                     const content = (
@@ -453,6 +473,7 @@ const ClosetView = ({
                 </GlassCard>
             </ScrollView>
             </GlassGroup>
+            </View>
 
             {/* ── Rename inline form ── */}
             {selected && editingId === selected._id && (
@@ -733,17 +754,20 @@ const ClosetView = ({
                 columnWrapperStyle={
                     viewMode === 'tile' ? { gap: spacing.sm } : undefined
                 }
+                extraData={detailArticle?._id}
                 renderItem={({ item }) =>
                     viewMode === 'tile' ? (
                         <TileArticleCard
                             article={item}
                             tileWidth={tileWidth}
+                            selected={item._id === detailArticle?._id}
                             onEdit={handleEditArticle}
                             onRemove={handleRemoveArticle}
                         />
                     ) : (
                         <SwipeableArticleCard
                             article={item}
+                            selected={item._id === detailArticle?._id}
                             onEdit={handleEditArticle}
                             onRemove={handleRemoveArticle}
                         />
@@ -799,8 +823,10 @@ const ClosetView = ({
                 }
             />
 
-            {/* ── Floating action button — opens the add-article chooser ── */}
-            {selected && !editingArticle && !addingManually && (
+            {/* ── Floating action button — opens the add-article chooser ──
+                In two panes the piece opens beside the list, so the list keeps
+                its button. */}
+            {selected && !addingManually && (twoPane || !editingArticle) && (
                 <Pressable
                     style={styles.fab}
                     onPress={openAddChooser}
@@ -811,31 +837,76 @@ const ClosetView = ({
                 </Pressable>
             )}
 
-            {editingArticle && (
-                <ArticleModal
-                    closetId={selected._id}
-                    onClose={() => setEditingArticle(null)}
-                    initialData={editingArticle}
-                    onDelete={async () => {
-                        await onRemoveArticle(selected._id, editingArticle._id);
-                        setEditingArticle(null);
-                    }}
-                    onSubmit={async (data) => {
-                        await onEditArticle(selected._id, editingArticle._id, data);
-                        setEditingArticle(null);
-                    }}
-                />
-            )}
+            </View>
 
-            {addingManually && selected && (
-                <ArticleModal
-                    closetId={selected._id}
-                    onClose={() => setAddingManually(false)}
-                    onSubmit={async (data) => {
-                        await onAddArticle(selected._id, data);
-                        setAddingManually(false);
-                    }}
-                />
+            {twoPane ? (
+                <View style={{ flex: 1, paddingRight: rightInset }}>
+                    {!detailArticle && !addingManually && (
+                        <PanePlaceholder message='Add a piece and it opens here.' />
+                    )}
+                    {detailArticle && !addingManually && (
+                        <ArticleModal
+                            // A fresh form per piece, so switching never shows
+                            // the last piece's unsaved values.
+                            key={detailArticle._id}
+                            inline={twoPane}
+                            closetId={selected._id}
+                            onClose={() => setEditingArticle(null)}
+                            initialData={detailArticle}
+                            onDelete={async () => {
+                                await onRemoveArticle(selected._id, detailArticle._id);
+                                setEditingArticle(null);
+                            }}
+                            onSubmit={async (data) => {
+                                await onEditArticle(selected._id, detailArticle._id, data);
+                                setEditingArticle(null);
+                            }}
+                        />
+                    )}
+        
+                    {addingManually && selected && (
+                        <ArticleModal
+                            inline={twoPane}
+                            closetId={selected._id}
+                            onClose={() => setAddingManually(false)}
+                            onSubmit={async (data) => {
+                                await onAddArticle(selected._id, data);
+                                setAddingManually(false);
+                            }}
+                        />
+                    )}
+                </View>
+            ) : (
+                <>
+                {editingArticle && (
+                    <ArticleModal
+                        inline={twoPane}
+                        closetId={selected._id}
+                        onClose={() => setEditingArticle(null)}
+                        initialData={editingArticle}
+                        onDelete={async () => {
+                            await onRemoveArticle(selected._id, editingArticle._id);
+                            setEditingArticle(null);
+                        }}
+                        onSubmit={async (data) => {
+                            await onEditArticle(selected._id, editingArticle._id, data);
+                            setEditingArticle(null);
+                        }}
+                    />
+                )}
+    
+                {addingManually && selected && (
+                    <ArticleModal
+                        inline={twoPane}
+                        closetId={selected._id}
+                        onClose={() => setAddingManually(false)}
+                        onSubmit={async (data) => {
+                            await onAddArticle(selected._id, data);
+                            setAddingManually(false);
+                        }}
+                    />
+                )}
+                </>
             )}
         </View>
     );

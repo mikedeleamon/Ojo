@@ -41,7 +41,7 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useIsFocused } from '@react-navigation/native';
+import { useIsFocused } from 'expo-router';
 import { Svg, Path, Circle } from 'react-native-svg';
 import * as ImageManipulator from 'expo-image-manipulator';
 import ArticleModal from '../../components/ArticleModal/ArticleModal';
@@ -52,6 +52,8 @@ import { hapticImpact } from '../../lib/haptics';
 import axios from '../../api/client';
 import { auth } from '../../lib/auth';
 import { useTheme } from '../../theme/ThemeContext';
+import { useFoldLayout } from '../../context/FoldLayoutContext';
+import { markCameraReturning } from '../../lib/cameraTabReturn';
 import { pickImage, showAccessDeniedAlert, MAX_FILE_BYTES } from '../../lib/imageService';
 import { ArticleFormData } from '../../types';
 import { fonts, fontSizes, fontWeights, radius, spacing } from '../../theme/tokens';
@@ -326,10 +328,13 @@ interface CropPreviewProps {
   image:    ImageData;
   onCancel: () => void;
   onConfirm: (cropped: ImageData) => void;
+  paneWidth?: number;
 }
 
-function CropPreview({ image, onCancel, onConfirm }: CropPreviewProps) {
-  const { width: screenW, height: screenH } = useWindowDimensions();
+function CropPreview({ image, onCancel, onConfirm, paneWidth }: CropPreviewProps) {
+  const { width: windowW, height: screenH } = useWindowDimensions();
+  // In two panes the crop stays in the left pane, clear of the fold.
+  const screenW = paneWidth ?? windowW;
   const insets = useSafeAreaInsets();
 
   // Crop frame sized to fit screen width minus padding, capped to height region
@@ -449,7 +454,7 @@ function CropPreview({ image, onCancel, onConfirm }: CropPreviewProps) {
   ]);
 
   return (
-    <View style={cropStyles.root}>
+    <View style={[cropStyles.root, paneWidth != null && { width: paneWidth }]}>
       {/* Image with pan transform */}
       <GestureDetector gesture={pan}>
         <View style={StyleSheet.absoluteFill}>
@@ -624,6 +629,17 @@ const cropStyles = StyleSheet.create({
 
 export default function CameraPage() {
   const insets    = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const fold = useFoldLayout();
+  const twoPane = fold.mode === 'two-pane' && fold.axis === 'row' && fold.panes !== null;
+  const primaryWidth = twoPane && fold.panes ? fold.panes.primary.width : undefined;
+  // Messages that replace the camera sit in the right pane, away from the fold.
+  const inSecondaryPane = (node: React.ReactNode) =>
+    twoPane || insets.right > 0 ? (
+      <View style={{ flex: 1, paddingLeft: primaryWidth ?? 0, paddingRight: insets.right, backgroundColor: colors.bgDefault }}>
+        {node}
+      </View>
+    ) : node;
   const router    = useRouter();
   const isFocused = useIsFocused();
   const cameraRef = useRef<CameraView>(null);
@@ -668,9 +684,10 @@ export default function CameraPage() {
 
   const dismiss = useCallback(() => {
     if (returnParam) {
-      // Came from the camera-tab redirect. dismissTo atomically pops the
-      // modal AND switches the active (tabs) child to the return path, so
-      // the camera-tab placeholder is never re-focused (no push-loop).
+      // Came from the camera-tab redirect. dismissTo pops the modal but leaves
+      // the placeholder tab active, so it re-focuses. The flag tells it to move
+      // on to the return path instead of opening the camera again.
+      markCameraReturning();
       router.dismissTo(returnParam as any);
     } else if (router.canDismiss()) {
       // Came from a non-tab entry (e.g. Closet add button) — just pop;
@@ -776,35 +793,40 @@ export default function CameraPage() {
     );
   }
   if (!canAddItem) {
-    return (
+    return inSecondaryPane(
       <LimitReachedScreen
         limit={itemLimit ?? FREE_ITEM_LIMIT}
         onUpgrade={() => router.replace(UPGRADE_ROUTE as any)}
         onCancel={dismiss}
-      />
+      />,
     );
   }
   if (!permission) return null;
   if (!permission.granted) {
-    return permission.canAskAgain ? (
-      <CameraPrePromptScreen onContinue={requestPermission} />
-    ) : (
-      <CameraDeniedScreen
-        onOpenSettings={() => Linking.openSettings()}
-        onClose={dismiss}
-      />
+    return inSecondaryPane(
+      permission.canAskAgain ? (
+        <CameraPrePromptScreen onContinue={requestPermission} />
+      ) : (
+        <CameraDeniedScreen
+          onOpenSettings={() => Linking.openSettings()}
+          onClose={dismiss}
+        />
+      ),
     );
   }
-  if (!targetCloset) return <NoClosetScreen onClose={dismiss} />;
+  if (!targetCloset) return inSecondaryPane(<NoClosetScreen onClose={dismiss} />);
 
   // ── Stage 2: Crop ─────────────────────────────────────────────────────────
   if (raw && !cropped) {
     return (
-      <CropPreview
-        image={raw}
-        onCancel={() => setRaw(null)}
-        onConfirm={(croppedImg) => setCropped(croppedImg)}
-      />
+      <View style={{ flex: 1, backgroundColor: '#000' }}>
+        <CropPreview
+          image={raw}
+          onCancel={() => setRaw(null)}
+          onConfirm={(croppedImg) => setCropped(croppedImg)}
+          paneWidth={primaryWidth}
+        />
+      </View>
     );
   }
 
@@ -901,7 +923,8 @@ export default function CameraPage() {
   };
 
   return (
-    <View style={st.root}>
+    <View style={[st.root, twoPane && { flexDirection: 'row' }]}>
+      <View style={twoPane ? { width: primaryWidth } : { flex: 1 }}>
       <GestureDetector gesture={swipeUp}>
         <View style={StyleSheet.absoluteFill}>
           {/* Mount the live camera ONLY when this screen is focused.
@@ -926,16 +949,27 @@ export default function CameraPage() {
 
       <CloseButton />
       <ControlBar />
+      </View>
 
       {/* ArticleModal — shown after crop confirm */}
-      {cropped && (
+      {cropped && (twoPane ? (
+        <View style={{ flex: 1, paddingRight: insets.right, backgroundColor: colors.bgDefault }}>
+          <ArticleModal
+            inline
+            closetId={targetCloset._id}
+            onClose={handleModalClose}
+            onSubmit={handleModalSubmit}
+            initialImageData={cropped}
+          />
+        </View>
+      ) : (
         <ArticleModal
           closetId={targetCloset._id}
           onClose={handleModalClose}
           onSubmit={handleModalSubmit}
           initialImageData={cropped}
         />
-      )}
+      ))}
     </View>
   );
 }

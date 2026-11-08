@@ -21,7 +21,6 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { InteractionManager } from 'react-native';
 import api from '../api/client';
 import { authHeaders, getToken } from '../lib/auth';
 import { useActiveLocation } from '../context/ActiveLocationContext';
@@ -30,6 +29,7 @@ import { selectNudgeworthySteps, buildNudgeContent } from '../lib/sameDayNudge';
 import { scheduleSameDayNudges, type SameDayNudgeItem } from '../lib/notifications';
 import type { OutfitResult } from '../lib/outfitEngine';
 import type { NotificationSettings } from '../types';
+import { runAfterInteractions } from '../lib/runAfterInteractions';
 
 /** Local calendar date as "YYYY-MM-DD" — must match SameDayNudgeItem.dateISO. */
 const localISODate = (d: Date): string => {
@@ -63,7 +63,7 @@ export function useSameDayNudgeScheduler({
 
     let cancelled = false;
 
-    const task = InteractionManager.runAfterInteractions(async () => {
+    const task = runAfterInteractions(async () => {
       try {
         if (!notifSettings.current) {
           const { data } = await api.get<NotificationSettings>(

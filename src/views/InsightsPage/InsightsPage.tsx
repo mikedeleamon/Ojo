@@ -50,6 +50,7 @@ import { ColorPalette } from './ColorPalette';
 import ShareToInstagramSheet from '../../components/ShareCard/ShareToInstagramSheet';
 import DonationListShareCard from '../../components/ShareCard/DonationListShareCard';
 import { donationShareLink } from '../../lib/share/deepLinks';
+import { useFoldColumns } from '../../hooks/useFoldColumns';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -134,6 +135,7 @@ export default function InsightsPage() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { closets, loading: closetsLoading, removeArticle } = useClosets();
   const tabPad = useTabBarPadding();
+  const columns = useFoldColumns(spacing.md);
   const reduceMotion = useReduceMotion();
   const nav = useAppNavigation();
   const confirm = useConfirm();
@@ -262,7 +264,7 @@ export default function InsightsPage() {
   // Empty state — new user with no closet or zero articles
   if (!data || data.health.totalArticles === 0) {
     return (
-      <SafeAreaView style={styles.root} edges={['top']}>
+      <SafeAreaView style={styles.root} edges={columns.twoPane ? ['top'] : ['top', 'right']}>
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={[styles.scrollContent, { paddingBottom: tabPad }]}
@@ -328,12 +330,17 @@ export default function InsightsPage() {
     : queuedInsights.slice(0, DONATION_PREVIEW);
 
   return (
-    <SafeAreaView style={styles.root} edges={['top']}>
+    <SafeAreaView style={styles.root} edges={columns.twoPane ? ['top'] : ['top', 'right']}>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: tabPad }]}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: tabPad },
+          columns.row,
+        ]}
         showsVerticalScrollIndicator={false}
       >
+        <View style={[{ gap: spacing.md }, columns.left]}>
         {/* ── Header ── */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Insights</Text>
@@ -543,6 +550,9 @@ export default function InsightsPage() {
           </GlassCard>
         )}
 
+        </View>
+
+        <View style={[{ gap: spacing.md }, columns.right]}>
         {/* ── Color Palette — circle-pack of wardrobe colours ── */}
         {data.articles.length > 0 && (
           <GlassCard style={styles.paletteCard}>
@@ -842,6 +852,7 @@ export default function InsightsPage() {
             ))}
           </GlassCard>
         )}
+        </View>
       </ScrollView>
 
       {showDonationShare && (

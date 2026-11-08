@@ -18,6 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { View, Text } from '../primitives';
 import OjoLogo from '../OjoLogo';
 import styles, { STICKER_LOGO, type ShareCardVariant } from './ShareCardFrame.styles';
+import type { ViewRef } from '../../types/nativeRefs';
 
 interface ShareCardFrameProps {
   /** Top→bottom gradient stops. Defaults to Ojo's standard dark brand gradient. */
@@ -38,7 +39,7 @@ const Footer = ({ style, sticker }: { style?: object; sticker?: boolean }) => (
   </View>
 );
 
-const ShareCardFrame = forwardRef<View, ShareCardFrameProps>(
+const ShareCardFrame = forwardRef<ViewRef, ShareCardFrameProps>(
   ({ gradientColors, variant = 'poster', children }, ref) => variant === 'sticker' ? (
     <View ref={ref} style={styles.sticker} collapsable={false}>
       {children}

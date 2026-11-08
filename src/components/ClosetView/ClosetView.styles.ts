@@ -12,6 +12,7 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.bgDefault },
 
     // ── Closet tab bar ─────────────────────────────────────────────────────────
+    clipRow: { overflow: 'hidden' },
     closetBar: {
         flexDirection: 'row',
         gap: 8,
@@ -293,6 +294,13 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         borderRadius: radius.sm,
         overflow: 'hidden',
     },
+    // The piece open in the detail pane, when the list and detail sit side by side.
+    // A ring drawn over the card: the native glass surface drops borders.
+    cardSelected: {
+        ...StyleSheet.absoluteFill,
+        borderWidth: 1.5,
+        borderColor: colors.successText,
+    },
     articleCardInner: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -419,11 +427,12 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     },
 
     // ── TripFit discovery banner ────────────────────────────────────────────────
+    // Inset like the list below it, so it lines up with the cards.
     tripBanner: {
         marginTop: spacing.md,
+        marginHorizontal: spacing.md,
         borderRadius: radius.md,
         overflow: 'hidden',
-        width: '100%',
     },
     tripBannerInner: {
         flexDirection: 'row',

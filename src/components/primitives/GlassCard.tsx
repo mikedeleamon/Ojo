@@ -17,6 +17,7 @@ import { View, ViewProps, StyleSheet, StyleProp, ViewStyle } from 'react-native'
 import { GlassView, isGlassEffectAPIAvailable } from 'expo-glass-effect';
 import { useTheme } from '../../theme/ThemeContext';
 import { darkColors } from '../../theme/tokens';
+import type { ViewRef } from '../../types/nativeRefs';
 
 const LIQUID_GLASS = isGlassEffectAPIAvailable();
 
@@ -47,7 +48,7 @@ interface GlassCardProps extends ViewProps {
   children?:   React.ReactNode;
 }
 
-const GlassCard = forwardRef<View, GlassCardProps>(
+const GlassCard = forwardRef<ViewRef, GlassCardProps>(
   ({ style, glassStyle = 'regular', tintColor, disableGlass = false, children, ...rest }, ref) => {
     const { colors, isDark } = useTheme();
 

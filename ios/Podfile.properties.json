@@ -1,6 +1,10 @@
 {
   "expo.jsEngine": "hermes",
   "EX_DEV_CLIENT_NETWORK_INSPECTOR": "true",
-  "newArchEnabled": "true",
-  "apple.privacyManifestAggregationEnabled": "false"
+  "expo.inlineModules.watchedDirectories": "[]",
+  "expo.inlineModules.xcodeProjectTargets": "{\"mainTarget\":\"Ojo\",\"targets\":[]}",
+  "ios.forceStaticLinking": "[]",
+  "apple.privacyManifestAggregationEnabled": "false",
+  "EXPO_USE_PRECOMPILED_MODULES": "true",
+  "expo.location.motionActivityEnabled": "false"
 }

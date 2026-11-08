@@ -38,6 +38,7 @@ import { StatusMessage } from '../../../components/shared';
 import { makeStyles } from '../screens/screens.styles';
 import { spacing, radius, fonts, fontSizes } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/ThemeContext';
+import type { ViewRef } from '../../../types/nativeRefs';
 
 interface Props {
     onLogout?: () => void;
@@ -81,7 +82,7 @@ export default function ProfileScreen({ onLogout }: Props) {
                     color: colors.saveBtnText,
                 },
                 backdrop: {
-                    ...StyleSheet.absoluteFillObject,
+                    ...StyleSheet.absoluteFill,
                     backgroundColor: 'rgba(0,0,0,0.55)',
                 },
                 modalCard: {
@@ -206,7 +207,7 @@ export default function ProfileScreen({ onLogout }: Props) {
         }
     })();
 
-    const deleteModalTitleRef = useRef<RNView>(null);
+    const deleteModalTitleRef = useRef<ViewRef>(null);
     useEffect(() => {
         if (!deleteStep) return;
         const id = setTimeout(() => {

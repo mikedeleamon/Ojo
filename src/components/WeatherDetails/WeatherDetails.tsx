@@ -8,7 +8,7 @@ import { CurrentWeather, DailyForecast, Forecast, LocationCoords, Settings } fro
 import { type ColorTokens, fonts, fontSizes, fontWeights, spacing, radius } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 
-interface Props { weather: CurrentWeather; settings: Settings; forecasts: Forecast[]; daily?: DailyForecast[]; city?: string; coords?: LocationCoords; }
+interface Props { weather: CurrentWeather; settings: Settings; forecasts: Forecast[]; daily?: DailyForecast[]; city?: string; coords?: LocationCoords; showStats?: boolean; }
 
 const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   root:       { gap: spacing.md },
@@ -38,13 +38,23 @@ const makeStyles = (colors: ColorTokens) => StyleSheet.create({
   pillValue: { fontFamily: fonts.body, fontSize: fontSizes.xs, fontWeight: fontWeights.semibold },
 });
 
-const WeatherDetails = ({ weather, settings, forecasts, daily, city, coords }: Props) => {
+interface StatsProps {
+  weather: CurrentWeather;
+  settings: Settings;
+  /** Show every stat with no "More details" toggle (the two-pane Home, which has
+   *  the room). Feels like is in that layout's hero, so Visibility takes its slot. */
+  showAll?: boolean;
+}
+
+/**
+ * Wind, humidity and the expandable details. Its own component because the
+ * two-pane Home shows these in the weather pane, apart from the outfit.
+ */
+export const WeatherStats = memo(({ weather, settings, showAll = false }: StatsProps) => {
   const { colors } = useTheme();
   const st = useMemo(() => makeStyles(colors), [colors]);
   const [expanded, setExpanded] = useState(false);
   const isMetric = settings.temperatureScale === 'Metric';
-  // Defer the (heavy, below-the-fold) outfit engine until the HUD has painted.
-  const showOutfit = useDeferredMount();
 
   const Stat = ({ label, value }: { label: string; value: string }) => (
     <GlassCard style={st.stat}>
@@ -76,17 +86,14 @@ const WeatherDetails = ({ weather, settings, forecasts, daily, city, coords }: P
   };
 
   const hasConditionData = weather.AirQualityText || weather.PollenCategory;
+  const visibility = weather.Visibility
+    ? isMetric
+      ? `${Math.round(weather.Visibility.Metric.Value)} km`
+      : `${Math.round(weather.Visibility.Imperial.Value)} mi`
+    : null;
 
   return (
     <View style={st.root}>
-      {showOutfit ? (
-        <OutfitSuggestion weather={weather} settings={settings} forecasts={forecasts} daily={daily} city={city} coords={coords} />
-      ) : (
-        <View style={st.outfitPlaceholder}>
-          <ActivityIndicator color={colors.textMuted} />
-        </View>
-      )}
-
       {/* Always-visible wind + humidity */}
       <GlassGroup spacing={spacing.sm} style={st.grid}>
         <Stat label="Wind"     value={isMetric
@@ -95,7 +102,7 @@ const WeatherDetails = ({ weather, settings, forecasts, daily, city, coords }: P
         <Stat label="Humidity" value={`${weather.RelativeHumidity}%`} />
       </GlassGroup>
 
-      <Pressable
+      {!showAll && <Pressable
         style={st.toggle}
         onPress={() => setExpanded(v => !v)}
         accessibilityRole="button"
@@ -108,15 +115,19 @@ const WeatherDetails = ({ weather, settings, forecasts, daily, city, coords }: P
           importantForAccessibility="no">
           <Path d="M4 6l4 4 4-4" stroke={colors.textSecondary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"/>
         </Svg>
-      </Pressable>
+      </Pressable>}
 
-      {expanded && (
+      {(expanded || showAll) && (
         <>
           <GlassGroup spacing={spacing.sm} style={st.grid}>
             <Stat label="UV Index"   value={weather.UVIndexText} />
-            <Stat label="Feels like" value={`${isMetric
-              ? weather.RealFeelTemperature.Metric.Value
-              : weather.RealFeelTemperature.Imperial.Value}°`} />
+            {showAll && visibility ? (
+              <Stat label="Visibility" value={visibility} />
+            ) : (
+              <Stat label="Feels like" value={`${isMetric
+                ? weather.RealFeelTemperature.Metric.Value
+                : weather.RealFeelTemperature.Imperial.Value}°`} />
+            )}
           </GlassGroup>
 
           {hasConditionData && (
@@ -127,6 +138,28 @@ const WeatherDetails = ({ weather, settings, forecasts, daily, city, coords }: P
           )}
         </>
       )}
+    </View>
+  );
+});
+WeatherStats.displayName = 'WeatherStats';
+
+const WeatherDetails = ({ weather, settings, forecasts, daily, city, coords, showStats = true }: Props) => {
+  const { colors } = useTheme();
+  const st = useMemo(() => makeStyles(colors), [colors]);
+  // Defer the (heavy, below-the-fold) outfit engine until the HUD has painted.
+  const showOutfit = useDeferredMount();
+
+  return (
+    <View style={st.root}>
+      {showOutfit ? (
+        <OutfitSuggestion weather={weather} settings={settings} forecasts={forecasts} daily={daily} city={city} coords={coords} />
+      ) : (
+        <View style={st.outfitPlaceholder}>
+          <ActivityIndicator color={colors.textMuted} />
+        </View>
+      )}
+
+      {showStats && <WeatherStats weather={weather} settings={settings} />}
     </View>
   );
 };

@@ -1,5 +1,5 @@
 import { View } from 'react-native';
-import { NativeTabs, Label, Icon } from 'expo-router/unstable-native-tabs';
+import { NativeTabs } from 'expo-router/native-tabs';
 import { useWeatherTheme } from '../../src/context/WeatherContext';
 
 // ─── Tab layout ──────────────────────────────────────────────────────────────
@@ -27,28 +27,28 @@ export default function TabLayout() {
     <View style={{ flex: 1 }}>
       <NativeTabs tintColor={accent}>
         <NativeTabs.Trigger name="index">
-          <Label>Home</Label>
-          <Icon src={require('../../assets/images/ojo_home_tab_icon.png')} />
+          <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Icon src={require('../../assets/images/ojo_home_tab_icon.png')} renderingMode='template' />
         </NativeTabs.Trigger>
 
         <NativeTabs.Trigger name="closet">
-          <Label>Closet</Label>
-          <Icon sf="hanger" />
+          <NativeTabs.Trigger.Label>Closet</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Icon sf="hanger" />
         </NativeTabs.Trigger>
 
         <NativeTabs.Trigger name="camera">
-          <Label>Add</Label>
-          <Icon sf="camera" />
+          <NativeTabs.Trigger.Label>Add</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Icon sf="camera" />
         </NativeTabs.Trigger>
 
         <NativeTabs.Trigger name="tripfit">
-          <Label>TripFit</Label>
-          <Icon src={require('../../assets/images/ojo_tripfit_tab_icon.png')} />
+          <NativeTabs.Trigger.Label>TripFit</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Icon src={require('../../assets/images/ojo_tripfit_tab_icon.png')} renderingMode='template' />
         </NativeTabs.Trigger>
 
         <NativeTabs.Trigger name="insights">
-          <Label>Insights</Label>
-          <Icon sf="chart.bar.fill" />
+          <NativeTabs.Trigger.Label>Insights</NativeTabs.Trigger.Label>
+          <NativeTabs.Trigger.Icon sf="chart.bar.fill" />
         </NativeTabs.Trigger>
       </NativeTabs>
     </View>

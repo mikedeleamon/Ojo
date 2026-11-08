@@ -142,7 +142,7 @@ export const useTripMode = (): TripModeState => {
     const appState = useRef(AppState.currentState);
     useEffect(() => {
         const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
-            if (appState.current.match(/inactive|background/) && next === 'active') {
+            if (appState.current?.match(/inactive|background/) && next === 'active') {
                 refresh();
             }
             appState.current = next;

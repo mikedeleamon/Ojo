@@ -34,6 +34,7 @@ import OjoLogo from '../OjoLogo';
 import RecapColorBar from '../recap/RecapColorBar';
 import { CARD_WIDTH, CARD_HEIGHT, STICKER_LOGO, STICKER_WIDTH, type ShareCardVariant } from './ShareCardFrame.styles';
 import { fonts } from '../../theme/tokens';
+import type { ViewRef } from '../../types/nativeRefs';
 
 interface RecapShareCardProps {
   cards: RecapCard[];
@@ -66,7 +67,7 @@ const pickStats = (cards: RecapCard[], meta: RecapWeekMeta): Stat[] => {
   ];
 };
 
-const RecapShareCard = forwardRef<View, RecapShareCardProps>(
+const RecapShareCard = forwardRef<ViewRef, RecapShareCardProps>(
   ({ cards, meta, gradientColors = RECAP_BRAND_GRADIENT, variant = 'poster' }, ref) => {
   const opener = cards.find(c => c.section === 'opener');
   const stats = pickStats(cards, meta);

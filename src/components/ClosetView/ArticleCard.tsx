@@ -1,6 +1,8 @@
 import { memo, useMemo, useState } from 'react';
 import { Pressable, Image, Animated, StyleSheet } from 'react-native';
-import { Swipeable } from 'react-native-gesture-handler';
+import Swipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable';
+import type { SharedValue } from 'react-native-reanimated';
+import { SwipeActionReveal } from '../primitives/SwipeActionReveal';
 import { LinearGradient } from 'expo-linear-gradient';
 import { View, Text, GlassCard } from '../primitives';
 import { HangerIcon } from '../shared/HangerIcon';
@@ -21,6 +23,8 @@ import { makeStyles } from './ClosetView.styles';
 interface ArticleCardProps {
     article: ClothingArticle;
     outOfSeason?: boolean;
+    /** Shown in the detail pane beside the list (two panes only). */
+    selected?: boolean;
     onEdit: (article: ClothingArticle) => void;
     onRemove: (article: ClothingArticle) => void;
 }
@@ -45,6 +49,7 @@ const ColorSwatch = ({ color, style }: { color?: string; style: object }) => {
 export const ArticleCard = memo(({
     article,
     outOfSeason,
+    selected = false,
     onEdit,
 }: ArticleCardProps) => {
     const { colors } = useTheme();
@@ -61,6 +66,7 @@ export const ArticleCard = memo(({
                 onPress={() => onEdit(article)}
                 accessibilityLabel='Edit article'
                 accessibilityRole='button'
+                accessibilityState={{ selected }}
             >
                 <View style={styles.articleImg}>
                     {article.imageUrl && !imgError ? (
@@ -118,6 +124,9 @@ export const ArticleCard = memo(({
                     style={styles.colorDot}
                 />
             </Pressable>
+            {selected && (
+                <View pointerEvents='none' style={[styles.cardSelected, { borderRadius: styles.articleCard.borderRadius }]} />
+            )}
         </GlassCard>
     );
 });
@@ -128,6 +137,8 @@ ArticleCard.displayName = 'ArticleCard';
 interface TileArticleCardProps {
     article: ClothingArticle;
     tileWidth: number;
+    /** Shown in the detail pane beside the list (two panes only). */
+    selected?: boolean;
     onEdit: (article: ClothingArticle) => void;
     onRemove: (article: ClothingArticle) => void;
 }
@@ -135,6 +146,7 @@ interface TileArticleCardProps {
 export const TileArticleCard = memo(({
     article,
     tileWidth,
+    selected = false,
     onEdit,
     onRemove,
 }: TileArticleCardProps) => {
@@ -162,6 +174,7 @@ export const TileArticleCard = memo(({
                 onLongPress={confirmDelete}
                 accessibilityLabel={`Edit ${articleDisplayName(article)}. Long press to delete.`}
                 accessibilityRole='button'
+                accessibilityState={{ selected }}
             >
                 <View style={styles.tileImg}>
                     {article.imageUrl && !imgError ? (
@@ -212,6 +225,9 @@ export const TileArticleCard = memo(({
                     </View>
                 </View>
             </Pressable>
+            {selected && (
+                <View pointerEvents='none' style={[styles.cardSelected, { borderRadius: styles.tileCard.borderRadius }]} />
+            )}
         </GlassCard>
     );
 });
@@ -244,21 +260,15 @@ const swipeStyles = StyleSheet.create({
 
 export const SwipeableArticleCard = memo((props: ArticleCardProps) => {
     const renderRightActions = (
-        _progress: ReturnType<Animated.Value['interpolate']>,
-        dragX: ReturnType<Animated.Value['interpolate']>,
-        swipeable: Swipeable,
+        _progress: SharedValue<number>,
+        translation: SharedValue<number>,
+        swipeable: SwipeableMethods,
     ) => {
-        const translateX = dragX.interpolate({
-            inputRange: [-76, 0],
-            outputRange: [0, 76],
-            extrapolate: 'clamp',
-        });
         return (
-            <Animated.View
-                style={[
-                    swipeStyles.deleteActionWrap,
-                    { transform: [{ translateX }] },
-                ]}
+            <SwipeActionReveal
+                translation={translation}
+                width={76}
+                style={swipeStyles.deleteActionWrap}
             >
                 <Pressable
                     style={swipeStyles.deleteAction}
@@ -271,7 +281,7 @@ export const SwipeableArticleCard = memo((props: ArticleCardProps) => {
                 >
                     <Text style={swipeStyles.deleteText}>Delete</Text>
                 </Pressable>
-            </Animated.View>
+            </SwipeActionReveal>
         );
     };
 

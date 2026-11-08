@@ -7,6 +7,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Svg, Path, Circle } from 'react-native-svg';
 import { View, Text, Pressable, GlassCard, GlassGroup, AppSlider } from '../../components/primitives';
 import OjoLogoIcon from '../../components/icons/OjoLogoIcon';
+import { BrandPane } from '../../components/layout/BrandPane';
+import { useFoldLayout } from '../../context/FoldLayoutContext';
 import { useSettings } from '../../hooks/useSettings';
 import { useReduceMotion } from '../../hooks/useReduceMotion';
 import { markOnboardingComplete } from '../../lib/onboarding';
@@ -138,6 +140,7 @@ export default function OnboardingPage({ onComplete }: Props) {
   const { settings, saveSettings } = useSettings();
   const reduceMotion = useReduceMotion();
 
+  const twoPane = useFoldLayout().mode === 'two-pane';
   const [step, setStep] = useState(1);
 
   const [cityLabel,  setCityLabel]  = useState<string | null>(settings.location || null);
@@ -317,7 +320,11 @@ export default function OnboardingPage({ onComplete }: Props) {
   }, [step, onComplete]);
 
   return (
-    <SafeAreaView style={st.root}>
+    <SafeAreaView
+      style={[st.root, twoPane && { flexDirection: 'row' }]}
+      edges={twoPane ? ['right'] : undefined}
+    >
+      {twoPane && <BrandPane />}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -335,7 +342,7 @@ export default function OnboardingPage({ onComplete }: Props) {
               {step === 1 && (
                 <View style={st.stepShell}>
                   <Dots step={1} colors={colors} />
-                  <OjoLogoIcon width={st.logo.width} height={st.logo.height} />
+                  {!twoPane && <OjoLogoIcon width={st.logo.width} height={st.logo.height} />}
                   <Text style={st.heading}>Welcome to Ojo</Text>
                   <Text style={st.sub}>
                     Let's take 60 seconds to set up your wardrobe so Ojo can suggest
