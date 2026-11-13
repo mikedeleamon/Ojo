@@ -160,6 +160,11 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         gap: spacing.sm,
     },
     resetLink: { paddingVertical: 2, paddingHorizontal: 4 },
+    swapHint: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs,
+        color: colors.textMuted,
+    },
     resetLinkText: {
         fontFamily: fonts.body,
         fontSize: fontSizes.xs,
@@ -167,6 +172,8 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         textDecorationLine: 'underline',
     },
     articleGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+    // The tappable part of a piece (photo + label): long-press to swap it.
+    articleSwapArea: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.xsPlus },
     articleCard: {
         flexDirection: 'row',
         alignItems: 'center',

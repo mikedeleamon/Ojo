@@ -1,2 +1,2 @@
-import { HistoryScreen } from '../../src/features/settings/screens/SimpleScreens';
-export default HistoryScreen;
+import { WearCalendarScreen } from '../../src/features/settings/screens/WearCalendarScreen';
+export default WearCalendarScreen;

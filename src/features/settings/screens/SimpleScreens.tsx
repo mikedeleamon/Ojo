@@ -1,26 +1,15 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useMemo } from 'react';
 import { StyleSheet, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { View, Text, Pressable } from '../../../components/primitives';
-import { useConfirm } from '../../../components/ConfirmDialog';
-import { loadHistory, deleteHistoryEntry, clearHistory } from '../../../lib/outfitHistory';
-import { useFocusEffect } from 'expo-router';
-import { OutfitHistoryEntry } from '../../../types';
+import { View, Text } from '../../../components/primitives';
 import { makeStyles } from './screens.styles';
-import { spacing, radius, fonts } from '../../../theme/tokens';
+import { spacing } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/ThemeContext';
 import { ColorTokens } from '../../../theme/tokens';
 
 const makeLocalStyles = (colors: ColorTokens) => StyleSheet.create({
   root:    { flex: 1, backgroundColor: colors.bgDefault },
   content: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xl },
-  clearBtn: {
-    alignSelf: 'flex-end',
-    paddingVertical: 6, paddingHorizontal: 14,
-    borderRadius: radius.pill, borderWidth: 1,
-    borderColor: 'rgba(252,165,165,0.3)',
-  },
-  clearBtnText: { fontFamily: fonts.body, fontSize: 12, color: 'rgba(252,165,165,0.75)' },
 });
 
 const Root = ({ children }: { children: React.ReactNode }) => {
@@ -71,75 +60,3 @@ export const DataUsageScreen = () => (
       body="Go to Account → Profile → Delete Account to permanently remove all your data within 30 days." />
   </Root>
 );
-
-// ─── History ──────────────────────────────────────────────────────────────────
-
-export const HistoryScreen = () => {
-  const { colors } = useTheme();
-  const s  = useMemo(() => makeStyles(colors), [colors]);
-  const st = useMemo(() => makeLocalStyles(colors), [colors]);
-  const confirm = useConfirm();
-  const [entries, setEntries] = useState<OutfitHistoryEntry[]>([]);
-
-  useFocusEffect(
-    useCallback(() => { loadHistory().then(setEntries).catch(() => {}); }, []),
-  );
-
-  const handleDelete = async (id: string) => {
-    await deleteHistoryEntry(id);
-    setEntries(prev => prev.filter(e => e.id !== id));
-  };
-
-  const handleClearAll = async () => {
-    const ok = await confirm({
-      title: `Clear all ${entries.length} entries?`,
-      message: 'Your outfit history will be permanently removed.',
-      confirmLabel: 'Clear all',
-      destructive: true,
-    });
-    if (!ok) return;
-    await clearHistory();
-    setEntries([]);
-  };
-
-  const formatDate = (iso: string) => {
-    const d = new Date(iso);
-    const today     = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(today.getDate() - 1);
-    const same = (a: Date, b: Date) =>
-      a.getDate() === b.getDate() && a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear();
-    const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    if (same(d, today))     return `Today, ${time}`;
-    if (same(d, yesterday)) return `Yesterday, ${time}`;
-    return `${d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}, ${time}`;
-  };
-
-  if (entries.length === 0) {
-    return <Root><InfoCard title="No outfits logged yet"
-      body='Tap "Wore this today" on the home screen after getting a suggestion.' /></Root>;
-  }
-
-  return (
-    <Root>
-      <Pressable style={st.clearBtn} onPress={handleClearAll} accessibilityRole="button">
-        <Text style={st.clearBtnText}>Clear all</Text>
-      </Pressable>
-      {entries.map(entry => (
-        <View key={entry.id} style={s.historyCard}>
-          <View style={s.historyMeta}>
-            <Text style={s.historyDate}>{formatDate(entry.wornAt)}</Text>
-            <Text style={s.historyCloset}>{entry.closetName}</Text>
-          </View>
-          <Text style={s.historySummary} numberOfLines={2}>{entry.articleSummary}</Text>
-          <Pressable style={s.historyDeleteBtn} onPress={() => handleDelete(entry.id)}
-            accessibilityLabel="Remove entry"
-            accessibilityRole="button">
-            <Text style={{ color: colors.textMuted, fontSize: 12 }}>✕</Text>
-          </Pressable>
-        </View>
-      ))}
-      <Text style={s.hint}>Outfits from the last 3 days are deprioritised in new suggestions.</Text>
-    </Root>
-  );
-};

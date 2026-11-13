@@ -43,6 +43,7 @@
  *   outfitSwipeHint       → the swipe-hint bounce and the animated layer it needs
  *   outfitCrossfade       → the animated-opacity layer wrapping the carousel
  *   freezeTwinkleOnScroll → clear-night twinkle continuing while scrolled away
+ *   weatherGlass          → rain beads, frost and heat shimmer on the outfit card
  *
  * Note these are not independent: `backdrop` off implies nothing is animating
  * behind the glass, so it subsumes `twinkle`. Test the narrow flags first.
@@ -99,6 +100,12 @@ export interface PerfFlags {
      * Clear night only — rain, drizzle and storm are deliberately unaffected.
      */
     freezeTwinkleOnScroll: boolean;
+    /**
+     * Draw the weather on the outfit card's glass: rain beads, frost creeping
+     * in from the corners, heat shimmer (components/WeatherGlass). Its loops
+     * also follow `twinkle`, like the sky's.
+     */
+    weatherGlass: boolean;
 }
 
 export const PERF_FLAG_LABELS: Record<keyof PerfFlags, string> = {
@@ -112,6 +119,7 @@ export const PERF_FLAG_LABELS: Record<keyof PerfFlags, string> = {
     outfitSwipeHint: 'Outfit swipe hint',
     outfitCrossfade: 'Outfit crossfade layer',
     freezeTwinkleOnScroll: 'Freeze twinkle on scroll',
+    weatherGlass: 'Weather on the glass',
 };
 
 // Mirrors the production build: everything on except the swipe hint.
@@ -126,6 +134,7 @@ const DEFAULTS: PerfFlags = {
     outfitSwipeHint: false,
     outfitCrossfade: true,
     freezeTwinkleOnScroll: true,
+    weatherGlass: true,
 };
 
 let flags: PerfFlags = DEFAULTS;

@@ -18,6 +18,7 @@ import {
   StyleDNA,
 } from './userPreferences';
 import { getGapSuggestions, GapSuggestion } from './wardrobeGaps';
+import { computeStyleArchetype, StyleArchetype } from './styleArchetype';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -49,6 +50,8 @@ export interface InsightsData {
   health:       WardrobeHealth;
   articles:     ArticleInsight[];                         // all articles, wear desc
   styleDNA:     StyleDNA;
+  /** Style DNA's name and the inputs for its art; null until a color is worn. */
+  archetype:    StyleArchetype | null;
   topWorn:      ArticleInsight[];                         // top 10 by totalWears
   sleeping:     ArticleInsight[];                         // isSleeping, daysSinceWorn desc
   neverWorn:    ArticleInsight[];                         // totalWears === 0
@@ -237,6 +240,10 @@ export const computeInsights = async (
 
   const health  = buildHealth(allInsights, activeWindowDays);
   const styleDNA = computeStyleDNA(preferences);
+  const archetype = computeStyleArchetype(
+    preferences,
+    history.flatMap(e => (typeof e.context?.feelsLikeF === 'number' ? [e.context.feelsLikeF] : [])),
+  );
 
   // Top worn — descending by totalWears, take 10
   const topWorn = [...allInsights]
@@ -268,6 +275,7 @@ export const computeInsights = async (
     health,
     articles: [...allInsights].sort((a, b) => b.totalWears - a.totalWears),
     styleDNA,
+    archetype,
     topWorn,
     sleeping,
     neverWorn,
