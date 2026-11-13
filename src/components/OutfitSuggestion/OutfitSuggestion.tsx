@@ -174,7 +174,10 @@ const ArticleThumb = ({
                 )}
             </View>
             <View style={styles.articleLabel}>
-                <Text style={styles.roleLabel}>
+                <Text
+                    style={styles.roleLabel}
+                    numberOfLines={1}
+                >
                     {role === 'accessory'
                         ? articleZoneLabel(article)
                         : ROLE_LABELS[role]}
@@ -193,7 +196,8 @@ const ArticleThumb = ({
                 <Pressable
                     style={styles.articleRemoveBtn}
                     onPress={onRemove}
-                    hitSlop={8}
+                    // 20 pt badge + 12 on each side = Apple's 44 pt minimum.
+                    hitSlop={12}
                     accessibilityLabel='Remove from outfit'
                     accessibilityRole='button'
                 >
