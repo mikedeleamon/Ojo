@@ -130,6 +130,9 @@ const main = () => {
     '--message', message,
     '--skip-bundler',
     '--input-dir', 'dist',
+    // Required with --non-interactive since the move to SDK 55+. The bundle is
+    // already built, so the server-side EAS variables it loads can't reach it.
+    '--environment', build.environment ?? profile,
     '--non-interactive',
   ];
   if (rollout) updateArgs.push('--rollout-percentage', rollout);
