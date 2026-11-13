@@ -608,15 +608,26 @@ export const cancelAllLocalNotifications = (): Promise<void> => {
 // (see lib/morningBrief.ts). Discrete days cost us N pending notifications and
 // buy real, day-specific copy.
 //
-// The cost of that choice: the window only advances while the app is open, so a
-// user who never opens Ojo eventually runs out. BRIEF_WINDOW_DAYS is the size of
-// that grace period. Every home-screen sync re-schedules the whole window, so in
-// normal use the near days are always freshly generated.
+// The cost of that choice: copy is written when the window is built, not when it
+// fires. Opening Home rebuilds the whole window, and so does the background
+// refresh (lib/background/refresh.ts) whenever iOS gives Ojo time or the phone
+// leaves its area, so in normal use tomorrow's brief is rebuilt overnight and the
+// later days never fire as first written. They only matter when nothing rebuilds
+// the window: the app was force-quit, Background App Refresh is off, or iOS has
+// stopped giving it time.
 //
-// iOS caps pending local notifications at 64. Budget: 7 here + up to 14 Trip Mode
+// BRIEF_WINDOW_DAYS is that safety margin. It was 7 when opening the app was the
+// only rebuild; it's 3 now (2026-11-12) because a longer margin mostly bought
+// briefs built on week-old forecasts and, for users without "Always" location,
+// up to a week of mornings about a city they'd left. Three days covers a couple
+// of nights without background time and keeps every brief inside a reliable
+// forecast range. The cost: someone who stops opening Ojo, and gets no background
+// time, stops hearing from it after 3 mornings instead of 7.
+//
+// iOS caps pending local notifications at 64. Budget: 3 here + up to 14 Trip Mode
 // + 2 per trip plan + 1 recap + up to 2 same-day nudges.
 
-export const BRIEF_WINDOW_DAYS = 7;
+export const BRIEF_WINDOW_DAYS = 3;
 
 const BRIEF_PREFIX = 'ojo_morningbrief_';
 const briefNotifId = (dateISO: string) => `${BRIEF_PREFIX}${dateISO}`;
@@ -726,7 +737,8 @@ export const getBriefPreview = async (): Promise<BriefDay | null> => {
 /**
  * Drop the window if the feature was turned off on another device (settings sync
  * through the server, notifications don't). Without this, disabling the brief on
- * one phone leaves the other still firing a week of already-scheduled copy.
+ * one phone leaves the other still firing the rest of its already-scheduled
+ * window (BRIEF_WINDOW_DAYS).
  *
  * Only ever cancels. Re-scheduling needs weather and closet data that only the
  * home screen has — useMorningBriefScheduler refills the window on next sync.

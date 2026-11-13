@@ -1,37 +1,19 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
-import api from '../api/client';
-import { authHeaders } from '../lib/auth';
 import { useTripPlans } from './useTripPlans';
 import { useClosets } from './useClosets';
 import { useSettings } from './useSettings';
 import { getCurrentLocation, type Coords } from '../lib/location';
-import { reportTripPresence } from '../lib/tripPresence';
-import { setTripNudgePresence } from '../lib/notifications';
 import {
-    selectActiveTrip,
-    todayDayIndex,
-    findDaySnapshot,
-    computeDrift,
-    computeForecastDrift,
-    toLocalISODate,
-    DEFAULT_TRIP_MODE_RADIUS_MI,
-} from '../lib/tripMode';
-import {
-    rehydratePlans,
-    buildTripWeather,
-    activeOutfit,
-    daysUntil,
-    planArticleIds,
-    isInForecastWindow,
-} from '../views/TripFit/shared';
-import { generateOutfits } from '../lib/outfitEngine';
-import type {
-    SavedTripFitPlan,
-    CurrentWeather,
-    DailyForecast,
-    ClothingArticle,
-} from '../types';
+    resolveTripMode,
+    applyTripPresence,
+    nextUpcomingTrip,
+    upcomingDriftApplies,
+    fetchUpcomingDrift,
+    INACTIVE_TRIP_MODE,
+} from '../lib/tripModeResolve';
+import { DEFAULT_TRIP_MODE_RADIUS_MI } from '../lib/tripMode';
+import type { SavedTripFitPlan } from '../types';
 import type { OutfitResult } from '../lib/outfit/types';
 
 /** A saved trip that hasn't started yet — independent of whether Trip Mode is "active" today. */
@@ -86,19 +68,7 @@ const getCachedLocation = async (timeoutMs: number): Promise<Coords | null> => {
   return value;
 };
 
-const INACTIVE = {
-    active: false as const,
-    trip: null,
-    locationConfirmed: false,
-    distanceMi: null,
-    dayIndex: 0,
-    total: 0,
-    outfit: null,
-    source: null,
-    driftNote: null,
-    closetId: '',
-    closetName: '',
-};
+const INACTIVE = INACTIVE_TRIP_MODE;
 
 /**
  * Detects whether Trip Mode should be showing today and resolves the outfit to
@@ -153,142 +123,24 @@ export const useTripMode = (): TripModeState => {
     useEffect(() => {
         let cancelled = false;
 
-        // One verdict, two consumers: the server's notification passes, and this
-        // device's Trip Mode morning nudges, whose mornings after the first wait
-        // for a confirmation (lib/notifications.ts · setTripNudgePresence).
-        const reportPresence = (tripId: string | null) => {
-            reportTripPresence(tripId).catch(() => {});
-            setTripNudgePresence(tripId, plans).catch(() => {});
-        };
-
+        // The decisions themselves live in lib/tripModeResolve, shared with the
+        // background refresh so a mid-trip refresh can't swap the widget's trip
+        // outfit for an ordinary one.
         const run = async () => {
             if (!settingsReady || plansLoading || closetsLoading) return;
             setWorking(true);
 
-            if (!enabled) {
-                // Trip Mode off is the user saying don't treat me as travelling.
-                // Withdraw any standing confirmation so neither the server nor
-                // the morning nudges keep acting on it.
-                reportPresence(null);
-                if (!cancelled) { setResolved(INACTIVE); setWorking(false); }
-                return;
-            }
-
-            const todayISO = toLocalISODate();
-
-            // Cheap pre-check with no GPS: bail (and skip the location prompt)
-            // unless a trip's date window covers today.
-            if (!selectActiveTrip(plans, todayISO, null, radiusMi)) {
-                // No trip is running, so there is nothing to be present at.
-                // Costs nothing for the user who has never travelled: a clear
-                // is only sent if a confirmation was sent before it.
-                reportPresence(null);
-                if (!cancelled) { setResolved(INACTIVE); setWorking(false); }
-                return;
-            }
-
-            const gps = await getCachedLocation(8000);
-            const sel = selectActiveTrip(
+            const { state, presence } = await resolveTripMode({
                 plans,
-                todayISO,
-                gps ? { lat: gps.lat, lon: gps.lng } : null,
-                radiusMi,
-            );
-            if (!sel) {
-                // Only GPS can produce this: the date pre-check above already
-                // passed, so a trip covers today and the fix put the user at
-                // none of their trip cities. That is a real answer — tell the
-                // server, so notifications about that city stop.
-                reportPresence(null);
-                if (!cancelled) { setResolved(INACTIVE); setWorking(false); }
-                return;
-            }
-
-            const { trip, locationConfirmed, distanceMi } = sel;
-
-            // Report only a GPS-backed verdict. Without a fix, `sel` is the
-            // date-only fallback — enough to show the card the user asked for,
-            // not enough to vouch for their whereabouts to the server. Staying
-            // quiet lets the last real answer expire on the server's schedule
-            // instead of being overwritten by a guess.
-            if (locationConfirmed) {
-                reportPresence(trip.id);
-            }
-            const { index, total } = todayDayIndex(trip, todayISO);
-
-            const closet =
-                closets.find((c) => c._id === trip.closetId) ??
-                closets.find((c) => c.isPreferred) ??
-                closets[0] ??
-                null;
-            const articles: ClothingArticle[] = closet?.articles ?? [];
-
-            let outfit: OutfitResult | null = null;
-            let source: 'logged' | 'generated' | null = null;
-            let driftNote: string | null = null;
-
-            const daySnap = findDaySnapshot(trip, todayISO);
-
-            if (daySnap) {
-                // Logged path: show the outfit TripFit saved for today.
-                const dayPlans = rehydratePlans(trip, articles);
-                const dp = dayPlans.find((p) => p.day.date === todayISO);
-                outfit = dp ? activeOutfit(dp) : null;
-                source = 'logged';
-                // Compare against live weather for a drift flag (best-effort).
-                try {
-                    const { data } = await api.get<CurrentWeather>('/api/weather/current', {
-                        params: { lat: trip.lat, lon: trip.lon },
-                        ...authHeaders(),
-                    });
-                    if (data) driftNote = computeDrift(daySnap, data);
-                } catch {
-                    /* drift is optional — ignore weather failures */
-                }
-            } else {
-                // Gap-fill path: no logged outfit (pending trip) — build one live.
-                source = 'generated';
-                try {
-                    const { data } = await api.get<DailyForecast[]>('/api/weather/daily', {
-                        params: { lat: trip.lat, lon: trip.lon },
-                        ...authHeaders(),
-                    });
-                    const days = data ?? [];
-                    const today =
-                        days.find((d) => d.date === todayISO) ??
-                        days.find((d) => d.date >= todayISO) ??
-                        days[0];
-                    if (today) {
-                        const { results } = generateOutfits(
-                            articles,
-                            buildTripWeather(today),
-                            { ...settings, occasion: trip.occasion },
-                            new Set(),
-                            5,
-                        );
-                        outfit = results[0] ?? null;
-                    }
-                } catch {
-                    /* leave outfit null — card shows a graceful empty state */
-                }
-            }
-
-            if (!cancelled) {
-                setResolved({
-                    active: true,
-                    trip,
-                    locationConfirmed,
-                    distanceMi,
-                    dayIndex: index,
-                    total,
-                    outfit,
-                    source,
-                    driftNote,
-                    closetId: closet?._id ?? trip.closetId,
-                    closetName: closet?.name ?? 'Trip',
-                });
-                setWorking(false);
-            }
+                closets,
+                settings,
+                getGps: async () => {
+                    const gps = await getCachedLocation(8000);
+                    return gps ? { lat: gps.lat, lon: gps.lng } : null;
+                },
+            });
+            applyTripPresence(presence, plans);
+            if (!cancelled) { setResolved(state); setWorking(false); }
         };
 
         run().catch(() => {
@@ -302,20 +154,10 @@ export const useTripMode = (): TripModeState => {
     // Soonest saved trip that hasn't started yet. Independent of the async
     // GPS/weather resolution above — a pure function of `plans` + today's date,
     // so a countdown is available immediately without waiting on location.
-    const upcomingBase = useMemo(() => {
-        if (!enabled) return null;
-        const next = plans
-            .map((plan) => ({ plan, days: daysUntil(plan.startDate) }))
-            .filter(({ days }) => days > 0)
-            .sort((a, b) => a.days - b.days)[0];
-        if (!next) return null;
-        return {
-            plan: next.plan,
-            daysUntil: next.days,
-            totalItems: planArticleIds(next.plan).length,
-            packedItems: next.plan.checkedIds.length,
-        };
-    }, [plans, enabled]);
+    const upcomingBase = useMemo(
+        () => nextUpcomingTrip(plans, { tripModeEnabled: enabled }),
+        [plans, enabled],
+    );
 
     // Forecast-drift check for the upcoming trip: re-fetch the destination's
     // daily forecast and compare the arrival day against the one saved with the
@@ -333,25 +175,18 @@ export const useTripMode = (): TripModeState => {
     const driftHasDays = (upcomingBase?.plan.days.length ?? 0) > 0;
     useEffect(() => {
         const plan = upcomingBase?.plan;
-        if (!plan || !driftHasDays || !isInForecastWindow(plan.startDate)) {
+        if (!plan || !upcomingDriftApplies(plan)) {
             setUpcomingDrift({ planId: plan?.id ?? '', note: null });
             return;
         }
-        const arrival = plan.days.find((d) => d.date === plan.startDate) ?? plan.days[0];
         let cancelled = false;
-        (async () => {
-            try {
-                const { data } = await api.get<DailyForecast[]>('/api/weather/daily', {
-                    params: { lat: plan.lat, lon: plan.lon },
-                    ...authHeaders(),
-                });
-                const fresh = (data ?? []).find((d) => d.date === arrival.date);
-                if (cancelled || !fresh) return;
-                setUpcomingDrift({ planId: plan.id, note: computeForecastDrift(arrival, fresh) });
-            } catch {
+        fetchUpcomingDrift(plan)
+            .then((note) => {
+                if (!cancelled) setUpcomingDrift({ planId: plan.id, note });
+            })
+            .catch(() => {
                 /* drift is optional — leave whatever was last resolved */
-            }
-        })();
+            });
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [driftPlanId, driftStartDate, driftFetchedAt, driftHasDays]);

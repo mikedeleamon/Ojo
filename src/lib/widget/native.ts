@@ -30,6 +30,10 @@ interface OjoWidgetBridgeNative {
   cacheThumb(remoteUrl: string): Promise<string>;
   /** Delete cached thumbnails whose relative paths aren't in keepPaths. */
   pruneThumbs(keepPaths: string[]): Promise<void>;
+  /** Ask iOS for extra background time; resolves to an id (0 = refused). */
+  beginBackgroundTime(name: string): Promise<number>;
+  /** Release time obtained from beginBackgroundTime. */
+  endBackgroundTime(id: number): Promise<void>;
 }
 
 const Native =
@@ -57,6 +61,25 @@ export const cacheThumb = async (remoteUrl: string): Promise<string | null> => {
   } catch (e) {
     console.warn('[Ojo] widget cacheThumb failed:', e);
     return null;
+  }
+};
+
+/**
+ * Run `work` with extra background time from iOS (about 30 s instead of the
+ * ~10 s a geofence wake gets). Falls back to running it plainly when the bridge
+ * is absent or iOS refuses — the work is the same, it just may be cut short.
+ */
+export const withBackgroundTime = async <T>(name: string, work: () => Promise<T>): Promise<T> => {
+  let id = 0;
+  try {
+    id = (await Native?.beginBackgroundTime(name)) ?? 0;
+  } catch {
+    id = 0;
+  }
+  try {
+    return await work();
+  } finally {
+    if (id) await Native?.endBackgroundTime(id).catch(() => {});
   }
 };
 

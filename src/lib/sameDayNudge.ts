@@ -17,6 +17,8 @@
  */
 
 import type { WidgetTimelineStep } from './widget/snapshot.types';
+import type { SameDayNudgeItem } from './notifications';
+import type { OutfitResult } from './outfit/types';
 
 /** Below this much runway, a push reads as late rather than useful. */
 export const NUDGE_MIN_LEAD_MINUTES = 90;
@@ -105,4 +107,30 @@ export function buildNudgeContent(input: NudgeContentInput): { title: string; bo
     title: buildNudgeTitle(input),
     body: buildNudgeBody(input),
   };
+}
+
+/** Local calendar date as "YYYY-MM-DD" — must match SameDayNudgeItem.dateISO. */
+const localISODate = (d: Date): string => {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+/**
+ * Today's nudges for an already-generated outfit, ready to schedule. Shared by
+ * the home-screen hook (useSameDayNudgeScheduler) and the background refresh
+ * (lib/background/refresh.ts), so both name the same steps with the same copy.
+ */
+export function buildSameDayNudgeItems(
+  outfit: OutfitResult | null | undefined,
+  city: string | undefined,
+  now: Date,
+): SameDayNudgeItem[] {
+  const timeline = outfit?.layering?.timeline;
+  if (!timeline?.length) return [];
+  const dateISO = localISODate(now);
+  return selectNudgeworthySteps(timeline, now).map(({ step }) => ({
+    dateISO,
+    hour: step.hour,
+    ...buildNudgeContent({ step, city }),
+  }));
 }

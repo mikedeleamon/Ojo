@@ -21,6 +21,8 @@ import { isOnboardingComplete, isOnboardingPending } from '../src/lib/onboarding
 import { recordAppOpen } from '../src/services/reviewManager';
 import { reconcileWeeklyRecap, reconcileMorningBriefs, reconcileSameDayNudges } from '../src/lib/notifications';
 import { claimReconcile } from '../src/lib/launchReconcile';
+// The background tasks themselves are defined from the app entry (index.ts).
+import { syncBackgroundWork } from '../src/lib/background/lifecycle';
 import * as Sentry from '@sentry/react-native';
 import { scrubBreadcrumb, scrubEvent } from '../src/lib/sentryScrub';
 
@@ -74,6 +76,8 @@ SplashScreen.preventAutoHideAsync();
 //                  closet data, so that stays with useMorningBriefScheduler on
 //                  the home screen.
 //   sameDayNudge — cancel-only, same reasoning as the Brief's.
+//   backgroundWork — registers the background refresh and, with "Always"
+//                  location, the area-change region (lib/background/tasks.ts).
 
 // ─── Splash ──────────────────────────────────────────────────────────────────
 function CustomSplash() {
@@ -133,6 +137,10 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
         if (claimReconcile('sameDayNudge')) {
           reconcileSameDayNudges().catch(() => {});
+        }
+
+        if (claimReconcile('backgroundWork')) {
+          syncBackgroundWork().catch(() => {});
         }
 
         // Onboarding is shown only when it was explicitly requested by completing

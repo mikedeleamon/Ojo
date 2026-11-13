@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { requireAuth, AuthRequest } from '../middleware/auth';
 import User from '../models/User';
 import { isValidTimeZone } from '../lib/timeZone';
+import { coarsen } from '../lib/coarseLocation';
 
 const router = Router();
 
@@ -110,6 +111,55 @@ router.post('/trip-presence', requireAuth, async (req: AuthRequest, res: Respons
     res.json({ success: true });
   } catch (err) {
     console.error('[notifications] trip presence save error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/notifications/device-location — where the phone is now.
+ *
+ * Body: `{ lat, lon, city? }` to report, or `{ lat: null }` to clear. The
+ * notification passes prefer a fresh report over the home city
+ * (lib/activeTrip.ts · resolveWeatherLocation), which is what keeps a closet
+ * gap nudge or weather alert describing the city the user is actually in.
+ *
+ * The client already rounds to ~1 km before sending (src/lib/coarseLocation.ts);
+ * rounding again here keeps the stored value coarse for any client that
+ * doesn't, so the privacy label's "Coarse Location" holds regardless.
+ */
+router.post('/device-location', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { lat, lon, city } = req.body ?? {};
+    if (lat === null || lon === null) {
+      await User.findByIdAndUpdate(req.userId, { $unset: { deviceLocation: '' } });
+      res.json({ success: true });
+      return;
+    }
+    const valid =
+      typeof lat === 'number' && Number.isFinite(lat) && lat >= -90 && lat <= 90 &&
+      typeof lon === 'number' && Number.isFinite(lon) && lon >= -180 && lon <= 180;
+    if (!valid) {
+      res.status(400).json({ error: 'lat and lon must be valid coordinates' });
+      return;
+    }
+    // A bare "lat,lng" is what the app's geocoder falls back to when it can't
+    // name a place; storing it would put coordinates into notification copy.
+    const trimmed = typeof city === 'string' ? city.trim() : '';
+    const isCoordinates = /^-?\d+(?:\.\d+)?\s*,\s*-?\d+(?:\.\d+)?$/.test(trimmed);
+    const name = isCoordinates ? '' : trimmed.slice(0, 120);
+    await User.findByIdAndUpdate(req.userId, {
+      $set: {
+        deviceLocation: {
+          lat: coarsen(lat),
+          lon: coarsen(lon),
+          ...(name ? { city: name } : {}),
+          reportedAt: new Date(),
+        },
+      },
+    });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[notifications] device location save error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

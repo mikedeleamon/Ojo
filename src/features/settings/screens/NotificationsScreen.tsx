@@ -6,6 +6,7 @@ import {
     Animated,
     Alert,
     Linking,
+    AppState,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Slider from '@react-native-community/slider';
@@ -40,6 +41,12 @@ import {
     type BriefDay,
 } from '../../../lib/notifications';
 import { releaseReconcile } from '../../../lib/launchReconcile';
+import {
+    getBackgroundLocationAccess,
+    requestBackgroundLocation,
+    type BackgroundLocationAccess,
+} from '../../../lib/background/locationAccess';
+import { syncBackgroundWork } from '../../../lib/background/lifecycle';
 import { storage } from '../../../lib/storage';
 import { hapticSuccess } from '../../../lib/haptics';
 import axios from '../../../api/client';
@@ -254,6 +261,27 @@ export default function NotificationsScreen() {
     const [preview, setPreview] = useState<BriefDay | null>(null);
     const savingRotate = useSpinAnimation(1_500);
 
+    // "Always" location is what lets these notifications follow the user
+    // instead of describing wherever Ojo was last opened (lib/background).
+    // Re-read on every return to the app, since the only way back from
+    // "blocked" is the Settings app.
+    const [locAccess, setLocAccess] = useState<BackgroundLocationAccess | null>(null);
+    useEffect(() => {
+        const read = () => {
+            getBackgroundLocationAccess().then(setLocAccess).catch(() => {});
+        };
+        read();
+        const sub = AppState.addEventListener('change', (next) => {
+            if (next === 'active') read();
+        });
+        return () => sub.remove();
+    }, []);
+    useEffect(() => {
+        // Granted here or in Settings: start following the phone now rather
+        // than at the next launch.
+        if (locAccess === 'always') syncBackgroundWork().catch(() => {});
+    }, [locAccess]);
+
     const set = useCallback(
         <K extends keyof NotificationSettings>(
             key: K,
@@ -354,6 +382,17 @@ export default function NotificationsScreen() {
         }
     };
 
+    const handleLocationContinue = async () => {
+        // Same rule as the notification banner: before iOS has asked, this
+        // button only leads to the system prompt; once iOS has recorded an
+        // answer it won't ask again, so the button hands off to Settings.
+        if (locAccess === 'blocked') {
+            Linking.openSettings();
+            return;
+        }
+        setLocAccess(await requestBackgroundLocation());
+    };
+
     const handleSave = async () => {
         setSaving(true);
         setError('');
@@ -399,7 +438,7 @@ export default function NotificationsScreen() {
             }
 
             // Turning the brief off must take effect now — the scheduled window would
-            // otherwise keep firing for up to a week. Turning it on can't be honoured
+            // otherwise keep firing for its remaining days. Turning it on can't be honoured
             // here: the copy needs weather and closet data this screen doesn't have,
             // so useMorningBriefScheduler fills the window on the next home-screen
             // visit. That's also why the preview clears rather than repopulating.
@@ -501,6 +540,41 @@ export default function NotificationsScreen() {
                         </Pressable>
                     </View>
                 )}
+
+                {/* Location-based alerts only. One button, "Continue", per the
+                    pre-permission rule above; declining happens in iOS's own
+                    prompt, and after that the button opens Settings. */}
+                {permission === 'granted' &&
+                    (ns.morningBriefEnabled ||
+                        ns.weatherChangeEnabled ||
+                        ns.closetGapEnabled ||
+                        ns.sameDayNudgeEnabled) &&
+                    locAccess !== null &&
+                    locAccess !== 'always' && (
+                        <View style={st.permBanner}>
+                            <Text style={st.permText}>
+                                {locAccess === 'blocked'
+                                    ? 'Ojo can’t use your location in the background, so these notifications describe wherever you last opened the app. To have them follow you, set Location to Always in Settings.'
+                                    : 'These notifications describe wherever you last opened Ojo. Ojo will ask to use your location in the background so they follow you instead.'}
+                            </Text>
+                            <Pressable
+                                style={st.permBtn}
+                                onPress={handleLocationContinue}
+                                accessibilityRole='button'
+                                accessibilityLabel={
+                                    locAccess === 'blocked'
+                                        ? 'Open Settings'
+                                        : 'Continue'
+                                }
+                            >
+                                <Text style={st.permBtnText}>
+                                    {locAccess === 'blocked'
+                                        ? 'Open Settings'
+                                        : 'Continue'}
+                                </Text>
+                            </Pressable>
+                        </View>
+                    )}
 
                 <View style={st.section}>
                     <Text style={s.sectionLabel}>Daily</Text>

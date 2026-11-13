@@ -276,6 +276,52 @@ extension WidgetSnapshot {
     deepLink: "ojo://outfit"
   )
 
+  /// When the app wrote this snapshot (JS `toISOString()`, with milliseconds).
+  var writtenAt: Date? {
+    let withFraction = ISO8601DateFormatter()
+    withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return withFraction.date(from: updatedAt) ?? ISO8601DateFormatter().date(from: updatedAt)
+  }
+
+  /// True once the local day this snapshot was written on has ended. Its
+  /// weather and "today's outfit" then describe yesterday. Unknown dates
+  /// (placeholder, pre-field snapshots) are never treated as stale.
+  func isStale(at date: Date) -> Bool {
+    guard let written = writtenAt, written <= date else { return false }
+    return !Calendar.current.isDate(written, inSameDayAs: date)
+  }
+
+  /// What the main widget shows once this snapshot is out of date: no outfit
+  /// and no weather, both of which would be yesterday's, and a prompt to open
+  /// Ojo (emptyReason "stale"). An empty-mode snapshot keeps its own setup
+  /// prompt — "create a closet" is still the right ask — minus the weather.
+  /// The background refresh normally replaces the snapshot before this shows;
+  /// it's the fallback for when iOS hasn't given Ojo time to.
+  var staleVersion: WidgetSnapshot {
+    WidgetSnapshot(
+      mode: .empty,
+      updatedAt: updatedAt,
+      headline: "",
+      tempLine: nil,
+      weather: nil,
+      weatherKind: nil,
+      isDay: nil,
+      items: [],
+      variants: nil,
+      layerNote: nil,
+      layerStack: nil,
+      alerts: [],
+      uvIndexText: nil,
+      timeline: nil,
+      fullTimeline: nil,
+      emptyReason: mode == .empty ? emptyReason : "stale",
+      trip: nil,
+      upcomingTrip: upcomingTrip,
+      tomorrow: tomorrow,
+      deepLink: mode == .empty ? deepLink : "ojo://outfit"
+    )
+  }
+
   /// Fallback when no snapshot has been written yet (or it failed to decode).
   static let empty = WidgetSnapshot(
     mode: .empty,

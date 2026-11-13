@@ -31,7 +31,10 @@ import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { buildWidgetInput, tomorrowDailyFor } from '../../lib/widget/buildInput';
 import { updateWidgetSnapshot } from '../../lib/widget/updateWidgetSnapshot';
 import { isWidgetBridgeAvailable } from '../../lib/widget/native';
-import { buildTripWeather } from '../../views/TripFit/shared';
+import { buildTomorrowForWidget } from '../../lib/widget/tomorrowOutfit';
+import { readWornToday, saveWornToday } from '../../lib/widget/wornToday';
+import { useActiveLocation } from '../../context/ActiveLocationContext';
+import { CURRENT_LOCATION_ID } from '../../lib/savedLocations';
 import TripModeCard from '../TripMode/TripModeCard';
 import ShareToInstagramSheet from '../ShareCard/ShareToInstagramSheet';
 import TodayOutfitShareCard from '../ShareCard/TodayOutfitShareCard';
@@ -617,6 +620,33 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
         };
     }, [wornLogged, loggedOutfit]);
 
+    // "Wore this" also has to survive the app closing: the background refresh
+    // rewrites the widget while Ojo is closed, and would otherwise replace the
+    // outfit the user committed to with the top suggestion. Saved for the day
+    // on log, dropped on undo, and read back on mount so a relaunch keeps
+    // showing it too (lib/widget/wornToday.ts).
+    const [persistedWorn, setPersistedWorn] = useState<OutfitResult | null>(null);
+    useEffect(() => {
+        let cancelled = false;
+        readWornToday()
+            .then((o) => { if (!cancelled) setPersistedWorn(o); })
+            .catch(() => {});
+        return () => { cancelled = true; };
+    }, []);
+    const prevWornRef = useRef<OutfitResult | null>(null);
+    useEffect(() => {
+        const prev = prevWornRef.current;
+        prevWornRef.current = wornOutfitForWidget;
+        if (wornOutfitForWidget) {
+            void saveWornToday(wornOutfitForWidget);
+            setPersistedWorn(wornOutfitForWidget);
+        } else if (prev) {
+            void saveWornToday(null);
+            setPersistedWorn(null);
+        }
+    }, [wornOutfitForWidget]);
+    const wornForWidget = wornOutfitForWidget ?? persistedWorn;
+
     // Tomorrow's outfit for the Tomorrow Prep widget's evening flip — generated
     // from tomorrow's daily forecast through the same synthetic-CurrentWeather
     // path TripFit uses for future days (buildTripWeather). Weather-only (null
@@ -638,19 +668,15 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
         if (!day) { setTomorrowForWidget(null); return; }
         if (!preferred) { setTomorrowForWidget({ day, outfit: null }); return; }
         const task = runAfterInteractions(() => {
-            const { results } = generateOutfits(
-                preferred.articles,
-                buildTripWeather(day),
-                effectiveSettings,
-                worn,
-                1,
-                profile,
+            setTomorrowForWidget(
+                buildTomorrowForWidget({
+                    daily,
+                    articles: preferred.articles,
+                    settings: effectiveSettings,
+                    worn,
+                    profile,
+                }),
             );
-            const top = results[0];
-            setTomorrowForWidget({
-                day,
-                outfit: top && top.slots.length > 0 ? top : null,
-            });
         });
         return () => task.cancel();
     }, [daily, preferred, effectiveSettings, worn, profile]);
@@ -662,12 +688,21 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
     // Uses outfits[0] (the primary recommendation), not the swiped card, so the
     // widget stays stable while the user browses. No-ops off-iOS / without the
     // native bridge; thumbnail caching + timeline reload happen natively.
+    //
+    // Only for the device's own place. Browsing a saved city used to repoint
+    // the widget there (Tokyo on the home screen of someone in Brooklyn), and
+    // it stayed that way, since the browsed city is restored on relaunch. The
+    // one exception is an account with no default city, whose saved cities are
+    // the only weather it can show — those keep following the screen.
+    const { activeId } = useActiveLocation();
+    const widgetFollowsScreen = activeId === CURRENT_LOCATION_ID || !settings.location;
     useEffect(() => {
         if (loading || tripMode.loading) return;
+        if (!widgetFollowsScreen) return;
         void updateWidgetSnapshot(
             buildWidgetInput({
                 todayOutfits: outfits,
-                wornOutfit: wornOutfitForWidget,
+                wornOutfit: wornForWidget,
                 outfitStatus: status,
                 closetCount: closets.length,
                 weather,
@@ -690,10 +725,11 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
     }, [
         tomorrowForWidget,
         loading,
+        widgetFollowsScreen,
         outfits,
         status,
         closets.length,
-        wornOutfitForWidget,
+        wornForWidget,
         weather,
         settings,
         daily,

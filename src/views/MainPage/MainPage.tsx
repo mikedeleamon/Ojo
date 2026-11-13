@@ -14,6 +14,8 @@ import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { ForceDarkPalette } from '../../theme/ThemeContext';
 import { darkColors } from '../../theme/tokens';
 import { useSideRail } from '../../hooks/useSideRail';
+import { parseLatLng } from '../../lib/geocoding';
+import { noteDeviceFix } from '../../lib/background/lifecycle';
 import type { WeatherSnapshot } from '../../types';
 
 // The HUD's own LocationsIcon and GearIcon, as template PNGs for native bar items
@@ -138,7 +140,15 @@ export default function MainPage() {
   const handleSnapshot = useCallback((snap: WeatherSnapshot) => {
     setSnapshots(prev => ({ ...prev, [activeId]: snap }));
     setSnapshot(activeId, snap);
-  }, [activeId]);
+    // A live device fix (gpsLocation is a "lat,lng" string only when GPS
+    // answered; otherwise it holds the default city's name) is the best
+    // evidence of where the phone is. Remembering it lets the background
+    // refresh keep this place current, tells the server so its weather alerts
+    // describe it, and re-centres the area-change region on it.
+    if (activeId === CURRENT_LOCATION_ID && gpsLocation && parseLatLng(gpsLocation) && snap.place) {
+      void noteDeviceFix(snap.place);
+    }
+  }, [activeId, gpsLocation]);
 
   const openLocations = useCallback(() => nav.push('/account/locations'), [nav]);
   const openSettings = useCallback(() => nav.push('/account'), [nav]);

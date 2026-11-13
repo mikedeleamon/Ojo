@@ -95,6 +95,22 @@ export interface ITripPresence {
   confirmedAt: Date;
 }
 
+/**
+ * Where the user's phone last said it was, rounded to ~1 km on the device and
+ * again on write (lib/coarseLocation.ts). Posted when the app shows weather for
+ * the device's own location and when it refreshes in the background, so the
+ * notification passes can describe the city the user is in instead of the
+ * default city they picked at sign-up. Expires on its own: see
+ * DEVICE_LOCATION_TTL_MS in lib/activeTrip.ts.
+ */
+export interface IDeviceLocation {
+  lat: number;
+  lon: number;
+  /** Display name from the device's reverse geocode, e.g. "Brooklyn". */
+  city?: string;
+  reportedAt: Date;
+}
+
 export interface IUser extends Document {
   firstName: string;
   lastName: string;
@@ -110,6 +126,7 @@ export interface IUser extends Document {
   isPro: boolean;
   lastMorningSnapshot?: IMorningSnapshot;
   tripPresence?: ITripPresence;
+  deviceLocation?: IDeviceLocation;
   // Gmail integration (Trip Planner)
   googleRefreshToken?: string;
   googleConnectedAt?: Date;
@@ -174,6 +191,13 @@ const tripPresenceSchema = new Schema<ITripPresence>({
   confirmedAt: { type: Date,   required: true },
 }, { _id: false });
 
+const deviceLocationSchema = new Schema<IDeviceLocation>({
+  lat:        { type: Number, required: true },
+  lon:        { type: Number, required: true },
+  city:       { type: String },
+  reportedAt: { type: Date,   required: true },
+}, { _id: false });
+
 const morningSnapshotSchema = new Schema<IMorningSnapshot>({
   hasPrecipitation: { type: Boolean, required: true },
   tempF:            { type: Number,  required: true },
@@ -198,6 +222,7 @@ const userSchema = new Schema<IUser>({
   isPro:                { type: Boolean, default: false },
   lastMorningSnapshot:  { type: morningSnapshotSchema },
   tripPresence:         { type: tripPresenceSchema },
+  deviceLocation:       { type: deviceLocationSchema },
   // Gmail integration (Trip Planner)
   googleRefreshToken:   { type: String, select: false }, // excluded from default queries
   googleConnectedAt:    { type: Date },

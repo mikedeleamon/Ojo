@@ -888,6 +888,7 @@ func emptyStateTitle(_ reason: String?) -> String {
   switch reason {
   case "no_closet":    return "Create a closet to get started"
   case "insufficient": return "Add a top & bottom to build an outfit"
+  case "stale":        return "Open Ojo for today's outfit"
   default:             return "Add clothes to see today's outfit"
   }
 }
@@ -896,6 +897,7 @@ func emptyStateGlyph(_ reason: String?) -> String {
   switch reason {
   case "no_closet":    return "folder.badge.plus"
   case "insufficient": return "square.stack.3d.up"
+  case "stale":        return "arrow.clockwise"
   default:             return "tshirt"
   }
 }

@@ -50,6 +50,16 @@ const writeCache = async (s: Settings): Promise<void> => {
     await storage.setItem(CACHE_KEY, JSON.stringify(s));
 };
 
+/**
+ * The on-disk settings, normalized like the provider's, for code that runs
+ * without React — the background refresh (lib/background/refresh.ts). Null
+ * when nothing has been cached (signed out, or never loaded).
+ */
+export const readCachedSettings = async (): Promise<Settings | null> => {
+    const cached = await readCache();
+    return cached ? normalize(cached) : null;
+};
+
 export const clearSettingsCache = async (): Promise<void> => {
     await storage.removeItem(CACHE_KEY);
 };

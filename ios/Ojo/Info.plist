@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.expo.modules.backgroundtask.processing</string>
+	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleAllowMixedLocalizations</key>
@@ -21,7 +25,7 @@
 	<key>CFBundlePackageType</key>
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.1.0</string>
+	<string>1.2.0</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleURLTypes</key>
@@ -68,6 +72,8 @@
 	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>Ojo uses your camera so you can photograph clothing items to add to your closet.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>With Always, Ojo notices when you've moved to a new area, so your morning outfit brief, weather alerts and widgets describe where you are even when the app is closed.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Ojo uses your location to fetch local weather for outfit suggestions.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
@@ -84,6 +90,10 @@
 	<string>$(RCT_METRO_PORT)</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>processing</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

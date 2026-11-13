@@ -5,7 +5,7 @@
  */
 
 import { Buffer } from 'buffer';
-import { secureStorage, storageGetJSON } from './storage';
+import { secureStorage, storage, storageGetJSON } from './storage';
 
 export const AUTH_KEY = 'ojo_auth';
 
@@ -20,6 +20,27 @@ let _cachedToken: string | null = null;
 /** Call once during splash screen before rendering anything. */
 export const initAuthCache = async (): Promise<void> => {
   _cachedToken = await getTokenAsync();
+  if (_cachedToken) void migrateAuthKeychainAccess();
+};
+
+const KEYCHAIN_MIGRATED_KEY = 'ojo_auth_keychain_after_first_unlock';
+
+/**
+ * Re-save the stored session once so it picks up AFTER_FIRST_UNLOCK (see
+ * secureStorage in lib/storage.ts). Sessions saved by older builds are
+ * readable only while the phone is unlocked, which hides them from the
+ * background refresh until the next sign-in or token refresh rewrites them.
+ */
+const migrateAuthKeychainAccess = async (): Promise<void> => {
+  try {
+    if ((await storage.getItem(KEYCHAIN_MIGRATED_KEY)) === 'true') return;
+    const raw = await secureStorage.getItem(AUTH_KEY);
+    if (!raw) return;
+    await secureStorage.setItem(AUTH_KEY, raw);
+    await storage.setItem(KEYCHAIN_MIGRATED_KEY, 'true');
+  } catch {
+    /* retried next launch */
+  }
 };
 
 /** Synchronous — reads the in-memory cache. Safe after initAuthCache() resolves. */
