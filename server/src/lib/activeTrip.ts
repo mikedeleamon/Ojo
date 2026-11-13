@@ -169,17 +169,69 @@ export const loadConfirmedTrips = async (
 };
 
 /**
- * Where this user's weather should come from: their trip city while a trip is
- * running, their home city otherwise. Null when neither has usable coordinates
- * — the client geocodes `location` and PATCHes lat/lon up, so users on old
- * clients are skipped until they re-save their location.
+ * How long a device-reported location keeps outranking the home city.
+ *
+ * The phone re-reports whenever the app shows weather for the device's own
+ * position, and — for users who allowed "Always" location — whenever it leaves
+ * the area it last reported from, plus on iOS background refreshes. So a fresh
+ * report is the best evidence of where the user is. A stale one isn't: a phone
+ * that has gone quiet for a day may have come home without saying so, and the
+ * home city is the safer guess then.
+ */
+export const DEVICE_LOCATION_TTL_MS = 24 * 60 * 60 * 1_000;
+
+/** The device's reported location, when it is recent enough to trust. */
+export const freshDeviceLocation = (
+  device: { lat?: number; lon?: number; city?: string; reportedAt?: Date } | null | undefined,
+  at: Date = new Date(),
+): { lat: number; lon: number; city?: string } | null => {
+  if (!device?.reportedAt) return null;
+  if (typeof device.lat !== 'number' || typeof device.lon !== 'number') return null;
+  const age = at.getTime() - new Date(device.reportedAt).getTime();
+  // A report dated in the future is a clock problem, not evidence.
+  if (!(age >= 0 && age < DEVICE_LOCATION_TTL_MS)) return null;
+  return { lat: device.lat, lon: device.lon, city: device.city };
+};
+
+/**
+ * Where this user's weather should come from, best evidence first:
+ *
+ *   1. The trip city, while a GPS-confirmed trip is running.
+ *   2. Where the phone last reported being, while that report is fresh.
+ *   3. The home city from settings.
+ *
+ * (2) is what stops these notifications describing a city the user has left.
+ * Without it, someone who moved — or travelled without a saved trip — kept
+ * hearing about the default city they picked at sign-up.
+ *
+ * Null when none has usable coordinates — the client geocodes `location` and
+ * PATCHes lat/lon up, so users on old clients are skipped until they re-save
+ * their location.
  */
 export const resolveWeatherLocation = (
-  user: { settings?: { location?: string; lat?: number; lon?: number } },
+  user: {
+    settings?: { location?: string; lat?: number; lon?: number };
+    deviceLocation?: { lat?: number; lon?: number; city?: string; reportedAt?: Date };
+  },
   trip?: Pick<ITripFitPlan, 'clientId' | 'destination' | 'lat' | 'lon'> | null,
+  at: Date = new Date(),
 ): WeatherLocation | null => {
   if (trip && typeof trip.lat === 'number' && typeof trip.lon === 'number' && trip.destination) {
     return { city: trip.destination, lat: trip.lat, lon: trip.lon, tripId: trip.clientId };
+  }
+  const device = freshDeviceLocation(user.deviceLocation, at);
+  if (device) {
+    // A report without a name still beats the home city for the forecast. The
+    // copy borrows the home city's name only when both are the same ~1 km
+    // cell; anywhere else it says "your area" rather than naming a city the
+    // user isn't in.
+    const home = user.settings;
+    const sameAsHome =
+      typeof home?.lat === 'number' &&
+      typeof home?.lon === 'number' &&
+      locationKey(home.lat, home.lon) === locationKey(device.lat, device.lon);
+    const city = device.city?.trim() || (sameAsHome ? home?.location : undefined) || 'your area';
+    return { city, lat: device.lat, lon: device.lon };
   }
   const { location, lat, lon } = user.settings ?? {};
   if (!location || typeof lat !== 'number' || typeof lon !== 'number') return null;

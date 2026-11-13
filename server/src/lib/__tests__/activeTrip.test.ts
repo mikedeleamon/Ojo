@@ -16,6 +16,8 @@ import {
   locationKey,
   confirmsTrip,
   TRIP_PRESENCE_TTL_MS,
+  DEVICE_LOCATION_TTL_MS,
+  freshDeviceLocation,
 } from '../activeTrip';
 
 const trip = (startDate: string, endDate: string, destination = 'Ocho Rios') => ({
@@ -118,6 +120,73 @@ describe('resolveWeatherLocation', () => {
   it('returns null when neither place has coordinates', () => {
     expect(resolveWeatherLocation({ settings: { location: 'Arlington, VA' } }, null)).toBeNull();
     expect(resolveWeatherLocation({}, null)).toBeNull();
+  });
+
+  // The bug these pin: with no trip saved, every push named the default city
+  // from sign-up, even after the user had moved or was travelling.
+  describe('device-reported location', () => {
+    const at = new Date('2026-11-12T13:00:00Z');
+    const reported = (hoursAgo: number, extra: Record<string, unknown> = {}) => ({
+      lat: 40.68,
+      lon: -73.94,
+      city: 'Brooklyn',
+      reportedAt: new Date(at.getTime() - hoursAgo * 3_600_000),
+      ...extra,
+    });
+
+    it('beats the home city while fresh', () => {
+      expect(resolveWeatherLocation({ ...user, deviceLocation: reported(3) }, null, at)).toEqual({
+        city: 'Brooklyn',
+        lat: 40.68,
+        lon: -73.94,
+      });
+    });
+
+    it('loses to a confirmed trip', () => {
+      const place = resolveWeatherLocation(
+        { ...user, deviceLocation: reported(1) },
+        trip('2026-11-10', '2026-11-14') as never,
+        at,
+      );
+      expect(place?.city).toBe('Ocho Rios');
+    });
+
+    it('stops counting once it is a day old', () => {
+      const stale = { ...user, deviceLocation: reported(DEVICE_LOCATION_TTL_MS / 3_600_000) };
+      expect(resolveWeatherLocation(stale, null, at)?.city).toBe('Arlington, VA');
+    });
+
+    it('ignores a report dated in the future', () => {
+      expect(resolveWeatherLocation({ ...user, deviceLocation: reported(-2) }, null, at)?.city)
+        .toBe('Arlington, VA');
+    });
+
+    it('uses the home name for an unnamed report in the same cell', () => {
+      const here = reported(1, { lat: 38.88, lon: -77.1, city: undefined });
+      expect(resolveWeatherLocation({ ...user, deviceLocation: here }, null, at)?.city)
+        .toBe('Arlington, VA');
+    });
+
+    it('never names the home city for an unnamed report elsewhere', () => {
+      const away = reported(1, { city: '  ' });
+      expect(resolveWeatherLocation({ ...user, deviceLocation: away }, null, at)).toEqual({
+        city: 'your area',
+        lat: 40.68,
+        lon: -73.94,
+      });
+    });
+
+    it('works for an account with no home coordinates', () => {
+      expect(resolveWeatherLocation({ deviceLocation: reported(1) }, null, at)?.city).toBe('Brooklyn');
+    });
+  });
+});
+
+describe('freshDeviceLocation', () => {
+  it('rejects reports missing coordinates or a time', () => {
+    expect(freshDeviceLocation(undefined)).toBeNull();
+    expect(freshDeviceLocation({ lat: 1, lon: 2 })).toBeNull();
+    expect(freshDeviceLocation({ lat: 1, reportedAt: new Date() })).toBeNull();
   });
 });
 

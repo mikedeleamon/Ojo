@@ -27,13 +27,15 @@ export type ReconcileTask =
   | 'weeklyRecap'
   | 'morningBrief'
   | 'sameDayNudge'
-  | 'tripPlans';
+  | 'tripPlans'
+  | 'backgroundWork';
 
 const done: Record<ReconcileTask, boolean> = {
   weeklyRecap:  false,
   morningBrief: false,
   sameDayNudge: false,
   tripPlans:    false,
+  backgroundWork: false,
 };
 
 /**

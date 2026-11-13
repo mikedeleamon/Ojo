@@ -116,6 +116,36 @@ public class OjoWidgetBridgeModule: Module {
       task.resume()
     }
 
+    // ── beginBackgroundTime / endBackgroundTime ──────────────────────────────
+    // When iOS wakes the app for a geofence crossing it allows roughly ten
+    // seconds before suspending it again, and nothing in expo-task-manager or
+    // expo-location asks for more. The background refresh (lib/background)
+    // needs a location fix, a weather fetch and outfit generation before it can
+    // rewrite the widget and the morning briefs, so it brackets that work with
+    // these to get the usual ~30 s. Lives here rather than in a module of its
+    // own because the widget snapshot is the main thing that time is spent on.
+    //
+    // Returns 0 when iOS refuses (UIBackgroundTaskIdentifier.invalid); ending 0
+    // is a no-op. The expiration handler ends the assertion itself, so a refresh
+    // that overruns is suspended instead of getting the app killed.
+    AsyncFunction("beginBackgroundTime") { (name: String) -> Int in
+      await MainActor.run {
+        let box = BackgroundTimeBox()
+        box.id = UIApplication.shared.beginBackgroundTask(withName: name) {
+          UIApplication.shared.endBackgroundTask(box.id)
+          box.id = .invalid
+        }
+        return box.id.rawValue
+      }
+    }
+
+    AsyncFunction("endBackgroundTime") { (rawId: Int) in
+      guard rawId != UIBackgroundTaskIdentifier.invalid.rawValue else { return }
+      await MainActor.run {
+        UIApplication.shared.endBackgroundTask(UIBackgroundTaskIdentifier(rawValue: rawId))
+      }
+    }
+
     // ── pruneThumbs ──────────────────────────────────────────────────────────
     // Best-effort cleanup: remove any cached thumbnail whose relative path isn't
     // in `keepPaths`, so the container doesn't grow unbounded as the closet
@@ -139,6 +169,12 @@ public class OjoWidgetBridgeModule: Module {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+/// Holds a background-task id so the expiration handler can end the same task
+/// it was created for. Only touched on the main actor.
+private final class BackgroundTimeBox: @unchecked Sendable {
+  var id: UIBackgroundTaskIdentifier = .invalid
+}
 
 private func appGroupContainer() throws -> URL {
   guard let url = FileManager.default

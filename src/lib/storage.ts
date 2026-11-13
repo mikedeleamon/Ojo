@@ -22,9 +22,22 @@ export const storage = {
 // Maps to Keychain (iOS) / Keystore (Android) via expo-secure-store.
 // SecureStore has no bulk clear — callers must removeItem(AUTH_KEY) explicitly.
 
+//
+// Written with AFTER_FIRST_UNLOCK rather than the WHEN_UNLOCKED default: the
+// background refresh (lib/background) runs while the phone is locked — that is
+// most of the time iOS grants it — and with WHEN_UNLOCKED the keychain refuses
+// the read, so it would see no session and do nothing. AFTER_FIRST_UNLOCK is
+// still encrypted at rest until the first unlock after a restart. Items written
+// before this change keep their old setting until rewritten; see
+// migrateAuthKeychainAccess in lib/auth.ts.
+const SECURE_WRITE_OPTIONS: SecureStore.SecureStoreOptions = {
+  keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK,
+};
+
 export const secureStorage = {
   getItem:    (key: string): Promise<string | null> => SecureStore.getItemAsync(key),
-  setItem:    (key: string, value: string): Promise<void> => SecureStore.setItemAsync(key, value),
+  setItem:    (key: string, value: string): Promise<void> =>
+    SecureStore.setItemAsync(key, value, SECURE_WRITE_OPTIONS),
   removeItem: (key: string): Promise<void> => SecureStore.deleteItemAsync(key),
 };
 

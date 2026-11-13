@@ -16,6 +16,8 @@ import { resetClosetsCache } from '../hooks/useClosets';
 import { resetTripPlansCache } from '../hooks/useTripPlans';
 import { resetOnboardingCache } from '../lib/onboarding';
 import { clearGapHistory } from '../lib/wardrobeGaps';
+import { stopBackgroundWork } from '../lib/background/lifecycle';
+import { clearWornToday } from '../lib/widget/wornToday';
 
 interface AuthState {
   isReady: boolean;
@@ -115,6 +117,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // not per-account: left in place, the next account would inherit "already
     // told them" for someone else's trip and skip its own first report.
     void clearTripPresenceCache().catch(() => {});
+    // Background work runs on the signed-in account's behalf: stop it, and
+    // forget the device's remembered place and today's worn outfit, which are
+    // stored per device rather than per account.
+    void stopBackgroundWork().catch(() => {});
+    void clearWornToday();
   }, []);
 
   return (

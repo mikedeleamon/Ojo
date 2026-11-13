@@ -34,6 +34,7 @@ import GearIcon from '../icons/GearIcon';
 import LocationsIcon from '../icons/LocationsIcon';
 import CameraIcon from '../icons/CameraIcon';
 import api from '../../api/client';
+import { authHeaders } from '../../lib/auth';
 import weatherConstants from '../../constants/weatherConstants';
 import WeatherIconDisplay from '../WeatherIconDisplay/WeatherIconDisplay';
 import ClearNightIconMoon from '../WeatherIcons/ClearNightIconMoon';
@@ -438,7 +439,11 @@ const WeatherHUD = ({
     useEffect(() => {
         if (!place) return;
         let cancelled = false;
-        const params = { params: { lat: place.lat, lon: place.lon } };
+        // The weather routes require a signed-in user. Without the header each
+        // of these three requests 401'd, ran a token refresh in the axios
+        // interceptor, and only then succeeded on the retry: three refreshes
+        // and six extra round trips on every Home load.
+        const params = { params: { lat: place.lat, lon: place.lon }, ...authHeaders() };
         Promise.all([
             api.get<CurrentWeather>(weatherConstants.GET_CURRENT, params),
             api.get<Forecast[]>(weatherConstants.GET_HOURLY, params),

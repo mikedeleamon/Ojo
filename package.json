@@ -1,7 +1,7 @@
 {
   "name": "ojo-native",
   "version": "1.0.0",
-  "main": "expo-router/entry",
+  "main": "index.ts",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
@@ -53,6 +53,7 @@
     "buffer": "^6.0.3",
     "expo": "^58.0.0",
     "expo-apple-authentication": "~58.0.2",
+    "expo-background-task": "~58.0.13",
     "expo-blur": "~58.0.5",
     "expo-build-properties": "~58.0.12",
     "expo-camera": "~58.0.14",
@@ -73,6 +74,7 @@
     "expo-splash-screen": "~58.0.13",
     "expo-status-bar": "~58.0.4",
     "expo-store-review": "~58.0.2",
+    "expo-task-manager": "~58.0.14",
     "expo-updates": "~58.0.21",
     "pako": "^2.1.0",
     "react": "19.3.0",

@@ -1,5 +1,6 @@
-import { selectNudgeworthySteps, buildNudgeContent } from '../sameDayNudge';
+import { selectNudgeworthySteps, buildNudgeContent, buildSameDayNudgeItems } from '../sameDayNudge';
 import type { WidgetTimelineStep } from '../widget/snapshot.types';
+import type { OutfitResult } from '../outfit/types';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -97,5 +98,35 @@ describe('buildNudgeContent', () => {
   it('does not double up punctuation already present', () => {
     const content = buildNudgeContent({ step: step({ action: 'Rain starts — keep it on!' }) });
     expect(content.body).toBe('Rain starts — keep it on!');
+  });
+});
+
+// ─── buildSameDayNudgeItems ────────────────────────────────────────────────────
+// Shared by the home-screen hook and the background refresh, so both name the
+// same city for the same steps.
+
+describe('buildSameDayNudgeItems', () => {
+  const outfitWith = (timeline: WidgetTimelineStep[] | undefined) =>
+    ({ layering: timeline ? { timeline } : undefined }) as unknown as OutfitResult;
+
+  it('dates each item today and names the city it was built for', () => {
+    const items = buildSameDayNudgeItems(outfitWith([step({ hour: 15 })]), 'Brooklyn, NY', at(9));
+    expect(items).toEqual([
+      {
+        dateISO: '2026-08-16',
+        hour: 15,
+        title: '3PM in Brooklyn',
+        body: 'Remove Grey Fleece — warming up.',
+      },
+    ]);
+  });
+
+  it('is empty without an outfit or a timeline', () => {
+    expect(buildSameDayNudgeItems(null, 'Brooklyn', at(9))).toEqual([]);
+    expect(buildSameDayNudgeItems(outfitWith(undefined), 'Brooklyn', at(9))).toEqual([]);
+  });
+
+  it('drops steps the lead floor rules out', () => {
+    expect(buildSameDayNudgeItems(outfitWith([step({ hour: 15 })]), 'Brooklyn', at(14, 15))).toEqual([]);
   });
 });

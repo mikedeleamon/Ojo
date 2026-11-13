@@ -13,11 +13,12 @@
  * bug in one scheduler's effect can't silently stop the other — independent
  * useEffects, independent dependency arrays.
  *
- * Same accepted cost as the Brief: only reschedules while the app is open, on
- * the home screen. There is no background task in this app. Forecast staleness
- * (the 12° drop this flags might really be 8° by afternoon) isn't re-validated
- * mid-day — every reopen naturally supersedes a stale schedule via the same
- * cancel-then-rebuild scheduleSameDayNudges already does on every call.
+ * This is the foreground half; the background refresh (lib/background/
+ * refresh.ts) rebuilds the same set from the same builder when iOS gives Ojo
+ * background time or the phone leaves its area. Between those, forecast
+ * staleness (the 12° drop this flags might really be 8° by afternoon) isn't
+ * re-validated — each run supersedes the last via the cancel-then-rebuild
+ * scheduleSameDayNudges does on every call.
  */
 
 import { useEffect, useRef } from 'react';
@@ -25,17 +26,11 @@ import api from '../api/client';
 import { authHeaders, getToken } from '../lib/auth';
 import { useActiveLocation } from '../context/ActiveLocationContext';
 import { CURRENT_LOCATION_ID } from '../lib/savedLocations';
-import { selectNudgeworthySteps, buildNudgeContent } from '../lib/sameDayNudge';
-import { scheduleSameDayNudges, type SameDayNudgeItem } from '../lib/notifications';
+import { buildSameDayNudgeItems } from '../lib/sameDayNudge';
+import { scheduleSameDayNudges } from '../lib/notifications';
 import type { OutfitResult } from '../lib/outfitEngine';
 import type { NotificationSettings } from '../types';
 import { runAfterInteractions } from '../lib/runAfterInteractions';
-
-/** Local calendar date as "YYYY-MM-DD" — must match SameDayNudgeItem.dateISO. */
-const localISODate = (d: Date): string => {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-};
 
 export interface SameDayNudgeSchedulerInput {
   /** outfits[0] from OutfitSuggestion — already generated, not regenerated here. */
@@ -80,15 +75,7 @@ export function useSameDayNudgeScheduler({
           return;
         }
 
-        const now = new Date();
-        const dateISO = localISODate(now);
-        const candidates = selectNudgeworthySteps(outfit.layering!.timeline, now);
-
-        const items: SameDayNudgeItem[] = candidates.map(({ step }) => ({
-          dateISO,
-          hour: step.hour,
-          ...buildNudgeContent({ step, city }),
-        }));
+        const items = buildSameDayNudgeItems(outfit, city, new Date());
 
         if (cancelled) return;
         await scheduleSameDayNudges(items);

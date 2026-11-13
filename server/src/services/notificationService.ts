@@ -23,7 +23,8 @@
  *
  * WHERE these describe is resolved per user too: a user whose device has
  * confirmed it is at a saved trip's city, during that trip's dates, gets the
- * trip city; everyone else gets their home city (see lib/activeTrip.ts). Before
+ * trip city; otherwise the place the phone last reported, while that report is
+ * under a day old; otherwise their home city (see lib/activeTrip.ts). Before
  * that, every one of these named `settings.location` unconditionally, so a user
  * three days into a trip was told about rain at home.
  *
@@ -286,10 +287,11 @@ async function runMorningCheck(): Promise<void> {
   const activeTrips = await loadConfirmedTrips(users, now);
 
   await mapWithConcurrency(users, SEND_CONCURRENCY, async (user) => {
-    // The trip city while a trip is running, the home city otherwise. Null when
-    // neither has usable coords: the client geocodes `location` and PATCHes
-    // lat/lon up, so users on old clients are skipped until they re-save it.
-    const place = resolveWeatherLocation(user, activeTrips.get(String(user._id)));
+    // The trip city while a trip is running, else where the phone last
+    // reported being (while that's fresh), else the home city. Null when none
+    // has coords: the client geocodes `location` and PATCHes lat/lon up, so
+    // users on old clients are skipped until they re-save it.
+    const place = resolveWeatherLocation(user, activeTrips.get(String(user._id)), now);
     if (!place) return;
 
     const weather = await getCurrentWeather(place.lat, place.lon);
@@ -358,7 +360,7 @@ async function runAfternoonCheck(): Promise<void> {
   const activeTrips = await loadConfirmedTrips(users, now);
 
   await mapWithConcurrency(users, SEND_CONCURRENCY, async (user) => {
-    const place = resolveWeatherLocation(user, activeTrips.get(String(user._id)));
+    const place = resolveWeatherLocation(user, activeTrips.get(String(user._id)), now);
     if (!place) return;
 
     const weather = await getCurrentWeather(place.lat, place.lon);
