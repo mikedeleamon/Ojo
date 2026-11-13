@@ -197,14 +197,28 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(0,0,0,0.2)',
     },
+    // A badge on the photo's top-left corner rather than a slot at the end of
+    // the row. In the row it took ~27 pt of a 141 pt card on a 6.3" iPhone,
+    // leaving the text 46 pt, so "OUTERWEAR" wrapped mid-word. Absolute
+    // children don't take part in the row, so the text gets that width back.
+    // The tap target stays ~44 pt through hitSlop on the Pressable.
     articleRemoveBtn: {
-        padding: 4,
-        marginLeft: 2,
+        position: 'absolute',
+        top: 2,
+        left: 2,
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(15, 23, 42, 0.82)',
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: 'rgba(255, 255, 255, 0.35)',
     },
     articleRemoveText: {
-        fontSize: 11,
-        color: colors.textMuted,
-        lineHeight: 14,
+        fontSize: 10,
+        lineHeight: 12,
+        color: '#FFFFFF',
     },
     articleLabel: { flex: 1, gap: 2 },
     roleLabel: {
