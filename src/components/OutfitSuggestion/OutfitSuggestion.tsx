@@ -26,7 +26,7 @@ import { useReduceMotion } from '../../hooks/useReduceMotion';
 import { useTripMode } from '../../hooks/useTripMode';
 import { useMorningBriefScheduler } from '../../hooks/useMorningBriefScheduler';
 import { useSameDayNudgeScheduler } from '../../hooks/useSameDayNudgeScheduler';
-import { hapticSuccess } from '../../lib/haptics';
+import { hapticImpact, hapticSuccess } from '../../lib/haptics';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { buildWidgetInput, tomorrowDailyFor } from '../../lib/widget/buildInput';
 import { updateWidgetSnapshot } from '../../lib/widget/updateWidgetSnapshot';
@@ -49,7 +49,10 @@ import {
     OutfitSlot,
     OutfitResult,
     articleZoneLabel,
+    swapAlternatives,
+    type SwapOption,
 } from '../../lib/outfitEngine';
+import SwapSheet from './SwapSheet';
 import { addHistoryEntry, recentlyWornWithAge, loadHistory } from '../../lib/outfitHistory';
 import { recordSuccessfulOutfit, maybeRequestReview } from '../../services/reviewManager';
 import { derivePreferenceProfile } from '../../lib/userPreferences';
@@ -127,10 +130,13 @@ const ArticleThumb = ({
     article,
     role,
     onRemove,
+    onSwap,
 }: {
     article: ClothingArticle;
     role: OutfitRole;
     onRemove?: () => void;
+    /** Long-press offers stand-ins for this piece (SwapSheet). */
+    onSwap?: () => void;
 }) => {
     const { colors, innerGlassTint } = useTheme();
     const perf = usePerfFlags();
@@ -146,6 +152,19 @@ const ArticleThumb = ({
             // Light skies: darkened with the card around it (see ThemeOverride).
             glassTint={innerGlassTint}
         >
+            <Pressable
+                style={styles.articleSwapArea}
+                onLongPress={onSwap}
+                delayLongPress={350}
+                disabled={!onSwap}
+                accessibilityRole={onSwap ? 'button' : undefined}
+                accessibilityLabel={`${role === 'accessory' ? articleZoneLabel(article) : ROLE_LABELS[role]}: ${articleDisplayName(article)}`}
+                accessibilityHint={onSwap ? 'Long-press for pieces that could replace it' : undefined}
+                accessibilityActions={onSwap ? [{ name: 'longpress', label: 'Swap this piece' }] : undefined}
+                onAccessibilityAction={(e) => {
+                    if (e.nativeEvent.actionName === 'longpress') onSwap?.();
+                }}
+            >
             <View style={styles.articleImg}>
                 {article.imageUrl ? (
                     <Image
@@ -195,6 +214,7 @@ const ArticleThumb = ({
                     <Text style={styles.articleMeta}>{article.fabricType}</Text>
                 ) : null}
             </View>
+            </Pressable>
             {onRemove && (
                 <Pressable
                     style={styles.articleRemoveBtn}
@@ -351,6 +371,21 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
     const [removedByOutfit, setRemovedByOutfit] = useState<
         Map<number, Set<string>>
     >(new Map());
+    // Swaps the user made, per outfit card: the re-scored outfit that replaces
+    // the generated one, and each version they swapped away from (ranker
+    // training negatives, logged with what they wear).
+    const [swaps, setSwaps] = useState<
+        Map<number, { outfit: OutfitResult; rejected: WearNegative[] }>
+    >(new Map());
+    // The piece being swapped, with its stand-ins; null when the sheet is closed.
+    const [swapTarget, setSwapTarget] = useState<{
+        outfitIdx: number;
+        article: ClothingArticle;
+        roleLabel: string;
+        score: number;
+        slots: OutfitSlot[];
+        options: SwapOption[];
+    } | null>(null);
     const [occasionOverride, setOccasionOverride] = useState<OutfitOccasion>(
         settings.occasion ?? 'everyday',
     );
@@ -450,6 +485,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
         setShowBreakdown(false);
         setWornLogged(false);
         setRemovedByOutfit(new Map());
+        setSwaps(new Map());
         setOccasionOverride(settings.occasion ?? 'everyday');
     }, [settings]);
 
@@ -520,6 +556,19 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
     const outfits = gen.outfits;
     const status = gen.status;
 
+    // A fresh generation replaces every card, so swaps made on the old ones go.
+    useEffect(() => {
+        setSwaps((prev) => (prev.size === 0 ? prev : new Map()));
+    }, [outfits]);
+
+    // The cards as shown: each generated outfit, or the user's swapped version
+    // of it. The widget and nudges keep reading `outfits` (the engine's own
+    // answer) until something is actually logged as worn.
+    const shown = useMemo(
+        () => (swaps.size === 0 ? outfits : outfits.map((o, i) => swaps.get(i)?.outfit ?? o)),
+        [outfits, swaps],
+    );
+
     // Feeds the in-app review prompt's eligibility count. recordSuccessfulOutfit
     // caps itself at once per calendar day, since this memo above recomputes on
     // every weather/preference/worn-status change, not just once per "real"
@@ -575,7 +624,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
     }, [needsGeneric, weather, effectiveSettings, forecasts, genericLat, genericLon]);
 
     const safeIdx = Math.min(activeIdx, Math.max(0, outfits.length - 1));
-    const activeOutfit: OutfitResult | null = outfits[safeIdx] ?? null;
+    const activeOutfit: OutfitResult | null = shown[safeIdx] ?? null;
 
     // Pager cards mount their ArticleThumb subtree lazily: only indices that
     // have actually been viewed. Starts with just the active index — the
@@ -798,6 +847,50 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
 
     const removedIds = removedByOutfit.get(safeIdx) ?? new Set<string>();
 
+    const handleSwapPress = (outfitIdx: number, slot: OutfitSlot) => {
+        if (!preferred) return;
+        const removed = removedByOutfit.get(outfitIdx) ?? new Set<string>();
+        const slots = (shown[outfitIdx]?.slots ?? []).filter((s) => !removed.has(s.article._id));
+        const options = swapAlternatives(
+            slots,
+            slot.article._id,
+            preferred.articles,
+            weather,
+            effectiveSettings,
+            worn,
+            profile,
+            forecasts,
+            3,
+        );
+        hapticImpact();
+        setSwapTarget({
+            outfitIdx,
+            article: slot.article,
+            roleLabel: slot.role === 'accessory' ? articleZoneLabel(slot.article) : ROLE_LABELS[slot.role],
+            // The outfit as it stands, scored the way the options are.
+            score: options[0] ? options[0].outfit.score - options[0].delta : shown[outfitIdx]?.score ?? 0,
+            slots,
+            options,
+        });
+    };
+
+    const handleSwapPick = (option: SwapOption) => {
+        if (!swapTarget) return;
+        const { outfitIdx, slots, score } = swapTarget;
+        setSwaps((prev) => {
+            const next = new Map(prev);
+            const rejected = [
+                ...(prev.get(outfitIdx)?.rejected ?? []),
+                { articleIds: slots.map((s) => s.article._id), score, source: 'swap_rejected' as const },
+            ];
+            next.set(outfitIdx, { outfit: option.outfit, rejected });
+            return next;
+        });
+        setSwapTarget(null);
+        setWornLogged(false);
+        hapticSuccess();
+    };
+
     const activeSlots =
         activeOutfit?.slots.filter((s) => !removedIds.has(s.article._id)) ?? [];
 
@@ -861,7 +954,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
         if (!preferred || !activeOutfit || activeOutfit.status !== 'ok') return;
         // The outfits shown alongside the worn one are ranker training negatives:
         // the user saw them and picked this one instead.
-        const negatives: WearNegative[] = outfits
+        const negatives: WearNegative[] = shown
             .filter((o, i) => i !== safeIdx && o.status === 'ok' && o.slots.length > 0)
             .slice(0, 5)
             .map((o) => ({
@@ -869,6 +962,8 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
                 score: o.score,
                 source: 'shown_not_worn' as const,
             }));
+        // Versions of this outfit the user swapped pieces out of.
+        negatives.push(...(swaps.get(safeIdx)?.rejected ?? []).slice(-5));
         logOutfitAsWorn({
             slots: activeSlots,
             score: activeOutfit.score,
@@ -1103,6 +1198,12 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
             next.delete(safeIdx);
             return next;
         });
+        setSwaps((prev) => {
+            if (!prev.has(safeIdx)) return prev;
+            const next = new Map(prev);
+            next.delete(safeIdx);
+            return next;
+        });
     };
 
     // Confirmation reflects whatever was logged (generated outfit or trip outfit).
@@ -1255,7 +1356,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
                                 }
                             }}
                         >
-                            {outfits.map((outfit, i) => {
+                            {shown.map((outfit, i) => {
                                 const cardRemovedIds =
                                     removedByOutfit.get(i) ??
                                     new Set<string>();
@@ -1293,9 +1394,10 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
                                                         )
                                                         .map((slot, j) => (
                                                             <ArticleThumb
-                                                                key={j}
+                                                                key={slot.article._id}
                                                                 article={slot.article}
                                                                 role={slot.role}
+                                                                onSwap={() => handleSwapPress(i, slot)}
                                                                 onRemove={
                                                                     REMOVABLE_ROLES.includes(
                                                                         slot.role,
@@ -1346,7 +1448,12 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
                                 ))}
                             </View>
                         )}
-                        {removedIds.size > 0 && (
+                        {/* Discoverability for the long-press: shown until the
+                            card has been changed, when Reset takes its place. */}
+                        {removedIds.size === 0 && !swaps.has(safeIdx) && (
+                            <Text style={styles.swapHint}>Hold a piece to swap it</Text>
+                        )}
+                        {(removedIds.size > 0 || swaps.has(safeIdx)) && (
                             <Pressable
                                 onPress={handleResetOutfit}
                                 style={styles.resetLink}
@@ -1510,6 +1617,17 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
                     )}
                 </Animated.View>
             </View>
+
+            <SwapSheet
+                current={
+                    swapTarget
+                        ? { article: swapTarget.article, roleLabel: swapTarget.roleLabel, score: swapTarget.score }
+                        : null
+                }
+                options={swapTarget?.options ?? []}
+                onPick={handleSwapPick}
+                onClose={() => setSwapTarget(null)}
+            />
 
             <ShareToInstagramSheet
                 visible={showShareSheet}

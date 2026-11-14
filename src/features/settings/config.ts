@@ -30,7 +30,7 @@ export const SETTINGS_CONFIG: SettingsSectionConfig[] = [
     items: [
       { key: 'profile',        label: 'Profile',         action: { type: 'navigate', to: '/account/profile' } },
       { key: 'password',       label: 'Password',        action: { type: 'navigate', to: '/account/password' } },
-      { key: 'history',        label: 'Outfit History',  action: { type: 'navigate', to: '/account/history' } },
+      { key: 'history',        label: 'Wear Calendar',   action: { type: 'navigate', to: '/account/history' } },
       { key: 'recap',          label: 'Weekly Recap',    action: { type: 'navigate', to: '/account/recap' } },
     ],
   },

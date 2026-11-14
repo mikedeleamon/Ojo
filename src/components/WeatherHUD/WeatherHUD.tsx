@@ -72,7 +72,10 @@ import { gradientFor, footerBgFor } from './weatherPalette';
 import { accentFromGradient } from '../../lib/weather/accentColor';
 import { backdropLayersFor, NO_LAYERS } from '../../lib/weather/backdropLayers';
 import { SNOW_GROUPS } from '../../lib/weather/backdropSpec';
-import { devCondition, devIsDay } from '../../lib/debug/devWeatherOverride';
+import { devCondition, devIsDay, devTempF } from '../../lib/debug/devWeatherOverride';
+import { edgeSplashes, glassEffectFor } from '../../lib/weather/weatherGlass';
+import WeatherGlassOverlay from '../WeatherGlass/WeatherGlassOverlay';
+import RainEdgeSplash, { SPLASH_RISE } from '../WeatherGlass/RainEdgeSplash';
 import FlakeFall from './FlakeFall';
 import FogDrift from './FogDrift';
 import ShootingStar from './ShootingStar';
@@ -883,6 +886,18 @@ const WeatherHUD = ({
     const isSleetBg = layers.rain === 'sleet';
     const isFogBg = layers.fog;
     const isGlareBg = layers.glare;
+    // What the weather does to the outfit card's glass: beads in rain, frost
+    // at or below freezing, shimmer from 90°F. Always the °F reading, whatever
+    // units the screen shows. See lib/weather/weatherGlass.
+    const airTempF = weather ? devTempF(weather.Temperature.Imperial.Value) : null;
+    const glassEffect = useMemo(
+        () => (perf.weatherGlass ? glassEffectFor(layers.rain, airTempF) : null),
+        [perf.weatherGlass, layers.rain, airTempF],
+    );
+    // Rain sits behind the card's content, frost and heat over it (see below).
+    const rainBehind = glassEffect?.kind === 'rain' ? glassEffect : null;
+    const onTheGlass = glassEffect?.kind === 'rain' ? null : glassEffect;
+    const splashing = !!rainBehind && edgeSplashes(bgCondition);
     // Glare and fog drift lighten the sky behind the header more than falling
     // snow or rain does, so the fade allows for more of it under them.
     const skyFade = useMemo(
@@ -1681,6 +1696,12 @@ const WeatherHUD = ({
                             // LIGHT_SKY_CARD_TINT.
                             glassTint={lightSky ? LIGHT_SKY_CARD_TINT : undefined}
                         >
+                            {/* Rain beads and running drops, behind everything
+                                on the card: under the text and buttons, and
+                                seen blurred through the outfit's glass tiles.
+                                (Under the card itself, its glass blurred them
+                                away entirely.) First child, so it's beneath. */}
+                            <WeatherGlassOverlay effect={rainBehind} animate={backdropAnimate} />
                             {/* Mounted on every pose and only scrolls in two
                                 panes. Adding it just for two panes would remount
                                 OutfitSuggestion on a fold and lose the selected
@@ -1709,7 +1730,26 @@ const WeatherHUD = ({
                                     />
                                 </ThemeOverride>
                             </ScrollView>
+                            {/* Frost and heat on the glass, over the content.
+                                Follows the sky's own animation gate. */}
+                            <WeatherGlassOverlay effect={onTheGlass} animate={backdropAnimate} />
                         </GlassCard>
+                        {/* Rain hitting the card's top edge, in front of the
+                            glass, for steady rain and storms only (not drizzle
+                            or light rain). Outside the card, which clips, so
+                            splashes can rise above it; lined up with the card's
+                            top and its side margins. */}
+                        {rainBehind && splashing && (
+                            <RainEdgeSplash
+                                density={rainBehind.density}
+                                animate={backdropAnimate && !reduceMotion}
+                                style={{
+                                    top: (twoPane ? outfitCardTop : 0) - SPLASH_RISE,
+                                    left: (twoPane && fold.panes ? fold.gutter / 2 : 0) + spacing.md,
+                                    right: spacing.md,
+                                }}
+                            />
+                        )}
                         </View>
 
                         {!twoPane && shareAndAttribution}

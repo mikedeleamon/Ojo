@@ -41,7 +41,7 @@ import {
   AQI_HIGH_LABELS,
   POLLEN_HIGH_LABELS,
 } from './outfit/weatherBuckets';
-import { roleOf, articleZoneLabel, buildAccCombos } from './outfit/roles';
+import { roleOf, articleZoneLabel, buildAccCombos, zoneOf } from './outfit/roles';
 import { COLOR_NEUTRALS, NEUTRAL_BASE_COLORS, pairHarmony } from './outfit/colorHarmony';
 import { currentSeason, SEASONAL_COLORS, seasonalBonus, type Season } from './outfit/seasons';
 
@@ -867,6 +867,152 @@ export const buildWearContext = (
   };
 };
 
+/**
+ * Articles that can be worn today, bucketed by role: weather-appropriate and
+ * matching the wardrobe's gender preference (unisex items and "All" users
+ * always pass).
+ */
+const eligibleByRole = (
+  articles: ClothingArticle[],
+  bucket:   WeatherBucket,
+  settings: Settings,
+): Map<OutfitRole, ClothingArticle[]> => {
+  const userGender = settings.gender ?? 'All';
+  const byRole = new Map<OutfitRole, ClothingArticle[]>();
+  for (const a of articles) {
+    if (!isWeatherAppropriate(a, bucket)) continue;
+    const itemGender = a.gender ?? 'Unisex';
+    if (userGender !== 'All' && itemGender !== 'Unisex' && itemGender !== userGender) continue;
+    const r = roleOf(a);
+    if (!byRole.has(r)) byRole.set(r, []);
+    byRole.get(r)!.push(a);
+  }
+  return byRole;
+};
+
+const buildNotesContext = (
+  weather:     CurrentWeather,
+  ctx:         Pick<DerivedWeatherContext, 'bucket' | 'precipIntensity' | 'windMph' | 'uvHigh' | 'uvIndexText' | 'isSnowing'>,
+  settings:    Settings,
+  layeringCtx: LayeringContext,
+  byRole:      Map<OutfitRole, ClothingArticle[]>,
+): NotesContext => ({
+  ...ctx,
+  settings,
+  aqiHigh:    weather.AirQualityText  ? AQI_HIGH_LABELS.has(weather.AirQualityText)  : undefined,
+  pollenHigh: weather.PollenCategory  ? POLLEN_HIGH_LABELS.has(weather.PollenCategory) : undefined,
+  needsMid:   layeringCtx.needsMid,
+  needsOuter: layeringCtx.needsOuter,
+  // From byRole, before capping: what the closet can offer today, not what
+  // the chosen outfit happens to contain.
+  closetHas: {
+    outerwear: (byRole.get('outerwear') ?? []).length > 0,
+    midLayer:  (byRole.get('midLayer')  ?? []).length > 0,
+    footwear:  (byRole.get('footwear')  ?? []).length > 0,
+    boots:     (byRole.get('footwear')  ?? []).some(a => a.clothingType === 'Boots'),
+  },
+});
+
+/** A scored combo as a full OutfitResult: layering, notes, alerts, and the score with its layering-confidence boost. */
+const toOutfitResult = (
+  combo:          ScoredCombo,
+  bucket:         WeatherBucket,
+  layeringCtx:    LayeringContext,
+  notesCtx:       NotesContext,
+  gaps:           GapType[],
+  isPersonalized: boolean,
+  moodLabel?:     string,
+): OutfitResult => {
+  const layering = generateLayeringRecommendation({ context: layeringCtx, slots: combo.slots });
+  const confidenceBoost = Math.round((layering.confidence - 0.5) * 6);
+  return {
+    status:          'ok' as OutfitStatus,
+    headline:        headline(bucket),
+    slots:           combo.slots,
+    notes:           buildNotes(combo.slots, combo.breakdown, notesCtx),
+    score:           Math.max(0, Math.min(100, combo.score + confidenceBoost)),
+    scoreBreakdown:  combo.breakdown,
+    layering,
+    accessoryAlerts: buildAccessoryAlerts(combo.slots, notesCtx),
+    isPersonalized,
+    moodLabel,
+    gaps,
+  };
+};
+
+/** One piece that could stand in for another: the piece and the outfit it makes. */
+export interface SwapOption {
+  article: ClothingArticle;
+  /** The whole outfit with the swap made, scored and annotated like any other. */
+  outfit:  OutfitResult;
+  /** Score change against the outfit as it stands now (negative = a little worse). */
+  delta:   number;
+}
+
+/** Alternatives may score at most this much below the current outfit… */
+export const SWAP_MAX_DROP = 12;
+/** …and never below this, whatever the current outfit scores. */
+export const SWAP_MIN_SCORE = 50;
+
+/**
+ * Up to `max` pieces that could replace one in an outfit and still score well,
+ * best first. A stand-in has to fill the same role (a top for a top; an
+ * accessory for one on the same body zone), suit today's weather, not already be
+ * in the outfit, and keep the outfit within SWAP_MAX_DROP points of where it is
+ * now. The outfit is re-scored exactly as generateOutfits scores, so its notes,
+ * layering and score update with the swap.
+ *
+ * `slots` is the outfit as shown (after any pieces the user removed). Returns []
+ * if the piece isn't in it or nothing else works as well today.
+ */
+export const swapAlternatives = (
+  slots:        OutfitSlot[],
+  articleId:    string,
+  articles:     ClothingArticle[],
+  weather:      CurrentWeather,
+  settings:     Settings,
+  recentlyWorn: RecentlyWorn          = new Set(),
+  profile:      UserPreferenceProfile = { colors: {}, fabrics: {}, categories: {}, colorPairs: {}, totalOutfits: 0 },
+  forecasts:    Forecast[]           = [],
+  max:          number               = 3,
+): SwapOption[] => {
+  const index = slots.findIndex(s => s.article._id === articleId);
+  if (index < 0) return [];
+  const current = slots[index];
+
+  const ctx = deriveWeatherContext(weather, settings, forecasts);
+  const { precipIntensity, humidity, windMph, isSnowing, effectiveFeelsLike, bucket } = ctx;
+  const byRole = eligibleByRole(articles, bucket, settings);
+  const layeringCtx = buildLayeringContext({ weather, forecasts, settings, dressingTemp: effectiveFeelsLike });
+  const notesCtx = buildNotesContext(weather, ctx, settings, layeringCtx, byRole);
+  const gaps = buildGaps(notesCtx);
+  const isPersonalized = profile.totalOutfits >= PERSONALIZATION_THRESHOLD;
+
+  const resultFor = (candidateSlots: OutfitSlot[]) =>
+    toOutfitResult(
+      scoreCombo(candidateSlots, bucket, effectiveFeelsLike, precipIntensity, humidity, windMph, isSnowing, settings, recentlyWorn, profile),
+      bucket, layeringCtx, notesCtx, gaps, isPersonalized,
+    );
+  const baseline = resultFor(slots).score;
+
+  const inOutfit = new Set(slots.map(s => s.article._id));
+  const candidates = (byRole.get(current.role) ?? []).filter(a =>
+    !inOutfit.has(a._id) &&
+    (current.role !== 'accessory' || zoneOf(a) === zoneOf(current.article)),
+  );
+
+  const options: SwapOption[] = candidates.map(article => {
+    const next = slots.map((s, i) => (i === index ? { role: s.role, article } : s));
+    const outfit = resultFor(next);
+    return { article, outfit, delta: outfit.score - baseline };
+  });
+
+  return options
+    .filter(o => o.outfit.score >= SWAP_MIN_SCORE && o.delta >= -SWAP_MAX_DROP)
+    .sort((a, b) => b.outfit.score - a.outfit.score || a.article._id.localeCompare(b.article._id))
+    .slice(0, max);
+};
+
 export const generateOutfits = (
   articles:     ClothingArticle[],
   weather:      CurrentWeather,
@@ -900,18 +1046,7 @@ export const generateOutfits = (
   } = deriveWeatherContext(weather, settings, forecasts);
 
   // ── Phase 1: Hard filter → role bucketing → pre-rank per bucket ───────────
-  const userGender = settings.gender ?? 'All';
-  const byRole = new Map<OutfitRole, ClothingArticle[]>();
-  for (const a of articles) {
-    if (!isWeatherAppropriate(a, bucket)) continue;
-    // Skip items whose gender tag doesn't match the user's wardrobe preference.
-    // Unisex items and "All" users always pass through.
-    const itemGender = a.gender ?? 'Unisex';
-    if (userGender !== 'All' && itemGender !== 'Unisex' && itemGender !== userGender) continue;
-    const r = roleOf(a);
-    if (!byRole.has(r)) byRole.set(r, []);
-    byRole.get(r)!.push(a);
-  }
+  const byRole = eligibleByRole(articles, bucket, settings);
 
   const cap = (role: OutfitRole) =>
     topNByFabric(byRole.get(role) ?? [], bucket, effectiveFeelsLike, precipIntensity, humidity, settings.humidityPreference, windMph, isSnowing);
@@ -1139,45 +1274,14 @@ export const generateOutfits = (
 
   // ── Phase 5: Attach notes and build OutfitResult[] ───────────────────────
 
-  const notesCtx: NotesContext = {
-    bucket, precipIntensity, windMph, uvHigh, uvIndexText, isSnowing, settings,
-    aqiHigh:    weather.AirQualityText  ? AQI_HIGH_LABELS.has(weather.AirQualityText)  : undefined,
-    pollenHigh: weather.PollenCategory  ? POLLEN_HIGH_LABELS.has(weather.PollenCategory) : undefined,
-    needsMid:   layeringCtx.needsMid,
-    needsOuter: layeringCtx.needsOuter,
-    // From byRole, before capping: what the closet can offer today, not what
-    // the chosen outfit happens to contain.
-    closetHas: {
-      outerwear: (byRole.get('outerwear') ?? []).length > 0,
-      midLayer:  (byRole.get('midLayer')  ?? []).length > 0,
-      footwear:  (byRole.get('footwear')  ?? []).length > 0,
-      boots:     (byRole.get('footwear')  ?? []).some(a => a.clothingType === 'Boots'),
-    },
-  };
+  const notesCtx = buildNotesContext(weather, { bucket, precipIntensity, windMph, uvHigh, uvIndexText, isSnowing }, settings, layeringCtx, byRole);
   const gaps = buildGaps(notesCtx);
 
   const isPersonalized = profile.totalOutfits >= PERSONALIZATION_THRESHOLD;
 
-  const results: OutfitResult[] = topList.map(combo => {
-    const layering = generateLayeringRecommendation({ context: layeringCtx, slots: combo.slots });
-
-    const confidenceBoost = Math.round((layering.confidence - 0.5) * 6);
-    const adjustedScore = Math.max(0, Math.min(100, combo.score + confidenceBoost));
-
-    return {
-      status:          'ok' as OutfitStatus,
-      headline:        headline(bucket),
-      slots:           combo.slots,
-      notes:           buildNotes(combo.slots, combo.breakdown, notesCtx),
-      score:           adjustedScore,
-      scoreBreakdown:  combo.breakdown,
-      layering,
-      accessoryAlerts: buildAccessoryAlerts(combo.slots, notesCtx),
-      isPersonalized,
-      moodLabel:       combo.moodLabel,
-      gaps,
-    };
-  });
+  const results: OutfitResult[] = topList.map(combo =>
+    toOutfitResult(combo, bucket, layeringCtx, notesCtx, gaps, isPersonalized, combo.moodLabel),
+  );
 
   results.sort((a, b) => b.score - a.score);
 

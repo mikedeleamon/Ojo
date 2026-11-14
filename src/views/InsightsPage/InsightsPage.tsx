@@ -49,6 +49,9 @@ import { ColorChord } from './ColorChord';
 import { ColorPalette } from './ColorPalette';
 import ShareToInstagramSheet from '../../components/ShareCard/ShareToInstagramSheet';
 import DonationListShareCard from '../../components/ShareCard/DonationListShareCard';
+import StyleDnaShareCard from '../../components/ShareCard/StyleDnaShareCard';
+import StyleDnaHero from '../../components/StyleDna/StyleDnaHero';
+import { useSettings } from '../../hooks/useSettings';
 import { donationShareLink } from '../../lib/share/deepLinks';
 import { useFoldColumns } from '../../hooks/useFoldColumns';
 
@@ -140,6 +143,8 @@ export default function InsightsPage() {
   const nav = useAppNavigation();
   const confirm = useConfirm();
   const { isPro, isReady, isConfigured } = usePurchases();
+  const { settings } = useSettings();
+  const tempScale = settings.temperatureScale === 'Metric' ? 'metric' : 'imperial';
 
   const [data,          setData]          = useState<InsightsData | null>(null);
   const [loading,       setLoading]       = useState(true);
@@ -148,6 +153,7 @@ export default function InsightsPage() {
   const [donateExpanded, setDonateExpanded] = useState(false);
   const [windowDays,    setWindowDays]    = useState<number>(90);
   const [showDonationShare, setShowDonationShare] = useState(false);
+  const [showDnaShare, setShowDnaShare] = useState(false);
 
   // Animated ring value (0 → utilizationRate)
   const ringAnim = useRef(new Animated.Value(0)).current;
@@ -306,7 +312,9 @@ export default function InsightsPage() {
     );
   }
 
-  const { health, styleDNA, topWorn, sleeping, colorPairs, gaps } = data;
+  const { health, styleDNA, archetype, topWorn, sleeping, colorPairs, gaps } = data;
+  // Style DNA only shows from LEARNING_THRESHOLD outfits ('none' renders no card).
+  const dnaLevel = styleDNA.level === 'active' ? 'active' : 'learning';
 
   // Ring color based on utilization
   const ringColor =
@@ -450,12 +458,18 @@ export default function InsightsPage() {
             accessibilityLabel="Unlock Style DNA with Ojo Pro"
           >
             <GlassCard style={styles.dnaCard}>
-              <View style={styles.dnaHeader}>
-                <Text style={styles.dnaTitle}>Style DNA</Text>
-              </View>
-              <Text style={styles.dnaLockedSub}>
-                Your top colors, fabrics, and color pairings — unlock with Ojo Pro.
-              </Text>
+              {archetype ? (
+                <StyleDnaHero archetype={archetype} level={dnaLevel} tempScale={tempScale} locked />
+              ) : (
+                <>
+                  <View style={styles.dnaHeader}>
+                    <Text style={styles.dnaTitle}>Style DNA</Text>
+                  </View>
+                  <Text style={styles.dnaLockedSub}>
+                    Your top colors, fabrics, and color pairings — unlock with Ojo Pro.
+                  </Text>
+                </>
+              )}
               <Text style={styles.dnaLockedCta}>Unlock →</Text>
             </GlassCard>
           </Pressable>
@@ -463,24 +477,35 @@ export default function InsightsPage() {
 
         {styleDNA.level !== 'none' && (isPro || !isConfigured) && (
           <GlassCard style={styles.dnaCard}>
-            <View style={styles.dnaHeader}>
-              <Text style={styles.dnaTitle}>Style DNA</Text>
-              <View
-                style={[
-                  styles.dnaBadge,
-                  styleDNA.level === 'learning' && styles.dnaBadgeLearning,
-                ]}
-              >
-                <Text
+            {/* The named, generative header. Without a worn color there's no
+                name to give, so the plain title stays. */}
+            {archetype ? (
+              <StyleDnaHero
+                archetype={archetype}
+                level={dnaLevel}
+                tempScale={tempScale}
+                onShare={() => setShowDnaShare(true)}
+              />
+            ) : (
+              <View style={styles.dnaHeader}>
+                <Text style={styles.dnaTitle}>Style DNA</Text>
+                <View
                   style={[
-                    styles.dnaBadgeText,
-                    styleDNA.level === 'learning' && styles.dnaBadgeTextLearning,
+                    styles.dnaBadge,
+                    styleDNA.level === 'learning' && styles.dnaBadgeLearning,
                   ]}
                 >
-                  {styleDNA.level === 'active' ? '✦ Personalized' : 'Still learning'}
-                </Text>
+                  <Text
+                    style={[
+                      styles.dnaBadgeText,
+                      styleDNA.level === 'learning' && styles.dnaBadgeTextLearning,
+                    ]}
+                  >
+                    {styleDNA.level === 'active' ? '✦ Personalized' : 'Still learning'}
+                  </Text>
+                </View>
               </View>
-            </View>
+            )}
 
             {/* Top colors */}
             {styleDNA.topColors.length > 0 && (
@@ -863,6 +888,19 @@ export default function InsightsPage() {
             <DonationListShareCard ref={cardRef} items={queuedInsights} />
           )}
           attributionURL={donationShareLink()}
+        />
+      )}
+      {showDnaShare && archetype && (
+        // No attributionURL: a link sticker needs a /s/style route on the
+        // server and an ojo:// branch first (see lib/share/deepLinks).
+        <ShareToInstagramSheet
+          visible
+          onClose={() => setShowDnaShare(false)}
+          renderCard={(cardRef) => (
+            <StyleDnaShareCard ref={cardRef} archetype={archetype} tempScale={tempScale} />
+          )}
+          backgroundTopColor='#0B1120'
+          backgroundBottomColor='#111A2E'
         />
       )}
     </SafeAreaView>

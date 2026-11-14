@@ -88,7 +88,7 @@ export default function AccountLayout() {
             />
             <Stack.Screen
                 name='history'
-                options={{ ...subScreen, title: 'History' }}
+                options={{ ...subScreen, title: 'Wear Calendar' }}
             />
             {/* Recap ships its own always-dark masthead + nav row (redesign). */}
             <Stack.Screen
