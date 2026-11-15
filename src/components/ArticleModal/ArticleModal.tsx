@@ -773,6 +773,10 @@ const ArticleModal = ({
                             {isEditing ? 'Edit Article' : 'Add Article'}
                         </Text>
                     </RNView>
+                    {/* In the two-pane Closet (iPhone Duo) the pane always shows a
+                        piece, so ✕ only fell back to the first one and looked
+                        dead. The footer's Cancel still backs out of an add. */}
+                    {!inline && (
                     <Pressable
                         style={st.closeBtn}
                         onPress={onClose}
@@ -782,6 +786,7 @@ const ArticleModal = ({
                     >
                         <Text style={st.closeBtnText}>✕</Text>
                     </Pressable>
+                    )}
                 </View>
 
                 <ScrollView

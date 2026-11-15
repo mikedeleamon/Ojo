@@ -5,6 +5,7 @@ import SettingsScreen from '../../src/features/settings/SettingsScreen';
 import { useFoldLayout } from '../../src/context/FoldLayoutContext';
 import { useAuth } from '../../src/context/AuthContext';
 import { useTheme } from '../../src/theme/ThemeContext';
+import { useSideRail } from '../../src/hooks/useSideRail';
 
 function AccountBackButton({ color }: { color: string }) {
     const router = useRouter();
@@ -47,6 +48,12 @@ export default function AccountLayout() {
     // right, so a row opens beside the list. The stack keeps its place in the
     // tree (by key), which means folding can't remount it and lose a form.
     const showList = fold.mode === 'two-pane' && fold.axis === 'row' && !FULL_SCREEN_ROUTES.has(route);
+    // iPhone Duo: the back button is a native nav-bar item, which iOS places in
+    // the side column with the other page buttons (Duo HIG). Beside the list
+    // there's nothing to go back to, so the item takes you Home instead (the
+    // list's own Home button is hidden on the Duo; see SettingsScreen).
+    const sideRail = useSideRail();
+    const router = useRouter();
 
     const subScreen = {
         headerShown: true,
@@ -60,8 +67,28 @@ export default function AccountLayout() {
         // renders unconditionally and falls back to /account when there's nothing
         // to pop.
         // Beside the list there's nothing to go back to.
-        headerLeft: showList ? undefined : () => <AccountBackButton color={colors.textPrimary} />,
-        headerBackVisible: showList ? false : undefined,
+        headerLeft: showList || sideRail ? undefined : () => <AccountBackButton color={colors.textPrimary} />,
+        headerBackVisible: showList || sideRail ? false : undefined,
+        unstable_headerLeftItems: sideRail
+            ? () => [
+                  showList
+                      ? {
+                            type: 'button' as const,
+                            label: 'Home',
+                            icon: { type: 'sfSymbol' as const, name: 'house' as const },
+                            tintColor: colors.textPrimary,
+                            onPress: () => router.navigate('/(tabs)'),
+                        }
+                      : {
+                            type: 'button' as const,
+                            label: 'Back',
+                            icon: { type: 'sfSymbol' as const, name: 'chevron.left' as const },
+                            tintColor: colors.textPrimary,
+                            onPress: () =>
+                                router.canGoBack() ? router.back() : router.replace('/account'),
+                        },
+              ]
+            : undefined,
     };
 
     return (

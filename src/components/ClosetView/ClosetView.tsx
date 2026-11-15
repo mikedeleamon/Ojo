@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
     ScrollView,
     FlatList,
@@ -18,7 +18,7 @@ import { spacing } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 import { hapticImpact } from '../../lib/haptics';
 import { getErrorMessage } from '../../lib/auth';
-import { limitCodeOf } from '../../config/limits';
+import { LIMIT_CODES, limitCodeOf } from '../../config/limits';
 import { makeStyles } from './ClosetView.styles';
 import {
     SearchIcon,
@@ -46,6 +46,10 @@ import { articleCategories } from '../../types';
 import { SwipeableArticleCard, TileArticleCard } from './ArticleCard';
 import { useFoldLayout } from '../../context/FoldLayoutContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useIconOnlyNav } from '../../hooks/useIconOnlyNav';
+import { SparkleIcon } from '../icons/GlyphIcons';
+import { useSideRail } from '../../hooks/useSideRail';
+import { useSideColumnAction } from '../../hooks/useSideColumnBack';
 import { PanePlaceholder } from '../layout/PanePlaceholder';
 
 type SortMode = 'default' | 'type' | 'color' | 'wornRecent' | 'wornStale';
@@ -78,7 +82,7 @@ interface Props {
     showItemWarning?: boolean;
     /** Route to the paywall. Called instead of opening an add flow the account
      *  cannot complete, so the user meets the wall BEFORE doing the work. */
-    onUpgrade?: () => void;
+    onUpgrade?: (from: 'items' | 'closets') => void;
     /** Pull-to-refresh handler; resolves when the refetch settles. */
     onRefresh?: () => Promise<void>;
     /** Bottom padding so scroll content clears the floating pill tab bar */
@@ -113,6 +117,8 @@ const ClosetView = ({
     const { width: windowWidth } = useWindowDimensions();
     const fold = useFoldLayout();
     const { right: rightInset } = useSafeAreaInsets();
+    // Regular iPhone: the banner's Go Pro link is a sparkle, not text (useIconOnlyNav).
+    const iconOnlyNav = useIconOnlyNav();
     const twoPane = fold.mode === 'two-pane' && fold.axis === 'row' && fold.panes !== null;
     const listWidth = twoPane && fold.panes ? fold.panes.primary.width : windowWidth - rightInset;
     const tileWidth = Math.floor(
@@ -165,7 +171,7 @@ const ClosetView = ({
         // The widget's ojo://closet/new deep link lands here directly, so it
         // has to respect the cap too — otherwise it is a way around the "+".
         if (canAddCloset) setCreating(true);
-        else onUpgrade?.();
+        else onUpgrade?.('closets');
     }, [autoCreate, canAddCloset, onUpgrade]);
 
     const selected = closets.find((c) => c._id === selectedId) ?? closets[0];
@@ -257,7 +263,7 @@ const ClosetView = ({
             if (limitCodeOf(err)) {
                 setNewName('');
                 setCreating(false);
-                onUpgrade?.();
+                onUpgrade?.(limitCodeOf(err) === LIMIT_CODES.item ? 'items' : 'closets');
                 return;
             }
             Alert.alert('Error', getErrorMessage(err, 'Failed to create closet.'));
@@ -321,7 +327,7 @@ const ClosetView = ({
         // Checked before the chooser opens, not after the photo is taken and
         // the attributes are filled in. The server refuses either way; the
         // point of checking here is that the user hasn't spent the effort yet.
-        if (!canAddItem) { onUpgrade?.(); return; }
+        if (!canAddItem) { onUpgrade?.('items'); return; }
         // Pass the closet the user is viewing so the photo path files the new
         // item here too — matching "Enter Manually" (which uses selected._id)
         // instead of silently defaulting to the preferred closet.
@@ -335,6 +341,28 @@ const ClosetView = ({
             { text: 'Cancel', style: 'cancel' },
         ]);
     };
+
+    // iPhone Duo: Add is the white button in the side column instead of the
+    // floating +, shown whenever the + would be. The ref keeps the native item
+    // stable while openAddChooser is rebuilt each render.
+    const sideRail = useSideRail();
+    const openAddRef = useRef(openAddChooser);
+    openAddRef.current = openAddChooser;
+    const showAdd = !!selected && !addingManually && (twoPane || !editingArticle);
+    const sideColumnAdd = useMemo(
+        () =>
+            showAdd
+                ? {
+                      label: 'Add',
+                      sfSymbol: 'plus',
+                      variant: 'prominent' as const,
+                      tintColor: '#FFFFFF',
+                      onPress: () => openAddRef.current(),
+                  }
+                : null,
+        [showAdd],
+    );
+    useSideColumnAction(sideColumnAdd);
 
     const openSortMenu = () => {
         const tick = (mode: SortMode) => (sortBy === mode ? '✓  ' : '    ');
@@ -464,7 +492,7 @@ const ClosetView = ({
                 <GlassCard glassStyle='clear' style={styles.newClosetBtn}>
                     <Pressable
                         style={styles.iconBtnFill}
-                        onPress={() => (canAddCloset ? setCreating(true) : onUpgrade?.())}
+                        onPress={() => (canAddCloset ? setCreating(true) : onUpgrade?.('closets'))}
                         accessibilityLabel={canAddCloset ? 'New closet' : 'New closet — requires Ojo Pro'}
                         accessibilityRole='button'
                     >
@@ -587,7 +615,7 @@ const ClosetView = ({
             {itemLimit !== null && (showItemWarning || !canAddItem) && (
                 <Pressable
                     style={styles.limitBanner}
-                    onPress={onUpgrade}
+                    onPress={() => onUpgrade?.('items')}
                     accessibilityRole='button'
                     accessibilityLabel='Upgrade to Ojo Pro for unlimited items'
                 >
@@ -596,7 +624,11 @@ const ClosetView = ({
                             ? `${itemLimit - itemCount} item${itemLimit - itemCount === 1 ? '' : 's'} left on the free plan.`
                             : `You've filled all ${itemLimit} free item slots. Everything you've added stays right here.`}
                     </Text>
-                    <Text style={styles.limitBannerCta}>Go Pro →</Text>
+                    {iconOnlyNav ? (
+                        <SparkleIcon size={20} color={colors.textPrimary} />
+                    ) : (
+                        <Text style={styles.limitBannerCta}>Go Pro →</Text>
+                    )}
                 </Pressable>
             )}
 
@@ -826,7 +858,7 @@ const ClosetView = ({
             {/* ── Floating action button — opens the add-article chooser ──
                 In two panes the piece opens beside the list, so the list keeps
                 its button. */}
-            {selected && !addingManually && (twoPane || !editingArticle) && (
+            {selected && !addingManually && (twoPane || !editingArticle) && !sideRail && (
                 <Pressable
                     style={styles.fab}
                     onPress={openAddChooser}

@@ -379,6 +379,7 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         fontSize: fontSizes.xs,
         color: colors.textSecondary,
     },
+    confirmMoment: { marginTop: spacing.sm },
     confirmUndo: {
         alignSelf: 'center' as const,
         paddingVertical: 6,

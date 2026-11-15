@@ -17,6 +17,8 @@ import { useClosets } from '../../hooks/useClosets';
 import { useTabBarPadding } from '../../hooks/useTabBarPadding';
 import { useReduceMotion } from '../../hooks/useReduceMotion';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
+import { useIconOnlyNav } from '../../hooks/useIconOnlyNav';
+import { ArrowRightIcon } from '../../components/icons/GlyphIcons';
 import { useConfirm } from '../../components/ConfirmDialog';
 import { usePurchases } from '../../context/PurchasesContext';
 import { hapticSelection, hapticSuccess } from '../../lib/haptics';
@@ -141,6 +143,8 @@ export default function InsightsPage() {
   const columns = useFoldColumns(spacing.md);
   const reduceMotion = useReduceMotion();
   const nav = useAppNavigation();
+  // Regular iPhone: links to other pages show an icon, not text (useIconOnlyNav).
+  const iconOnlyNav = useIconOnlyNav();
   const confirm = useConfirm();
   const { isPro, isReady, isConfigured } = usePurchases();
   const { settings } = useSettings();
@@ -300,10 +304,15 @@ export default function InsightsPage() {
                 style={styles.ctaBtn}
                 onPress={() => nav.push('/(tabs)/closet')}
                 accessibilityRole="button"
+                accessibilityLabel={closets.length === 0 ? 'Create a closet' : 'Go to Closet'}
               >
-                <Text style={styles.ctaBtnText}>
-                  {closets.length === 0 ? 'Create a closet' : 'Go to Closet'}
-                </Text>
+                {iconOnlyNav ? (
+                  <HangerIcon size={24} color={colors.saveBtnText} decorative />
+                ) : (
+                  <Text style={styles.ctaBtnText}>
+                    {closets.length === 0 ? 'Create a closet' : 'Go to Closet'}
+                  </Text>
+                )}
               </Pressable>
             </View>
           </GlassCard>
@@ -375,7 +384,11 @@ export default function InsightsPage() {
                 ? 'Add prices to unlock cost-per-wear analytics'
                 : `${health.pricedCount} of ${health.totalArticles} items priced — add more`}
             </Text>
-            <Text style={styles.priceNudgeCta}>Add →</Text>
+            {iconOnlyNav ? (
+              <ArrowRightIcon color={colors.textPrimary} />
+            ) : (
+              <Text style={styles.priceNudgeCta}>Add →</Text>
+            )}
           </Pressable>
         )}
 
@@ -453,7 +466,7 @@ export default function InsightsPage() {
             card behind a paywall that can only say "check back soon". */}
         {styleDNA.level !== 'none' && isConfigured && isReady && !isPro && (
           <Pressable
-            onPress={() => nav.push('/account/upgrade')}
+            onPress={() => nav.push('/account/upgrade', { from: 'styledna' })}
             accessibilityRole="button"
             accessibilityLabel="Unlock Style DNA with Ojo Pro"
           >

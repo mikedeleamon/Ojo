@@ -19,6 +19,8 @@ import { isGoogleSignInAvailable, signInWithGoogle } from '../../lib/googleSignI
 import { markOnboardingPending } from '../../lib/onboarding';
 import GoogleGlyph from '../../components/icons/GoogleGlyph';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
+import { useIconOnlyNav } from '../../hooks/useIconOnlyNav';
+import { KeyIcon, PersonPlusIcon } from '../../components/icons/GlyphIcons';
 import { spacing, radius, fonts, fontSizes } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 import LegalConsentNotice from '../../components/LegalConsentNotice';
@@ -51,6 +53,8 @@ export default function LoginPage({ onLogin }: Props) {
     );
 
     const nav = useAppNavigation();
+    // Regular iPhone: links to other pages show an icon, not text (useIconOnlyNav).
+    const iconOnlyNav = useIconOnlyNav();
     const [identifier, setIdentifier] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState<string | null>(null);
@@ -210,8 +214,13 @@ export default function LoginPage({ onLogin }: Props) {
                         onPress={() => nav.push('/(auth)/forgot-password')}
                         accessibilityRole="link"
                         accessibilityLabel="Forgot password"
+                        hitSlop={10}
                     >
-                        <Text style={styles.linkMuted}>Forgot password?</Text>
+                        {iconOnlyNav ? (
+                            <KeyIcon color={colors.textSecondary} />
+                        ) : (
+                            <Text style={styles.linkMuted}>Forgot password?</Text>
+                        )}
                     </Pressable>
                 </View>
 
@@ -237,8 +246,14 @@ export default function LoginPage({ onLogin }: Props) {
                     <Pressable
                         onPress={() => nav.push('/(auth)/signup')}
                         accessibilityRole="link"
+                        accessibilityLabel="Sign up"
+                        hitSlop={10}
                     >
-                        <Text style={styles.link}>Sign up</Text>
+                        {iconOnlyNav ? (
+                            <PersonPlusIcon color={colors.textPrimary} />
+                        ) : (
+                            <Text style={styles.link}>Sign up</Text>
+                        )}
                     </Pressable>
                 </View>
 

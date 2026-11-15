@@ -108,3 +108,89 @@ export const PhotoLibraryIcon = ({
         <Path d='m21 15-5-5L5 21' />
     </Svg>
 );
+
+// ─── Navigation glyphs ──────────────────────────────────────────────────────
+// On a regular iPhone, buttons that open another page show one of these in
+// place of their text label (see useIconOnlyNav). The control keeps the old
+// text as its accessibilityLabel.
+
+/** Left chevron — back / return to the previous page. */
+export const ChevronLeftIcon = ({
+    size = 20,
+    color = 'rgba(255,255,255,0.85)',
+    strokeWidth = 2,
+    decorative = true,
+}: GlyphProps) => (
+    <Svg {...base(size, color, strokeWidth, decorative)}>
+        <Path d='M15 6l-6 6 6 6' />
+    </Svg>
+);
+
+/** Right arrow — "go to" for a nudge that opens another page. */
+export const ArrowRightIcon = ({
+    size = 18,
+    color = 'rgba(255,255,255,0.85)',
+    strokeWidth = 1.8,
+    decorative = true,
+}: GlyphProps) => (
+    <Svg {...base(size, color, strokeWidth, decorative)}>
+        <Line x1={5} y1={12} x2={19} y2={12} />
+        <Path d='M12 5l7 7-7 7' />
+    </Svg>
+);
+
+/** Key — forgot / reset password. */
+export const KeyIcon = ({
+    size = 20,
+    color = 'rgba(255,255,255,0.85)',
+    strokeWidth = 1.6,
+    decorative = true,
+}: GlyphProps) => (
+    <Svg {...base(size, color, strokeWidth, decorative)}>
+        <Circle cx={7.5} cy={15.5} r={4.5} />
+        <Path d='M10.7 12.3 21 2' />
+        <Path d='m16 7 3 3' />
+        <Path d='m19 4 2 2' />
+    </Svg>
+);
+
+/** Person with a plus — create an account. */
+export const PersonPlusIcon = ({
+    size = 20,
+    color = 'rgba(255,255,255,0.85)',
+    strokeWidth = 1.6,
+    decorative = true,
+}: GlyphProps) => (
+    <Svg {...base(size, color, strokeWidth, decorative)}>
+        <Path d='M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2' />
+        <Circle cx={9} cy={7} r={4} />
+        <Line x1={19} y1={8} x2={19} y2={14} />
+        <Line x1={22} y1={11} x2={16} y2={11} />
+    </Svg>
+);
+
+/** Arrow into a door — sign in. */
+export const SignInIcon = ({
+    size = 20,
+    color = 'rgba(255,255,255,0.85)',
+    strokeWidth = 1.6,
+    decorative = true,
+}: GlyphProps) => (
+    <Svg {...base(size, color, strokeWidth, decorative)}>
+        <Path d='M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4' />
+        <Path d='m10 17 5-5-5-5' />
+        <Line x1={15} y1={12} x2={3} y2={12} />
+    </Svg>
+);
+
+/** Four-point sparkle — Ojo Pro. */
+export const SparkleIcon = ({
+    size = 18,
+    color = 'rgba(255,255,255,0.85)',
+    strokeWidth = 1.6,
+    decorative = true,
+}: GlyphProps) => (
+    <Svg {...base(size, color, strokeWidth, decorative)}>
+        <Path d='M12 3c.5 4.5 2.5 6.5 7 7-4.5.5-6.5 2.5-7 7-.5-4.5-2.5-6.5-7-7 4.5-.5 6.5-2.5 7-7z' />
+    </Svg>
+);

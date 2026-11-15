@@ -31,6 +31,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { View, Text, GlassCard } from '../primitives';
 import GearIcon from '../icons/GearIcon';
+import { useIconOnlyNav } from '../../hooks/useIconOnlyNav';
 import LocationsIcon from '../icons/LocationsIcon';
 import CameraIcon from '../icons/CameraIcon';
 import api from '../../api/client';
@@ -295,6 +296,8 @@ const WeatherHUD = ({
           }
         : null;
     const nav = useAppNavigation();
+    // Regular iPhone: page links show an icon, not text (useIconOnlyNav).
+    const iconOnlyNav = useIconOnlyNav();
     // Seed the resolved place (coords + city name) from the cached snapshot so
     // the city label paints immediately on a warm load, in lockstep with the
     // rest of the HUD — instead of lagging behind the async geocode below.
@@ -1026,8 +1029,13 @@ const WeatherHUD = ({
                     onPress={() => nav.push('/account')}
                     accessibilityRole='button'
                     accessibilityLabel='Check settings'
+                    hitSlop={10}
                 >
-                    <Text style={st.settingsLink}>Check settings</Text>
+                    {iconOnlyNav ? (
+                        <GearIcon stroke={colors.textSecondary} decorative />
+                    ) : (
+                        <Text style={st.settingsLink}>Check settings</Text>
+                    )}
                 </Pressable>
             </View>
         );

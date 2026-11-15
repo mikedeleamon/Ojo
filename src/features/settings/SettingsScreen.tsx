@@ -14,6 +14,8 @@ import { spacing, radius, fonts, fontSizes, fontWeights } from '../../theme/toke
 import { useTheme } from '../../theme/ThemeContext';
 import type { ViewRef } from '../../types/nativeRefs';
 import { usePaneOverlay } from '../../hooks/usePaneOverlay';
+import { useSideRail } from '../../hooks/useSideRail';
+import { useSideColumnBack } from '../../hooks/useSideColumnBack';
 
 interface Props {
     onLogout?: () => void;
@@ -129,6 +131,16 @@ export default function SettingsScreen({ onLogout, embedded = false, activeRoute
     }), [colors]);
 
     const nav = useAppNavigation();
+
+    // iPhone Duo: the back button lives in the side column with the other page
+    // buttons. Embedded beside a page, the list isn't a Stack screen of its own,
+    // so the account layout puts a Home item on that page's header instead.
+    const sideRail = useSideRail();
+    const sideColumnBack = useMemo(
+        () => (embedded ? null : { label: 'Back', onPress: () => nav.goBack(), tintColor: colors.textPrimary }),
+        [embedded, nav, colors.textPrimary],
+    );
+    useSideColumnBack(sideColumnBack);
     const { settings, refreshSettings } = useSettings();
     const [showLogout, setShowLogout] = useState(false);
     // Let the push transition animate against a light screen, then mount the
@@ -208,6 +220,7 @@ export default function SettingsScreen({ onLogout, embedded = false, activeRoute
             edges={embedded ? ['top', 'left', 'bottom'] : undefined}
         >
             <View style={styles.header}>
+                {!sideRail && (
                 <Pressable
                     onPress={() => (embedded ? router.navigate('/(tabs)') : nav.goBack())}
                     style={styles.backBtn}
@@ -216,6 +229,7 @@ export default function SettingsScreen({ onLogout, embedded = false, activeRoute
                 >
                     <Text style={[styles.backArrow, { color: colors.textPrimary }]}>‹</Text>
                 </Pressable>
+                )}
                 <Text style={styles.title}>Account</Text>
             </View>
 

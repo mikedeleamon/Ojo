@@ -30,6 +30,8 @@ import { loadHistory } from '../../../lib/outfitHistory';
 import { useClosets } from '../../../hooks/useClosets';
 import { usePurchases } from '../../../context/PurchasesContext';
 import { useAppNavigation } from '../../../hooks/useAppNavigation';
+import { useIconOnlyNav } from '../../../hooks/useIconOnlyNav';
+import { SparkleIcon } from '../../../components/icons/GlyphIcons';
 import {
     derivePreferenceProfile,
     UserPreferenceProfile,
@@ -429,6 +431,8 @@ const StyleDNACard = ({
     onUnlock: () => void;
 }) => {
     const { colors } = useTheme();
+    // Regular iPhone: the Unlock link (opens Ojo Pro) is a sparkle, not text.
+    const iconOnlyNav = useIconOnlyNav();
     const dna = computeStyleDNA(prefs);
     const levelColor = LEVEL_COLORS[dna.level];
     // Continuous progress: 0 → 30 outfits maps linearly to 0% → 100%, so the
@@ -494,7 +498,11 @@ const StyleDNACard = ({
                     <Text style={styles.dnaUnlockText}>
                         See the colors, fabrics and pairings Ojo has learned
                     </Text>
-                    <Text style={styles.dnaUnlockCta}>Unlock →</Text>
+                    {iconOnlyNav ? (
+                        <SparkleIcon size={20} color={colors.textPrimary} />
+                    ) : (
+                        <Text style={styles.dnaUnlockCta}>Unlock →</Text>
+                    )}
                 </Pressable>
             )}
         </View>
@@ -773,7 +781,7 @@ export default function PreferencesScreen() {
                             styles={styles}
                             unlocked={dnaUnlocked}
                             locked={dnaLocked}
-                            onUnlock={() => nav.push('/account/upgrade')}
+                            onUnlock={() => nav.push('/account/upgrade', { from: 'styledna' })}
                         />
                     </View>
 

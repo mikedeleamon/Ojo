@@ -105,7 +105,7 @@ export default function ClosetPage() {
         canAddItem={canAddItem}
         canAddCloset={canAddCloset}
         showItemWarning={showItemWarning}
-        onUpgrade={() => push(UPGRADE_ROUTE)}
+        onUpgrade={(from) => push(UPGRADE_ROUTE, { from })}
         onTripFit={() => push('/(tabs)/tripfit')}
         onRefresh={hardRefresh}
         tabClearance={tabPad}
