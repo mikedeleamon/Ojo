@@ -15,7 +15,8 @@ import {
     StyleSheet,
     useWindowDimensions,
 } from 'react-native';
-import { useRouter, Stack } from 'expo-router';
+import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
+import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -52,6 +53,17 @@ import {
     IS_TEST_STORE,
 } from '../../context/PurchasesContext';
 import { FREE_ITEM_LIMIT } from '../../config/limits';
+import {
+    FEATURE_COPY,
+    featureFor,
+    featureOrder,
+    parsePaywallFrom,
+    pitchFor,
+} from '../../lib/paywall/pitch';
+import type { PaywallFrom, PaywallProof, ProFeature } from '../../lib/paywall/pitch';
+import { usePaywallProof } from '../../hooks/usePaywallProof';
+import { LEARNING_THRESHOLD } from '../../lib/userPreferences';
+import { swatchHex } from '../InsightsPage/swatches';
 import {
     cancelFeedback,
     offeringStateFrom,
@@ -185,6 +197,10 @@ export default function UpgradeScreen() {
     const router = useRouter();
     const { colors } = useTheme();
     const { isConfigured, isPro, isReady } = usePurchases();
+    // Which gate opened the paywall; picks the pitch and is recorded with a
+    // purchase. Unknown or missing → the general pitch.
+    const { from: fromParam } = useLocalSearchParams<{ from?: string }>();
+    const from = parsePaywallFrom(fromParam);
 
     const close = () => {
         if (router.canGoBack()) router.back();
@@ -327,7 +343,7 @@ export default function UpgradeScreen() {
         );
     }
 
-    return <OjoProPaywall onClose={close} />;
+    return <OjoProPaywall onClose={close} from={from} />;
 }
 
 type PlanKey = 'monthly' | 'annual';
@@ -471,8 +487,20 @@ function purchaseFailure(error: unknown): Feedback | null {
     }
 }
 
-function OjoProPaywall({ onClose }: { onClose: () => void }) {
+function OjoProPaywall({
+    onClose,
+    from,
+}: {
+    onClose: () => void;
+    from: PaywallFrom;
+}) {
     const insets = useSafeAreaInsets();
+    // The pitch follows why the paywall was opened, and is made concrete with
+    // the person's own numbers. See src/lib/paywall/pitch.ts.
+    const proof = usePaywallProof();
+    const pitch = pitchFor(from, proof);
+    const lead = featureFor(from);
+    const rows = featureOrder(from);
     // Two panes: the pitch on the left. The plans, CTA, Restore and legal copy all
     // stay together on the right, because App Review expects them in one place.
     const columns = useFoldColumns(20);
@@ -664,6 +692,11 @@ function OjoProPaywall({ onClose }: { onClose: () => void }) {
             );
         }, PURCHASE_STALL_MS);
 
+        // Which gate led here, on the RevenueCat customer, so each gate's
+        // conversion shows on the dashboard. Never awaited: a slow or failed
+        // attribute call must not hold up the purchase.
+        Purchases.setAttributes({ paywall_from: from }).catch(() => {});
+
         try {
             const { customerInfo } =
                 await Purchases.purchasePackage(selectedPkg);
@@ -709,7 +742,7 @@ function OjoProPaywall({ onClose }: { onClose: () => void }) {
             focus.remove();
             if (mounted.current) setPurchasing(false);
         }
-    }, [selectedPkg, purchasing, onClose, say]);
+    }, [selectedPkg, purchasing, onClose, say, from]);
 
     const handleRestore = useCallback(async () => {
         if (restoring) return;
@@ -806,42 +839,29 @@ function OjoProPaywall({ onClose }: { onClose: () => void }) {
                             color='#ffffff'
                         />
                         <Text style={styles.eyebrow}>Ojo Pro</Text>
-                        <Text style={styles.headline}>
-                            Room for{'\n'}everything you own.
-                        </Text>
-                        <Text style={styles.subhead}>
-                            Ojo gets smarter every time you use it. Pro lifts
-                            the limits and opens up what it learns.
-                        </Text>
+                        <Text style={styles.headline}>{pitch.headline}</Text>
+                        <Text style={styles.subhead}>{pitch.subhead}</Text>
                     </View>
 
+                    {/* The person's own numbers. Left out on the Duo cover,
+                        where the plans and button need the room. */}
+                    {!titlesOnly && <ProofCard lead={lead} proof={proof} />}
+
                     <View style={[styles.features, titlesOnly && styles.featuresGrid]}>
-                        {/* Ordered by how often each gate is actually met, so
-                            the first row is the reason most people are here. */}
-                        <FeatureRow
-                            titleOnly={titlesOnly}
-                            icon={<HangerIcon size={23} color='#ffffff' decorative />}
-                            title='Unlimited items'
-                            body={`Free covers ${FREE_ITEM_LIMIT} items — enough for a full year of weather. Pro removes the cap.`}
-                        />
-                        <FeatureRow
-                            titleOnly={titlesOnly}
-                            icon={<GridIcon size={22} color='#ffffff' />}
-                            title='Unlimited closets'
-                            body='Free includes one closet. Pro adds a travel closet, a seasonal one, as many as you like.'
-                        />
-                        <FeatureRow
-                            titleOnly={titlesOnly}
-                            icon={<TripFitIcon size={24} />}
-                            title='Unlimited saved trips'
-                            body="Free keeps 1 trip at a time. Pro keeps every trip you're planning."
-                        />
-                        <FeatureRow
-                            titleOnly={titlesOnly}
-                            icon={<StyleDnaGlyph size={21} />}
-                            title='Your Style DNA'
-                            body='Top colors, fabrics and pairings, learned from what you actually wear.'
-                        />
+                        {/* The feature the person came for leads and is
+                            outlined; the rest follow in the order each gate is
+                            most often met. */}
+                        {rows.map((feature) => (
+                            <FeatureRow
+                                key={feature}
+                                titleOnly={titlesOnly}
+                                lead={feature === lead}
+                                icon={FEATURE_ICON[feature]}
+                                title={FEATURE_COPY[feature].title}
+                                shortTitle={FEATURE_COPY[feature].short}
+                                body={FEATURE_COPY[feature].body}
+                            />
+                        ))}
                     </View>
 
                     </View>
@@ -1229,26 +1249,40 @@ function StyleDnaGlyph({ size = 21 }: { size?: number }) {
     );
 }
 
+/** Each feature's icon, keyed like FEATURE_COPY. */
+const FEATURE_ICON: Record<ProFeature, ReactNode> = {
+    items: <HangerIcon size={23} color='#ffffff' decorative />,
+    closets: <GridIcon size={22} color='#ffffff' />,
+    trips: <TripFitIcon size={24} />,
+    styledna: <StyleDnaGlyph size={21} />,
+};
+
 function FeatureRow({
     icon,
     title,
+    shortTitle,
     body,
     titleOnly = false,
+    lead = false,
 }: {
     icon: ReactNode;
     title: string;
+    shortTitle: string;
     body: string;
     titleOnly?: boolean;
+    /** The feature the person came for: outlined, so it reads as the answer. */
+    lead?: boolean;
 }) {
     if (titleOnly) {
-        return (
-            <GlassCard style={styles.featureTile}>
+        const tile = (
+            <GlassCard style={[styles.featureTile, lead && styles.featureTileInFrame]}>
                 <View style={styles.featureTileIcon}>{icon}</View>
-                <Text style={styles.featureTileTitle} numberOfLines={2}>{title}</Text>
+                <Text style={styles.featureTileTitle} numberOfLines={2}>{shortTitle}</Text>
             </GlassCard>
         );
+        return lead ? <View style={styles.featureTileLeadFrame}>{tile}</View> : tile;
     }
-    return (
+    const card = (
         <GlassCard style={styles.featureRow}>
             <View style={styles.featureIconWrap}>{icon}</View>
             <View style={styles.featureTextWrap}>
@@ -1257,6 +1291,170 @@ function FeatureRow({
             </View>
         </GlassCard>
     );
+    // The ring sits on a wrapper, as on the plan cards: the native glass path
+    // strips border styles from GlassCard itself.
+    return lead ? <View style={styles.featureLeadFrame}>{card}</View> : card;
+}
+
+/**
+ * The person's own numbers, matched to why they opened the paywall. Renders
+ * nothing when there is nothing real to show yet (a new account, data still
+ * loading), rather than a card of zeros.
+ */
+function ProofCard({ lead, proof }: { lead: ProFeature | null; proof: PaywallProof }) {
+    const outfits = proof.outfitCount;
+
+    switch (lead) {
+        case 'items': {
+            if (proof.itemCount === 0) return null;
+            const fill = Math.min(1, proof.itemCount / FREE_ITEM_LIMIT);
+            return (
+                <GlassCard style={styles.proofCard}>
+                    <Text style={styles.proofLabel}>Your closet</Text>
+                    <View style={styles.proofSplit}>
+                        <Text style={styles.proofValue}>
+                            {proof.itemCount > FREE_ITEM_LIMIT
+                                ? `${proof.itemCount} items · Free covers ${FREE_ITEM_LIMIT}`
+                                : `${proof.itemCount} of ${FREE_ITEM_LIMIT} items`}
+                        </Text>
+                        {outfits > 0 && (
+                            <Text style={styles.proofAside}>
+                                {outfits} {outfits === 1 ? 'outfit' : 'outfits'} logged
+                            </Text>
+                        )}
+                    </View>
+                    <View style={styles.proofTrack}>
+                        <View style={[styles.proofFill, { width: `${Math.round(fill * 100)}%` }]} />
+                    </View>
+                </GlassCard>
+            );
+        }
+
+        case 'styledna': {
+            if (proof.topColors.length === 0) {
+                // Below 10 outfits there is no Style DNA to preview yet, so
+                // show the way there instead of invented colors.
+                const left = Math.max(1, LEARNING_THRESHOLD - outfits);
+                return (
+                    <GlassCard style={styles.proofCard}>
+                        <Text style={styles.proofLabel}>Your Style DNA</Text>
+                        <Text style={styles.proofValue}>
+                            Log {left} more {left === 1 ? 'outfit' : 'outfits'} and Ojo starts learning your colors.
+                        </Text>
+                        <View style={styles.proofTrack}>
+                            <View
+                                style={[
+                                    styles.proofFill,
+                                    { width: `${Math.round((Math.min(outfits, LEARNING_THRESHOLD) / LEARNING_THRESHOLD) * 100)}%` },
+                                ]}
+                            />
+                        </View>
+                    </GlassCard>
+                );
+            }
+            return (
+                <GlassCard style={styles.proofCard}>
+                    <Text style={styles.proofLabel}>Your Style DNA</Text>
+                    {/* Their real top colors, blurred, with the names left
+                        out: enough to recognise as theirs, not the answer. */}
+                    <View
+                        style={styles.proofSwatchWrap}
+                        accessible
+                        accessibilityLabel='Your Style DNA colors, hidden until you unlock Ojo Pro'
+                    >
+                        <View style={styles.proofSwatchRow}>
+                            {proof.topColors.map((name) => (
+                                <View
+                                    key={name}
+                                    style={[styles.proofSwatch, { backgroundColor: swatchHex(name) }]}
+                                />
+                            ))}
+                        </View>
+                        <BlurView
+                            tint='dark'
+                            intensity={45}
+                            style={StyleSheet.absoluteFill}
+                        />
+                        <View style={styles.proofLockWrap} pointerEvents='none'>
+                            <View style={styles.proofLockPill}>
+                                <Text style={styles.proofLockText}>Unlock</Text>
+                            </View>
+                        </View>
+                    </View>
+                    <Text style={styles.proofAside}>
+                        Learned from {outfits} {outfits === 1 ? 'outfit' : 'outfits'} you logged
+                    </Text>
+                </GlassCard>
+            );
+        }
+
+        case 'trips': {
+            if (!proof.tripName) return null;
+            return (
+                <GlassCard style={styles.proofCard}>
+                    <Text style={styles.proofLabel}>Your trips</Text>
+                    <View style={styles.proofTileRow}>
+                        <View style={styles.proofTile}>
+                            <TripFitIcon size={18} />
+                            <Text style={styles.proofTileText} numberOfLines={1}>
+                                {proof.tripName}
+                            </Text>
+                        </View>
+                        <View style={[styles.proofTile, styles.proofTileGhost]}>
+                            <Text style={styles.proofGhostText} numberOfLines={1}>
+                                + Your next trip
+                            </Text>
+                        </View>
+                    </View>
+                </GlassCard>
+            );
+        }
+
+        case 'closets': {
+            const first = proof.closetNames[0];
+            if (!first) return null;
+            const taken = new Set(proof.closetNames.map((n) => n.toLowerCase()));
+            const ideas = ['Travel', 'Work', 'Winter'].filter((n) => !taken.has(n.toLowerCase()));
+            return (
+                <GlassCard style={styles.proofCard}>
+                    <Text style={styles.proofLabel}>Your closets</Text>
+                    <View style={styles.proofTileRow}>
+                        <View style={[styles.proofTile, styles.proofTileStack]}>
+                            <Text style={styles.proofTileText} numberOfLines={1}>{first}</Text>
+                            <Text style={styles.proofGhostText}>{proof.itemCount} items</Text>
+                        </View>
+                        {ideas.map((name) => (
+                            <View key={name} style={[styles.proofTile, styles.proofTileGhost, styles.proofTileStack]}>
+                                <Text style={styles.proofGhostText} numberOfLines={1}>{name}</Text>
+                            </View>
+                        ))}
+                    </View>
+                </GlassCard>
+            );
+        }
+
+        default: {
+            if (outfits === 0 && proof.itemCount === 0) return null;
+            const stats: [number, string][] = [
+                [outfits, outfits === 1 ? 'outfit logged' : 'outfits logged'],
+                [proof.itemCount, proof.itemCount === 1 ? 'item' : 'items'],
+                [proof.tripCount, proof.tripCount === 1 ? 'trip saved' : 'trips saved'],
+            ];
+            return (
+                <GlassCard style={styles.proofCard}>
+                    <Text style={styles.proofLabel}>So far with Ojo</Text>
+                    <View style={styles.proofStats}>
+                        {stats.map(([value, label]) => (
+                            <View key={label} style={styles.proofStat}>
+                                <Text style={styles.proofStatValue}>{value}</Text>
+                                <Text style={styles.proofAside}>{label}</Text>
+                            </View>
+                        ))}
+                    </View>
+                </GlassCard>
+            );
+        }
+    }
 }
 
 function PlanCard({
@@ -1449,6 +1647,116 @@ const styles = StyleSheet.create({
         lineHeight: 18,
         color: 'rgba(255,255,255,0.78)',
     },
+
+    featureLeadFrame: {
+        borderRadius: radius.md,
+        borderWidth: 1.5,
+        borderColor: 'rgba(159,232,112,0.72)',
+        overflow: 'hidden',
+    },
+    // The frame takes the tile's place in the grid; the tile inside fills it.
+    featureTileLeadFrame: {
+        flexBasis: '47%',
+        flexGrow: 1,
+        borderRadius: radius.md,
+        borderWidth: 1.5,
+        borderColor: 'rgba(159,232,112,0.72)',
+        overflow: 'hidden',
+    },
+    featureTileInFrame: { flexBasis: 'auto', flexGrow: 1 },
+
+    proofCard: { borderRadius: radius.md, padding: 13, gap: 8 },
+    proofLabel: {
+        fontFamily: fonts.bodySemiBold,
+        fontSize: fontSizes.xs,
+        letterSpacing: 2,
+        textTransform: 'uppercase',
+        color: 'rgba(255,255,255,0.66)',
+    },
+    proofSplit: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'baseline',
+        flexWrap: 'wrap',
+        gap: 6,
+    },
+    proofValue: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.base,
+        lineHeight: 21,
+        color: '#ffffff',
+    },
+    proofAside: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.sm,
+        color: 'rgba(255,255,255,0.74)',
+    },
+    proofTrack: {
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: 'rgba(255,255,255,0.12)',
+        overflow: 'hidden',
+    },
+    proofFill: { height: 6, borderRadius: 3, backgroundColor: '#87DE5A' },
+    proofSwatchWrap: { borderRadius: 12, overflow: 'hidden' },
+    proofSwatchRow: { flexDirection: 'row', gap: 8, padding: 4 },
+    proofSwatch: { flex: 1, height: 40, borderRadius: 10 },
+    proofLockWrap: {
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    proofLockPill: {
+        paddingHorizontal: 14,
+        paddingVertical: 5,
+        borderRadius: 14,
+        backgroundColor: 'rgba(15,23,42,0.72)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.26)',
+    },
+    proofLockText: {
+        fontFamily: fonts.bodySemiBold,
+        fontSize: fontSizes.sm,
+        color: '#ffffff',
+    },
+    proofTileRow: { flexDirection: 'row', gap: 8 },
+    proofTile: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        minHeight: 40,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        borderRadius: 12,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.16)',
+    },
+    proofTileStack: { flexDirection: 'column', alignItems: 'flex-start', gap: 2 },
+    proofTileGhost: {
+        backgroundColor: 'transparent',
+        borderStyle: 'dashed',
+        borderColor: 'rgba(255,255,255,0.32)',
+    },
+    proofTileText: {
+        flexShrink: 1,
+        fontFamily: fonts.bodySemiBold,
+        fontSize: fontSizes.sm,
+        color: '#ffffff',
+    },
+    proofGhostText: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.sm,
+        color: 'rgba(255,255,255,0.66)',
+    },
+    proofStats: { flexDirection: 'row', justifyContent: 'space-around' },
+    proofStat: { alignItems: 'center', gap: 2 },
+    proofStatValue: { fontFamily: fonts.display, fontSize: 24, color: '#ffffff' },
 
     planRow: { flexDirection: 'row', gap: 10 },
     planSlot: { flex: 1 },

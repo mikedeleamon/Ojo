@@ -796,7 +796,7 @@ export default function CameraPage() {
     return inSecondaryPane(
       <LimitReachedScreen
         limit={itemLimit ?? FREE_ITEM_LIMIT}
-        onUpgrade={() => router.replace(UPGRADE_ROUTE as any)}
+        onUpgrade={() => router.replace({ pathname: UPGRADE_ROUTE, params: { from: 'items' } } as any)}
         onCancel={dismiss}
       />,
     );

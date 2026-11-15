@@ -20,6 +20,8 @@ import { climateBandLabel } from '../../lib/climate';
 import { makeStyles } from './OutfitSuggestion.styles';
 import { useTheme } from '../../theme/ThemeContext';
 import { spacing } from '../../theme/tokens';
+import { HangerIcon } from '../shared';
+import { useIconOnlyNav } from '../../hooks/useIconOnlyNav';
 
 interface Props {
     outfit: GenericOutfit;
@@ -32,6 +34,8 @@ interface Props {
 export default function GenericSuggestion({ outfit, title, ctaLabel, onCta }: Props) {
     const { colors } = useTheme();
     const styles = useMemo(() => makeStyles(colors), [colors]);
+    // The CTA opens the Closet; on a regular iPhone it shows the hanger, not text.
+    const iconOnlyNav = useIconOnlyNav();
 
     return (
         <View style={styles.genericCard}>
@@ -73,7 +77,11 @@ export default function GenericSuggestion({ outfit, title, ctaLabel, onCta }: Pr
                 accessibilityRole='button'
                 accessibilityLabel={ctaLabel}
             >
-                <Text style={styles.ctaBtnText}>{ctaLabel}</Text>
+                {iconOnlyNav ? (
+                    <HangerIcon size={22} color={colors.saveBtnText} decorative />
+                ) : (
+                    <Text style={styles.ctaBtnText}>{ctaLabel}</Text>
+                )}
             </Pressable>
         </View>
     );

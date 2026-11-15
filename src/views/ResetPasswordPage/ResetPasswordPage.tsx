@@ -12,6 +12,8 @@ import { AuthState, Settings } from '../../types';
 import { getErrorMessage, saveAuth } from '../../lib/auth';
 import { validatePassword, PASSWORD_RULE_HINT } from '../../lib/passwordPolicy';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
+import { useIconOnlyNav } from '../../hooks/useIconOnlyNav';
+import { ChevronLeftIcon, KeyIcon } from '../../components/icons/GlyphIcons';
 import { useTheme } from '../../theme/ThemeContext';
 
 interface Props {
@@ -24,6 +26,8 @@ interface Props {
 export default function ResetPasswordPage({ token, onLogin }: Props) {
     const { colors } = useTheme();
     const nav = useAppNavigation();
+    // Regular iPhone: links to other pages show an icon, not text (useIconOnlyNav).
+    const iconOnlyNav = useIconOnlyNav();
     const styles = useMemo(() => makeAuthStyles(colors), [colors]);
 
     const [password, setPassword] = useState('');
@@ -83,8 +87,13 @@ export default function ResetPasswordPage({ token, onLogin }: Props) {
                             onPress={() => nav.replace('/(auth)/forgot-password')}
                             accessibilityRole="link"
                             accessibilityLabel="Request a new link"
+                            hitSlop={10}
                         >
-                            <Text style={styles.link}>Request a new link →</Text>
+                            {iconOnlyNav ? (
+                                <KeyIcon color={colors.textPrimary} />
+                            ) : (
+                                <Text style={styles.link}>Request a new link →</Text>
+                            )}
                         </Pressable>
                     </AuthStatus>
                 ) : error ? (
@@ -124,10 +133,16 @@ export default function ResetPasswordPage({ token, onLogin }: Props) {
                     onPress={() => nav.replace('/(auth)/login')}
                     accessibilityRole="link"
                     accessibilityLabel="Back to sign in"
+                    hitSlop={10}
+                    style={iconOnlyNav ? { alignSelf: 'center' } : undefined}
                 >
-                    <Text style={[styles.link, { textAlign: 'center' }]}>
-                        Back to sign in
-                    </Text>
+                    {iconOnlyNav ? (
+                        <ChevronLeftIcon size={22} color={colors.textPrimary} />
+                    ) : (
+                        <Text style={[styles.link, { textAlign: 'center' }]}>
+                            Back to sign in
+                        </Text>
+                    )}
                 </Pressable>
             </GlassCard>
         </AuthScaffold>

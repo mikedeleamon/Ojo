@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { View, Text, Pressable, ScrollView } from '../../../components/primitives';
 import { WebView } from 'react-native-webview';
 import Loading from '../../../components/Loading/Loading';
-import { LegalDocument, EFFECTIVE_DATE, shouldUseIframe } from '../../../config/legal';
+import { LegalDocument, shouldUseIframe } from '../../../config/legal';
 import { spacing, radius, fonts, fontSizes } from '../../../theme/tokens';
 import { useTheme } from '../../../theme/ThemeContext';
 
@@ -57,7 +57,7 @@ export default function LegalWebViewScreen({ doc, onClose }: Props) {
       <View style={styles.header}>
         <View style={styles.headerText}>
           <Text style={styles.headerTitle}>{doc.title}</Text>
-          <Text style={styles.headerSub}>{doc.subtitle} · Effective: {EFFECTIVE_DATE}</Text>
+          <Text style={styles.headerSub}>{doc.subtitle} · Effective: {doc.effectiveDate}</Text>
         </View>
         {onClose && (
           <Pressable style={styles.closeBtn} onPress={onClose} accessibilityLabel="Close" accessibilityRole="button">

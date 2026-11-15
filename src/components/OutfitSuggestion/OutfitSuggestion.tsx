@@ -27,6 +27,7 @@ import { useTripMode } from '../../hooks/useTripMode';
 import { useMorningBriefScheduler } from '../../hooks/useMorningBriefScheduler';
 import { useSameDayNudgeScheduler } from '../../hooks/useSameDayNudgeScheduler';
 import { hapticImpact, hapticSuccess } from '../../lib/haptics';
+import { useIconOnlyNav } from '../../hooks/useIconOnlyNav';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import { buildWidgetInput, tomorrowDailyFor } from '../../lib/widget/buildInput';
 import { updateWidgetSnapshot } from '../../lib/widget/updateWidgetSnapshot';
@@ -56,7 +57,10 @@ import SwapSheet from './SwapSheet';
 import ShareIcon from '../icons/ShareIcon';
 import { addHistoryEntry, recentlyWornWithAge, loadHistory } from '../../lib/outfitHistory';
 import { recordSuccessfulOutfit, maybeRequestReview } from '../../services/reviewManager';
-import { derivePreferenceProfile } from '../../lib/userPreferences';
+import { derivePreferenceProfile, LEARNING_THRESHOLD } from '../../lib/userPreferences';
+import { usePurchases } from '../../context/PurchasesContext';
+import { useOneTimeMoment } from '../../hooks/useOneTimeMoment';
+import ProMoment from '../ProMoment/ProMoment';
 import {
     recordGaps,
     getGapSuggestions,
@@ -403,6 +407,19 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
         [closets, history],
     );
     const nav = useAppNavigation();
+    // Regular iPhone: the Closet CTAs show the hanger, not text (useIconOnlyNav).
+    const iconOnlyNav = useIconOnlyNav();
+
+    // The day the ranker starts learning (10 logged outfits), shown once, under
+    // "Logged for today" where the count is already on screen. Free accounts
+    // only, and only once the entitlement is known, so a subscriber never sees
+    // a pitch for what they already have.
+    const { isPro, isReady, isConfigured } = usePurchases();
+    const learningMoment = useOneTimeMoment(
+        'ranker_learning',
+        wornLogged && isConfigured && isReady && !isPro &&
+            profile.totalOutfits >= LEARNING_THRESHOLD,
+    );
 
     // ─── Trip Mode ────────────────────────────────────────────────────────────
     // When the user is in (or scheduled for) a saved trip today, the outfit they
@@ -1085,7 +1102,11 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
                                 accessibilityRole='button'
                                 accessibilityLabel='Set up closet'
                             >
-                                <Text style={styles.ctaBtnText}>Set up closet</Text>
+                                {iconOnlyNav ? (
+                                    <HangerIcon size={22} color={colors.saveBtnText} decorative />
+                                ) : (
+                                    <Text style={styles.ctaBtnText}>Set up closet</Text>
+                                )}
                             </Pressable>
                         }
                     />
@@ -1177,7 +1198,11 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
                                 accessibilityRole='button'
                                 accessibilityLabel='Add clothes'
                             >
-                                <Text style={styles.ctaBtnText}>Add clothes</Text>
+                                {iconOnlyNav ? (
+                                    <HangerIcon size={22} color={colors.saveBtnText} decorative />
+                                ) : (
+                                    <Text style={styles.ctaBtnText}>Add clothes</Text>
+                                )}
                             </Pressable>
                         }
                     />
@@ -1645,6 +1670,25 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
                                     <ShareIcon size={18} color={colors.textPrimary} />
                                 </Pressable>
                             </View>
+
+                            {learningMoment.visible && (
+                                <View style={styles.confirmMoment}>
+                                    <ProMoment
+                                        title={
+                                            profile.totalOutfits === LEARNING_THRESHOLD
+                                                ? 'Ojo just started learning your style'
+                                                : 'Ojo is learning your style'
+                                        }
+                                        body={`${profile.totalOutfits} outfits in, your picks lean toward what you actually wear. Style DNA shows what it has noticed.`}
+                                        cta='See your Style DNA'
+                                        onPress={() => {
+                                            learningMoment.dismiss();
+                                            nav.push('/account/upgrade', { from: 'learning' });
+                                        }}
+                                        onDismiss={learningMoment.dismiss}
+                                    />
+                                </View>
+                            )}
 
                             <Pressable
                                 onPress={handleUndoLog}

@@ -15,7 +15,10 @@ export const LEGAL_URLS = {
   termsOfService:  'https://www.ojoapp.io/terms',
 } as const;
 
+// Matches the website: Terms keeps its date, and the Privacy Policy was
+// revised on its own (background location, Siri) on November 14, 2026.
 export const EFFECTIVE_DATE = 'September 23, 2026';
+export const PRIVACY_EFFECTIVE_DATE = 'November 14, 2026';
 export const DEVELOPER_NAME = 'Ojo Studio, LLC';
 export const CONTACT_EMAIL  = 'support@ojoapp.io';
 export const WEBSITE_URL    = 'https://www.ojoapp.io';
@@ -39,6 +42,7 @@ export interface LegalDocument {
   title:    string;
   subtitle: string;
   url:      string;
+  effectiveDate: string;
   sections: LegalSection[];
 }
 
@@ -46,6 +50,7 @@ export const PRIVACY_POLICY: LegalDocument = {
   title:    'Privacy Policy',
   subtitle: 'Ojo Wardrobe App',
   url:      LEGAL_URLS.privacyPolicy,
+  effectiveDate: PRIVACY_EFFECTIVE_DATE,
   sections: [
     {
       heading: '1. Introduction',
@@ -193,6 +198,7 @@ export const TERMS_OF_SERVICE: LegalDocument = {
   title:    'Terms of Service',
   subtitle: 'Ojo Wardrobe App',
   url:      LEGAL_URLS.termsOfService,
+  effectiveDate: EFFECTIVE_DATE,
   sections: [
     {
       heading: '1. Acceptance of Terms',

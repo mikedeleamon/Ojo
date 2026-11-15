@@ -11,7 +11,7 @@
  * Dev-only: /account/recap?demo=1 renders the spec's sample week (recapDemo).
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Linking, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -38,6 +38,12 @@ import { loadShownBeforeWeek, recordShownTemplates } from '../../lib/recapStorag
 import { recapShareLink } from '../../lib/share/deepLinks';
 import { DEMO_RECAP } from './recapDemo';
 import { useFoldColumns } from '../../hooks/useFoldColumns';
+import { useSideRail } from '../../hooks/useSideRail';
+import { useSideColumnBack } from '../../hooks/useSideColumnBack';
+import { useOneTimeMoment } from '../../hooks/useOneTimeMoment';
+import { usePurchases } from '../../context/PurchasesContext';
+import { LEARNING_THRESHOLD } from '../../lib/userPreferences';
+import ProMoment from '../../components/ProMoment/ProMoment';
 
 // ─── Shop CTA (unchanged from the prior recap) ─────────────────────────────────
 
@@ -262,6 +268,25 @@ export default function RecapPage() {
     if (router.canGoBack()) router.back();
     else router.replace('/account');
   };
+  // iPhone Duo: Back sits in the side column with the other page buttons, and
+  // the nav row keeps only the week stamp and Share. The screen is always dark,
+  // so the side-column item stays white.
+  const sideRail = useSideRail();
+  const sideColumnBack = useMemo(
+    () => ({ label: 'Back', onPress: () => (router.canGoBack() ? router.back() : router.replace('/account')) }),
+    [router],
+  );
+  useSideColumnBack(sideColumnBack);
+
+  // Once, at the end of a real week's recap, for a free account that has a
+  // Style DNA to see (10+ outfits). Style DNA is the all-weeks view of what
+  // the recap shows for one.
+  const { isPro, isReady, isConfigured } = usePurchases();
+  const recapMoment = useOneTimeMoment(
+    'recap_style_dna',
+    !isDemo && !!data && isConfigured && isReady && !isPro &&
+      data.meta.outfitsThisWeek > 0 && data.meta.allTime.count >= LEARNING_THRESHOLD,
+  );
 
   const handleShop = (gapType: GapType) => {
     hapticSelection();
@@ -314,9 +339,13 @@ export default function RecapPage() {
       <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom', 'right']}>
         {/* Nav row */}
         <View style={st.navRow}>
-          <Pressable style={st.navBtn} onPress={handleBack} accessibilityLabel='Back' accessibilityRole='button'>
-            <BackIcon />
-          </Pressable>
+          {sideRail ? (
+            <View style={sx.navSpacer} />
+          ) : (
+            <Pressable style={st.navBtn} onPress={handleBack} accessibilityLabel='Back' accessibilityRole='button'>
+              <BackIcon />
+            </Pressable>
+          )}
           <Text style={st.navStamp}>{meta.weekLabel}</Text>
           {/* Nothing worth posting when the week is empty — keep the row balanced. */}
           {meta.outfitsThisWeek > 0 ? (
@@ -342,6 +371,20 @@ export default function RecapPage() {
               <View style={[sx.pane, columns.right]}>{cards.filter(c => !isHeroCard(c)).map(renderCard)}</View>
             </View>
           ) : cards.map(renderCard)}
+
+          {recapMoment.visible && (
+            <ProMoment
+              tone='ink'
+              title='That’s your week'
+              body='Style DNA turns all your weeks into your top colors, fabrics and pairings.'
+              cta='See your Style DNA'
+              onPress={() => {
+                recapMoment.dismiss();
+                router.push({ pathname: '/account/upgrade', params: { from: 'recap' } });
+              }}
+              onDismiss={recapMoment.dismiss}
+            />
+          )}
 
           <Text style={[st.stamp, { textAlign: 'center', marginTop: 6 }]}>{meta.weekStamp}</Text>
         </ScrollView>

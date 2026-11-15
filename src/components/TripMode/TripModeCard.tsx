@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { Image } from 'react-native';
 import { View, Text, Pressable, GlassCard } from '../primitives';
 import { HangerIcon } from '../shared';
+import SuitcaseIcon from '../icons/SuitcaseIcon';
+import { useIconOnlyNav } from '../../hooks/useIconOnlyNav';
 import { useTheme } from '../../theme/ThemeContext';
 import { makeStyles } from './TripModeCard.styles';
 import type { SavedTripFitPlan, ClothingArticle } from '../../types';
@@ -71,6 +73,8 @@ export default function TripModeCard({
     onDismiss,
 }: Props) {
     const { colors } = useTheme();
+    // Regular iPhone: Open trip is an icon button (useIconOnlyNav).
+    const iconOnlyNav = useIconOnlyNav();
     const st = useMemo(() => makeStyles(colors), [colors]);
 
     const articles = useMemo(
@@ -143,12 +147,16 @@ export default function TripModeCard({
                         <Text style={st.primaryBtnText}>Wore this</Text>
                     </Pressable>
                     <Pressable
-                        style={st.secondaryBtn}
+                        style={[st.secondaryBtn, iconOnlyNav && st.secondaryBtnIconOnly]}
                         onPress={onOpenTrip}
                         accessibilityRole="button"
                         accessibilityLabel="Open this trip"
                     >
-                        <Text style={st.secondaryBtnText}>Open trip</Text>
+                        {iconOnlyNav ? (
+                            <SuitcaseIcon size={20} color={colors.textSecondary} decorative />
+                        ) : (
+                            <Text style={st.secondaryBtnText}>Open trip</Text>
+                        )}
                     </Pressable>
                 </View>
             </GlassCard>

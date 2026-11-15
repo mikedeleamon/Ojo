@@ -19,6 +19,9 @@ import { useWeatherTheme } from '../../src/context/WeatherContext';
 // of TripFitIcon (src/components/icons/ClosetIcons.tsx); the gradient fill is
 // deliberately dropped, since a template image discards color anyway. Regenerate
 // with scripts/render-tripfit-tab-icon.py if the logo's geometry changes.
+//
+// Tabs keep their text labels on every device: the icons alone aren't yet
+// familiar enough to stand on their own (user, 2026-11-14).
 
 export default function TabLayout() {
   const { accent } = useWeatherTheme();

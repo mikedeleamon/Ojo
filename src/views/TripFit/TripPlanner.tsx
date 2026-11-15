@@ -22,6 +22,8 @@ import SuitcaseIcon from '../../components/icons/SuitcaseIcon';
 import { PackingCategoryIcon } from '../../components/icons/PackingCategoryIcon';
 import { useTheme, ForceDarkPalette } from '../../theme/ThemeContext';
 import { useTabBarPadding } from '../../hooks/useTabBarPadding';
+import { useSideRail } from '../../hooks/useSideRail';
+import { useSideColumnBack } from '../../hooks/useSideColumnBack';
 import {
     fonts,
     fontSizes,
@@ -900,7 +902,7 @@ export default function TripPlanner({
             endDate:   toISODate(tripEnd),
         })) return false;
 
-        router.push('/account/upgrade');
+        router.push({ pathname: '/account/upgrade', params: { from: 'trips' } });
         return true;
     }, [isConfigured, isReady, isPro, isSaved, savedPlans, destination, tripStart, tripEnd, router]);
 
@@ -1041,6 +1043,17 @@ export default function TripPlanner({
     const calContainerWidth = contentWidth - spacing.md * 2;
     const showForm = !isSaved;
 
+    // iPhone Duo: Back sits in the side column with the other page buttons
+    // (TripFit is its own Stack for this; see app/(tabs)/tripfit/_layout.tsx).
+    // Same rule as the in-page chevron: none beside the library for a saved trip.
+    const sideRail = useSideRail();
+    const showBack = !(besideLibrary && isSaved);
+    const sideColumnBack = useMemo(
+        () => (showBack ? { label: isSaved ? 'Trips' : 'Cancel', onPress: onBack, tintColor: colors.textPrimary } : null),
+        [showBack, isSaved, onBack, colors.textPrimary],
+    );
+    useSideColumnBack(sideColumnBack);
+
     return (
         // The planner is a mode of the TripFit tab, not a pushed screen, so the
         // tab bar stays visible — clear it with `tabPad` instead of a bottom edge.
@@ -1049,7 +1062,7 @@ export default function TripPlanner({
             <View style={st.header}>
                 {/* Beside the library a saved trip has nowhere to go back to: the
                     trips are already on the left. A new trip keeps it as Cancel. */}
-                {!(besideLibrary && isSaved) && (
+                {showBack && !sideRail && (
                     <Pressable
                         onPress={onBack}
                         style={st.backBtn}

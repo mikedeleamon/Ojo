@@ -111,6 +111,8 @@ export const makeStyles = (colors: ColorTokens) =>
             alignItems: 'center',
             justifyContent: 'center',
         },
+        // Icon-only on a regular iPhone: a square beside Wore this, not half the row.
+        secondaryBtnIconOnly: { flex: 0, width: 48 },
         secondaryBtnText: {
             fontFamily: fonts.bodyMedium,
             fontSize: fontSizes.sm,
