@@ -42,7 +42,8 @@ export const activeOutfit = (p: DayPlan): OutfitResult =>
 export { synthesizeDayWeather as buildTripWeather } from '../../lib/outfit/dayOutfit';
 
 export function fmtDate(iso: string): string {
-    return new Date(iso + 'T12:00:00').toLocaleDateString('en-US', {
+    // The phone's own locale (undefined), not a fixed US format.
+    return new Date(iso + 'T12:00:00').toLocaleDateString(undefined, {
         weekday: 'short',
         month: 'short',
         day: 'numeric',
@@ -50,7 +51,7 @@ export function fmtDate(iso: string): string {
 }
 
 export function fmtShortDate(d: Date): string {
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 export function fmtShortISO(iso: string): string {

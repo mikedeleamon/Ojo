@@ -24,6 +24,8 @@ import { authHeaders } from '../../lib/auth';
 import type { SavedTripFitPlan } from '../../types';
 import type { PlannerPrefill } from './TripPlanner';
 import PhraseWeatherIcon from '../../components/WeatherIcons/PhraseWeatherIcon';
+import { useSettings } from '../../hooks/useSettings';
+import { formatTempRange, tempScaleOf } from '../../lib/units';
 import { PlaneIcon, GlobeIcon } from '../../components/icons/GlyphIcons';
 import {
     fmtShortISO,
@@ -91,6 +93,8 @@ const TripCard = ({
     st: ReturnType<typeof makeStyles>;
 }) => {
     const status = tripFitStatus(plan);
+    const { settings } = useSettings();
+    const tempScale = tempScaleOf(settings);
 
     const { minTemp, maxTemp, dominantPhrase } = useMemo(() => {
         if (!plan.days.length)
@@ -103,8 +107,9 @@ const TripCard = ({
         const dominant =
             Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'Cloudy';
         return {
-            minTemp: Math.round(Math.min(...mins)),
-            maxTemp: Math.round(Math.max(...maxs)),
+            // °F, unrounded: formatTempRange converts and rounds once.
+            minTemp: Math.min(...mins),
+            maxTemp: Math.max(...maxs),
             dominantPhrase: dominant,
         };
     }, [plan.days]);
@@ -184,7 +189,7 @@ const TripCard = ({
 
                             <Text style={[st.cardDates, { color: darkColors.textSecondary }]}>
                                 {fmtShortISO(plan.startDate)} – {fmtShortISO(plan.endDate)}
-                                {minTemp !== null ? ` · ${minTemp}°–${maxTemp}°F` : ''}
+                                {minTemp !== null && maxTemp !== null ? ` · ${formatTempRange(minTemp, maxTemp, tempScale)}` : ''}
                             </Text>
 
                             {status === 'pending' ? (

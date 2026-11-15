@@ -38,7 +38,9 @@ const InfoCard = ({ title, body }: { title: string; body: string }) => {
 export const PermissionsScreen = () => (
   <Root>
     <InfoCard title="Location"
-      body="When you pick “My Location,” your device's GPS is read on demand to look up local weather, and rounded to about 1 km before it leaves your phone. That rounded location is saved to your account so scheduled notifications, like your morning brief, can fetch local weather while the app is closed — we don't keep a history of where you've been, and we never track your location in the background. Prefer not to share GPS? Add your cities by name in Locations and skip it entirely." />
+      body="When you pick “My Location,” your device's GPS is read while you use Ojo to look up local weather, and rounded to about 1 km before it leaves your phone. The latest rounded location is saved to your account so scheduled notifications, like your morning brief, can fetch local weather while the app is closed. We keep only the most recent one, never a history of where you've been. Prefer not to share GPS? Add your cities by name in Locations and skip it entirely." />
+    <InfoCard title="Background location (optional)"
+      body="Off unless you turn it on. If you allow “Always” location from Push Notifications, iOS wakes Ojo when your phone moves about 8 km (5 miles) from where it was, and Ojo may also refresh now and then in the background. Each time it reads your location once, updates your widgets, morning brief and weather alerts for where you are, and sends the same rounded location. It doesn't follow your movements continuously. To stop it, set Ojo's location access back to “While Using” in the iOS Settings app." />
     <InfoCard title="Camera & Photos"
       body="Camera and photo library access are requested only when you add a clothing item with a photo, or save a shared image to your photos. Clothing photos are stored securely and only used to display your items." />
     <InfoCard title="Notifications"
@@ -53,7 +55,7 @@ export const PermissionsScreen = () => (
 export const DataUsageScreen = () => (
   <Root>
     <InfoCard title="What we store"
-      body="Your account, closets, clothing articles, outfit history, and style preferences are stored in our secure cloud database." />
+      body="Your account, closets, clothing articles, outfit history, style preferences, and your most recent location rounded to about 1 km are stored in our secure cloud database." />
     <InfoCard title="What we don't do"
       body="We don't sell your data, use it for advertising, or share it with third parties beyond what's needed to run the app." />
     <InfoCard title="Delete your data"

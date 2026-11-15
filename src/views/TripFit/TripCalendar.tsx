@@ -73,7 +73,7 @@ function buildCalendarDays(viewMonth: Date): (Date | null)[] {
 }
 
 function fmtMonth(d: Date): string {
-    return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    return d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
 }
 
 const DAY_LABELS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
@@ -188,7 +188,7 @@ export default function TripCalendar({
                             key={day.toISOString()}
                             onPress={() => handleDayPress(day)}
                             accessibilityRole="button"
-                            accessibilityLabel={day.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
+                            accessibilityLabel={day.toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}
                             accessibilityState={{ selected, disabled }}
                             style={[st.dayCell, { width: cellSize, height: cellSize * 0.9 }]}
                         >

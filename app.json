@@ -220,6 +220,7 @@
       "./plugins/withOjoAppGroup",
       "./plugins/withInstagramShareScheme",
       "./plugins/withWidgetBuildSettings",
+      "./plugins/withSiriShortcuts",
       "@bacons/apple-targets",
       [
         "@sentry/react-native/expo",

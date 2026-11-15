@@ -7,8 +7,15 @@
  */
 
 import { METALLIC_GRADIENTS } from '../../lib/colors/metallicGradients';
+import { CSS_COLORS } from '../../lib/colors/cssColors';
 
-export const SWATCH: Record<string, string> = {
+/**
+ * Every clothing color the app offers (CSS_COLORS), with the Insights shades
+ * below layered on top. Built from the shared list so a color added to the
+ * picker can never fall through to grey here again, as Electric Blue, Sky Blue,
+ * Periwinkle, Baby Blue and Dusty Rose once did.
+ */
+const INSIGHTS_SHADES: Record<string, string> = {
   Black: '#1a1a1a', White: '#f0f0f0', Grey: '#9ca3af', Brown: '#92400e',
   Beige: '#d4b896', Cream: '#fef3c7', Silver: '#c0c0c0', Gold: '#d4af37',
   'Rose Gold': '#c9776a', Champagne: '#f4e4c1', Navy: '#1e3a5f',
@@ -21,6 +28,8 @@ export const SWATCH: Record<string, string> = {
   Lavender: '#c4b5fd', Pink: '#f9a8d4', Rose: '#fb7185', Blush: '#fecdd3',
   Magenta: '#e879f9', 'Hot Pink': '#ec4899', Fuchsia: '#d946ef', Multi: '#888',
 };
+
+export const SWATCH: Record<string, string> = { ...CSS_COLORS, ...INSIGHTS_SHADES };
 
 /** Fallback hue for an unknown colour name (neutral glass grey). */
 const FALLBACK = '#9ca3af';

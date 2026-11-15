@@ -16,3 +16,17 @@ export const formatTemp = (
     if (scale === 'metric') return `${fToC(fahrenheit)}°C`;
     return `${Math.round(fahrenheit)}°F`;
 };
+
+export type TempScale = 'imperial' | 'metric';
+
+/** The user's temperature scale, from Settings.temperatureScale ('Metric' | 'Imperial'). */
+export const tempScaleOf = (settings: { temperatureScale?: string }): TempScale =>
+    settings.temperatureScale === 'Metric' ? 'metric' : 'imperial';
+
+/** A Fahrenheit reading as whole degrees in the user's scale. */
+export const degreesIn = (fahrenheit: number, scale: TempScale): number =>
+    scale === 'metric' ? fToC(fahrenheit) : Math.round(fahrenheit);
+
+/** "41°–55°F" or "5°–13°C" from a Fahrenheit low and high. */
+export const formatTempRange = (minF: number, maxF: number, scale: TempScale): string =>
+    `${degreesIn(minF, scale)}°–${degreesIn(maxF, scale)}°${scale === 'metric' ? 'C' : 'F'}`;

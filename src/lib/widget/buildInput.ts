@@ -37,6 +37,7 @@ const itemsFromOutfit = (outfit: OutfitResult): WidgetSnapshotInput['items'] =>
     id: s.article._id,
     role: String(s.role),
     imageUrl: s.article.imageUrl ?? '',
+    name: s.article.name?.trim() || s.article.clothingType || undefined,
   }));
 
 /**
@@ -348,6 +349,7 @@ export function buildWidgetInput(data: WidgetSyncData): WidgetSnapshotInput {
       weatherKind,
       isDay,
       items: itemsFromOutfit(wornOutfit),
+      worn: true,
       variants: [variantFromOutfit(wornOutfit)],
       ...widgetAlertsFor(wornOutfit),
       fullTimeline: fullTimelineOf(wornOutfit),

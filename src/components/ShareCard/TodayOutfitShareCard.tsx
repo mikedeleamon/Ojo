@@ -9,12 +9,15 @@ import ShareCardFrame from './ShareCardFrame';
 import { contentWidth, type ShareCardVariant } from './ShareCardFrame.styles';
 import cs from './shareCardCommon.styles';
 import type { ViewRef } from '../../types/nativeRefs';
+import { degreesIn, type TempScale } from '../../lib/units';
 
 interface TodayOutfitShareCardProps {
   slots: OutfitSlot[];
   score: number;
   isPersonalized?: boolean;
   weather: CurrentWeather;
+  /** The user's temperature scale. */
+  tempScale: TempScale;
   /** 'sticker' for a video Story; see ShareCardFrame. */
   variant?: ShareCardVariant;
 }
@@ -35,11 +38,12 @@ function tileSize(count: number, variant: ShareCardVariant) {
 }
 
 const TodayOutfitShareCard = forwardRef<ViewRef, TodayOutfitShareCardProps>(
-  ({ slots, score, isPersonalized, weather, variant = 'poster' }, ref) => {
+  ({ slots, score, isPersonalized, weather, tempScale, variant = 'poster' }, ref) => {
     const photos = slots.slice(0, 4);
     const { width, height } = tileSize(photos.length, variant);
-    const tempF = Math.round(weather.Temperature.Imperial.Value);
-    const dateLabel = new Date().toLocaleDateString('en-US', {
+    const temp = degreesIn(weather.Temperature.Imperial.Value, tempScale);
+    // The phone's own locale, not a fixed US format.
+    const dateLabel = new Date().toLocaleDateString(undefined, {
       weekday: 'long',
       month: 'short',
       day: 'numeric',
@@ -52,7 +56,7 @@ const TodayOutfitShareCard = forwardRef<ViewRef, TodayOutfitShareCardProps>(
 
         <View style={cs.weatherChip}>
           <Text style={cs.weatherChipText}>
-            {phraseEmoji(weather.WeatherText)} {tempF}°{' '}
+            {phraseEmoji(weather.WeatherText)} {temp}°{' '}
             {humanizeConditionShort(weather.WeatherText)}
           </Text>
         </View>

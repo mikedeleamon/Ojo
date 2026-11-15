@@ -138,6 +138,21 @@ describe('buildWidgetInput variants', () => {
     expect(input.headline).toBe('Worn');
     expect(input.variants).toHaveLength(1);
     expect(input.variants![0].headline).toBe('Worn');
+    expect(input.worn).toBe(true);
+  });
+
+  it('a generated suggestion is not marked as worn', () => {
+    expect(buildWidgetInput(baseData()).worn).toBeUndefined();
+  });
+
+  it('gives each piece a spoken name: its own name, else its clothing type', () => {
+    const named = outfit('Named');
+    named.slots = [
+      { role: 'top', article: { _id: 'a', imageUrl: 'https://img/a.jpg', clothingType: 'Hoodie', name: ' Grey Hoodie ' } },
+      { role: 'bottom', article: { _id: 'b', imageUrl: 'https://img/b.jpg', clothingType: 'Jeans', name: '' } },
+    ] as OutfitResult['slots'];
+    const input = buildWidgetInput(baseData({ todayOutfits: [named] }));
+    expect(input.items.map((i) => i.name)).toEqual(['Grey Hoodie', 'Jeans']);
   });
 
   it('trip mode is a single variant carrying the weather block', () => {
