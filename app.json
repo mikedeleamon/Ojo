@@ -158,6 +158,8 @@
     },
     "plugins": [
       "./plugins/withoutDevLauncherNetworkKeys",
+      "./plugins/withoutBackgroundFetchMode",
+      "./plugins/withHeadlessLaunch",
       "expo-apple-authentication",
       [
         "expo-secure-store",
