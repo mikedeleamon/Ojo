@@ -118,6 +118,18 @@ export interface OjoWidgetSnapshotItem {
   role: string;
   /** Container-relative thumbnail path ("thumbs/<hash>.jpg"), or null when uncached. */
   thumb: string | null;
+  /** What Siri says for this piece: the article's name, else its clothing type. Optional so older snapshots still decode. */
+  name?: string;
+}
+
+/** One outfit piece before its thumbnail is cached — the image is still a remote URL. */
+export interface WidgetItemInput {
+  id: string;
+  role: string;
+  /** Remote (R2) image URL; cached to a local thumbnail before writing. */
+  imageUrl: string;
+  /** Spoken label — see OjoWidgetSnapshotItem.name. */
+  name?: string;
 }
 
 /**
@@ -183,7 +195,7 @@ export interface OjoWidgetTomorrow {
 
 /** Input-side tomorrow block — thumbnails are still remote URLs. */
 export interface OjoWidgetTomorrowInput extends Omit<OjoWidgetTomorrow, 'items'> {
-  items?: { id: string; role: string; imageUrl: string }[];
+  items?: WidgetItemInput[];
 }
 
 /**
@@ -207,7 +219,7 @@ export interface WidgetOutfitVariant {
 /** Input-side variant — thumbnails are still remote URLs (see WidgetSnapshotInput.items). */
 export interface WidgetOutfitVariantInput {
   headline: string;
-  items: { id: string; role: string; imageUrl: string }[];
+  items: WidgetItemInput[];
   layerNote?: string;
   layerStack?: WidgetLayerStack;
   alerts: WidgetAlertKind[];
@@ -244,6 +256,8 @@ export interface OjoWidgetSnapshot {
   /** Local daytime flag; the gradient's day/night variant for 'clear' and 'partlyCloudy'. */
   isDay?: boolean;
   items: OjoWidgetSnapshotItem[];
+  /** True when `items` is the outfit the user logged as worn today, not a suggestion — Siri then says "You're wearing…". */
+  worn?: boolean;
   /** All renderable outfits for today, primary first — the "Change fit" intent cycles them. Omitted for empty mode and pre-variant snapshots (Swift then treats the top-level fields as the only variant). */
   variants?: WidgetOutfitVariant[];
   /** Short layering call-to-action from layeringEngine's recommendation, e.g. "Bring a jacket — windy after 4pm." Omitted in 'empty' mode. */
@@ -283,12 +297,9 @@ export interface WidgetSnapshotInput {
   weather?: OjoWidgetWeather;
   weatherKind?: WeatherKind;
   isDay?: boolean;
-  items: {
-    id: string;
-    role: string;
-    /** Remote (R2) image URL; cached to a local thumbnail before writing. */
-    imageUrl: string;
-  }[];
+  items: WidgetItemInput[];
+  /** See OjoWidgetSnapshot.worn. */
+  worn?: boolean;
   /** All renderable outfits for today, primary first. Index 0 mirrors the top-level fields. */
   variants?: WidgetOutfitVariantInput[];
   layerNote?: string;

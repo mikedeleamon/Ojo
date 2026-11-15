@@ -28,6 +28,8 @@ import { fToC, cToF } from '../../../lib/units';
 import { hapticSelection } from '../../../lib/haptics';
 import { loadHistory } from '../../../lib/outfitHistory';
 import { useClosets } from '../../../hooks/useClosets';
+import { usePurchases } from '../../../context/PurchasesContext';
+import { useAppNavigation } from '../../../hooks/useAppNavigation';
 import {
     derivePreferenceProfile,
     UserPreferenceProfile,
@@ -284,6 +286,17 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
             fontFamily: fonts.body,
             fontSize: fontSizes.xs,
         },
+        dnaUnlock: {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginTop: 6,
+            paddingTop: 10,
+            borderTopWidth: StyleSheet.hairlineWidth,
+            borderTopColor: colors.glassBorder,
+        },
+        dnaUnlockText: { fontFamily: fonts.body, fontSize: fontSizes.sm, color: colors.textSecondary, flex: 1 },
+        dnaUnlockCta: { fontFamily: fonts.bodySemiBold, fontSize: fontSizes.sm, color: colors.textPrimary },
     });
 
 const SliderField = ({
@@ -396,12 +409,24 @@ const LEVEL_COLORS: Record<StyleDNA['level'], string> = {
     active: 'rgba(99,102,241,0.9)',
 };
 
+/**
+ * The ranker's progress, which is free for everyone. What it has learned (top
+ * colors, fabric) is Style DNA, an Ojo Pro feature, so it shows only when
+ * `unlocked`; `locked` adds a row into the paywall. Both false while the
+ * subscription is still resolving, so a subscriber never sees a locked flash.
+ */
 const StyleDNACard = ({
     prefs,
     styles,
+    unlocked,
+    locked,
+    onUnlock,
 }: {
     prefs: UserPreferenceProfile;
     styles: ReturnType<typeof makeStyles>;
+    unlocked: boolean;
+    locked: boolean;
+    onUnlock: () => void;
 }) => {
     const { colors } = useTheme();
     const dna = computeStyleDNA(prefs);
@@ -444,11 +469,11 @@ const StyleDNACard = ({
                     ? 'Score badge now shows "Your Score"'
                     : dna.level === 'learning'
                       ? `${30 - dna.totalOutfits} more to fully personalize`
-                      : dna.totalOutfits >= 3 && dna.topColors.length > 0
+                      : unlocked && dna.totalOutfits >= 3 && dna.topColors.length > 0
                         ? `Early signal: leaning toward ${dna.topColors[0]} · ${10 - dna.totalOutfits} to go`
                         : `${10 - dna.totalOutfits} outfits until the ranker starts learning`}
             </Text>
-            {dna.topColors.length > 0 && (
+            {unlocked && dna.topColors.length > 0 && (
                 <Text
                     style={[
                         styles.dnaSub,
@@ -458,6 +483,19 @@ const StyleDNACard = ({
                     {dna.level === 'none' ? 'Emerging ' : 'Signature '}colors: {dna.topColors.join(', ')}
                     {dna.topFabric ? ` · Fabric: ${dna.topFabric}` : ''}
                 </Text>
+            )}
+            {locked && (
+                <Pressable
+                    style={styles.dnaUnlock}
+                    onPress={onUnlock}
+                    accessibilityRole='button'
+                    accessibilityLabel='Unlock your Style DNA with Ojo Pro'
+                >
+                    <Text style={styles.dnaUnlockText}>
+                        See the colors, fabrics and pairings Ojo has learned
+                    </Text>
+                    <Text style={styles.dnaUnlockCta}>Unlock →</Text>
+                </Pressable>
             )}
         </View>
     );
@@ -560,6 +598,13 @@ export default function PreferencesScreen() {
     const tabPad = useTabBarPadding();
 
     const { closets } = useClosets();
+    const nav = useAppNavigation();
+    // Same rule as the Style DNA card in Insights: Pro (or no store configured,
+    // when there's nothing to buy) sees it; free users see the locked row once
+    // the subscription has resolved.
+    const { isPro, isReady, isConfigured } = usePurchases();
+    const dnaUnlocked = isPro || !isConfigured;
+    const dnaLocked = isConfigured && isReady && !isPro;
     const [history, setHistory] = useState<OutfitHistoryEntry[]>([]);
     // Style DNA + patterns are derived from outfit history joined against the
     // closets — history is the single source of truth, no separate prefs store.
@@ -726,11 +771,14 @@ export default function PreferencesScreen() {
                         <StyleDNACard
                             prefs={prefs}
                             styles={styles}
+                            unlocked={dnaUnlocked}
+                            locked={dnaLocked}
+                            onUnlock={() => nav.push('/account/upgrade')}
                         />
                     </View>
 
-                    {/* Wear patterns */}
-                    {prefs.totalOutfits > 0 && (
+                    {/* Wear patterns: Style DNA data, so Pro only. */}
+                    {dnaUnlocked && prefs.totalOutfits > 0 && (
                         <View style={styles.section}>
                             <Text style={styles.sectionTitle}>
                                 Your patterns · {prefs.totalOutfits} outfits

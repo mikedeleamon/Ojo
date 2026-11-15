@@ -19,6 +19,10 @@ struct WidgetSnapshot: Codable {
   let weatherKind: String?
   let isDay: Bool?
   let items: [Item]
+  /// True when `items` is the outfit the user logged as worn today rather than
+  /// a suggestion (Siri then says "You're wearing…"). A defaulted var so older
+  /// snapshots decode and the memberwise init calls below can leave it out.
+  var worn: Bool? = nil
   /// All renderable outfits for today, primary first — the "Change fit" intent
   /// cycles them. Optional: empty mode and pre-variant snapshots omit it, in
   /// which case the top-level fields are the only variant.
@@ -77,6 +81,9 @@ struct WidgetSnapshot: Codable {
     let role: String
     /// Container-relative thumbnail path ("thumbs/<hash>.jpg"), or nil when uncached.
     let thumb: String?
+    /// Spoken label for Siri: the piece's name, else its clothing type. Nil on
+    /// snapshots written before the field existed.
+    var name: String? = nil
   }
 
   /// Mirrors snapshot.types.ts `OjoWidgetWeather`. Values arrive pre-converted
@@ -196,6 +203,7 @@ extension WidgetSnapshot {
       weatherKind: weatherKind,
       isDay: isDay,
       items: v.items,
+      worn: worn,
       variants: variants,
       layerNote: v.layerNote,
       layerStack: v.layerStack,

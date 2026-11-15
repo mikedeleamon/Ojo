@@ -33,6 +33,7 @@ const resolveItems = async (
       id: it.id,
       role: it.role,
       thumb: await cacheThumb(it.imageUrl),
+      ...(it.name ? { name: it.name } : {}),
     })),
   );
 
@@ -101,6 +102,7 @@ async function doUpdate(input: WidgetSnapshotInput, sig: string): Promise<void> 
     weatherKind: input.weatherKind,
     isDay: input.isDay,
     items: resolved,
+    worn: input.worn,
     variants,
     layerNote: input.layerNote,
     layerStack: input.layerStack,

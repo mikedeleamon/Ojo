@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0A1E5E202E9C40A100C0FFEE /* OjoAppIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A1E5E1F2E9C40A100C0FFEE /* OjoAppIntents.swift */; };
+		0A1E5E222E9C40A100C0FFEE /* Snapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A1E5E212E9C40A100C0FFEE /* Snapshot.swift */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
 		5FDBD8444EE6976131BBE953 /* libPods-Ojo.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 79AD24CC980F3144162C1828 /* libPods-Ojo.a */; };
@@ -48,6 +50,8 @@
 
 /* Begin PBXFileReference section */
 		0703EA065D1FABF11678A0DE /* Pods-Ojo.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Ojo.debug.xcconfig"; path = "Target Support Files/Pods-Ojo/Pods-Ojo.debug.xcconfig"; sourceTree = "<group>"; };
+		0A1E5E1F2E9C40A100C0FFEE /* OjoAppIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OjoAppIntents.swift; path = ../native/siri/OjoAppIntents.swift; sourceTree = "<group>"; };
+		0A1E5E212E9C40A100C0FFEE /* Snapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Snapshot.swift; path = "../targets/ojo-widget/Snapshot.swift"; sourceTree = "<group>"; };
 		13B07F961A680F5B00A75B9A /* Ojo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; fileEncoding = 4; includeInIndex = 0; path = Ojo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = Ojo/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = text.plist.xml; name = Info.plist; path = Ojo/Info.plist; sourceTree = "<group>"; };
@@ -130,6 +134,8 @@
 			children = (
 				F11748412D0307B40044C1D9 /* AppDelegate.swift */,
 				F11748432D0307B40044C1D9 /* SceneDelegate.swift */,
+				0A1E5E1F2E9C40A100C0FFEE /* OjoAppIntents.swift */,
+				0A1E5E212E9C40A100C0FFEE /* Snapshot.swift */,
 				F11748442D0722820044C1D9 /* Ojo-Bridging-Header.h */,
 				BB2F792B24A3F905000567C9 /* Supporting */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
@@ -575,6 +581,8 @@
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
 				F11748442D0307B40044C1D9 /* SceneDelegate.swift in Sources */,
+				0A1E5E202E9C40A100C0FFEE /* OjoAppIntents.swift in Sources */,
+				0A1E5E222E9C40A100C0FFEE /* Snapshot.swift in Sources */,
 				AFFA2BE54F41ADE834AED43A /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

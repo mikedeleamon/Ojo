@@ -87,12 +87,6 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    overflowBtnText: {
-        fontSize: 12,
-        color: colors.textSecondary,
-        letterSpacing: 1.5,
-        lineHeight: 14,
-    },
     pagerCard: {
         gap: spacing.sm,
     },
@@ -338,6 +332,23 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         fontFamily: fonts.body,
         fontSize: fontSizes.xs,
         color: colors.textMuted,
+    },
+    confirmShare: {
+        flexDirection: 'row' as const,
+        alignItems: 'center' as const,
+        justifyContent: 'center' as const,
+        gap: spacing.xs,
+        alignSelf: 'stretch' as const,
+        paddingVertical: spacing.sm,
+        borderRadius: radius.md,
+        borderWidth: 1,
+        borderColor: colors.glassBorder,
+        backgroundColor: colors.glassBgStrong,
+    },
+    confirmShareText: {
+        fontFamily: fonts.bodySemiBold,
+        fontSize: fontSizes.base,
+        color: colors.textPrimary,
     },
     confirmUndo: {
         alignSelf: 'center' as const,

@@ -8,6 +8,7 @@ import ShareCardFrame from './ShareCardFrame';
 import { contentWidth, type ShareCardVariant } from './ShareCardFrame.styles';
 import cs from './shareCardCommon.styles';
 import type { ViewRef } from '../../types/nativeRefs';
+import { formatTempRange, type TempScale } from '../../lib/units';
 
 interface TripFitShareCardProps {
   destination: string;
@@ -15,6 +16,8 @@ interface TripFitShareCardProps {
   slots: OutfitSlot[];
   /** e.g. "Day 2 of 5" */
   dayLabel?: string;
+  /** The user's temperature scale; the day's temps arrive in °F. */
+  tempScale: TempScale;
   /** 'sticker' for a video Story; see ShareCardFrame. */
   variant?: ShareCardVariant;
 }
@@ -29,7 +32,7 @@ function tileSize(count: number, variant: ShareCardVariant) {
 }
 
 const TripFitShareCard = forwardRef<ViewRef, TripFitShareCardProps>(
-  ({ destination, day, slots, dayLabel, variant = 'poster' }, ref) => {
+  ({ destination, day, slots, dayLabel, tempScale, variant = 'poster' }, ref) => {
     const photos = slots.slice(0, 4);
     const { width, height } = tileSize(photos.length, variant);
 
@@ -41,8 +44,7 @@ const TripFitShareCard = forwardRef<ViewRef, TripFitShareCardProps>(
 
         <View style={cs.weatherChip}>
           <Text style={cs.weatherChipText}>
-            {phraseEmoji(day.dayPhrase)} {Math.round(day.minTempF)}°–
-            {Math.round(day.maxTempF)}°
+            {phraseEmoji(day.dayPhrase)} {formatTempRange(day.minTempF, day.maxTempF, tempScale)}
           </Text>
         </View>
 

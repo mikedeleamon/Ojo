@@ -74,6 +74,8 @@ import { lookFor } from '../../lib/visualLibrary/looks';
 import PackingListShareCard from '../../components/ShareCard/PackingListShareCard';
 import { tripShareLink } from '../../lib/share/deepLinks';
 import type { ScrollViewRef } from '../../types/nativeRefs';
+import { useSettings } from '../../hooks/useSettings';
+import { formatTempRange, tempScaleOf } from '../../lib/units';
 import { useFoldLayout } from '../../context/FoldLayoutContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -144,6 +146,8 @@ const DayCard = ({
     onReplan: () => void;
     onShare: () => void;
 }) => {
+    const { settings } = useSettings();
+    const tempScale = tempScaleOf(settings);
     const outfit = activeOutfit(plan);
     const articles = outfit.slots.map(
         (s: { article: ClothingArticle }) => s.article,
@@ -182,7 +186,7 @@ const DayCard = ({
                     </Text>
                 </RNView>
                 <Text style={[dayCardSt.tempRow, { color: colors.textMuted }]}>
-                    {Math.round(plan.day.minTempF)}° – {Math.round(plan.day.maxTempF)}°F ·{' '}
+                    {formatTempRange(plan.day.minTempF, plan.day.maxTempF, tempScale)} ·{' '}
                     {humanizeCondition(plan.day.dayPhrase)}
                 </Text>
 
@@ -327,10 +331,10 @@ const HeroBanner = ({
     plans: DayPlan[];
     destination: string;
 }) => {
+    const { settings } = useSettings();
     const allMin = plans.map((p) => p.day.minTempF);
     const allMax = plans.map((p) => p.day.maxTempF);
-    const minTemp = Math.round(Math.min(...allMin));
-    const maxTemp = Math.round(Math.max(...allMax));
+    const tempRange = formatTempRange(Math.min(...allMin), Math.max(...allMax), tempScaleOf(settings));
 
     const startStr = fmtShortDate(fromISODate(plans[0].day.date));
     const endStr = fmtShortDate(fromISODate(plans[plans.length - 1].day.date));
@@ -362,7 +366,7 @@ const HeroBanner = ({
                         {startStr} – {endStr}
                     </Text>
                     <Text style={[heroBannerSt.tempRange, { color: darkColors.textPrimary }]}>
-                        {minTemp}° – {maxTemp}°F
+                        {tempRange}
                     </Text>
                 </GlassCard>
             </RNView>
@@ -1429,6 +1433,7 @@ export default function TripPlanner({
                             day={plans[shareDayIdx].day}
                             slots={activeOutfit(plans[shareDayIdx]).slots}
                             dayLabel={`Day ${shareDayIdx + 1} of ${plans.length}`}
+                            tempScale={tempScaleOf(settings)}
                         />
                     )}
                     renderSticker={(stickerRef) => (
@@ -1439,6 +1444,7 @@ export default function TripPlanner({
                             day={plans[shareDayIdx].day}
                             slots={activeOutfit(plans[shareDayIdx]).slots}
                             dayLabel={`Day ${shareDayIdx + 1} of ${plans.length}`}
+                            tempScale={tempScaleOf(settings)}
                         />
                     )}
                     // A forecast day has no time of day: show its weather in daylight.

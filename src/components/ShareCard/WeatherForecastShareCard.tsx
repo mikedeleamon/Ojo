@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
 // e.g. "3 PM" → "3PM" — compact enough for the narrow hour tiles.
 const hourLabel = (iso: string) =>
   new Date(iso)
-    .toLocaleTimeString('en-US', { hour: 'numeric' })
+    .toLocaleTimeString(undefined, { hour: 'numeric' })
     .replace(/\s+/g, '');
 
 const WeatherForecastShareCard = forwardRef<ViewRef, WeatherForecastShareCardProps>(

@@ -53,6 +53,7 @@ import {
     type SwapOption,
 } from '../../lib/outfitEngine';
 import SwapSheet from './SwapSheet';
+import ShareIcon from '../icons/ShareIcon';
 import { addHistoryEntry, recentlyWornWithAge, loadHistory } from '../../lib/outfitHistory';
 import { recordSuccessfulOutfit, maybeRequestReview } from '../../services/reviewManager';
 import { derivePreferenceProfile } from '../../lib/userPreferences';
@@ -76,6 +77,7 @@ import {
     WearNegative,
 } from '../../types';
 import { articleDisplayName } from '../../types';
+import { tempScaleOf } from '../../lib/units';
 import { spacing } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 import {
@@ -1241,7 +1243,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
                             accessibilityRole='button'
                             hitSlop={8}
                         >
-                            <Text style={styles.overflowBtnText}>···</Text>
+                            <ShareIcon size={15} color={colors.textSecondary} />
                         </Pressable>
                     </View>
                 )}
@@ -1602,6 +1604,18 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
                                 </View>
                             </View>
 
+                            {/* Right after logging is when people want to share
+                                it. Shares whatever was logged, a Trip Mode outfit
+                                included (confirmSlots). */}
+                            <Pressable
+                                onPress={() => setShowShareSheet(true)}
+                                style={({ pressed }) => [styles.confirmShare, pressed && { opacity: 0.7 }]}
+                                accessibilityRole='button'
+                                accessibilityLabel="Share today's fit"
+                            >
+                                <ShareIcon size={16} color={colors.textPrimary} />
+                                <Text style={styles.confirmShareText}>Share today's fit</Text>
+                            </Pressable>
                             <Pressable
                                 onPress={handleUndoLog}
                                 style={styles.confirmUndo}
@@ -1639,6 +1653,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
                         score={confirmScore}
                         isPersonalized={scoreLevel === 'active'}
                         weather={weather}
+                        tempScale={tempScaleOf(settings)}
                     />
                 )}
                 renderSticker={(stickerRef) => (
@@ -1649,6 +1664,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
                         score={confirmScore}
                         isPersonalized={scoreLevel === 'active'}
                         weather={weather}
+                        tempScale={tempScaleOf(settings)}
                     />
                 )}
                 look={lookFor({ condition: weather.WeatherText, isDayTime: weather.IsDayTime, coords })}
