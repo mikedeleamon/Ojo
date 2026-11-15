@@ -482,10 +482,13 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
             .finally(() => setHistoryReady(true));
     }, []);
 
+    // New settings regenerate the suggestions, but they don't undo what was
+    // already logged: the "Logged for today" panel shows the outfit captured at
+    // log time (loggedOutfit), not the regenerated ones. Clearing wornLogged
+    // here also deleted today's worn record for the widget.
     useEffect(() => {
         setActiveIdx(0);
         setShowBreakdown(false);
-        setWornLogged(false);
         setRemovedByOutfit(new Map());
         setSwaps(new Map());
         setOccasionOverride(settings.occasion ?? 'everyday');
@@ -679,12 +682,20 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
     // rewrites the widget while Ojo is closed, and would otherwise replace the
     // outfit the user committed to with the top suggestion. Saved for the day
     // on log, dropped on undo, and read back on mount so a relaunch keeps
-    // showing it too (lib/widget/wornToday.ts).
+    // showing it too (lib/widget/wornToday.ts). The same record brings back the
+    // "Logged for today" panel when Home is rebuilt, so a logged outfit stays
+    // logged for the rest of the day instead of reverting to suggestions.
     const [persistedWorn, setPersistedWorn] = useState<OutfitResult | null>(null);
     useEffect(() => {
         let cancelled = false;
         readWornToday()
-            .then((o) => { if (!cancelled) setPersistedWorn(o); })
+            .then((o) => {
+                if (cancelled || !o) return;
+                setPersistedWorn(o);
+                // Only if nothing was logged while the read was in flight.
+                setLoggedOutfit((cur) => cur ?? { slots: o.slots, score: o.score, result: o });
+                setWornLogged(true);
+            })
             .catch(() => {});
         return () => { cancelled = true; };
     }, []);
@@ -1602,20 +1613,39 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
                                         </View>
                                     )}
                                 </View>
+
+                                {/* Right after logging is when people want to share
+                                    it. The row previews the actual story card (the
+                                    same component the share sheet exports, scaled
+                                    down) so it's clear what tapping produces.
+                                    Shares whatever was logged, a Trip Mode outfit
+                                    included (confirmSlots). */}
+                                <Pressable
+                                    onPress={() => setShowShareSheet(true)}
+                                    style={({ pressed }) => [styles.confirmShareRow, pressed && { opacity: 0.7 }]}
+                                    accessibilityRole='button'
+                                    accessibilityLabel="Share today's fit"
+                                    accessibilityHint='Opens a story-sized card of this outfit to share'
+                                >
+                                    <View style={styles.confirmShareThumb} pointerEvents='none'>
+                                        <View style={styles.confirmShareThumbInner}>
+                                            <TodayOutfitShareCard
+                                                slots={confirmSlots}
+                                                score={confirmScore}
+                                                isPersonalized={scoreLevel === 'active'}
+                                                weather={weather}
+                                                tempScale={tempScaleOf(settings)}
+                                            />
+                                        </View>
+                                    </View>
+                                    <View style={styles.confirmShareCopy}>
+                                        <Text style={styles.confirmShareTitle}>Your fit card is ready</Text>
+                                        <Text style={styles.confirmShareSub}>Story-sized, with today's weather</Text>
+                                    </View>
+                                    <ShareIcon size={18} color={colors.textPrimary} />
+                                </Pressable>
                             </View>
 
-                            {/* Right after logging is when people want to share
-                                it. Shares whatever was logged, a Trip Mode outfit
-                                included (confirmSlots). */}
-                            <Pressable
-                                onPress={() => setShowShareSheet(true)}
-                                style={({ pressed }) => [styles.confirmShare, pressed && { opacity: 0.7 }]}
-                                accessibilityRole='button'
-                                accessibilityLabel="Share today's fit"
-                            >
-                                <ShareIcon size={16} color={colors.textPrimary} />
-                                <Text style={styles.confirmShareText}>Share today's fit</Text>
-                            </Pressable>
                             <Pressable
                                 onPress={handleUndoLog}
                                 style={styles.confirmUndo}

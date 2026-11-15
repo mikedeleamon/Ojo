@@ -7,6 +7,10 @@ import {
     spacing,
     radius,
 } from '../../theme/tokens';
+import { CARD_WIDTH, CARD_HEIGHT } from '../ShareCard/ShareCardFrame.styles';
+
+/** Mini story card in the "Logged for today" share row: 360pt card → 44pt wide. */
+const SHARE_THUMB_SCALE = 44 / CARD_WIDTH;
 
 export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
     root: { gap: spacing.sm },
@@ -333,22 +337,47 @@ export const makeStyles = (colors: ColorTokens) => StyleSheet.create({
         fontSize: fontSizes.xs,
         color: colors.textMuted,
     },
-    confirmShare: {
+    // Share row at the foot of the "Logged for today" card: a hairline divider,
+    // then a mini story card, two lines of copy and the share glyph.
+    confirmShareRow: {
         flexDirection: 'row' as const,
         alignItems: 'center' as const,
-        justifyContent: 'center' as const,
-        gap: spacing.xs,
-        alignSelf: 'stretch' as const,
-        paddingVertical: spacing.sm,
-        borderRadius: radius.md,
+        gap: spacing.sm,
+        marginTop: spacing.xs,
+        paddingTop: spacing.sm,
+        borderTopWidth: StyleSheet.hairlineWidth,
+        borderTopColor: colors.glassBorder,
+    },
+    // Outer box is the scaled size; it clips the full-size card inside.
+    confirmShareThumb: {
+        width: CARD_WIDTH * SHARE_THUMB_SCALE,
+        height: CARD_HEIGHT * SHARE_THUMB_SCALE,
+        borderRadius: 6,
+        overflow: 'hidden' as const,
         borderWidth: 1,
         borderColor: colors.glassBorder,
-        backgroundColor: colors.glassBgStrong,
     },
-    confirmShareText: {
+    // Must carry the card's real size: the transform pivots about its own box
+    // (same trick as ShareToInstagramSheet's preview).
+    confirmShareThumbInner: {
+        width: CARD_WIDTH,
+        height: CARD_HEIGHT,
+        transform: [{ scale: SHARE_THUMB_SCALE }],
+        transformOrigin: 'top left',
+    },
+    confirmShareCopy: {
+        flex: 1,
+        gap: 2,
+    },
+    confirmShareTitle: {
         fontFamily: fonts.bodySemiBold,
         fontSize: fontSizes.base,
         color: colors.textPrimary,
+    },
+    confirmShareSub: {
+        fontFamily: fonts.body,
+        fontSize: fontSizes.xs,
+        color: colors.textSecondary,
     },
     confirmUndo: {
         alignSelf: 'center' as const,

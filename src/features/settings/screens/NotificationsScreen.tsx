@@ -145,6 +145,10 @@ const makeLocalStyles = (colors: ColorTokens, isDark: boolean) =>
             color: colors.textSecondary,
             lineHeight: (fontSizes.sm - 1) * 1.55,
         },
+        // Native glass on iOS 26+ (GlassCard drops the background and border
+        // and tints the material with permGlassTint). Elsewhere, Android
+        // included, GlassCard renders a plain View with these translucent amber
+        // styles as the fallback.
         permBanner: {
             backgroundColor: isDark
                 ? 'rgba(250, 204, 21, 0.08)'
@@ -246,6 +250,9 @@ export default function NotificationsScreen() {
     const { colors, isDark } = useTheme();
     const s = useMemo(() => makeStyles(colors), [colors]);
     const st = useMemo(() => makeLocalStyles(colors, isDark), [colors, isDark]);
+    // A light amber tint in the glass itself, so the banner still reads as a
+    // notice while keeping the glass's depth.
+    const permGlassTint = isDark ? 'rgba(250, 204, 21, 0.12)' : 'rgba(250, 204, 21, 0.22)';
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -516,7 +523,7 @@ export default function NotificationsScreen() {
                     "Allow". Once a denial is recorded iOS won't ask again, and the
                     button hands off to Settings instead. */}
                 {permission !== 'granted' && (
-                    <View style={st.permBanner}>
+                    <GlassCard style={st.permBanner} glassTint={permGlassTint}>
                         <Text style={st.permText}>
                             {permission === 'denied'
                                 ? 'Push notifications are blocked for Ojo.'
@@ -538,7 +545,7 @@ export default function NotificationsScreen() {
                                     : 'Continue'}
                             </Text>
                         </Pressable>
-                    </View>
+                    </GlassCard>
                 )}
 
                 {/* Location-based alerts only. One button, "Continue", per the
@@ -551,7 +558,7 @@ export default function NotificationsScreen() {
                         ns.sameDayNudgeEnabled) &&
                     locAccess !== null &&
                     locAccess !== 'always' && (
-                        <View style={st.permBanner}>
+                        <GlassCard style={st.permBanner} glassTint={permGlassTint}>
                             <Text style={st.permText}>
                                 {locAccess === 'blocked'
                                     ? 'Ojo can’t use your location in the background, so these notifications describe wherever you last opened the app. To have them follow you, set Location to Always in Settings.'
@@ -573,7 +580,7 @@ export default function NotificationsScreen() {
                                         : 'Continue'}
                                 </Text>
                             </Pressable>
-                        </View>
+                        </GlassCard>
                     )}
 
                 <View style={st.section}>
