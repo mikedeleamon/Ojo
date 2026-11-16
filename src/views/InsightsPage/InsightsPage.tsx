@@ -297,8 +297,8 @@ export default function InsightsPage() {
                 lineHeight: fontSizes.base * 1.6,
               }}>
                 {closets.length === 0
-                  ? 'Create a closet and photograph your clothes to unlock wardrobe utilization, cost-per-wear, sleeping items, and colour palette analysis.'
-                  : 'Add items to your closet to unlock wardrobe utilization, cost-per-wear, sleeping items, and colour palette analysis.'}
+                  ? 'Create a closet and photograph your clothes to unlock wardrobe utilization, cost-per-wear, sleeping pieces, and colour palette analysis.'
+                  : 'Add clothes to your closet to unlock wardrobe utilization, cost-per-wear, sleeping pieces, and colour palette analysis.'}
               </Text>
               <Pressable
                 style={styles.ctaBtn}
@@ -382,7 +382,7 @@ export default function InsightsPage() {
             <Text style={styles.priceNudgeText}>
               {health.pricedCount === 0
                 ? 'Add prices to unlock cost-per-wear analytics'
-                : `${health.pricedCount} of ${health.totalArticles} items priced — add more`}
+                : `${health.pricedCount} of ${health.totalArticles} pieces priced — add more`}
             </Text>
             {iconOnlyNav ? (
               <ArrowRightIcon color={colors.textPrimary} />
@@ -428,7 +428,7 @@ export default function InsightsPage() {
           <View style={styles.healthStats}>
             <View style={styles.statRow}>
               <Text style={styles.statValue}>{health.totalArticles}</Text>
-              <Text style={styles.statLabel}>total items</Text>
+              <Text style={styles.statLabel}>total pieces</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statRow}>
@@ -698,13 +698,13 @@ export default function InsightsPage() {
           </GlassCard>
         )}
 
-        {/* ── Sleeping Items + Donation Queue — merged GlassGroup ── */}
+        {/* ── Sleeping pieces + Donation Queue — merged GlassGroup ── */}
         <GlassGroup spacing={8}>
-          {/* Sleeping Items */}
+          {/* Sleeping pieces */}
           {sleeping.length > 0 && (
             <GlassCard style={styles.itemCard}>
               <View style={styles.itemCardHeader}>
-                <Text style={styles.itemCardTitle}>Sleeping Items</Text>
+                <Text style={styles.itemCardTitle}>Sleeping pieces</Text>
                 <View style={styles.countBadge}>
                   <Text style={styles.countBadgeText}>{sleeping.length}</Text>
                 </View>
@@ -790,7 +790,7 @@ export default function InsightsPage() {
 
             {queuedInsights.length === 0 ? (
               <Text style={styles.emptyText}>
-                Items you mark for donation appear here.
+                Pieces you mark for donation appear here.
               </Text>
             ) : (
               <>

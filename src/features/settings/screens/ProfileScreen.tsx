@@ -359,7 +359,7 @@ export default function ProfileScreen({ onLogout }: Props) {
                         <Text style={s.dangerTitle}>Delete account</Text>
                         <Text style={s.dangerBody}>
                             Permanently removes your account, closets, clothing
-                            articles, and outfit history. Cannot be undone.
+                            clothes, and outfit history. Cannot be undone.
                         </Text>
                         <Pressable
                             style={s.dangerBtn}

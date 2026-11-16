@@ -1314,8 +1314,8 @@ function ProofCard({ lead, proof }: { lead: ProFeature | null; proof: PaywallPro
                     <View style={styles.proofSplit}>
                         <Text style={styles.proofValue}>
                             {proof.itemCount > FREE_ITEM_LIMIT
-                                ? `${proof.itemCount} items · Free covers ${FREE_ITEM_LIMIT}`
-                                : `${proof.itemCount} of ${FREE_ITEM_LIMIT} items`}
+                                ? `${proof.itemCount} pieces · Free covers ${FREE_ITEM_LIMIT}`
+                                : `${proof.itemCount} of ${FREE_ITEM_LIMIT} pieces`}
                         </Text>
                         {outfits > 0 && (
                             <Text style={styles.proofAside}>

@@ -64,7 +64,7 @@ export const ArticleCard = memo(({
             <Pressable
                 style={styles.articleCardInner}
                 onPress={() => onEdit(article)}
-                accessibilityLabel='Edit article'
+                accessibilityLabel='Edit piece'
                 accessibilityRole='button'
                 accessibilityState={{ selected }}
             >
@@ -158,7 +158,7 @@ export const TileArticleCard = memo(({
 
     const confirmDelete = async () => {
         const ok = await confirm({
-            title: 'Remove article?',
+            title: 'Remove this piece?',
             message: articleDisplayName(article),
             confirmLabel: 'Remove',
             destructive: true,

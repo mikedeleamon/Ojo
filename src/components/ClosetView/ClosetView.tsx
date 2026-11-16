@@ -283,7 +283,7 @@ const ClosetView = ({
     const handleDelete = async (id: string) => {
         const ok = await confirm({
             title: 'Delete closet?',
-            message: 'This will also delete all articles inside.',
+            message: 'This also deletes every piece in it.',
             confirmLabel: 'Delete',
             destructive: true,
         });
@@ -366,7 +366,7 @@ const ClosetView = ({
 
     const openSortMenu = () => {
         const tick = (mode: SortMode) => (sortBy === mode ? '✓  ' : '    ');
-        Alert.alert('Sort articles', undefined, [
+        Alert.alert('Sort pieces', undefined, [
             { text: `${tick('default')}Default order`, onPress: () => setSortBy('default') },
             { text: `${tick('type')}By type`, onPress: () => setSortBy('type') },
             { text: `${tick('color')}By color`, onPress: () => setSortBy('color') },
@@ -461,7 +461,7 @@ const ClosetView = ({
                             </Text>
                         </>
                     );
-                    const a11y = `${c.name} closet, ${c.articles.length} items. Hold for options.`;
+                    const a11y = `${c.name} closet, ${c.articles.length} pieces. Hold for options.`;
                     // Active tab is a solid accent pill; inactive tabs are native
                     // glass (GlassCard) so the GlassGroup merges them on iOS 26.
                     return active ? (
@@ -575,7 +575,7 @@ const ClosetView = ({
                 {itemLimit !== null && (
                     <Text
                         style={styles.itemCounter}
-                        accessibilityLabel={`${itemCount} of ${itemLimit} free item slots used`}
+                        accessibilityLabel={`${itemCount} of ${itemLimit} free slots used`}
                     >
                         {itemCount}/{itemLimit}
                     </Text>
@@ -617,12 +617,12 @@ const ClosetView = ({
                     style={styles.limitBanner}
                     onPress={() => onUpgrade?.('items')}
                     accessibilityRole='button'
-                    accessibilityLabel='Upgrade to Ojo Pro for unlimited items'
+                    accessibilityLabel='Upgrade to Ojo Pro for unlimited pieces'
                 >
                     <Text style={styles.limitBannerText}>
                         {canAddItem
-                            ? `${itemLimit - itemCount} item${itemLimit - itemCount === 1 ? '' : 's'} left on the free plan.`
-                            : `You've filled all ${itemLimit} free item slots. Everything you've added stays right here.`}
+                            ? `${itemLimit - itemCount} piece${itemLimit - itemCount === 1 ? '' : 's'} left on the free plan.`
+                            : `You've filled all ${itemLimit} free slots. Everything you've added stays right here.`}
                     </Text>
                     {iconOnlyNav ? (
                         <SparkleIcon size={20} color={colors.textPrimary} />
@@ -638,11 +638,11 @@ const ClosetView = ({
                     <SearchIcon size={15} color={colors.textMuted} />
                     <TextInput
                         style={styles.searchInput}
-                        placeholder='Search articles…'
+                        placeholder='Search your closet…'
                         placeholderTextColor={colors.textMuted}
                         value={query}
                         onChangeText={setQuery}
-                        accessibilityLabel="Search articles"
+                        accessibilityLabel="Search your closet"
                     />
                     {query ? (
                         <IconButton
@@ -660,7 +660,7 @@ const ClosetView = ({
                     <Pressable
                         style={styles.iconBtnFill}
                         onPress={openSortMenu}
-                        accessibilityLabel='Sort articles'
+                        accessibilityLabel='Sort pieces'
                         accessibilityRole='button'
                     >
                         <SortIcon
@@ -695,7 +695,7 @@ const ClosetView = ({
                     style={styles.filterPanel}
                     contentContainerStyle={{ gap: 12, padding: spacing.md }}
                 >
-                    <Text style={styles.filterGroupLabel}>Gender</Text>
+                    <Text style={styles.filterGroupLabel}>Cut</Text>
                     <View style={styles.chipRow}>
                         {[...ARTICLE_GENDERS].map((g) => (
                             <Chip
@@ -706,7 +706,7 @@ const ClosetView = ({
                             />
                         ))}
                     </View>
-                    <Text style={styles.filterGroupLabel}>Category</Text>
+                    <Text style={styles.filterGroupLabel}>Style</Text>
                     <View style={styles.chipRow}>
                         {CATEGORIES.map((c) => (
                             <Chip
@@ -830,7 +830,7 @@ const ClosetView = ({
                     !selected || selected.articles.length === 0 ? (
                         <View style={styles.emptyState}>
                             <HangerIcon size={36} color={colors.textMuted} />
-                            <Text style={styles.emptyTitle}>No articles yet</Text>
+                            <Text style={styles.emptyTitle}>No pieces yet</Text>
                             <Pressable
                                 style={styles.addBtn}
                                 onPress={openAddChooser}
@@ -862,7 +862,7 @@ const ClosetView = ({
                 <Pressable
                     style={styles.fab}
                     onPress={openAddChooser}
-                    accessibilityLabel='Add article'
+                    accessibilityLabel='Add a piece'
                     accessibilityRole='button'
                 >
                     <PlusIcon size={24} color={colors.saveBtnText} decorative />

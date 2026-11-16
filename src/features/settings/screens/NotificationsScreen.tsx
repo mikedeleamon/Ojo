@@ -749,7 +749,7 @@ export default function NotificationsScreen() {
                             <RowLabel
                                 st={st}
                                 title='Closet Gap Nudge'
-                                subtitle='Suggests adding missing items when your closet lacks gear for the forecast.'
+                                subtitle='Suggests adding missing pieces when your closet lacks gear for the forecast.'
                             />
                             <Switch
                                 value={ns.closetGapEnabled}

@@ -97,13 +97,13 @@ export default function PriceBackfillScreen() {
         <ScrollView contentContainerStyle={st.content} keyboardShouldPersistTaps="handled">
           <Text style={st.intro}>
             Add what you paid to unlock cost-per-wear and total wardrobe value in
-            Insights. Items without a price are listed below.
+            Insights. Pieces without a price are listed below.
           </Text>
 
           {rows.length === 0 ? (
             <View style={st.empty}>
               <Text style={st.emptyTitle}>
-                {totalSaved > 0 ? 'All caught up 🎉' : 'Every item has a price 🎉'}
+                {totalSaved > 0 ? 'All caught up 🎉' : 'Every piece has a price 🎉'}
               </Text>
               <Text style={st.emptyBody}>
                 Cost-per-wear is fully unlocked in the Insights tab.
