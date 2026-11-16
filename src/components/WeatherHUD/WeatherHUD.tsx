@@ -120,6 +120,10 @@ const STACKED_NAV_ROW_TOP = 3;
  */
 const CITY_CAP_OFFSET = 10;
 
+/** The geocoder couldn't place the city; the error state offers "Change city" for it. */
+const CITY_NOT_FOUND = 'Location not found. Check your city name.';
+const WEATHER_LOAD_FAILED = 'Could not load weather. Please try again later.';
+
 /** Long enough for the loading overlay to fade before the scroll bar shows. */
 const CARD_SCROLL_BAR_FLASH_DELAY_MS = 500;
 
@@ -397,10 +401,16 @@ const WeatherHUD = ({
             if (coords) {
                 setPlace(coords);
             } else {
-                setError('Location not found. Check your city name.');
+                setError(CITY_NOT_FOUND);
                 setLoading(false);
                 setRefreshing(false);
             }
+        }).catch(() => {
+            // The geocoder itself failed (offline, throttled), not the name.
+            if (cancelled) return;
+            setError(WEATHER_LOAD_FAILED);
+            setLoading(false);
+            setRefreshing(false);
         });
         return () => {
             cancelled = true;
@@ -494,7 +504,7 @@ const WeatherHUD = ({
                 setError(
                     status === 429
                         ? 'Weather API rate limit reached. Wait a few minutes and try again.'
-                        : 'Could not load weather. Please try again later.',
+                        : WEATHER_LOAD_FAILED,
                 );
             })
             .finally(() => {
@@ -977,7 +987,7 @@ const WeatherHUD = ({
         return m ? `rgb(${m[1].trim()},${m[2].trim()},${m[3].trim()})` : c;
     }, [weather?.WeatherText, weather?.IsDayTime]);
 
-    // ── Error state (#9: retry + check settings) ──────────────────────────────
+    // ── Error state (#9: retry, plus a way to fix the city) ────────────────────
     // With no location at all (GPS denied, no default city), retrying alone
     // can't help: offer a city, or the system settings to allow location.
     if (error && !weather && !location)
@@ -1025,18 +1035,26 @@ const WeatherHUD = ({
                 >
                     <Text style={st.retryBtnText}>Try again</Text>
                 </Pressable>
-                <Pressable
-                    onPress={() => nav.push('/account')}
-                    accessibilityRole='button'
-                    accessibilityLabel='Check settings'
-                    hitSlop={10}
-                >
-                    {iconOnlyNav ? (
-                        <GearIcon stroke={colors.textSecondary} decorative />
-                    ) : (
-                        <Text style={st.settingsLink}>Check settings</Text>
-                    )}
-                </Pressable>
+                {/* Only a bad city name is fixable from the app (pick another
+                    city); a rate limit or failed fetch just needs a retry. */}
+                {error === CITY_NOT_FOUND && (
+                    <Pressable
+                        onPress={() =>
+                            onOpenLocations
+                                ? onOpenLocations()
+                                : nav.push('/account/locations')
+                        }
+                        accessibilityRole='button'
+                        accessibilityLabel='Change city'
+                        hitSlop={10}
+                    >
+                        {iconOnlyNav ? (
+                            <LocationsIcon stroke={colors.textSecondary} decorative />
+                        ) : (
+                            <Text style={st.settingsLink}>Change city</Text>
+                        )}
+                    </Pressable>
+                )}
             </View>
         );
 
