@@ -1131,7 +1131,7 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
                             onPress={() => setPreferredCloset(c._id)}
                             disabled={settingPref}
                             accessibilityRole='button'
-                            accessibilityLabel={`${c.name}, ${c.articles.length} items`}
+                            accessibilityLabel={`${c.name}, ${c.articles.length} pieces`}
                         >
                             <HangerIcon
                                 size={14}

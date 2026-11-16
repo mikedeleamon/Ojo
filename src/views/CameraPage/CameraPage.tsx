@@ -187,7 +187,7 @@ function LimitReachedScreen({
     <View style={st.root}>
       <Text style={st.title}>Closet full</Text>
       <Text style={st.body}>
-        You've filled all {limit} items on the free plan. Everything you've
+        You've filled all {limit} free slots. Everything you've
         added stays exactly where it is — Ojo Pro lifts the cap so you can keep
         going.
       </Text>
@@ -250,7 +250,7 @@ function NoClosetScreen({ onClose }: { onClose: () => void }) {
     <View style={st.root}>
       <Text style={st.title}>No closet yet</Text>
       <Text style={st.body}>
-        Name your first closet to start adding garments.
+        Name your first closet to start adding clothes.
       </Text>
       <TextInput
         style={inputStyle.input}

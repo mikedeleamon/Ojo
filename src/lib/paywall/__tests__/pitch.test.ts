@@ -53,13 +53,13 @@ describe('featureOrder', () => {
 describe('pitchFor', () => {
   it('uses the real item count when there is one', () => {
     const p = pitchFor('items', { ...EMPTY_PROOF, itemCount: 38 });
-    expect(p.subhead).toContain(`38 of your ${FREE_ITEM_LIMIT} free items`);
+    expect(p.subhead).toContain(`38 of your ${FREE_ITEM_LIMIT} free pieces`);
   });
 
   it('never claims more free items than the limit for an account over the cap', () => {
     const p = pitchFor('items', { ...EMPTY_PROOF, itemCount: FREE_ITEM_LIMIT + 13 });
     expect(p.subhead).not.toContain(`of your ${FREE_ITEM_LIMIT} free`);
-    expect(p.subhead).toContain(`${FREE_ITEM_LIMIT + 13} of your items stay`);
+    expect(p.subhead).toContain(`${FREE_ITEM_LIMIT + 13} of your pieces stay`);
   });
 
   it('never shows a zero count', () => {

@@ -59,6 +59,14 @@ const BODY_ZONES: BodyZone[] = [
     'Carried',
 ];
 const TOP_BOTTOM: string[] = ['Top', 'Bottom', 'Full body', 'Footwear', 'N/A'];
+// What the chips say. The stored values above stay as they are (the engine reads them).
+const TOP_BOTTOM_LABELS: Record<string, string> = {
+    Top: 'Upper body',
+    Bottom: 'Lower body',
+    'Full body': 'Full body',
+    Footwear: 'Feet',
+    'N/A': 'None of these',
+};
 
 const SWATCH: Record<string, string> = {
     Black: '#1a1a1a',
@@ -256,12 +264,15 @@ const ChipField = ({
     label,
     value,
     items,
+    itemLabels,
     onValueChange,
     required = false,
 }: {
     label: string;
     value: string;
     items: string[];
+    /** Display text per stored value, when the two differ. */
+    itemLabels?: Record<string, string>;
     onValueChange: (v: string) => void;
     required?: boolean;
 }) => {
@@ -282,7 +293,7 @@ const ChipField = ({
                             onValueChange(value === item ? '' : item)
                         }
                         accessibilityRole='radio'
-                        accessibilityLabel={item}
+                        accessibilityLabel={itemLabels?.[item] ?? item}
                         accessibilityState={{ selected: value === item }}
                     >
                         <Text
@@ -291,7 +302,7 @@ const ChipField = ({
                                 value === item && st.chipTextActive,
                             ]}
                         >
-                            {item}
+                            {itemLabels?.[item] ?? item}
                         </Text>
                     </Pressable>
                 ))}
@@ -721,7 +732,7 @@ const ArticleModal = ({
         try {
             await onDelete?.();
         } catch (err) {
-            setError(getErrorMessage(err, 'Failed to delete article.'));
+            setError(getErrorMessage(err, "Couldn't delete this piece. Try again."));
         } finally {
             setDeleting(false);
         }
@@ -730,7 +741,7 @@ const ArticleModal = ({
     const handleSubmit = async () => {
         setError(null);
         if (!form.clothingType) {
-            setError('Clothing type is required.');
+            setError('Choose a type first.');
             return;
         }
         setSaving(true);
@@ -742,7 +753,7 @@ const ArticleModal = ({
                 clothingCategory: form.clothingCategories[0] ?? '',
             });
         } catch (err) {
-            setError(getErrorMessage(err, 'Failed to save article.'));
+            setError(getErrorMessage(err, "Couldn't save this piece. Try again."));
         } finally {
             setSaving(false);
         }
@@ -766,11 +777,11 @@ const ArticleModal = ({
                         ref={headerRef}
                         accessible={true}
                         accessibilityLabel={
-                            isEditing ? 'Edit Article' : 'Add Article'
+                            isEditing ? 'Edit piece' : 'Add a piece'
                         }
                     >
                         <Text style={st.title}>
-                            {isEditing ? 'Edit Article' : 'Add Article'}
+                            {isEditing ? 'Edit piece' : 'Add a piece'}
                         </Text>
                     </RNView>
                     {/* In the two-pane Closet (iPhone Duo) the pane always shows a
@@ -1023,19 +1034,20 @@ const ArticleModal = ({
                         onChange={handleTypeChange}
                     />
 
-                    {/* Top / Bottom — only shown for 'Other'; auto-derived for all known types */}
+                    {/* Where it's worn (topOrBottom) — only shown for 'Other'; auto-derived for all known types */}
                     {typeIsAmbiguous && (
                         <ChipField
-                            label='Top / Bottom'
+                            label="Where it's worn"
                             value={form.topOrBottom}
                             items={TOP_BOTTOM}
+                            itemLabels={TOP_BOTTOM_LABELS}
                             onValueChange={(v) => set('topOrBottom', v)}
                         />
                     )}
 
                     {/* Category — multi-select */}
                     <MultiChipField
-                        label='Category'
+                        label='Style'
                         values={form.clothingCategories}
                         items={CATEGORIES}
                         onValueChange={(v) => set('clothingCategories', v)}
@@ -1043,7 +1055,7 @@ const ArticleModal = ({
 
                     {/* Gender — auto-set for Dress/Skirt/Blouse, always overridable */}
                     <ChipField
-                        label='Gender'
+                        label='Cut'
                         value={form.gender ?? 'Unisex'}
                         items={[...ARTICLE_GENDERS]}
                         onValueChange={(v) => set('gender', v || 'Unisex')}
@@ -1065,14 +1077,14 @@ const ArticleModal = ({
 
                     {/* Merchant */}
                     <View style={st.field}>
-                        <FieldLabel>Merchant</FieldLabel>
+                        <FieldLabel>Store</FieldLabel>
                         <TextInput
                             style={st.input}
                             placeholder='e.g. Zara'
                             placeholderTextColor={colors.textMuted}
                             value={form.merchant}
                             onChangeText={(v) => set('merchant', v)}
-                            accessibilityLabel='Merchant'
+                            accessibilityLabel='Store'
                         />
                     </View>
 
@@ -1119,7 +1131,7 @@ const ArticleModal = ({
               All named accessories set isAccessory automatically from the type. */}
                     {typeIsAmbiguous && (
                         <View style={st.field}>
-                            <FieldLabel>Classification</FieldLabel>
+                            <FieldLabel>Is it an accessory?</FieldLabel>
                             <View style={st.chipGrid}>
                                 <Pressable
                                     style={[
@@ -1158,7 +1170,7 @@ const ArticleModal = ({
                     {/* Body Zone — only relevant (and visible) when the item is an accessory */}
                     {form.isAccessory && (
                         <ChipField
-                            label='Body Zone'
+                            label='Worn on'
                             value={form.bodyZone ?? ''}
                             items={BODY_ZONES}
                             onValueChange={(v) =>
@@ -1179,8 +1191,8 @@ const ArticleModal = ({
                                 accessibilityRole='button'
                                 accessibilityLabel={
                                     deleting
-                                        ? 'Deleting article'
-                                        : 'Delete article'
+                                        ? 'Deleting piece'
+                                        : 'Delete piece'
                                 }
                                 accessibilityState={{
                                     busy: deleting,
@@ -1188,7 +1200,7 @@ const ArticleModal = ({
                                 }}
                             >
                                 <Text style={st.deleteBtnText}>
-                                    {deleting ? 'Deleting…' : 'Delete article'}
+                                    {deleting ? 'Deleting…' : 'Delete piece'}
                                 </Text>
                             </Pressable>
                         </View>

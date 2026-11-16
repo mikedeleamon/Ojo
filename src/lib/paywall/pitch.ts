@@ -96,10 +96,10 @@ export const pitchFor = (from: PaywallFrom, proof: PaywallProof): PaywallPitch =
         // An account can sit over the cap (kept from before the limit, or a
         // lapsed Pro): everything it has stays, it just can't add.
         subhead: proof.itemCount > FREE_ITEM_LIMIT
-          ? `All ${proof.itemCount} of your items stay. Pro lets you keep adding.`
+          ? `All ${proof.itemCount} of your pieces stay. Pro lets you keep adding.`
           : proof.itemCount > 0
-            ? `You’ve added ${proof.itemCount} of your ${FREE_ITEM_LIMIT} free items. Pro keeps the room open.`
-            : `Free covers ${FREE_ITEM_LIMIT} items. Pro keeps the room open.`,
+            ? `You’ve added ${proof.itemCount} of your ${FREE_ITEM_LIMIT} free pieces. Pro keeps the room open.`
+            : `Free covers ${FREE_ITEM_LIMIT} pieces. Pro keeps the room open.`,
       };
     case 'closets':
       return {
@@ -139,8 +139,8 @@ export interface FeatureCopy {
 export const FEATURE_COPY: Record<ProFeature, FeatureCopy> = {
   items: {
     title: 'Room for everything you own',
-    short: 'Unlimited items',
-    body: `Free covers ${FREE_ITEM_LIMIT} items. With Pro, every piece you own can be picked.`,
+    short: 'Unlimited pieces',
+    body: `Free covers ${FREE_ITEM_LIMIT} pieces. With Pro, every piece you own can be picked.`,
   },
   closets: {
     title: 'A closet for every part of life',

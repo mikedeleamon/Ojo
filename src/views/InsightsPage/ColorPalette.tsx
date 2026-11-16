@@ -256,7 +256,7 @@ export function ColorPalette({ articles, colors, reduceMotion }: Props) {
               onPress={() => toggle(b.name)}
               opacity={dimmed ? 0.28 : 1}
               accessible
-              accessibilityLabel={`${b.name}, ${b.count} ${b.count === 1 ? 'item' : 'items'}, ${b.pct}%${isSel ? ', selected' : ''}`}
+              accessibilityLabel={`${b.name}, ${b.count} ${b.count === 1 ? 'piece' : 'pieces'}, ${b.pct}%${isSel ? ', selected' : ''}`}
             >
               {/* Orb body */}
               <Circle cx={b.cx} cy={b.cy} r={b.rr} fill={fill} fillOpacity={0.9} />
@@ -339,7 +339,7 @@ export function ColorPalette({ articles, colors, reduceMotion }: Props) {
             <Text style={{ color: colors.textPrimary, fontWeight: fontWeights.semibold }}>
               {sel.name}
             </Text>{' '}
-            — {sel.count} {sel.count === 1 ? 'item' : 'items'} · {sel.pct}%
+            — {sel.count} {sel.count === 1 ? 'piece' : 'pieces'} · {sel.pct}%
           </Text>
         </View>
       ) : (

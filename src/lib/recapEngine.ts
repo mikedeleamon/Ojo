@@ -511,7 +511,7 @@ const buildCandidates = (
     const label = articleLabel(mvp.article);
     out.push({
       id: 'mvp_item', section: 'items',
-      headlines: [`MVP: your ${label}.`, 'One item did the heavy lifting.'],
+      headlines: [`MVP: your ${label}.`, 'One piece did the heavy lifting.'],
       bodies: [
         `${mvp.weekWears} appearances in seven days — someone's earning their hanger space.`,
         `Your ${label} clocked in ${mvp.weekWears} times this week. Give it the weekend off.`,

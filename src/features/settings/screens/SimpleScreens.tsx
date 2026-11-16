@@ -42,7 +42,7 @@ export const PermissionsScreen = () => (
     <InfoCard title="Background location (optional)"
       body="Off unless you turn it on. If you allow “Always” location from Push Notifications, iOS wakes Ojo when your phone moves about 8 km (5 miles) from where it was, and Ojo may also refresh now and then in the background. Each time it reads your location once, updates your widgets, morning brief and weather alerts for where you are, and sends the same rounded location. It doesn't follow your movements continuously. To stop it, set Ojo's location access back to “While Using” in the iOS Settings app." />
     <InfoCard title="Camera & Photos"
-      body="Camera and photo library access are requested only when you add a clothing item with a photo, or save a shared image to your photos. Clothing photos are stored securely and only used to display your items." />
+      body="Camera and photo library access are requested only when you add clothes with a photo, or save a shared image to your photos. Clothing photos are stored securely and only used to display your items." />
     <InfoCard title="Notifications"
       body="Notifications are optional. You choose which alerts to receive in Account → Push Notifications, and you can turn them off at any time." />
     <InfoCard title="Other"
@@ -55,7 +55,7 @@ export const PermissionsScreen = () => (
 export const DataUsageScreen = () => (
   <Root>
     <InfoCard title="What we store"
-      body="Your account, closets, clothing articles, outfit history, style preferences, and your most recent location rounded to about 1 km are stored in our secure cloud database." />
+      body="Your account, closets, clothes, outfit history, style preferences, and your most recent location rounded to about 1 km are stored in our secure cloud database." />
     <InfoCard title="What we don't do"
       body="We don't sell your data, use it for advertising, or share it with third parties beyond what's needed to run the app." />
     <InfoCard title="Delete your data"
