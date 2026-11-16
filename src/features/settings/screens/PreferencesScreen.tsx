@@ -151,41 +151,12 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
             fontWeight: fontWeights.medium,
             color: colors.textPrimary,
         },
-        historyEmpty: {
+        hint: {
             fontFamily: fonts.body,
             fontSize: fontSizes.xs,
             color: colors.textMuted,
             fontStyle: 'italic',
             paddingVertical: 4,
-        },
-        historyCard: {
-            backgroundColor: colors.glassBg,
-            borderRadius: radius.sm,
-            borderWidth: 1,
-            borderColor: colors.glassBorder,
-            padding: spacing.sm,
-            gap: 4,
-        },
-        historyCardRow: {
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-        },
-        historyDate: {
-            fontFamily: fonts.body,
-            fontSize: fontSizes.xs,
-            color: colors.textMuted,
-        },
-        historyCloset: {
-            fontFamily: fonts.body,
-            fontSize: 10,
-            color: colors.textMuted,
-        },
-        historySummary: {
-            fontFamily: fonts.body,
-            fontSize: fontSizes.xs,
-            color: colors.textSecondary,
-            lineHeight: fontSizes.xs * 1.4,
         },
         patternRow: {
             gap: 6,
@@ -253,7 +224,7 @@ const makeStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
             color: colors.textMuted,
             marginTop: 1,
         },
-        // Style DNA card — matches historyCard pattern so theme changes apply
+        // Style DNA card — glass card pattern so theme changes apply
         dnaCard: {
             backgroundColor: colors.glassBg,
             borderRadius: radius.sm,
@@ -338,65 +309,10 @@ const SliderField = ({
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const formatWornAt = (iso: string): string => {
-    const d = new Date(iso);
-    const now = new Date();
-    const diff = Math.floor(
-        (now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24),
-    );
-    if (diff === 0) return 'Today';
-    if (diff === 1) return 'Yesterday';
-    if (diff < 7) return `${diff} days ago`;
-    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-};
-
 const topEntries = (map: Record<string, number>, n = 5) =>
     Object.entries(map)
         .sort((a, b) => b[1] - a[1])
         .slice(0, n);
-
-// ─── Sub-sections ─────────────────────────────────────────────────────────────
-
-const HistorySection = ({
-    history,
-    styles,
-}: {
-    history: OutfitHistoryEntry[];
-    styles: ReturnType<typeof makeStyles>;
-}) => {
-    if (history.length === 0) {
-        return (
-            <Text style={styles.historyEmpty}>
-                Log outfits with "Wore this today" to see your history here.
-            </Text>
-        );
-    }
-    return (
-        <>
-            {history.slice(0, 8).map((entry) => (
-                <GlassCard
-                    key={entry.id}
-                    style={styles.historyCard}
-                >
-                    <View style={styles.historyCardRow}>
-                        <Text style={styles.historyDate}>
-                            {formatWornAt(entry.wornAt)}
-                        </Text>
-                        <Text style={styles.historyCloset}>
-                            {entry.closetName}
-                        </Text>
-                    </View>
-                    <Text
-                        style={styles.historySummary}
-                        numberOfLines={2}
-                    >
-                        {entry.articleSummary}
-                    </Text>
-                </GlassCard>
-            ))}
-        </>
-    );
-};
 
 // ─── Style DNA card ──────────────────────────────────────────────────────────
 
@@ -762,15 +678,6 @@ export default function PreferencesScreen() {
                     ]}
                     keyboardShouldPersistTaps='handled'
                 >
-                    {/* Outfit history */}
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Outfit history</Text>
-                        <HistorySection
-                            history={history}
-                            styles={styles}
-                        />
-                    </View>
-
                     {/* Style Ranker DNA card */}
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>
@@ -832,7 +739,7 @@ export default function PreferencesScreen() {
                             })}
                         </View>
                         {styleMinGuard && (
-                            <Text style={styles.historyEmpty}>
+                            <Text style={styles.hint}>
                                 At least one style must be selected.
                             </Text>
                         )}
