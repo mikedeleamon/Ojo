@@ -10,15 +10,11 @@ import {
 import axios from '../../api/client';
 import { getErrorMessage } from '../../lib/auth';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
-import { useIconOnlyNav } from '../../hooks/useIconOnlyNav';
-import { ChevronLeftIcon } from '../../components/icons/GlyphIcons';
 import { useTheme } from '../../theme/ThemeContext';
 
 export default function ForgotPasswordPage() {
     const { colors } = useTheme();
     const nav = useAppNavigation();
-    // Regular iPhone: links to other pages show an icon, not text (useIconOnlyNav).
-    const iconOnlyNav = useIconOnlyNav();
     const styles = useMemo(() => makeAuthStyles(colors), [colors]);
 
     const [email, setEmail] = useState('');
@@ -59,15 +55,10 @@ export default function ForgotPasswordPage() {
                             accessibilityRole="link"
                             accessibilityLabel="Back to sign in"
                             hitSlop={10}
-                            style={iconOnlyNav ? { alignSelf: 'center' } : undefined}
                         >
-                            {iconOnlyNav ? (
-                                <ChevronLeftIcon size={22} color={colors.textPrimary} />
-                            ) : (
-                                <Text style={[styles.link, { textAlign: 'center' }]}>
-                                    Back to sign in
-                                </Text>
-                            )}
+                            <Text style={[styles.link, { textAlign: 'center' }]}>
+                                Back to sign in
+                            </Text>
                         </Pressable>
                     </>
                 ) : (
@@ -104,15 +95,10 @@ export default function ForgotPasswordPage() {
                             accessibilityRole="link"
                             accessibilityLabel="Back to sign in"
                             hitSlop={10}
-                            style={iconOnlyNav ? { alignSelf: 'center' } : undefined}
                         >
-                            {iconOnlyNav ? (
-                                <ChevronLeftIcon size={22} color={colors.textPrimary} />
-                            ) : (
-                                <Text style={[styles.link, { textAlign: 'center' }]}>
-                                    Back to sign in
-                                </Text>
-                            )}
+                            <Text style={[styles.link, { textAlign: 'center' }]}>
+                                Back to sign in
+                            </Text>
                         </Pressable>
                     </>
                 )}

@@ -14,8 +14,6 @@ import { getErrorMessage, saveAuth } from '../../lib/auth';
 import { markOnboardingPending } from '../../lib/onboarding';
 import { validatePassword } from '../../lib/passwordPolicy';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
-import { useIconOnlyNav } from '../../hooks/useIconOnlyNav';
-import { SignInIcon } from '../../components/icons/GlyphIcons';
 import { useTheme } from '../../theme/ThemeContext';
 import LegalConsentNotice from '../../components/LegalConsentNotice';
 
@@ -87,8 +85,6 @@ export default function SignupPage({ onLogin }: Props) {
     );
 
     const nav = useAppNavigation();
-    // Regular iPhone: links to other pages show an icon, not text (useIconOnlyNav).
-    const iconOnlyNav = useIconOnlyNav();
 
     const [form, setForm] = useState<FormState>({
         firstName: '',
@@ -274,11 +270,7 @@ export default function SignupPage({ onLogin }: Props) {
                         accessibilityLabel="Sign in"
                         hitSlop={10}
                     >
-                        {iconOnlyNav ? (
-                            <SignInIcon color={colors.textPrimary} />
-                        ) : (
-                            <Text style={styles.link}>Sign in</Text>
-                        )}
+                        <Text style={styles.link}>Sign in</Text>
                     </Pressable>
                 </View>
             </AuthScaffold>
