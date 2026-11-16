@@ -30,6 +30,10 @@ export function parseLatLng(query: string): { lat: number; lon: number } | null 
  * - Pass-through for already-formatted "lat,lng" strings (with optional
  *   reverse-geocode for the display name).
  * - Otherwise forward-geocode via expo-location.
+ *
+ * Returns null only when the geocoder has no match for the name. A geocoder
+ * failure (offline, throttled) rejects instead, so callers don't tell someone
+ * to fix a city name that is fine.
  */
 export async function geocodeCity(query: string): Promise<LocationCoords | null> {
   if (!query.trim()) return null;
@@ -40,14 +44,10 @@ export async function geocodeCity(query: string): Promise<LocationCoords | null>
     return { ...direct, name };
   }
 
-  try {
-    const results = await Location.geocodeAsync(query.trim());
-    const hit = results[0];
-    if (!hit) return null;
-    return { lat: hit.latitude, lon: hit.longitude, name: query.trim() };
-  } catch {
-    return null;
-  }
+  const results = await Location.geocodeAsync(query.trim());
+  const hit = results[0];
+  if (!hit) return null;
+  return { lat: hit.latitude, lon: hit.longitude, name: query.trim() };
 }
 
 /** Best-effort reverse geocode → human-readable city/region label, or null. */
