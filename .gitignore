@@ -88,3 +88,10 @@ android/sentry.properties
 # src/lib/visualLibrary/manifest.json is committed.
 scripts/visual-library/work/
 __pycache__/
+
+# What's-new video: footage and renders stay local
+scripts/whats-new-video/work/
+scripts/whats-new-video/out/
+scripts/whats-new-video/footage/
+scripts/whats-new-video/demo-account.local.json
+scripts/whats-new-video/assets/bezel/

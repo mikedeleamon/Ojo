@@ -306,13 +306,9 @@ export default function InsightsPage() {
                 accessibilityRole="button"
                 accessibilityLabel={closets.length === 0 ? 'Create a closet' : 'Go to Closet'}
               >
-                {iconOnlyNav ? (
-                  <HangerIcon size={24} color={colors.saveBtnText} decorative />
-                ) : (
-                  <Text style={styles.ctaBtnText}>
-                    {closets.length === 0 ? 'Create a closet' : 'Go to Closet'}
-                  </Text>
-                )}
+                <Text style={styles.ctaBtnText}>
+                  {closets.length === 0 ? 'Create a closet' : 'Go to Closet'}
+                </Text>
               </Pressable>
             </View>
           </GlassCard>
