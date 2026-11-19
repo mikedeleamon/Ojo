@@ -9,7 +9,7 @@
  */
 
 import { classifyCondition, type WeatherKind } from './conditions';
-import type { RainVariant } from './backdropSpec';
+import type { CloudCover, RainVariant } from './backdropSpec';
 
 export interface BackdropLayers {
     /** Twinkling star field (ClearNightIconMoon). */
@@ -24,9 +24,11 @@ export interface BackdropLayers {
     fog: boolean;
     /** Sun glare from the top-right corner (SunGlare), on clear and sunny days. */
     glare: boolean;
+    /** Drifting cloud (CloudDrift): separate cumulus, or overcast banks. */
+    clouds: CloudCover | null;
 }
 
-export const NO_LAYERS: BackdropLayers = { stars: false, rain: null, flash: false, flakes: null, fog: false, glare: false };
+export const NO_LAYERS: BackdropLayers = { stars: false, rain: null, flash: false, flakes: null, fog: false, glare: false, clouds: null };
 
 export function layersForKind(kind: WeatherKind, isDay: boolean): BackdropLayers {
     switch (kind) {
@@ -39,7 +41,10 @@ export function layersForKind(kind: WeatherKind, isDay: boolean): BackdropLayers
         case 'ice':          return { ...NO_LAYERS, rain: 'sleet' };
         case 'snow':         return { ...NO_LAYERS, flakes: 'snow' };
         case 'fog':          return { ...NO_LAYERS, fog: true };
-        // Haze, cloudy and partly cloudy are gradient-only.
+        // Day and night: cloud is still there after dark (WeatherHUD dims it).
+        case 'partlyCloudy': return { ...NO_LAYERS, clouds: 'partly' };
+        case 'cloudy':       return { ...NO_LAYERS, clouds: 'overcast' };
+        // Haze is gradient-only.
         default:             return NO_LAYERS;
     }
 }

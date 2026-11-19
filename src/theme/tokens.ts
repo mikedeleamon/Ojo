@@ -156,7 +156,11 @@ export const weatherGradients = {
   dawnBlue:     ['#070C1F', '#153A82', '#3B7DD8'],   // nautical twilight, cool blue
 
   // ── Clouds ────────────────────────────────────────────────────────────────
-  partlyCloudy: ['#334155', '#475569', '#64748B'],
+  // The clear-day sky greyed by a third (lib/weather/skyGradient mixes it, and
+  // a test holds these to that mix). Home follows the sun from here, the same
+  // way clear skies do; this is the midday stop and what tiles without
+  // coordinates show. It used to be slate, which read as overcast.
+  partlyCloudy: ['#3791C1', '#5AB6E1', '#87C4E3'],
   cloudy:       ['#1F2937', '#374151', '#4B5563'],
 
   // ── Precipitation ─────────────────────────────────────────────────────────

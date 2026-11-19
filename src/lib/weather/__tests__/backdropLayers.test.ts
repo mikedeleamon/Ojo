@@ -24,9 +24,17 @@ describe('backdropLayersFor', () => {
         expect(backdropLayersFor('Hot', false)).toEqual(NO_LAYERS);
     });
 
-    it('leaves the rest gradient-only', () => {
-        for (const condition of ['Haze', 'Cloudy', 'Partly cloudy']) {
-            expect(backdropLayersFor(condition, true)).toEqual(NO_LAYERS);
+    it('drifts cloud over partly cloudy and overcast skies, day and night', () => {
+        for (const isDay of [true, false]) {
+            expect(backdropLayersFor('Partly cloudy', isDay)).toEqual({ ...NO_LAYERS, clouds: 'partly' });
+            expect(backdropLayersFor('Cloudy', isDay)).toEqual({ ...NO_LAYERS, clouds: 'overcast' });
+            expect(backdropLayersFor('Mostly cloudy', isDay)).toEqual({ ...NO_LAYERS, clouds: 'overcast' });
         }
+        expect(backdropLayersFor('Clear', true).clouds).toBeNull();
+        expect(backdropLayersFor('Rain', true).clouds).toBeNull();
+    });
+
+    it('leaves haze gradient-only', () => {
+        expect(backdropLayersFor('Haze', true)).toEqual(NO_LAYERS);
     });
 });

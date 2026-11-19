@@ -286,99 +286,411 @@ export function holdPerHit(values: readonly number[]): { inputRange: number[]; o
 }
 
 // ─── Running drops ───────────────────────────────────────────────────────────
+// Now and then a bead on the top border gathers enough water to run down the
+// card's face. What makes it read as water rather than a dot on a rail:
+//   - it sags as it swells, lets go slowly and picks up speed, and never stalls
+//     or slows (stick-slip was tried and looked like a stutter);
+//   - it draws out into a teardrop as it speeds up;
+//   - it wanders a few points either side of straight down;
+//   - it swallows the beads it crosses, growing and speeding up a little with
+//     each, and they bead up again later;
+//   - it leaves a wet trail that dries from the top, and a few tiny beads;
+//   - the next drop starts from a different bead.
+//
+// A whole run is worked out ahead of time (planRun), from a seed, and turned
+// into keyframes (runKeyframes) for one 0→1 timing on the native driver. The
+// only JavaScript per run is starting the next one.
 
-/**
- * A bead on the top border that gathers water until it's heavy enough to run,
- * then runs straight down the card's face at a steady speed. It starts as one of
- * the top strip's own beads (`bead` is its index there), so the drop that runs
- * is visibly one that was already sitting on the edge.
- */
-export interface BorderRunner {
+/** A bead on the top border that a run can start from, in card coordinates. */
+export interface RunSpot {
+    /** Its index in the top strip, so the strip leaves it for the lane to draw. */
     bead: number;
-    /** Where it sits on the edge, in card coordinates. */
     x: number;
     y: number;
-    /** Its size while running: the bead, filled out to a runnable drop. */
+    /** Its size at rest: the bead, filled out to a size that can run. */
     r: number;
-    /** How long it sits on the edge before it starts to swell. */
-    restMs: number;
-    /** Wait before its first loop, so runners don't go together. */
+}
+
+/**
+ * A slice of the card's width that one drop at a time runs down. Each run
+ * starts from the next of its spots. Lanes don't overlap, so no interior bead
+ * can be swallowed by two drops.
+ */
+export interface RunLane {
+    lo: number;
+    hi: number;
+    spots: RunSpot[];
+    /** Wait before its first run, so lanes don't go together. */
     delayMs: number;
 }
 
 /** The smallest drop that runs. Smaller beads stay put, as they do on glass. */
 const MIN_RUNNER_R = 2.6;
+/** Starting beads per lane. */
+export const SPOTS_PER_LANE = 3;
+/** Spots keep this far inside their lane, which leaves the drop room to wander. */
+const LANE_INSET = 10;
+const SPOT_GAP = 12;
 
 /**
- * Picks the runners from the top strip's beads: the biggest ones over the face
- * (not the corners), spread out so two never run side by side.
+ * `count` lanes across the card's face (not the corners), each with its biggest
+ * top-strip beads as starting spots. A lane with no bead to start from is
+ * left out.
  */
-export function borderRunners(top: Bead[], width: number, band: number, count: number, seed: number): BorderRunner[] {
+export function runLanes(top: Bead[], width: number, band: number, count: number, seed: number): RunLane[] {
     if (count <= 0) return [];
-    const minGap = (width / (count + 1)) * 0.6;
-    const candidates = top
-        .map((b, i) => ({ b, i }))
-        .filter(({ b }) => b.along >= band + 8 && b.along <= width - band - 8)
-        .sort((p, q) => q.b.r - p.b.r || p.i - q.i);
-    const picked: { b: Bead; i: number }[] = [];
-    for (const c of candidates) {
-        if (picked.length >= count) break;
-        if (picked.every((p) => Math.abs(p.b.along - c.b.along) >= minGap)) picked.push(c);
-    }
-    return picked
-        .sort((p, q) => p.b.along - q.b.along)
-        .map(({ b, i }, n) => {
-            const k = seed + n * 29;
-            return {
-                bead: i,
-                x: b.along,
-                y: b.across,
-                r: Math.max(MIN_RUNNER_R, b.r),
-                restMs: Math.round(2500 + 3500 * rnd(k, 1)),
-                delayMs: Math.round(n * 1700 + 1500 * rnd(k, 2)),
-            };
+    const from = band + 8;
+    const span = (width - band - 8 - from) / count;
+    if (!(span > 0)) return [];
+    const lanes: RunLane[] = [];
+    for (let n = 0; n < count; n++) {
+        const lo = from + span * n;
+        const hi = lo + span;
+        const candidates = top
+            .map((b, i) => ({ b, i }))
+            .filter(({ b }) => b.along >= lo + LANE_INSET && b.along <= hi - LANE_INSET)
+            .sort((p, q) => q.b.r - p.b.r || p.i - q.i);
+        const picked: { b: Bead; i: number }[] = [];
+        for (const c of candidates) {
+            if (picked.length >= SPOTS_PER_LANE) break;
+            if (picked.every((p) => Math.abs(p.b.along - c.b.along) >= SPOT_GAP)) picked.push(c);
+        }
+        if (picked.length === 0) continue;
+        lanes.push({
+            lo,
+            hi,
+            spots: picked.map(({ b, i }) => ({ bead: i, x: b.along, y: b.across, r: Math.max(MIN_RUNNER_R, b.r) })),
+            delayMs: Math.round(n * 1700 + 1500 * rnd(seed + n * 29, 2)),
         });
+    }
+    return lanes;
 }
 
-/** One steady running speed, points per millisecond (≈100 pt/s). No speeding up or stalling. */
-export const RUNNER_SPEED = 0.1;
 /** How long a bead swells on the edge before it lets go. */
-export const SWELL_MS = 1200;
-/** How much it swells. */
+export const SWELL_MS = 1300;
+/** How much it swells, how far it sags (in radii), and how much taller than wide it gets. */
 export const SWELL_SCALE = 1.3;
-/** After it runs off the card, its trail dries for this long… */
-export const DRY_MS = 1400;
-/** …and a new bead forms on the edge where it was. */
-export const REFORM_MS = 900;
+export const SWELL_SAG = 0.55;
+export const SWELL_STRETCH = 1.12;
+/** Speed it lets go at, and the speed the smallest runner settles to (points per second). */
+export const RUN_START_SPEED = 14;
+export const RUN_SPEED = 185;
+/** Seconds to close most of the gap to its settled speed. */
+const RUN_PICKUP_S = 0.5;
+/** Each swallowed bead raises the settled speed by this much. */
+const SWALLOW_SPEEDUP = 9;
+/** A stretch of trail is dry this long after the drop passes it. */
+export const TRAIL_DRY_MS = 1900;
+/** After the run: the beads it left stay, then fade. */
+export const CRUMBS_STAY_MS = 2200;
+export const CRUMBS_FADE_MS = 2000;
+/** After the run: a new bead grows where the drop started. */
+export const REGROW_AT_MS = 800;
+export const REGROW_MS = 2600;
+/** After the run: the beads it swallowed bead up again. */
+export const REFORM_AT_MS = 2600;
+export const REFORM_MS = 2400;
+/** From the end of the run to the end of the loop. Everything above fits inside it. */
+export const LINGER_MS = 5200;
 
-/** A runner's loop, as shares of the loop (0–1) at which each phase ends. */
-export interface RunnerTimeline {
+/** The teardrop's length from the middle of its head to its tip, in radii, at a speed. */
+export const TEAR_MAX = 1.15 + 1.9 * 1.2;
+export function tearLength(v: number): number {
+    return 1.15 + 1.9 * Math.min(1.2, v / RUN_SPEED);
+}
+
+/** Where the drop is at a moment of its run. */
+export interface RunSample {
+    /** Milliseconds since it let go. */
+    t: number;
+    x: number;
+    y: number;
+    r: number;
+    /** Points per second. */
+    v: number;
+}
+
+export interface RunPlan {
+    spot: RunSpot;
+    restMs: number;
+    /** Length of the run itself, from letting go to off the bottom. */
+    runMs: number;
     cycleMs: number;
-    /** Distance it runs, from its place on the edge to past the card's bottom. */
-    distance: number;
-    restEnd: number;
-    swellEnd: number;
-    runEnd: number;
-    dryEnd: number;
+    /** The run, sampled every SAMPLE_MS; the first is the moment it lets go. */
+    samples: RunSample[];
+    /** Interior beads it swallows (`bead` is the index in interiorBeads' result). */
+    eaten: (InteriorBead & { bead: number })[];
+    /** Tiny beads it leaves on its trail. */
+    crumbs: { x: number; y: number; r: number }[];
+}
+
+const SIM_HZ = 120;
+const SAMPLE_EVERY = 10;
+/** Milliseconds between samples. */
+export const SAMPLE_MS = (1000 * SAMPLE_EVERY) / SIM_HZ;
+
+/**
+ * The card height a run is planned for: bucketed to 200 pt, so a card that
+ * grows by a row doesn't restart the drops. The card clips whatever runs past
+ * its real bottom.
+ */
+export function runBucket(height: number): number {
+    return Math.max(400, Math.ceil(height / 200) * 200);
 }
 
 /**
- * The loop for a runner on a card `height` tall. Height is bucketed to 200 pt so
- * a card that grows by one row doesn't restart the loop.
+ * One run down a lane: `run` counts the lane's runs from 0 and picks the spot
+ * and the wander. `height` is the bucketed card height; `interior` the beads on
+ * the card's face.
  */
-export function runnerTimeline(height: number, runner: BorderRunner): RunnerTimeline {
-    const bucket = Math.max(400, Math.ceil(height / 200) * 200);
-    const distance = bucket - runner.y + runner.r * 3;
-    const runMs = distance / RUNNER_SPEED;
-    const cycleMs = runner.restMs + SWELL_MS + runMs + DRY_MS + REFORM_MS;
-    const at = (ms: number) => ms / cycleMs;
+export function planRun(
+    lane: RunLane,
+    laneIndex: number,
+    run: number,
+    height: number,
+    interior: readonly InteriorBead[],
+    seed: number,
+): RunPlan {
+    const k = seed + laneIndex * 29 + run * 131;
+    const spot = lane.spots[run % lane.spots.length];
+    const restMs = Math.round(600 + 1800 * rnd(k, 1));
+
+    let r = spot.r * SWELL_SCALE;
+    let settled = RUN_SPEED + 22 * (spot.r - MIN_RUNNER_R);
+    let v = RUN_START_SPEED;
+    let s = 0;
+    const y0 = spot.y + spot.r * SWELL_SAG;
+    const p1 = rnd(k, 2) * Math.PI * 2;
+    const p2 = rnd(k, 3) * Math.PI * 2;
+    // Two slow sines, eased in so it leaves the edge heading straight down.
+    const wander = (d: number) =>
+        Math.min(1, d / 45) *
+        (3.6 * (Math.sin(d / 68 + p1) - Math.sin(p1)) + 1.4 * (Math.sin(d / 29 + p2) - Math.sin(p2)));
+    const xAt = (d: number) => Math.min(lane.hi - r, Math.max(lane.lo + r, spot.x + wander(d)));
+
+    // Only beads in this lane, and below where the drop starts.
+    const inLane = interior
+        .map((b, bead) => ({ ...b, bead }))
+        .filter((b) => b.x >= lane.lo && b.x <= lane.hi);
+    const gone = new Set<number>();
+    const eaten: RunPlan['eaten'] = [];
+    const crumbs: RunPlan['crumbs'] = [];
+    let nextCrumb = 26 + 30 * rnd(k, 4);
+
+    const dt = 1 / SIM_HZ;
+    const samples: RunSample[] = [{ t: 0, x: spot.x, y: y0, r, v }];
+    for (let step = 1; step < SIM_HZ * 60; step++) {
+        v += ((settled - v) * dt) / RUN_PICKUP_S;
+        s += v * dt;
+        const x = xAt(s);
+        const y = y0 + s;
+        for (const b of inLane) {
+            if (gone.has(b.bead)) continue;
+            if (Math.abs(b.y - y) < r + 1 && Math.abs(b.x - x) < r + b.r + 0.5) {
+                gone.add(b.bead);
+                eaten.push(b);
+                // Volumes add; a little is lost to the trail.
+                r = Math.cbrt(r ** 3 + 0.8 * b.r ** 3);
+                settled += SWALLOW_SPEEDUP;
+            }
+        }
+        if (s > nextCrumb) {
+            const c = k + 100 + crumbs.length * 3;
+            crumbs.push({ x: x + (rnd(c, 1) - 0.5) * 1.2, y: y - r * 1.6, r: 0.55 + 0.8 * rnd(c, 2) });
+            nextCrumb = s + 30 + 42 * rnd(c, 3);
+        }
+        const done = y - r * 4 > height;
+        if (step % SAMPLE_EVERY === 0 || done) {
+            samples.push({ t: (step * 1000) / SIM_HZ, x, y, r, v });
+        }
+        if (done) break;
+    }
+    const runMs = samples[samples.length - 1].t;
     return {
-        cycleMs: Math.round(cycleMs),
-        distance,
-        restEnd: at(runner.restMs),
-        swellEnd: at(runner.restMs + SWELL_MS),
-        runEnd: at(runner.restMs + SWELL_MS + runMs),
-        dryEnd: at(runner.restMs + SWELL_MS + runMs + DRY_MS),
+        spot,
+        restMs,
+        runMs,
+        cycleMs: Math.round(restMs + SWELL_MS + runMs + LINGER_MS),
+        samples,
+        eaten,
+        crumbs: crumbs.filter((c) => c.y < height),
+    };
+}
+
+/** An interpolation of the loop's 0→1 progress. */
+export interface Keys {
+    inputRange: number[];
+    outputRange: number[];
+}
+
+/** One stretch of the trail, top to bottom, and when it dries. */
+export interface TrailStretch {
+    /** Its top and bottom, in points below the trail's start. */
+    from: number;
+    to: number;
+    /** Fully wet until the drop leaves it, then dries. */
+    opacity: Keys;
+    /**
+     * How much fainter its top is drawn than its bottom, 0–1: the head start
+     * its top has on drying. Baked into the art so neighbouring stretches,
+     * which fade one after another, meet without a visible step.
+     */
+    lead: number;
+}
+
+/**
+ * Everything a run animates, as interpolations of one progress value. Lengths
+ * are points; the art they move is laid out by RainBeads.
+ */
+export interface RunKeys {
+    /** The drop: offset from its spot, size as a multiple of its resting size, and the swell's stretch. */
+    dx: Keys;
+    dy: Keys;
+    scale: Keys;
+    stretch: Keys;
+    opacity: Keys;
+    /** The top half of the bead's rim, shown while it is a bead and not a teardrop. */
+    rimOpacity: Keys;
+    /** The teardrop's tail: its length as a share of TEAR_MAX, and when it shows. */
+    tail: Keys;
+    tailOpacity: Keys;
+    /**
+     * The trail and the beads left on it sit in a window whose bottom edge
+     * follows the drop, so they appear behind it. `reveal` is how far that edge
+     * has come down from the trail's start (trailTop); it ends at trailLength.
+     */
+    reveal: Keys;
+    trailTop: number;
+    trailLength: number;
+    /** The trail's centre line: card x, points below trailTop, and the drop's radius there. */
+    trail: { x: number; d: number; r: number }[];
+    stretches: TrailStretch[];
+    crumbsOpacity: Keys;
+    /**
+     * The beads it swallows sit in a window whose top edge follows the drop, so
+     * each goes as the drop reaches it. `eat` is how far that edge has come down
+     * from eatTop; it ends at eatLength. Later the window is put back and the
+     * beads fade in again together.
+     */
+    eat: Keys;
+    eatTop: number;
+    eatLength: number;
+    eatOpacity: Keys;
+}
+
+/** Share of a loop used for a hard cut. */
+const CUT_MS = 1;
+
+/** [milliseconds into the loop, value] pairs → an interpolation over 0–1. */
+function keysOf(cycleMs: number, pairs: readonly (readonly [number, number])[]): Keys {
+    const inputRange: number[] = [];
+    const outputRange: number[] = [];
+    let last = -1;
+    for (const [ms, value] of pairs) {
+        // Strictly increasing, whatever the rounding did to two close keys.
+        const at = Math.min(1, Math.max(ms / cycleMs, last + 1e-6));
+        if (at <= last) continue;
+        inputRange.push(at);
+        outputRange.push(value);
+        last = at;
+    }
+    if (inputRange[0] !== 0) {
+        inputRange.unshift(0);
+        outputRange.unshift(outputRange[0]);
+    }
+    if (inputRange[inputRange.length - 1] < 1) {
+        inputRange.push(1);
+        outputRange.push(outputRange[outputRange.length - 1]);
+    }
+    return { inputRange, outputRange };
+}
+
+/** Most stretches a trail is cut into, and the length each aims for. */
+const MAX_STRETCHES = 12;
+const STRETCH_LENGTH = 70;
+/** The trail starts this many radii above the middle of the drop, under its head. */
+const TRAIL_TUCK = 0.4;
+
+export function runKeyframes(plan: RunPlan): RunKeys {
+    const { spot, samples, cycleMs } = plan;
+    const R = plan.restMs;
+    const S = R + SWELL_MS;
+    const E = S + plan.runMs;
+    const first = samples[0];
+    const end = samples[samples.length - 1];
+    const sag = first.y - spot.y;
+    const during = (value: (p: RunSample) => number) =>
+        samples.map((p) => [S + p.t, value(p)] as const);
+
+    const tailAt = (v: number) => tearLength(v) / TEAR_MAX;
+
+    // Trail window: its bottom edge sits just under the drop's head.
+    const trailTop = first.y - first.r * TRAIL_TUCK;
+    const edge = samples.map((p) => p.y - p.r * TRAIL_TUCK - trailTop);
+    const trailLength = edge[edge.length - 1];
+    /** Milliseconds into the run at which the window's edge reaches `d`. */
+    const reaches = (d: number) => {
+        for (let i = 1; i < edge.length; i++) {
+            if (edge[i] >= d) {
+                const f = (d - edge[i - 1]) / (edge[i] - edge[i - 1] || 1);
+                return samples[i - 1].t + (samples[i].t - samples[i - 1].t) * f;
+            }
+        }
+        return end.t;
+    };
+    const count = Math.min(MAX_STRETCHES, Math.max(1, Math.ceil(trailLength / STRETCH_LENGTH)));
+    const stretches: TrailStretch[] = [];
+    let entered = 0;
+    for (let i = 0; i < count; i++) {
+        const from = (trailLength * i) / count;
+        const to = (trailLength * (i + 1)) / count;
+        const left = reaches(to);
+        stretches.push({
+            from,
+            to,
+            opacity: keysOf(cycleMs, [[0, 1], [S + left, 1], [S + left + TRAIL_DRY_MS, 0]]),
+            lead: Math.min(0.6, (left - entered) / TRAIL_DRY_MS),
+        });
+        entered = left;
+    }
+
+    // Swallowing window: its top edge sits just past the drop's middle. It
+    // starts a little above the drop, clear of the first bead it can reach.
+    const eatTop = first.y - first.r - 6;
+    const eatEdge = (p: RunSample) => p.y + p.r * 0.3 - eatTop;
+    const eatLength = eatEdge(end);
+
+    return {
+        dx: keysOf(cycleMs, [[0, 0], [S, 0], ...during((p) => p.x - spot.x).slice(1), [E + CUT_MS, 0]]),
+        dy: keysOf(cycleMs, [
+            [0, 0], [R, 0], [R + SWELL_MS / 2, sag / 4], [S, sag],
+            ...during((p) => p.y - spot.y).slice(1), [E + CUT_MS, 0],
+        ]),
+        scale: keysOf(cycleMs, [
+            [0, 1], [R, 1], [S, first.r / spot.r],
+            ...during((p) => p.r / spot.r).slice(1),
+            [E + CUT_MS, 0.05], [E + REGROW_AT_MS, 0.05], [E + REGROW_AT_MS + REGROW_MS, 1],
+        ]),
+        stretch: keysOf(cycleMs, [[0, 1], [R, 1], [S, SWELL_STRETCH], [S + 150, 1]]),
+        opacity: keysOf(cycleMs, [[0, 1], [E, 1], [E + CUT_MS, 0], [E + REGROW_AT_MS, 0], [E + REGROW_AT_MS + CUT_MS, 1]]),
+        rimOpacity: keysOf(cycleMs, [[0, 1], [S, 1], [S + CUT_MS, 0], [E, 0], [E + CUT_MS, 1]]),
+        tail: keysOf(cycleMs, [[0, tailAt(first.v)], ...during((p) => tailAt(p.v)), [E + CUT_MS, tailAt(first.v)]]),
+        tailOpacity: keysOf(cycleMs, [[0, 0], [S, 0], [S + CUT_MS, 1], [E, 1], [E + CUT_MS, 0]]),
+        reveal: keysOf(cycleMs, [[0, 0], ...samples.map((p, i) => [S + p.t, edge[i]] as const)]),
+        trailTop,
+        trailLength,
+        trail: samples.map((p, i) => ({ x: p.x, d: edge[i], r: p.r })),
+        stretches,
+        crumbsOpacity: keysOf(cycleMs, [[0, 1], [E + CRUMBS_STAY_MS, 1], [E + CRUMBS_STAY_MS + CRUMBS_FADE_MS, 0]]),
+        eat: keysOf(cycleMs, [
+            [0, 0], [S - CUT_MS, 0], ...during(eatEdge),
+            [E + REFORM_AT_MS, eatLength], [E + REFORM_AT_MS + CUT_MS, 0],
+        ]),
+        eatTop,
+        eatLength,
+        eatOpacity: keysOf(cycleMs, [
+            [0, 1], [E, 1], [E + CUT_MS, 0], [E + REFORM_AT_MS + CUT_MS, 0], [E + REFORM_AT_MS + REFORM_MS, 1],
+        ]),
     };
 }
 

@@ -1,4 +1,4 @@
-import { skyGradientFor } from '../skyGradient';
+import { CLOUD_GREY, PARTLY_CLOUDY_GREYING, greyedSky, partlyCloudyGradientFor, skyGradientFor } from '../skyGradient';
 import { gradientFor } from '../conditions';
 import { weatherGradients } from '../../../theme/tokens';
 import { hexToRgb, rgbToHsl } from '../../../components/WeatherHUD/colorMath';
@@ -248,5 +248,81 @@ describe('skyGradientFor — twilight is not lurid', () => {
         // the sunset itself.
         const [, sat] = hsl(skyGradientFor(-5)[2]);
         expect(sat).toBeGreaterThan(CAP);
+    });
+});
+
+describe('partlyCloudyGradientFor', () => {
+    const saturation = (hex: string) => rgbToHsl(...hexToRgb(hex))[1];
+
+    it('is the clear-day sky greyed by a third at midday, BY REFERENCE', () => {
+        expect(partlyCloudyGradientFor(45)).toBe(weatherGradients.partlyCloudy);
+        expect(partlyCloudyGradientFor(10, true)).toBe(weatherGradients.partlyCloudy);
+        expect([...weatherGradients.partlyCloudy]).toEqual(greyedSky(weatherGradients.clearDay, PARTLY_CLOUDY_GREYING));
+    });
+
+    it('is the clear-night sky after dark, BY REFERENCE', () => {
+        expect(partlyCloudyGradientFor(-16)).toBe(weatherGradients.clearNight);
+        expect(partlyCloudyGradientFor(-40, true)).toBe(weatherGradients.clearNight);
+    });
+
+    it('still shows blue: bluer than the old slate, greyer than a clear day', () => {
+        weatherGradients.partlyCloudy.forEach((c, i) => {
+            const [h, s] = rgbToHsl(...hexToRgb(c));
+            expect(h).toBeGreaterThan(190);
+            expect(h).toBeLessThan(215);
+            expect(s).toBeGreaterThan(0.4);
+            expect(s).toBeLessThan(saturation(weatherGradients.clearDay[i]));
+        });
+    });
+
+    it('follows the sun: warm at sunset, rosier at dawn', () => {
+        const dusk = partlyCloudyGradientFor(-4);
+        const dawn = partlyCloudyGradientFor(-4, true);
+        expect(dusk).not.toEqual(dawn);
+        // The horizon keeps its orange (hue under 50), only quieter than a clear sunset's.
+        const [h, s] = rgbToHsl(...hexToRgb(dusk[2]));
+        expect(h).toBeLessThan(50);
+        expect(s).toBeGreaterThan(0.4);
+        expect(s).toBeLessThan(saturation(weatherGradients.sunset[2]));
+    });
+
+    it('greys by mixing straight toward the cloud grey, never through another hue', () => {
+        const grey = hexToRgb(CLOUD_GREY);
+        const from = hexToRgb('#FCD34D');
+        const mixed = hexToRgb(greyedSky(['#FCD34D'], 0.5)[0]);
+        mixed.forEach((c, i) => expect(Math.abs(c - (from[i] + grey[i]) / 2)).toBeLessThanOrEqual(0.5));
+        expect(greyedSky(['#0284C7'], 0)).toEqual(['#0284C7']);
+    });
+
+    it('emits three valid hex stops, and moves no more abruptly than the clear sky it is made from', () => {
+        const step = (a: readonly string[], b: readonly string[]) =>
+            Math.max(...a.map((c, i) => {
+                const x = hexToRgb(c);
+                const y = hexToRgb(b[i]);
+                return Math.max(...x.map((v, k) => Math.abs(v - y[k])));
+            }));
+        for (const rising of [false, true]) {
+            let worst = 0;
+            let worstClear = 0;
+            for (let e = 20; e >= -20; e -= 0.25) {
+                const g = partlyCloudyGradientFor(e, rising);
+                expect(g).toHaveLength(3);
+                g.forEach((c) => expect(c).toMatch(HEX));
+                worst = Math.max(worst, step(g, partlyCloudyGradientFor(e + 0.25, rising)));
+                worstClear = Math.max(worstClear, step(skyGradientFor(e, rising), skyGradientFor(e + 0.25, rising)));
+            }
+            expect(worst).toBeLessThanOrEqual(worstClear);
+        }
+    });
+
+    it('is what gradientFor gives partly cloudy when it knows where the sun is', () => {
+        expect(gradientFor('Partly cloudy', true, 45)).toBe(weatherGradients.partlyCloudy);
+        expect(gradientFor('PartlyCloudy', true, -4)).toEqual(partlyCloudyGradientFor(-4));
+        expect(gradientFor('PartlyCloudy', false, -4, true)).toEqual(partlyCloudyGradientFor(-4, true));
+        // Elevation wins over a stale IsDayTime flag, as it does for clear skies.
+        expect(gradientFor('PartlyCloudy', false, 40)).toBe(weatherGradients.partlyCloudy);
+        // Without it: the midday sky by day, clear night at night.
+        expect(gradientFor('PartlyCloudy', true)).toBe(weatherGradients.partlyCloudy);
+        expect(gradientFor('PartlyCloudy', false)).toBe(weatherGradients.clearNight);
     });
 });

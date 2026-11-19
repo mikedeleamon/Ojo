@@ -73,12 +73,13 @@ import { gradientFor, footerBgFor } from './weatherPalette';
 import { accentFromGradient } from '../../lib/weather/accentColor';
 import { backdropLayersFor, NO_LAYERS } from '../../lib/weather/backdropLayers';
 import { SNOW_GROUPS } from '../../lib/weather/backdropSpec';
-import { devCondition, devIsDay, devTempF } from '../../lib/debug/devWeatherOverride';
+import { devCondition, devIsDay, devScene, devSun, devTempF } from '../../lib/debug/devWeatherOverride';
 import { edgeSplashes, glassEffectFor } from '../../lib/weather/weatherGlass';
 import WeatherGlassOverlay from '../WeatherGlass/WeatherGlassOverlay';
 import RainEdgeSplash, { SPLASH_RISE } from '../WeatherGlass/RainEdgeSplash';
 import FlakeFall from './FlakeFall';
 import FogDrift from './FogDrift';
+import CloudDrift from './CloudDrift';
 import ShootingStar from './ShootingStar';
 import SunGlare from './SunGlare';
 import { solarPosition, type SolarPosition } from '../../lib/solarPosition';
@@ -90,6 +91,7 @@ import { usePerfFlags } from '../../lib/debug/perfFlags';
 import LastUpdated from './LastUpdated';
 import {
     HAZY_BACKDROP_LIFT,
+    cloudBackdropLift,
     isLightSky,
     lightSkyFade,
     STACKED_HOME_TEXT_BAND,
@@ -465,10 +467,14 @@ const WeatherHUD = ({
             api.get<Forecast[]>(weatherConstants.GET_HOURLY, params),
             api.get<DailyForecast[]>(weatherConstants.GET_DAILY, params),
         ])
-            .then(([wRes, fRes, dRes]) => {
+            .then(([wRes0, fRes0, dRes0]) => {
                 if (cancelled) return;
-                const w = wRes.data;
-                if (!w) throw new Error('Empty response');
+                if (!wRes0.data) throw new Error('Empty response');
+                // DEV TOOL: EXPO_PUBLIC_DEV_SCENE swaps in a consistent fake scene; a no-op otherwise.
+                const scene = devScene(wRes0.data, fRes0.data ?? [], dRes0.data ?? []);
+                const w = scene.current;
+                const fRes = { data: scene.hourly };
+                const dRes = { data: scene.daily };
 
                 const events = extractSunEvents(dRes.data ?? []);
 
@@ -566,7 +572,8 @@ const WeatherHUD = ({
 
     useEffect(() => {
         if (!place) return;
-        const update = () => setSun(solarPosition(place.lat, place.lon));
+        // devSun is a no-op outside dev; see lib/debug/devWeatherOverride.
+        const update = () => setSun(devSun(solarPosition(place.lat, place.lon)));
         update();
         const timer = setInterval(update, SUN_TICK_MS);
 
@@ -612,7 +619,6 @@ const WeatherHUD = ({
     // Pale skies (snow, sunny days, sunrise and sunset, hot, fog, haze) need
     // darker tiles and haloed text to stay readable; see lib/weather/skyContrast.
     const lightSky = useMemo(() => isLightSky(targetGradient), [targetGradient]);
-    const skyText = lightSky ? LIGHT_SKY_TEXT : null;
 
     // Publish the tab-bar accent off the same memoised gradient. Deliberately
     // *not* driven from the animated gradient above: `tintColor` is a native
@@ -899,6 +905,14 @@ const WeatherHUD = ({
     const isSleetBg = layers.rain === 'sleet';
     const isFogBg = layers.fog;
     const isGlareBg = layers.glare;
+    const cloudCover = layers.clouds;
+    // Text drawn straight onto the sky. On a light sky, and on any sky with
+    // cloud drifting behind it, the header's greys go full white with a halo:
+    // cloud lightens the sky behind them even when the sky itself is dark, and
+    // the fade below is worked out for white. Tiles and cards have their own
+    // surfaces and follow lightSky alone.
+    const brightBehindHeader = lightSky || !!cloudCover;
+    const skyText = brightBehindHeader ? LIGHT_SKY_TEXT : null;
     // What the weather does to the outfit card's glass: beads in rain, frost
     // at or below freezing, shimmer from 90°F. Always the °F reading, whatever
     // units the screen shows. See lib/weather/weatherGlass.
@@ -912,17 +926,23 @@ const WeatherHUD = ({
     const onTheGlass = glassEffect?.kind === 'rain' ? null : glassEffect;
     const splashing = !!rainBehind && edgeSplashes(bgCondition);
     // Glare and fog drift lighten the sky behind the header more than falling
-    // snow or rain does, so the fade allows for more of it under them.
+    // snow or rain does, and drifting cloud more again, so the fade allows for
+    // more of it under them. Cloud is bright enough to need the fade on a sky
+    // that isn't light, too; lightSkyFade returns null when it isn't needed.
     const skyFade = useMemo(
         () =>
-            lightSky
+            lightSky || cloudCover
                 ? lightSkyFade(
                       targetGradient,
-                      isGlareBg || isFogBg ? HAZY_BACKDROP_LIFT : PARTICLE_BACKDROP_LIFT,
+                      cloudCover
+                          ? cloudBackdropLift(cloudCover, lightSky)
+                          : isGlareBg || isFogBg
+                            ? HAZY_BACKDROP_LIFT
+                            : PARTICLE_BACKDROP_LIFT,
                       isStacked ? STACKED_HOME_TEXT_BAND : undefined,
                   )
                 : null,
-        [lightSky, targetGradient, isGlareBg, isFogBg, isStacked],
+        [lightSky, targetGradient, cloudCover, isGlareBg, isFogBg, isStacked],
     );
 
     // ── Backdrop animation gate ──────────────────────────────────────────────
@@ -1310,7 +1330,7 @@ const WeatherHUD = ({
                     condition={weather.WeatherText}
                     isDay={weather.IsDayTime}
                     size='large'
-                    onLightSky={lightSky}
+                    onLightSky={brightBehindHeader}
                     temperature={tempVal}
                     feelsLike={feelsVal}
                     latitude={place?.lat}
@@ -1603,9 +1623,32 @@ const WeatherHUD = ({
                 <FogDrift animate={backdropAnimate} />
             </BackdropLayer>
 
-            {/* Light skies only: a fade behind the header, sized to the sky
-                and in its own hue, over the sky and its particles, under the
-                content. See lightSkyFade in lib/weather/skyContrast. */}
+            {/* Drifting cloud: separate cumulus on a partly cloudy sky,
+                overlapping grey banks on an overcast one. One layer each, so
+                going from one to the other cross-fades. Far off like the fog,
+                so it barely tracks the scroll. Cumulus is dimmed on a sky
+                that isn't light (dusk, night); see DIM_CLOUD. */}
+            <BackdropLayer
+                visible={cloudCover === 'partly' && perf.backdrop}
+                scrollY={scrollY}
+                depth={0.3}
+                parallax={perf.parallax}
+            >
+                <CloudDrift cover='partly' dim={!lightSky} animate={backdropAnimate} />
+            </BackdropLayer>
+            <BackdropLayer
+                visible={cloudCover === 'overcast' && perf.backdrop}
+                scrollY={scrollY}
+                depth={0.3}
+                parallax={perf.parallax}
+            >
+                <CloudDrift cover='overcast' animate={backdropAnimate} />
+            </BackdropLayer>
+
+            {/* Light skies, and any sky with cloud on it: a fade behind the
+                header, sized to the sky and in its own hue, over the sky and
+                its particles, under the content. See lightSkyFade in
+                lib/weather/skyContrast. */}
             {skyFade && (
                 <LinearGradient
                     pointerEvents='none'

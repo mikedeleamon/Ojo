@@ -1,4 +1,8 @@
 import {
+    CLOUD_HEADER_COVER,
+    PARTLY_CLOUD_HEADER_COVER,
+    DIM_CLOUD,
+    cloudBackdropLift,
     HAZY_BACKDROP_LIFT,
     isLightSky,
     lightSkyFade,
@@ -13,6 +17,7 @@ import {
     type TextBand,
 } from '../skyContrast';
 import { darkColors, weatherGradients } from '../../../theme/tokens';
+import { partlyCloudyGradientFor } from '../skyGradient';
 
 describe('relativeLuminance', () => {
     it('spans black to white', () => {
@@ -36,6 +41,7 @@ describe('isLightSky', () => {
         'dawnPale',
         'dawnGold',
         'dawn',
+        'partlyCloudy',
         'drizzle',
         'snow',
         'foggy',
@@ -50,7 +56,6 @@ describe('isLightSky', () => {
         'blueHour',
         'dawnAfterglow',
         'dawnBlue',
-        'partlyCloudy',
         'cloudy',
         'rainy',
         'stormy',
@@ -77,7 +82,7 @@ describe('isLightSky', () => {
 describe('lightSkyFade', () => {
     const LIGHT = [
         'sunny', 'clearDay', 'hot', 'lowSun', 'goldenHour', 'sunset', 'dawnPale',
-        'dawnGold', 'dawn', 'drizzle', 'snow', 'foggy', 'hazy',
+        'dawnGold', 'dawn', 'partlyCloudy', 'drizzle', 'snow', 'foggy', 'hazy',
     ] as const;
 
     const hex = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
@@ -139,6 +144,31 @@ describe('lightSkyFade', () => {
     it.each(CASES)('keeps the rotated Duo Home text on %s (%s) at 4.5:1 or better', (name, _backdrop, lift) => {
         const band = STACKED_HOME_TEXT_BAND;
         expect(worstLabelContrast(weatherGradients[name], band.from, band.to, lift, band)).toBeGreaterThanOrEqual(4.5);
+    });
+
+    // Partly cloudy follows the sun, so its sky is any of the clear-sky stages,
+    // greyed, with cloud drifting over it; overcast is one dark sky.
+    const CLOUDY_SKIES: (readonly [string, readonly string[], number])[] = [
+        ...[60, 10, 6, 2, -2, -4, -7, -10, -16].flatMap((elevation) =>
+            [false, true].map((rising) => {
+                const sky = partlyCloudyGradientFor(elevation, rising);
+                return [`partly cloudy at ${elevation}° ${rising ? 'rising' : 'setting'}`, sky, cloudBackdropLift('partly', isLightSky(sky))] as const;
+            }),
+        ),
+        ['overcast', weatherGradients.cloudy, cloudBackdropLift('overcast', false)],
+    ];
+
+    it.each(CLOUDY_SKIES)('keeps the header on %s readable under the densest cloud', (_name, sky, lift) => {
+        expect(worstLabelContrast(sky, 0.15, 0.45, lift)).toBeGreaterThanOrEqual(4.5);
+        expect(worstLabelContrast(sky, 0, 0.15, lift)).toBeGreaterThanOrEqual(3);
+        const band = STACKED_HOME_TEXT_BAND;
+        expect(worstLabelContrast(sky, band.from, band.to, lift, band)).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it('allows for less cloud on a sky that is not light, where it is drawn dim', () => {
+        expect(cloudBackdropLift('partly', true)).toBe(PARTLY_CLOUD_HEADER_COVER);
+        expect(cloudBackdropLift('partly', false)).toBeCloseTo(PARTLY_CLOUD_HEADER_COVER * DIM_CLOUD, 10);
+        expect(cloudBackdropLift('overcast', false)).toBe(CLOUD_HEADER_COVER);
     });
 
     it('fades a particle sky less than the same sky under glare or fog', () => {

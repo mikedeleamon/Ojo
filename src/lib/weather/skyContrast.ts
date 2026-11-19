@@ -152,6 +152,49 @@ const LARGE_TEXT_TARGET = 3.05;
  */
 export const HAZY_BACKDROP_LIFT = 0.12;
 export const PARTICLE_BACKDROP_LIFT = 0.05;
+/**
+ * Drifting cloud (CloudDrift) lightens the sky more than any other backdrop,
+ * and it moves, so every part of the header ends up with cloud behind it. This
+ * is the most cloud allowed behind the header: the densest the two layers can
+ * ever stack up to anywhere the header's text sits (CLOUD_HEADER_TO), as a
+ * share of white.
+ * lib/weather/cloudField's tests hold the cloud specs under it, and the fade
+ * below allows for exactly this much.
+ */
+export const CLOUD_HEADER_COVER = 0.25;
+/**
+ * The same allowance for partly cloudy's cumulus, which may be whiter: they
+ * are separate clouds with blue between them, and read as grey at 0.25 (user,
+ * 2026-11-18). The fade pays for it, a few points darker at the top (0.40 to
+ * 0.44 on a midday sky).
+ */
+export const PARTLY_CLOUD_HEADER_COVER = 0.35;
+/**
+ * How far down the screen the header's text reaches, as a fraction of its
+ * height, for keeping bright cloud out from behind it. Lower than the fade's
+ * own band: on an iPhone 17 (402 x 874 pt) the feels-like and high/low lines
+ * under the temperature end at 0.585, measured in the simulator.
+ */
+export const CLOUD_HEADER_TO = 0.6;
+/**
+ * Partly cloudy cloud on a sky that isn't light (dusk, night) is drawn at this
+ * share of its opacity. With no sun on it cloud is grey rather than white, and
+ * a dark sky gets none of the darkened tiles and cards a light one does, so
+ * the fuller clouds lower down the screen can't be left bright behind them.
+ */
+export const DIM_CLOUD = 0.3;
+
+/** The backdrop allowance for a sky with drifting cloud on it. */
+export function cloudBackdropLift(cover: 'partly' | 'overcast', lightSky: boolean): number {
+    // Overcast banks are specced dim to begin with, for their dark sky.
+    if (cover === 'overcast') return CLOUD_HEADER_COVER;
+    return lightSky ? PARTLY_CLOUD_HEADER_COVER : PARTLY_CLOUD_HEADER_COVER * DIM_CLOUD;
+}
+
+/** The most cloud allowed behind the header text, for each cover. */
+export function cloudHeaderCover(cover: 'partly' | 'overcast'): number {
+    return cover === 'partly' ? PARTLY_CLOUD_HEADER_COVER : CLOUD_HEADER_COVER;
+}
 /** The fade's colour: the sky's top stop at this fraction of its brightness. */
 const FADE_DEPTH = 0.3;
 
@@ -198,7 +241,9 @@ function alphaFor(bg: Rgb, fade: Rgb, target: number): number {
 /**
  * The fade for a light sky, or null when its header already reads without one.
  * `backdropLift` is HAZY_BACKDROP_LIFT when sun glare or fog drift is drawn,
- * PARTICLE_BACKDROP_LIFT otherwise.
+ * cloudBackdropLift() under drifting cloud, PARTICLE_BACKDROP_LIFT otherwise.
+ * Cloud is the one backdrop bright enough to need this on a sky that isn't
+ * light, so WeatherHUD asks for it whenever cloud is drawn.
  * Full strength `top` at the top of the screen, `mid` at `band.to`, gone by
  * FADE_END. `mid` covers the lowest small text; `top` is the least that keeps
  * the large text at the top and every small-text line in between passing.

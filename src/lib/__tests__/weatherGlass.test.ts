@@ -3,12 +3,27 @@ import {
     FREEZING_F,
     GLASS_BAND,
     HEAT_F,
-    RUNNER_SPEED,
+    CRUMBS_FADE_MS,
+    CRUMBS_STAY_MS,
+    LINGER_MS,
+    REFORM_AT_MS,
+    REFORM_MS,
+    REGROW_AT_MS,
+    REGROW_MS,
+    RUN_SPEED,
+    RUN_START_SPEED,
     SPLASH_HITS,
+    SPOTS_PER_LANE,
     SWELL_MS,
-    borderRunners,
+    SWELL_SAG,
+    SWELL_SCALE,
+    TRAIL_DRY_MS,
     edgeSplashes,
-    runnerTimeline,
+    planRun,
+    runBucket,
+    runKeyframes,
+    runLanes,
+    type Keys,
     frostCorner,
     frostEdge,
     glassEffectFor,
@@ -227,44 +242,190 @@ describe('side frost', () => {
 
 describe('drops running off the top border', () => {
     const spec = BEAD_SPECS.storm;
-    const top = stripBeads(360, GLASS_BAND, spec, 101);
+    const W = 360;
+    const top = stripBeads(W, GLASS_BAND, spec, 101);
+    const lanes = runLanes(top, W, GLASS_BAND, spec.runners, 601);
+    const height = runBucket(900);
+    const interior = interiorBeads(W, height, GLASS_BAND, spec, 503);
+    const plans = lanes.flatMap((lane, n) => [0, 1, 2, 3].map((run) => ({ lane, plan: planRun(lane, n, run, height, interior, 601) })));
 
-    it('start as beads already on the top edge, over the face, spread apart', () => {
-        const runners = borderRunners(top, 360, GLASS_BAND, spec.runners, 1);
-        expect(runners).toHaveLength(spec.runners);
-        for (const r of runners) {
-            const bead = top[r.bead];
-            expect(r.x).toBe(bead.along);
-            expect(r.y).toBe(bead.across);
-            expect(r.r).toBeGreaterThanOrEqual(bead.r);
-            expect(r.x).toBeGreaterThan(GLASS_BAND);
-            expect(r.x).toBeLessThan(360 - GLASS_BAND);
+    it('start from beads already on the top edge, a lane each across the face', () => {
+        expect(lanes).toHaveLength(spec.runners);
+        lanes.forEach((lane, n) => {
+            expect(lane.spots.length).toBeGreaterThan(0);
+            expect(lane.spots.length).toBeLessThanOrEqual(SPOTS_PER_LANE);
+            for (const spot of lane.spots) {
+                const bead = top[spot.bead];
+                expect(spot.x).toBe(bead.along);
+                expect(spot.y).toBe(bead.across);
+                expect(spot.r).toBeGreaterThanOrEqual(bead.r);
+                expect(spot.x).toBeGreaterThan(lane.lo);
+                expect(spot.x).toBeLessThan(lane.hi);
+            }
+            expect(lane.lo).toBeGreaterThan(GLASS_BAND);
+            expect(lane.hi).toBeLessThan(W - GLASS_BAND);
+            if (n > 0) expect(lane.lo).toBeGreaterThanOrEqual(lanes[n - 1].hi);
+        });
+    });
+
+    it('takes the biggest bead in each lane first, and none in drizzle', () => {
+        for (const lane of lanes) {
+            const inLane = top.filter((b) => b.along >= lane.lo + 10 && b.along <= lane.hi - 10);
+            expect(top[lane.spots[0].bead].r).toBe(Math.max(...inLane.map((b) => b.r)));
         }
-        const xs = runners.map((r) => r.x);
-        for (let i = 1; i < xs.length; i++) expect(xs[i] - xs[i - 1]).toBeGreaterThan(40);
+        expect(runLanes(top, W, GLASS_BAND, BEAD_SPECS.drizzle.runners, 601)).toEqual([]);
     });
 
-    it('takes the biggest beads, and none in drizzle', () => {
-        const [r] = borderRunners(top, 360, GLASS_BAND, 1, 1);
-        const eligible = top.filter((b) => b.along >= GLASS_BAND + 8 && b.along <= 360 - GLASS_BAND - 8);
-        expect(top[r.bead].r).toBe(Math.max(...eligible.map((b) => b.r)));
-        expect(borderRunners(top, 360, GLASS_BAND, BEAD_SPECS.drizzle.runners, 1)).toEqual([]);
+    it('starts each run from the next bead', () => {
+        const lane = lanes.find((l) => l.spots.length > 1)!;
+        const n = lanes.indexOf(lane);
+        const spots = [0, 1].map((run) => planRun(lane, n, run, height, interior, 601).spot);
+        expect(spots[0]).not.toBe(spots[1]);
+        expect(planRun(lane, n, lane.spots.length, height, interior, 601).spot).toBe(spots[0]);
     });
 
-    it('runs at one steady speed, after sitting and swelling on the edge', () => {
-        const [r] = borderRunners(top, 360, GLASS_BAND, 1, 1);
-        const tl = runnerTimeline(1000, r);
-        expect(0 < tl.restEnd && tl.restEnd < tl.swellEnd && tl.swellEnd < tl.runEnd && tl.runEnd < tl.dryEnd && tl.dryEnd < 1).toBe(true);
-        const runMs = (tl.runEnd - tl.swellEnd) * tl.cycleMs;
-        expect(tl.distance / runMs).toBeCloseTo(RUNNER_SPEED, 2);
-        expect((tl.swellEnd - tl.restEnd) * tl.cycleMs).toBeCloseTo(SWELL_MS, -1);
-        // Runs past the bottom of the card.
-        expect(tl.distance + r.y).toBeGreaterThan(1000);
+    it('lets go slowly, picks up speed, and never slows or stalls', () => {
+        for (const { plan } of plans) {
+            const v = plan.samples.map((p) => p.v);
+            expect(v[0]).toBe(RUN_START_SPEED);
+            for (let i = 1; i < v.length; i++) expect(v[i]).toBeGreaterThan(v[i - 1]);
+            expect(v[v.length - 1]).toBeGreaterThan(RUN_SPEED * 0.95);
+            const y = plan.samples.map((p) => p.y);
+            for (let i = 1; i < y.length; i++) expect(y[i]).toBeGreaterThan(y[i - 1]);
+        }
     });
 
-    it("doesn't restart a runner's loop for a small change in card height", () => {
-        const [r] = borderRunners(top, 360, GLASS_BAND, 1, 1);
-        expect(runnerTimeline(1010, r).cycleMs).toBe(runnerTimeline(1090, r).cycleMs);
+    it('wanders a few points, inside its lane, and runs off the bottom', () => {
+        for (const { lane, plan } of plans) {
+            const xs = plan.samples.map((p) => p.x);
+            expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(1);
+            expect(Math.max(...xs) - Math.min(...xs)).toBeLessThan(16);
+            for (const p of plan.samples) {
+                expect(p.x).toBeGreaterThanOrEqual(lane.lo);
+                expect(p.x).toBeLessThanOrEqual(lane.hi);
+            }
+            const end = plan.samples[plan.samples.length - 1];
+            expect(end.y - end.r).toBeGreaterThan(height);
+        }
+    });
+
+    it('swallows only beads on its path, each once, and grows with them', () => {
+        const all = plans.filter(({ plan }) => plan.eaten.length > 0);
+        expect(all.length).toBeGreaterThan(0);
+        for (const { lane, plan } of all) {
+            expect(new Set(plan.eaten.map((b) => b.bead)).size).toBe(plan.eaten.length);
+            for (const b of plan.eaten) {
+                expect(interior[b.bead]).toMatchObject({ x: b.x, y: b.y, r: b.r });
+                expect(b.x).toBeGreaterThanOrEqual(lane.lo);
+                expect(b.x).toBeLessThanOrEqual(lane.hi);
+                // Within reach of the drop where it crosses the bead's height.
+                const at = plan.samples.reduce((best, p) => (Math.abs(p.y - b.y) < Math.abs(best.y - b.y) ? p : best));
+                expect(Math.abs(at.x - b.x)).toBeLessThan(at.r + b.r + 3);
+            }
+            const r = plan.samples.map((p) => p.r);
+            expect(r[r.length - 1]).toBeGreaterThan(r[0]);
+        }
+    });
+
+    it('never lets two lanes swallow the same bead', () => {
+        const first = lanes.map((lane, n) => planRun(lane, n, 0, height, interior, 601).eaten.map((b) => b.bead));
+        const flat = first.flat();
+        expect(new Set(flat).size).toBe(flat.length);
+    });
+
+    it('is the same run every time it is planned', () => {
+        expect(planRun(lanes[0], 0, 2, height, interior, 601)).toEqual(planRun(lanes[0], 0, 2, height, interior, 601));
+    });
+
+    it("doesn't replan for a small change in card height", () => {
+        expect(runBucket(1010)).toBe(runBucket(1090));
+        expect(runBucket(120)).toBe(400);
+    });
+
+    it('fits the swell, the run and everything after it into one loop', () => {
+        for (const { plan } of plans) {
+            expect(plan.cycleMs).toBe(Math.round(plan.restMs + SWELL_MS + plan.runMs + LINGER_MS));
+            expect(plan.runMs).toBe(plan.samples[plan.samples.length - 1].t);
+        }
+        expect(Math.max(TRAIL_DRY_MS, CRUMBS_STAY_MS + CRUMBS_FADE_MS, REGROW_AT_MS + REGROW_MS, REFORM_AT_MS + REFORM_MS)).toBeLessThan(LINGER_MS);
+    });
+
+    describe('keyframes', () => {
+        const isKeys = (v: unknown): v is Keys => !!v && typeof v === 'object' && 'inputRange' in (v as object);
+        const at = (k: Keys, t: number) => {
+            const i = k.inputRange.findIndex((x) => x >= t);
+            if (i <= 0) return k.outputRange[Math.max(i, 0)];
+            const f = (t - k.inputRange[i - 1]) / (k.inputRange[i] - k.inputRange[i - 1]);
+            return k.outputRange[i - 1] + (k.outputRange[i] - k.outputRange[i - 1]) * f;
+        };
+
+        it('are valid interpolations of one 0–1 loop', () => {
+            for (const { plan } of plans) {
+                const keys = runKeyframes(plan);
+                const all = [...Object.values(keys).filter(isKeys), ...keys.stretches.map((s) => s.opacity)];
+                expect(all.length).toBeGreaterThan(12);
+                for (const k of all) {
+                    expect(k.inputRange).toHaveLength(k.outputRange.length);
+                    expect(k.inputRange[0]).toBe(0);
+                    expect(k.inputRange[k.inputRange.length - 1]).toBe(1);
+                    for (let i = 1; i < k.inputRange.length; i++) expect(k.inputRange[i]).toBeGreaterThan(k.inputRange[i - 1]);
+                    for (const v of k.outputRange) expect(Number.isFinite(v)).toBe(true);
+                }
+            }
+        });
+
+        it('end every loop the way it starts, so the next run can take over', () => {
+            const { plan } = plans[0];
+            const keys = runKeyframes(plan);
+            for (const k of [keys.dx, keys.dy, keys.scale, keys.stretch, keys.opacity, keys.rimOpacity, keys.tailOpacity, keys.eat, keys.eatOpacity]) {
+                expect(k.outputRange[k.outputRange.length - 1]).toBe(k.outputRange[0]);
+            }
+            // Bead on its spot, at its resting size, tail hidden, swallowed beads back.
+            expect([keys.dx.outputRange[0], keys.dy.outputRange[0], keys.scale.outputRange[0]]).toEqual([0, 0, 1]);
+            expect(keys.tailOpacity.outputRange[0]).toBe(0);
+            expect(keys.eatOpacity.outputRange[0]).toBe(1);
+            // The trail and what's left on it have dried by then.
+            expect(keys.crumbsOpacity.outputRange[keys.crumbsOpacity.outputRange.length - 1]).toBe(0);
+            for (const s of keys.stretches) expect(s.opacity.outputRange[s.opacity.outputRange.length - 1]).toBe(0);
+        });
+
+        it('sags and stretches the bead as it swells, then draws the teardrop out with its speed', () => {
+            const { plan } = plans[0];
+            const keys = runKeyframes(plan);
+            const release = (plan.restMs + SWELL_MS) / plan.cycleMs;
+            expect(at(keys.scale, release)).toBeCloseTo(SWELL_SCALE, 5);
+            expect(at(keys.dy, release)).toBeCloseTo(plan.spot.r * SWELL_SAG, 5);
+            const tail = keys.tail.outputRange;
+            expect(Math.max(...tail)).toBeGreaterThan(tail[0] * 2);
+            expect(Math.max(...tail)).toBeLessThanOrEqual(1);
+        });
+
+        it('dries the trail from the top, and covers all of it', () => {
+            const keys = runKeyframes(plans[0].plan);
+            const driesAt = keys.stretches.map((s) => s.opacity.inputRange[s.opacity.outputRange.indexOf(0)]);
+            for (let i = 1; i < driesAt.length; i++) expect(driesAt[i]).toBeGreaterThan(driesAt[i - 1]);
+            expect(keys.stretches[0].from).toBe(0);
+            expect(keys.stretches[keys.stretches.length - 1].to).toBeCloseTo(keys.trailLength, 5);
+            for (let i = 1; i < keys.stretches.length; i++) expect(keys.stretches[i].from).toBe(keys.stretches[i - 1].to);
+            for (const s of keys.stretches) {
+                expect(s.lead).toBeGreaterThan(0);
+                expect(s.lead).toBeLessThanOrEqual(0.6);
+            }
+            // The window opens as the drop comes down, never back up.
+            const reveal = keys.reveal.outputRange;
+            for (let i = 1; i < reveal.length; i++) expect(reveal[i]).toBeGreaterThanOrEqual(reveal[i - 1]);
+            expect(reveal[reveal.length - 1]).toBeCloseTo(keys.trailLength, 5);
+        });
+
+        it('leaves its beads on the trail, behind the drop', () => {
+            const { plan } = plans[0];
+            const keys = runKeyframes(plan);
+            expect(plan.crumbs.length).toBeGreaterThan(3);
+            for (const c of plan.crumbs) {
+                expect(c.y).toBeGreaterThan(keys.trailTop);
+                expect(c.y).toBeLessThan(height);
+            }
+        });
     });
 });
 

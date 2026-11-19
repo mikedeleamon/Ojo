@@ -1,5 +1,5 @@
 import { weatherGradients } from '../../theme/tokens';
-import { skyGradientFor } from './skyGradient';
+import { partlyCloudyGradientFor, skyGradientFor } from './skyGradient';
 
 /**
  * Single source of truth for interpreting Apple WeatherKit `conditionCode`
@@ -143,7 +143,8 @@ const KIND_STYLES: Record<WeatherKind, KindStyle> = {
     },
     partlyCloudy: {
         icon: (isDay) => (isDay ? 'partly-cloudy' : 'partly-cloudy-night'),
-        // At night a partly-cloudy sky reads against the clear-night gradient.
+        // Without the sun's position: the midday partly cloudy sky by day, the
+        // clear-night gradient at night. With it, gradientFor follows the sun.
         gradient: (isDay) =>
             isDay ? weatherGradients.partlyCloudy : weatherGradients.clearNight,
         footerBg: () => 'rgba(22,34,54,0.97)',
@@ -168,8 +169,9 @@ export const iconTypeFor = (condition: string, isDay: boolean): WeatherIconType 
 
 /**
  * Conditions whose background IS the sky, so time of day should drive it.
- * Rain/cloud/storm palettes carry the condition's identity instead, and would
- * lose it if repainted by solar elevation.
+ * Partly cloudy is driven by it too, greyed (see gradientFor). Rain, overcast
+ * and storm palettes carry the condition's identity instead, and would lose it
+ * if repainted by solar elevation.
  */
 const SKY_DOMINATED = new Set<WeatherKind>(['clear', 'sunny']);
 
@@ -189,8 +191,10 @@ export const gradientFor = (
     isRising = false,
 ): readonly string[] => {
     const kind = classifyCondition(condition);
-    if (solarElevationDeg !== undefined && SKY_DOMINATED.has(kind)) {
-        return skyGradientFor(solarElevationDeg, isRising);
+    if (solarElevationDeg !== undefined) {
+        if (SKY_DOMINATED.has(kind)) return skyGradientFor(solarElevationDeg, isRising);
+        // Blue shows between the clouds, so partly cloudy follows the sun too.
+        if (kind === 'partlyCloudy') return partlyCloudyGradientFor(solarElevationDeg, isRising);
     }
     return KIND_STYLES[kind].gradient(isDay);
 };

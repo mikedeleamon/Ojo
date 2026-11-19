@@ -477,3 +477,158 @@ export const FOG_LAYERS: readonly FogLayerSpec[] = [
         ],
     },
 ];
+
+// ─── Clouds ──────────────────────────────────────────────────────────────────
+// Cloud drifting sideways on partly cloudy and overcast skies, built like the
+// fog: each layer is one Animated.View whose clouds repeat every canvas width,
+// translated left by one width and snapped back, so a layer is one native loop.
+// A cloud is a row of soft puffs standing on a flat base (lib/weather/cloudField
+// lays them out), white on top with a shaded belly.
+//
+// Opacities are per puff, and puffs overlap, so a cloud's core is several times
+// denser than the number written here. What the header text can stand is set in
+// lib/weather/skyContrast (CLOUD_HEADER_COVER, PARTLY_CLOUD_HEADER_COVER), and cloudField's tests hold
+// these numbers to it. Raise an opacity here and that test says so.
+
+export interface CloudSpec {
+    /** Left edge and width, 0–1 of the canvas width. */
+    xf: number;
+    wf: number;
+    /** Vertical middle and nominal height, 0–1 of the canvas height. The base sits half a height below the middle. */
+    yf: number;
+    hf: number;
+    /** Opacity of one puff. */
+    opacity: number;
+}
+
+export interface CloudLayerSpec {
+    id: string;
+    /** Milliseconds to drift one canvas width. */
+    duration: number;
+    /** Puff colour, and the colour of the shade under the base. */
+    color: string;
+    belly: string;
+    clouds: readonly CloudSpec[];
+}
+
+/**
+ * An overcast layer: soft lumps scattered over the whole sky on a jittered
+ * grid, not rows. Overcast is one continuous deck, and the layers only drift
+ * sideways, so anything laid out in rows stays a row for good and reads as
+ * stripes (see meanCloudCover in lib/weather/cloudField). Lumps on a grid fine
+ * enough to overlap their neighbours keep every row's average the same, and
+ * their own sizes and shades give the deck its texture.
+ */
+export interface OvercastLayerSpec {
+    id: string;
+    /** Milliseconds to drift one canvas width. */
+    duration: number;
+    /** Puff colour, and the colour of the shade under some lumps. */
+    color: string;
+    belly: string;
+    /** Rows of lumps down the grid. Everything else is sized from a row's height, so lumps keep their shape on any screen. */
+    rows: number;
+    /**
+     * A cell's width over its height. Columns are a whole, even number per
+     * canvas width, so the drift repeats and the light/dark turns (toneSpread)
+     * wrap round; the count is the nearest even one to this, capped at
+     * maxColumns so a very wide screen (the Duo's inner one) stays affordable.
+     */
+    cellAspect: number;
+    maxColumns: number;
+    /** Where the grid starts and ends, 0–1 of the canvas height. It runs past both edges. */
+    top: number;
+    bottom: number;
+    /** Shifts the whole grid by this share of a column and of a row, so two layers interleave. */
+    colPhase: number;
+    rowPhase: number;
+    /**
+     * How far a lump may stray from its grid point, as a share of a cell:
+     * sideways, and up or down. Sideways is free (a row's average doesn't
+     * change); up or down moves cloud between rows, so it's kept small.
+     */
+    jitterX: number;
+    jitterY: number;
+    /** A lump's body height as a share of a row's: over 1, so each lump overlaps the rows beside it. */
+    lumpH: readonly [number, number];
+    /** Each puff's width over its height: wider than tall, but never the flat slabs that read as bands. */
+    aspect: readonly [number, number];
+    /** Puffs per lump: one body and the rest set off it. */
+    puffs: number;
+    /**
+     * Opacity of one puff. Along each row lumps take turns lighter and darker
+     * by `toneSpread` (a share of it), so every row holds the same mix and
+     * averages the same, while light and dark sit side by side; on top of that
+     * each lump strays at random by up to `opacitySpread`.
+     */
+    opacity: number;
+    toneSpread: number;
+    opacitySpread: number;
+    /** Share of lumps with a shaded underside, for darker patches among the lighter ones. */
+    shadedShare: number;
+    seed: number;
+}
+
+export type CloudCover = 'partly' | 'overcast';
+
+export const CLOUD_LAYERS: {
+    readonly partly: readonly CloudLayerSpec[];
+    readonly overcast: readonly OvercastLayerSpec[];
+} = {
+    // A few separate cumulus with sky between them. Faint over the header
+    // (white text sits straight on the sky down to about 60% of the screen's
+    // height on an iPhone: the feels-like and high/low lines) and fuller below
+    // it, where the tiles and cards have their own surfaces.
+    partly: [
+        {
+            id: 'far', duration: 95000, color: '#FFFFFF', belly: '#5B7A99',
+            clouds: [
+                // Upper cumulus, as white as PARTLY_CLOUD_HEADER_COVER allows
+                // (raised from 0.07, which read grey: user, 2026-11-18).
+                { xf: 0.02, yf: 0.105, wf: 0.62, hf: 0.075, opacity: 0.10 },
+                { xf: 0.58, yf: 0.30, wf: 0.50, hf: 0.06, opacity: 0.10 },
+                { xf: 0.10, yf: 0.43, wf: 0.46, hf: 0.055, opacity: 0.10 },
+                { xf: 0.62, yf: 0.545, wf: 0.44, hf: 0.05, opacity: 0.10 },
+            ],
+        },
+        {
+            id: 'near', duration: 60000, color: '#FFFFFF', belly: '#5B7A99',
+            clouds: [
+                { xf: 0.50, yf: 0.20, wf: 0.70, hf: 0.085, opacity: 0.10 },
+                // Fuller than the cumulus over the header, but kept soft: at
+                // twice this they stacked to near-solid white (0.88) behind the
+                // tiles and the outfit card (user, 2026-11-18).
+                { xf: -0.10, yf: 0.70, wf: 0.85, hf: 0.11, opacity: 0.15 },
+                { xf: 0.82, yf: 0.80, wf: 0.80, hf: 0.12, opacity: 0.135 },
+            ],
+        },
+    ],
+    // One grey deck over the whole sky, never bright: nothing on an overcast
+    // Home has a darkened surface behind it. The near layer's grid sits half a
+    // cell off the far one's, so its lumps fill the far layer's gaps.
+    overcast: [
+        {
+            id: 'far', duration: 110000, color: '#CBD5E1', belly: '#0F172A',
+            rows: 10, cellAspect: 2.2, maxColumns: 4, top: -0.06, bottom: 1.06, colPhase: 0, rowPhase: 0, jitterX: 0.3, jitterY: 0.05,
+            lumpH: [1.6, 1.9], aspect: [1.3, 2.0], puffs: 3,
+            opacity: 0.023, toneSpread: 0.75, opacitySpread: 0.15, shadedShare: 0.35, seed: 1100,
+        },
+        {
+            id: 'near', duration: 70000, color: '#DDE4EC', belly: '#0F172A',
+            rows: 10, cellAspect: 2.2, maxColumns: 4, top: -0.06, bottom: 1.06, colPhase: 0.5, rowPhase: 0.5, jitterX: 0.3, jitterY: 0.05,
+            lumpH: [1.6, 1.9], aspect: [1.3, 2.0], puffs: 3,
+            opacity: 0.023, toneSpread: 0.75, opacitySpread: 0.15, shadedShare: 0.35, seed: 1300,
+        },
+    ],
+};
+
+/**
+ * A puff's opacity from its centre (0) to its edge (1), as a share of the
+ * cloud's opacity: solid to halfway out, then a soft edge.
+ */
+export const CLOUD_PUFF_FALLOFF: readonly { offset: number; share: number }[] = [
+    { offset: 0, share: 1 },
+    { offset: 0.5, share: 1 },
+    { offset: 0.82, share: 0.4 },
+    { offset: 1, share: 0 },
+];

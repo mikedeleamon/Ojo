@@ -18,6 +18,12 @@ const API_KEY = Platform.select({
  *  needs to know when that signal can't exist. */
 export const IS_TEST_STORE = API_KEY?.startsWith('test_') ?? false;
 
+/** DEV TOOL: `EXPO_PUBLIC_DEV_FORCE_PRO=1 npx expo start --clear` treats the
+ *  signed-in account as Ojo Pro, for recording Pro screens without a test
+ *  purchase. `__DEV__` folds this to false in release builds, the same way
+ *  devWeatherOverride's EXPO_PUBLIC_DEV_TEMP_F works. */
+const DEV_FORCE_PRO = __DEV__ && process.env.EXPO_PUBLIC_DEV_FORCE_PRO === '1';
+
 interface PurchasesState {
   isReady: boolean;
   /** False until a RevenueCat API key is set — see API_KEY above. Screens
@@ -94,7 +100,7 @@ export function PurchasesProvider({ children }: { children: React.ReactNode }) {
   }, [isLoggedIn, applyCustomerInfo]);
 
   return (
-    <PurchasesContext.Provider value={{ isReady, isConfigured: !!API_KEY, isPro }}>
+    <PurchasesContext.Provider value={{ isReady, isConfigured: !!API_KEY, isPro: isPro || DEV_FORCE_PRO }}>
       {children}
     </PurchasesContext.Provider>
   );

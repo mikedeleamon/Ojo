@@ -1,13 +1,14 @@
 import { weatherGradients } from '../../theme/tokens';
-import { lerpColor } from '../../components/WeatherHUD/colorMath';
+import { hexToRgb, lerpColor, rgbToHex } from '../../components/WeatherHUD/colorMath';
 
 // ─── Time-of-day sky ────────────────────────────────────────────────────────
 // Blends the clear-sky palettes by solar elevation so the background evolves
 // continuously rather than flipping on WeatherKit's IsDayTime boolean.
 //
-// Only clear/sunny conditions use this (see conditions.ts). Under rain, cloud or
-// storm the sky is not what you're looking at, and those palettes already carry
-// the condition's identity.
+// Clear and sunny conditions use this as it is, and partly cloudy uses it
+// greyed (partlyCloudyGradientFor, below; see conditions.ts). Under rain,
+// overcast or storm the sky is not what you're looking at, and those palettes
+// already carry the condition's identity.
 
 /** A named stage of the clear sky — the key of its palette in weatherGradients. */
 export type SkyStage =
@@ -101,4 +102,52 @@ export function skyGradientFor(
     }
 
     return last.colors;
+}
+
+// ─── Partly cloudy ──────────────────────────────────────────────────────────
+// A partly cloudy sky is still the sky: you can see blue between the clouds at
+// noon and the sunset between them in the evening. So it follows the sun like a
+// clear sky does, with the colour taken down by the cloud. The clouds
+// themselves are drawn over it (CloudDrift).
+
+/** The cloud grey a partly cloudy sky is mixed toward. */
+export const CLOUD_GREY = '#9AA8B5';
+/** How far toward CLOUD_GREY a partly cloudy sky goes in full daylight. */
+export const PARTLY_CLOUDY_GREYING = 0.35;
+
+/** The greying is full from the day stop up, and gone by the night stop. */
+const GREYING_FULL_AT = DUSK_STOPS[0].elevation;
+const GREYING_GONE_AT = DUSK_STOPS[DUSK_STOPS.length - 1].elevation;
+
+/**
+ * A straight RGB mix toward the grey. Not lerpColor: that blends hue the long
+ * way round to keep skies from turning green, which would send a golden
+ * horizon through pink on its way to grey.
+ */
+export function greyedSky(colors: readonly string[], amount: number): string[] {
+    const grey = hexToRgb(CLOUD_GREY);
+    return colors.map((c) => {
+        const rgb = hexToRgb(c);
+        return rgbToHex(
+            rgb[0] + (grey[0] - rgb[0]) * amount,
+            rgb[1] + (grey[1] - rgb[1]) * amount,
+            rgb[2] + (grey[2] - rgb[2]) * amount,
+        ).toUpperCase();
+    });
+}
+
+/**
+ * The partly cloudy palette for a solar elevation: the clear sky for that
+ * moment, greyed. The greying eases off as the light goes, because a night sky
+ * mixed toward daylight grey turns to slate; by night it is the clear-night
+ * palette, as it always was.
+ *
+ * Like skyGradientFor, the flat stretches return a token by reference: midday
+ * is weatherGradients.partlyCloudy and night is weatherGradients.clearNight.
+ */
+export function partlyCloudyGradientFor(elevationDeg: number, isRising = false): readonly string[] {
+    if (elevationDeg >= GREYING_FULL_AT) return weatherGradients.partlyCloudy;
+    if (elevationDeg <= GREYING_GONE_AT) return weatherGradients.clearNight;
+    const daylight = (elevationDeg - GREYING_GONE_AT) / (GREYING_FULL_AT - GREYING_GONE_AT);
+    return greyedSky(skyGradientFor(elevationDeg, isRising), PARTLY_CLOUDY_GREYING * daylight);
 }
