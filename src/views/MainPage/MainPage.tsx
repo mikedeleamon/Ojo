@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { StyleSheet } from 'react-native';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { AppState, StyleSheet } from 'react-native';
 import { Stack } from 'expo-router';
 import { View } from '../../components/primitives';
 import WeatherHUD from '../../components/WeatherHUD/WeatherHUD';
@@ -16,6 +16,7 @@ import { darkColors } from '../../theme/tokens';
 import { useSideRail } from '../../hooks/useSideRail';
 import { parseLatLng } from '../../lib/geocoding';
 import { noteDeviceFix } from '../../lib/background/lifecycle';
+import { locationAfterResumeFix, shouldRefixOnResume } from '../../lib/resumeFix';
 import type { WeatherSnapshot } from '../../types';
 
 // The HUD's own LocationsIcon and GearIcon, as template PNGs for native bar items
@@ -38,6 +39,9 @@ export default function MainPage() {
   // because the fix was slow.
   const [gpsDenied,   setGpsDenied]   = useState(false);
   const [refreshKey,  setRefreshKey]  = useState(0);
+  // When GPS last answered, so coming back to the app can tell whether it's
+  // worth asking again (lib/resumeFix.ts).
+  const lastFixAt = useRef<number | null>(null);
   // In-memory mirror of the per-city snapshot cache, so the seed for the active
   // city is available synchronously when switching (no async flash).
   const [snapshots, setSnapshots] = useState<Record<string, WeatherSnapshot>>({});
@@ -85,9 +89,36 @@ export default function MainPage() {
     if (!getToken()) return;
     setGpsDenied(false);
     getCurrentLocation(8000).then(async coords => {
+      if (coords) lastFixAt.current = Date.now();
       setGpsDenied(!coords && !(await hasLocationPermission()));
       setGpsLocation(coords ? formatCoords(coords.lat, coords.lng) : settings.location);
     });
+  }, [settingsReady, settings.location, activeId]);
+
+  // Coming back to the app: read GPS again. Nothing above runs on a resume,
+  // and iOS can keep Ojo suspended for days, so without this Home kept the
+  // fix from its last cold start: open it after a flight and it showed (and
+  // reported to the server) the city you left. An unchanged ~1 km fix is the
+  // same string, so React skips the update and nothing refetches; a move
+  // changes `location`, and WeatherHUD geocodes and fetches the new place.
+  useEffect(() => {
+    if (!settingsReady || activeId !== CURRENT_LOCATION_ID) return;
+    const sub = AppState.addEventListener('change', next => {
+      if (next !== 'active' || !getToken()) return;
+      if (!shouldRefixOnResume(lastFixAt.current, Date.now())) return;
+      getCurrentLocation(8000).then(async coords => {
+        if (coords) lastFixAt.current = Date.now();
+        const permitted = !!coords || (await hasLocationPermission());
+        setGpsDenied(!permitted);
+        setGpsLocation(current => locationAfterResumeFix({
+          fix: coords ? formatCoords(coords.lat, coords.lng) : null,
+          permitted,
+          current,
+          fallback: settings.location,
+        }));
+      });
+    });
+    return () => sub.remove();
   }, [settingsReady, settings.location, activeId]);
 
   // With location access off and no default city, My Location can only show
@@ -126,6 +157,7 @@ export default function MainPage() {
   const handleRefresh = useCallback(() => {
     if (activeId === CURRENT_LOCATION_ID) {
       getCurrentLocation(8000).then(async coords => {
+        if (coords) lastFixAt.current = Date.now();
         setGpsDenied(!coords && !(await hasLocationPermission()));
         setGpsLocation(coords ? formatCoords(coords.lat, coords.lng) : settings.location);
         setRefreshKey(k => k + 1);
