@@ -3,6 +3,7 @@ import { requireAuth, AuthRequest } from '../middleware/auth';
 import User from '../models/User';
 import { isValidTimeZone } from '../lib/timeZone';
 import { coarsen } from '../lib/coarseLocation';
+import { claimPushToken, releasePushToken } from '../lib/pushTokens';
 
 const router = Router();
 
@@ -66,12 +67,34 @@ router.post('/token', requireAuth, async (req: AuthRequest, res: Response): Prom
     // traveller's notifications on their new local clock, and it's a dotted
     // $set so it can't clobber the rest of `settings`.
     const tz = timeZoneOrUndefined(timeZone);
-    await User.findByIdAndUpdate(req.userId, {
-      $set: { pushToken, ...(tz ? { 'settings.timeZone': tz } : {}) },
-    });
+    // Taken from any other account that had it: one phone, one account to
+    // push for (see lib/pushTokens.ts).
+    await claimPushToken(User, req.userId!, pushToken, tz ? { 'settings.timeZone': tz } : {});
     res.json({ success: true });
   } catch (err) {
     console.error('[notifications] token save error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/notifications/token/release — the phone is signing out.
+ *
+ * Body: `{ pushToken }`, the token this phone registered. Clears it from the
+ * account only if that account still holds it. A POST rather than a DELETE
+ * with a body, which some proxies drop.
+ */
+router.post('/token/release', requireAuth, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { pushToken } = req.body ?? {};
+    if (!pushToken || typeof pushToken !== 'string') {
+      res.status(400).json({ error: 'pushToken is required' });
+      return;
+    }
+    await releasePushToken(User, req.userId!, pushToken);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[notifications] token release error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

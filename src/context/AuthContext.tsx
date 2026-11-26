@@ -3,11 +3,16 @@ import {
   initAuthCache,
   getToken,
   clearAuth,
+  authHeaders,
   isTokenExpiringSoon,
   refreshToken,
   onSessionExpired,
 } from '../lib/auth';
-import { registerPushToken, cancelAllLocalNotifications } from '../lib/notifications';
+import {
+  registerPushToken,
+  releasePushToken,
+  cancelAllLocalNotifications,
+} from '../lib/notifications';
 import { resetLaunchReconcilers } from '../lib/launchReconcile';
 import { clearTripPresenceCache } from '../lib/tripPresence';
 import { loadHistory } from '../lib/outfitHistory';
@@ -78,7 +83,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loadHistory().catch(() => {});
   }, []);
   const logout = useCallback(() => {
+    // Captured before clearAuth drops the session they belong to.
+    const leaving = authHeaders();
     clearAuth();
+    // This phone's push token stays with the account leaving unless the server
+    // is told; see releasePushToken.
+    void releasePushToken(leaving);
     setIsLoggedIn(false);
     // Drop the shared closet cache so the next account doesn't briefly see the
     // previous user's wardrobe before its own fetch resolves.

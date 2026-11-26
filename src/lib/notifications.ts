@@ -1,6 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+import rawAxios from 'axios';
 import axios from '../api/client';
 import { authHeaders, getToken } from './auth';
 import { NotificationSettings } from '../types';
@@ -70,6 +71,10 @@ export const getExpoPushToken = async (): Promise<string | null> => {
   }
 };
 
+// The token this install last registered, so sign-out can name it without
+// another trip to Expo's push service.
+let registeredPushToken: string | null = null;
+
 export const registerPushToken = async (): Promise<string | null> => {
   if (!getToken()) return null;
   const status = await getPermissionStatus();
@@ -87,10 +92,44 @@ export const registerPushToken = async (): Promise<string | null> => {
       { pushToken: token, timeZone: deviceTimeZone() },
       authHeaders(),
     );
+    registeredPushToken = token;
     return token;
   } catch (err) {
     console.warn('[notifications] Failed to register push token:', err);
     return null;
+  }
+};
+
+/**
+ * Sign-out: tell the server to stop pushing to this phone for the account
+ * that is leaving. Without it, that account kept sending its closet-gap nudges
+ * and weather alerts here, for its own home city and its own closet, to
+ * whoever used the phone next (server/src/lib/pushTokens.ts).
+ *
+ * `leaving` is that account's auth headers, captured before the session is
+ * cleared. Sent with plain axios rather than the API client: the client's 401
+ * handler would refresh the session, which by then may be the next account's,
+ * and release that account's token instead.
+ */
+export const releasePushToken = async (
+  leaving: ReturnType<typeof authHeaders>,
+): Promise<void> => {
+  if (!('headers' in leaving)) return;
+  let token = registeredPushToken;
+  registeredPushToken = null;
+  try {
+    // Signed in and out without registering this session (no cold start in
+    // between): the account may still hold this phone's token from before.
+    if (!token && (await getPermissionStatus()) === 'granted') token = await getExpoPushToken();
+    if (!token) return;
+    await rawAxios.post(
+      '/api/notifications/token/release',
+      { pushToken: token },
+      { ...leaving, baseURL: axios.defaults.baseURL, timeout: 10_000 },
+    );
+  } catch {
+    // Best-effort: the next account to register this phone takes the token
+    // from this one anyway.
   }
 };
 
