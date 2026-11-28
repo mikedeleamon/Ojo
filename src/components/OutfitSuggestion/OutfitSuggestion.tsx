@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback, memo } from 'react';
 import { useFocusEffect } from 'expo-router';
 import {
+    AppState,
     ScrollView,
     Image,
     Pressable,
@@ -782,6 +783,11 @@ const OutfitSuggestion = ({ weather, settings, forecasts, daily, city, coords }:
     useEffect(() => {
         if (loading || tripMode.loading) return;
         if (!widgetFollowsScreen) return;
+        // Off screen, the background refresh owns the widget (it skips while
+        // the app is active, for the same reason). When iOS relaunches Ojo in
+        // the background, Home renders from cached weather without reading
+        // GPS, and writing that could overwrite the refresh's fresh snapshot.
+        if (AppState.currentState === 'background') return;
         void updateWidgetSnapshot(
             buildWidgetInput({
                 todayOutfits: outfits,

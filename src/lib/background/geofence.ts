@@ -20,11 +20,13 @@ import { isSamePlace } from './devicePlace';
 export const CITY_GEOFENCE_TASK = 'ojo-city-geofence';
 
 /**
- * Leaving this radius counts as moving somewhere new. ~5 miles: wide enough
- * that a commute across one city doesn't wake the app all day, small enough
- * that the next town over gets its own forecast.
+ * Leaving this radius counts as moving somewhere new. ~15 miles: a metro area's
+ * weather is close to the same across it, and each wake is a background
+ * location read that iOS counts toward its "Ojo has been using your location"
+ * reminder. Was 8 km, which woke the app on ordinary commutes; the cost is that
+ * the next town over keeps your old forecast until you open the app.
  */
-export const CITY_GEOFENCE_RADIUS_M = 8_000;
+export const CITY_GEOFENCE_RADIUS_M = 25_000;
 
 const REGION_ID = 'ojo-current-area';
 const CENTER_KEY = 'ojo_geofence_center';
@@ -59,6 +61,15 @@ export const watchArea = async (point: { lat: number; lon: number }): Promise<vo
   } catch {
     // Best-effort: without the region, the scheduled background refresh still
     // runs; it just can't react to a move as it happens.
+  }
+};
+
+/** Whether the region is registered with iOS right now. */
+export const isWatchingArea = async (): Promise<boolean> => {
+  try {
+    return await Location.hasStartedGeofencingAsync(CITY_GEOFENCE_TASK);
+  } catch {
+    return false;
   }
 };
 

@@ -42,6 +42,12 @@ export default function MainPage() {
   // When GPS last answered, so coming back to the app can tell whether it's
   // worth asking again (lib/resumeFix.ts).
   const lastFixAt = useRef<number | null>(null);
+  // Home mounted with the app off screen (iOS relaunched Ojo in the
+  // background), so My Location holds off on GPS until the app comes on screen.
+  // Read at mount so the first render doesn't start a default-city fetch.
+  const [waitingForScreen, setWaitingForScreen] = useState(
+    () => AppState.currentState === 'background',
+  );
   // In-memory mirror of the per-city snapshot cache, so the seed for the active
   // city is available synchronously when switching (no async flash).
   const [snapshots, setSnapshots] = useState<Record<string, WeatherSnapshot>>({});
@@ -87,6 +93,17 @@ export default function MainPage() {
     // OnboardingPage step 2). Spending it here first, on a stranger looking at
     // a password field, is the worst possible moment and cannot be retried.
     if (!getToken()) return;
+    // Off screen: iOS relaunched Ojo in the background (a geofence exit) and
+    // rendered the whole UI headlessly. Reading GPS here made every such
+    // launch two background location reads, the background refresh's and
+    // this one, and iOS counts each toward its "Ojo has been using your
+    // location in the background" reminder. The resume effect below reads it
+    // once the app is on screen.
+    if (AppState.currentState === 'background') {
+      setWaitingForScreen(true);
+      return;
+    }
+    setWaitingForScreen(false);
     setGpsDenied(false);
     getCurrentLocation(8000).then(async coords => {
       if (coords) lastFixAt.current = Date.now();
@@ -105,7 +122,13 @@ export default function MainPage() {
     if (!settingsReady || activeId !== CURRENT_LOCATION_ID) return;
     const sub = AppState.addEventListener('change', next => {
       if (next !== 'active' || !getToken()) return;
-      if (!shouldRefixOnResume(lastFixAt.current, Date.now())) return;
+      if (waitingForScreen) {
+        // First time on screen after a background launch: from here on it's a
+        // cold start — the default city until the fix below answers.
+        setWaitingForScreen(false);
+      } else if (!shouldRefixOnResume(lastFixAt.current, Date.now())) {
+        return;
+      }
       getCurrentLocation(8000).then(async coords => {
         if (coords) lastFixAt.current = Date.now();
         const permitted = !!coords || (await hasLocationPermission());
@@ -119,7 +142,7 @@ export default function MainPage() {
       });
     });
     return () => sub.remove();
-  }, [settingsReady, settings.location, activeId]);
+  }, [settingsReady, settings.location, activeId, waitingForScreen]);
 
   // With location access off and no default city, My Location can only show
   // an error. A saved city can show weather, so switch to it — including one
@@ -136,9 +159,12 @@ export default function MainPage() {
   // For saved cities, pass stored coordinates as a "lat,lng" string so
   // geocodeCity skips the CLGeocoder network call entirely (parseLatLng fast
   // path). CLGeocoder can hang or fail in production; stored coords are exact.
+  //
+  // While waiting to come on screen, My Location is empty, not the default
+  // city: nothing fetches, and the HUD keeps painting its cached snapshot.
   const location = active
     ? `${active.lat},${active.lon}`
-    : (gpsLocation || settings.location);
+    : waitingForScreen ? '' : (gpsLocation || settings.location);
   const seed = snapshots[activeId] ?? null;
 
   // Pull-to-refresh on Home refetches weather (refreshKey) AND force-refreshes

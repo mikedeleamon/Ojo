@@ -9,8 +9,15 @@
  *     kept describing whatever city the app was last opened in.
  *
  * Two triggers call this (lib/background/tasks.ts):
- *   - `scheduled` — iOS background processing time, whenever iOS grants it;
+ *   - `scheduled` — iOS background processing time, whenever iOS grants it.
+ *                   Uses the last known place and never reads location: if the
+ *                   phone had left that area, the geofence would have said so.
  *   - `moved`     — the phone left the area it was in (needs "Always" location).
+ *                   The only background run that reads the device's location.
+ *
+ * Every background location read shows up in iOS's periodic "Ojo has been
+ * using your location in the background" reminder, which Apple gives apps no
+ * way to turn off. Fewer reads is the only lever.
  *
  * Stages run in order of what matters most, because iOS can suspend the app at
  * any point: where the phone is (and telling the server), then the region for
@@ -48,7 +55,7 @@ import { buildSameDayNudgeItems } from '../sameDayNudge';
 import { scheduleMorningBriefs, scheduleSameDayNudges } from '../notifications';
 import { getBackgroundLocationAccess } from './locationAccess';
 import { isSamePlace, readDevicePlace, rememberDevicePlace } from './devicePlace';
-import { watchArea } from './geofence';
+import { isWatchingArea, watchArea } from './geofence';
 import type {
   Closet,
   CurrentWeather,
@@ -92,8 +99,8 @@ let inFlight: Promise<RefreshOutcome> | null = null;
  * Refresh the widget and notifications for where the phone is now.
  *
  * `fix` is a position the trigger already has (none today — geofence events
- * carry the region, not the device), else one is requested here. Concurrent
- * calls share one run.
+ * carry the region, not the device), else a `moved` run requests one here.
+ * Concurrent calls share one run.
  */
 export function runBackgroundRefresh(input: {
   trigger: RefreshTrigger;
@@ -133,7 +140,10 @@ async function refresh({
   if (!settings) return 'skipped';
 
   // ── 2. Where the phone is ──────────────────────────────────────────────────
-  const fix = givenFix ?? (await backgroundFix());
+  // Only a move reads location. A scheduled run used to take a fresh GPS fix
+  // every time, several times a day with the phone sitting at home, and each
+  // one was a point on iOS's background-location reminder map.
+  const fix = givenFix ?? (trigger === 'moved' ? await backgroundFix() : null);
   const remembered = await readDevicePlace();
   let place: { lat: number; lon: number; name?: string } | null = null;
 
@@ -147,9 +157,18 @@ async function refresh({
     // Re-centre on the exact fix so the next move is measured from here.
     await watchArea(fix);
   } else if (remembered) {
-    // No "Always" permission (or no fix): keep the last known place current
-    // in time, even though it can't follow a move.
+    // A scheduled run, no "Always" permission, or no fix: keep the last known
+    // place current in time.
     place = remembered;
+    if (trigger === 'scheduled' && (await getBackgroundLocationAccess()) === 'always') {
+      // A running region with no exit means the phone is still within it, so
+      // this place is still a fair answer: re-report it (throttled to every
+      // 6 h) before the server's 24 h copy ages out and its alerts fall back
+      // to the home city. The fresh fix used to do that.
+      if (await isWatchingArea()) place = await rememberDevicePlace(remembered);
+      // Restart the region if iOS dropped it; a no-op when it's running here.
+      await watchArea(remembered);
+    }
   } else if (typeof settings.lat === 'number' && typeof settings.lon === 'number') {
     place = { lat: settings.lat, lon: settings.lon, name: settings.location || undefined };
   }
