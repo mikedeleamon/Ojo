@@ -33,9 +33,12 @@ jest.mock('../../auth', () => ({
 
 import {
   clearDevicePlace,
+  clearMovedBefore,
   isCoordinateLabel,
   isSamePlace,
+  noteMoved,
   readDevicePlace,
+  readMovedAt,
   rememberDevicePlace,
 } from '../devicePlace';
 
@@ -115,11 +118,33 @@ describe('isSamePlace', () => {
   });
 });
 
+describe('moves waiting for a settled fix', () => {
+  it('has none pending until a move is noted', async () => {
+    expect(await readMovedAt()).toBeNull();
+    await noteMoved(1_000);
+    expect(await readMovedAt()).toBe(1_000);
+  });
+
+  it('is settled by a fix that started after the move', async () => {
+    await noteMoved(1_000);
+    await clearMovedBefore(2_000);
+    expect(await readMovedAt()).toBeNull();
+  });
+
+  it('stays pending when the move came in while the fix was being taken', async () => {
+    await noteMoved(3_000);
+    await clearMovedBefore(2_000);
+    expect(await readMovedAt()).toBe(3_000);
+  });
+});
+
 describe('clearDevicePlace', () => {
-  it('forgets the place and the report, so the next account starts clean', async () => {
+  it('forgets the place, the report and any pending move, so the next account starts clean', async () => {
     await rememberDevicePlace(BROOKLYN);
+    await noteMoved();
     await clearDevicePlace();
     expect(await readDevicePlace()).toBeNull();
     expect(mockStore[REPORTED_KEY]).toBeUndefined();
+    expect(await readMovedAt()).toBeNull();
   });
 });

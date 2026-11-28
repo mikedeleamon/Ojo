@@ -20,6 +20,7 @@ import { storage, storageGetJSON, storageSetJSON } from '../storage';
 
 const PLACE_KEY = 'ojo_device_place';
 const REPORTED_KEY = 'ojo_device_place_reported';
+const MOVED_KEY = 'ojo_device_moved_at';
 
 export interface DevicePlace {
   /** Rounded to ~1 km — the precision anything that leaves the phone uses. */
@@ -101,8 +102,35 @@ const reportDevicePlace = async (place: DevicePlace): Promise<void> => {
   }
 };
 
+// ─── Where the phone settled after a move ────────────────────────────────────
+// iOS wakes Ojo the moment the phone crosses the edge of its area, which is
+// mid-journey. The fix that wake gets is a point on the way, up to one region
+// radius short of where the phone ends up, and once it stops within that
+// radius no further wake comes. The same goes for a move whose fix failed, or
+// one skipped because the app was on screen. So a move is noted here, and the
+// next scheduled background refresh reads GPS once to find where the phone
+// settled; a refresh with no move pending reads nothing.
+
+/** Note that the phone left its area at `at` (ms since epoch). */
+export const noteMoved = (at: number = Date.now()): Promise<void> =>
+  storageSetJSON(storage, MOVED_KEY, at);
+
+/** When the last move that hasn't been settled was noted, or null for none. */
+export const readMovedAt = (): Promise<number | null> =>
+  storageGetJSON<number | null>(storage, MOVED_KEY, null);
+
+/**
+ * A fix that started at `fixStartedAt` settles every move noted before it. A
+ * move noted after it started stays pending: the fix may predate it.
+ */
+export const clearMovedBefore = async (fixStartedAt: number): Promise<void> => {
+  const at = await readMovedAt();
+  if (at !== null && at <= fixStartedAt) await storage.removeItem(MOVED_KEY).catch(() => {});
+};
+
 /** Forget the place on this device — for sign-out, since the key isn't per account. */
 export const clearDevicePlace = async (): Promise<void> => {
   await storage.removeItem(PLACE_KEY).catch(() => {});
   await storage.removeItem(REPORTED_KEY).catch(() => {});
+  await storage.removeItem(MOVED_KEY).catch(() => {});
 };
